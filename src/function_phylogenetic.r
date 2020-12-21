@@ -1,4 +1,4 @@
-source("utils.r")
+source("src/utils.r",local = T)
 # Phylogenetic data ------------------------------------------------------------
 # load.phylogenetic = function() {
 #   load("/media/elusers/users/benjamin/A-PROJECTS/01_PhD/06-phd-final-report/data/EVO/SC-phylo-ali-prot_data.Rdata")
@@ -6,6 +6,11 @@ source("utils.r")
 #   return(SC)
 #   #scinfo = readRDS('yeast-proteome-sgd_infos.rds')
 # }
+
+get.ygob.pair = function(ygob = load.ygob.ohnologs() ){
+  return(ygob[, c('orf', 'dup.orf')])
+}
+
 
 load.ygob.ohnologs = function() {
   message("REF: Byrne and Wolfe, 2005, Genome Research")

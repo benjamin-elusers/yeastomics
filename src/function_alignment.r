@@ -1,4 +1,4 @@
-source("utils.r")
+source("src/utils.r")
 # Pairwise alignment -----------------------------------------------------------
 get.pair.prot = function(prot, pair){
   seq.1 = prot[pair[[1]]]
@@ -58,4 +58,12 @@ list2str = function(L){
     stop("Input must be a list of vector!")
   bs  = Biostrings::BString(sapply(L,function(x){ print(x); paste0(x,collapse='') }) )
 }
+
+compute.aascore.ali = function(df.ali,aascores=sticky){
+  df.score = tibble( aa=names(aascores), sti=aascores)
+  df.ali %>%
+    left_join(df.score, by=c('s1'='aa')) %>% rename(sti.1 = sti ) %>%
+    left_join(df.score, by=c('s2'='aa')) %>% rename(sti.2 = sti )
+}
+
 

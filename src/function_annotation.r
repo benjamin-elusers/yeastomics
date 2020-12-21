@@ -1,4 +1,4 @@
-source('utils.r')
+source('src/utils.r',local = T)
 # Biological annotations (mapped to Uniprot) -----------------------------------
 get.uniprot.pmid = function(uniprot) {
   require(AnnotationDbi)

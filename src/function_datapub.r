@@ -1,137 +1,6 @@
-source("utils.r")
-# Local proteome data ----------------------------------------------------------
-
-# Precomputed data #
-#==================#
-# raw.aligned.dataset = file.path(data.path, "202-aligned-residues-datasets.rds")
-#if( !file.exists(dataset) ){ stop(sprintf("Cannot find the dataset at : %s",dataset)) }
-# PROTEOME=readRDS('./data/PROTEIN-EVORATE.rds')
-# ALIGNED.DATA = readRDS('./data/RESIDUE-EVORATE.rds')
-#==================#
-
-load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_general.R"){
-  source(toolbox,local = T)
-  library(AnnotationDbi)
-  library(org.Sc.sgd.db)
-  library(GO.db)
-  library(dplyr)
-  SC = get.proteome.table() %>%
-    mutate(
-      has_len = !is.na(len),
-      rel_diso1 = diso1/len, rel_diso2 = diso2/len, diso05 = diso05/len,
-      has_diso05 = !is.na(diso05), has_diso1 = !is.na(diso1), has_diso2 = !is.na(diso2),
-      has_tox = !is.na(over.tox),
-      has_loc_ymd = !is.na(loc.ymd), has_loc_dtt = !is.na(loc.dtt),
-      has_loc_h2o2 = !is.na(loc.h2o2), has_loc_starv = !is.na(loc.starv),
-      has_viability = !is.na(viable)
-    )
-  return(SC)
-}
-
-load.aligned.data = function(data.path='../data/'){
-  message("
-          Merged dataset with residue-level informations from:
-          (1) SGD S288C proteome sequence
-          (2) Uniprot reference yeast proteome (aligned to SGD)
-          (3) Dubreuil et al. (2019) for Abundance, Disorder (IUP+D2P2) & stickiness (+aaindex)
-          (4) Rate4Site based on fungi lineage Wapinsky et al. (2007) of 14 yeast species
-          (5) 3Dcomplex for yeast quaternary structures (based on X-Ray from PDB)"
-  )
-  return(readRDS(dataset))
-}
-
-# Evolutionary rate per regions on quaternary structures
-get.evo3d =  function(path.data='../data/'){
-  ALIGNED.RES = get.aligned.data(path.data) %>%
-    mutate(iup=IUP20!=0, noiup = (IUP20==0),
-           d2p2=d2p2_diso>=7, nod2p2= d2p2_diso<3,
-           dom = domain!=0 & noiup, nodom = antidomain!=0) %>%
-    dplyr::select( ends_with('.id'),
-                   starts_with('l_'),starts_with('pos_'),
-                   starts_with('aa_'), starts_with('gap_'),
-                   starts_with('has_'),
-                   starts_with('R4S_',ignore.case = F),
-                   ends_with('.3d'),
-                   c(iup,noiup,d2p2,nod2p2,dom,nodom,l_evo, l_pdb, gap_pdb),
-                   -c(code.id, chain_name.id, org_ref.id,accession.id,uniprotAcc.id,
-                      R4S_nmsa, R4S_orf, R4S_orf_sd, R4S_uni, R4S_uni_sd, R4S_std,
-                      aa_sgd, gap_sgd,
-                      aa_uniprot, gap_uniprot,
-                      pos_dubreuil, aa_dubreuil, l_dubreuil, gap_dubreuil,
-                      noseq.3d, npdb.3d,
-                      homo.3d, best_BU.3d,hydro_kyte.3d, stickiness_ec.3d ) ) %>%
-    filter(has_R4S)
-  EVO3D= ALIGNED.RES %>% filter(has_R4S & has_pdb)
-  return(EVO3D)
-}
-
-# Evolutionary rate per regions on quaternary structure with ASA cutoff
-get.evo3d.byasa = function(asa,aligned.data=NULL){
-  message(sprintf('Surface is ASA above %s%%.',asa))
-  if(is.null(aligned.data)){  aligned.data = get.evo3d() }
-  byasa = aligned.data %>%
-    group_by(UNIPROTKB.id,SGD.id,ORF.id,code.chain.id) %>%
-    mutate( CUTOFF_LEN=20, CUTOFF_ASA = asa,
-            L_evo = sum_(has_R4S), L_pdb= sum_(has_pdb),
-            ASA_under = asa_rel_in_BU.3d <= 25 & asa_rel_alone.3d <=25,  ASA_over = asa_rel_in_BU.3d > CUTOFF_ASA,
-            L_buried=sum_(ASA_under), L_surface=sum_(ASA_over),
-            L_iup = sum_(iup),  L_d2p2 = sum_(d2p2),
-            L_noiup = sum_(noiup),  L_nod2p2 = sum_(nod2p2),
-            L_dom = sum_(dom), L_nodom = sum_(nodom),
-            R_full = ifelse(L_evo>=CUTOFF_LEN, mean_(R4S_norm), NA),
-            R_pdb = ifelse(L_pdb>=CUTOFF_LEN, mean_(R4S_norm[!gap_pdb]), NA),
-            R_surface   = ifelse(L_surface>=CUTOFF_LEN,   mean_(R4S_norm[ASA_over]),   NA),
-            R_buried    = ifelse(L_buried>=CUTOFF_LEN,    mean_(R4S_norm[ASA_under]),    NA),
-            R_iup   = ifelse(L_iup>=CUTOFF_LEN,   mean_(R4S_norm[iup]),   NA),
-            R_d2p2   = ifelse(L_d2p2>=CUTOFF_LEN,   mean_(R4S_norm[d2p2]),   NA),
-            R_noiup   = ifelse(L_noiup>=CUTOFF_LEN,   mean_(R4S_norm[noiup]),   NA),
-            R_nod2p2   = ifelse(L_nod2p2>=CUTOFF_LEN,   mean_(R4S_norm[nod2p2]),   NA),
-            R_dom   = ifelse(L_dom>=CUTOFF_LEN,   mean_(R4S_norm[dom]),   NA),
-            R_nodom   = ifelse(L_nodom>=CUTOFF_LEN,   mean_(R4S_norm[nodom]),   NA)
-    )    %>%
-    dplyr::select( UNIPROTKB.id, SGD.id, code.chain.id, ORF.id,
-                   has_iup, has_pdb, has_R4S,
-                   starts_with(c('R_','L_','CUTOFF_'))
-    ) %>%
-    filter(!is.na(UNIPROTKB.id)) %>%
-    ungroup() %>% distinct() %>%
-    rename_with(function(x){ evo.cols[x]},.cols=names(evo.cols))
-}
-
-get.sc.ohno = function(myseq) {
-  ygob = load.ygob.ohnologs()
-  bogy = ygob %>%
-    dplyr::rename( orf = dup.orf, gname = dup.gname, dup.orf = orf, dup.gname = gname ) %>%
-    mutate(ref = 2) %>%
-    dplyr::select(WGD_anc, orf, gname, ref, dup.orf, dup.gname, pid, rlen)
-  ohno = ygob %>% bind_rows(bogy)
-
-  if(missing(myseq)){ myseq = load.sgd.proteome() }
-  ohno.seq = get.pair.prot(prot=myseq, pair = get.ygob.pair(ohno))
-  ohno.ali = align.pair.prot(p1=ohno.seq$s1, p2=ohno.seq$s2, mat='BLOSUM62')
-  aafreq = alphabetFrequency(alignedSubject(ohno.ali))
-  gaps = rowSums(aafreq[,c("-","+")])
-
-  pair = get.ygob.pair(ohno) %>%
-    mutate( L1 = width(ohno.seq$s1),
-            L2 = width(ohno.seq$s2),
-            RLEN = round(pmin(L1,L2) / pmax(L1,L2), 2),
-            PID1 = round(pid( ohno.ali, "PID1" ),1),
-            PID2 = round(pid( ohno.ali, "PID2" ),1),
-            PID3 = round(pid( ohno.ali, "PID3" ),1),
-            PID4 = round(pid( ohno.ali, "PID4" ),1),
-            SCORE.B100 = score( ohno.ali ),
-            S = nmatch( ohno.ali ),
-            N = nmismatch( ohno.ali ),
-            G = gaps,
-            SGDID = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$orf,columns ="SGD",keytype = 'ORF')[,2],
-            SGDID.dup = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$dup.orf,columns ="SGD",keytype = 'ORF')[,2]
-    ) %>% right_join(ohno)
-
-  return(pair)
-}
-
-
+source("src/utils.r",local = T)
+source("src/function_sequence.r",local = T)
+source('src/function_alignment.r',local = T)
 # Remote published proteome data -----------------------------------------------
 load.dubreuil2019.data = function(d){
   # Load stickiness and disorder data
@@ -161,9 +30,10 @@ load.dubreuil2019.data = function(d){
   return(res)
 }
 
-load.leunberger2017.data = function(species='S. cerevisiae'){
+load.leunberger2017.data = function(species='S. cerevisiae',rawdata=F){
   # Load protein stability data
-  library(openxlsx)
+  require(openxlsx)
+  require(tidyverse)
   message("REF: P. Leuenberger et al., 2017, Science")
   message("Cell-wide analysis of protein thermal unfolding reveals determinants of thermostability")
   match.arg(species, choices = c('S. cerevisiae','E. coli', 'Human HeLa Cells','T. thermophilus'), several.ok = F)
@@ -172,6 +42,19 @@ load.leunberger2017.data = function(species='S. cerevisiae'){
   LIP_MS = read.xlsx(xlsxFile = S3.url,
                      sheet = species, detectDates = T,
                      skipEmptyRows = T, skipEmptyCols = T)
+
+  peptides = LIP_MS %>%
+    add_count(Protein_ID,name='npep') %>%
+    distinct() %>%
+    mutate( nres = round(0.01*Protein.Coverage*Length))
+
+  if(!rawdata){
+    peptides = peptides %>%
+               dplyr::select(Protein_ID,Tm.Protein,
+                  Protinfo,Protein.Coverage,Length,
+                  Measured.Domains, Theoretical.Number.of.Domain,
+                  Essential,npep )
+  }
   # cols = c("Peptide.ID","Aggregation","Position","Tm.Peptide", "Tm.Protein",
   #          "Length","Sequence","Protein_ID","Pepinfo","Protinfo",
   #          "Secondary.Structure","Domain.logic","Domain.Name",
@@ -183,14 +66,14 @@ load.leunberger2017.data = function(species='S. cerevisiae'){
   # [19] "h_ciu"        "mf_cil"       "mf_ciu"       "mu_cil"       "mu_ciu"       "sf_cil"       "sf_ciu"       "su_cil"       "su_ciu"
   # [28] "tm_cil"       "tm_ciu"       "sig_cil"      "sig_ciu"      "ProteinID"
   #
-  return(LIP_MS)
+  return(peptides)
 }
 
 load.jackson2018.data =function(){
   # Load 1011 yeast strains data
   # Sheet 1 = Strains details
   require(tidyverse)
-
+  require(hablar)
   get.longest = function(S, s='\\.'){
     require(stringr)
     L = str_split(string = S, pattern = s)
@@ -212,40 +95,41 @@ load.jackson2018.data =function(){
     #              mutate(X.Total.number.of.SNPs.=readr::parse_number(X.Total.number.of.SNPs.),
     #              X.Number.of.singletons.=readr::parse_number(X.Number.of.singletons.))
     collection = readxl::read_excel(path = todownload, sheet = 1, progress = T,skip = 2,col_names = T,n_max = 1011,guess_max = 900)
-
     #%>%
-
     clean_header = colnames(collection) %>%
-      str_replace_all('\\.+', rep= '\\.') %>% # REMOVE CONSECUTIVE DOTS
-      stringr::str_sub(start = 3, end = -2) %>% # REMOVE starting 'X.' and ending '.'
-      tolower # CONVERT TO LOWERCASE
+                   tolower %>% # CONVERT TO LOWERCASE
+                   gsub("[[:punct:]]","",x=.) %>% # REMOVE PUNCTUATIONS%>%
+                   gsub("\\s+",".",x=.) # SPACES TO UNDERSCORE
+
+    #  str_replace_all('\\.+', rep= '\\.') %>% # REMOVE CONSECUTIVE DOTS
+    #  stringr::str_sub(start = 3, end = -2) %>% # REMOVE starting 'X.' and ending '.'
+
 
     names(collection)=clean_header
-
     strains= tibble(type.convert(collection[1:1011,])) %>%   # 1011 first rows = strains details
-      hablar::convert(chr(isolate.name),
-                      chr(isolation),
-                      chr(geographical.origins),
-                      num(number.of.singletons),
-                      chr(collection.provider)
+      hablar::convert(hablar::chr(isolate.name),
+                      hablar::chr(isolation),
+                      hablar::chr(geographical.origins),
+                      hablar::num(number.of.singletons),
+                      hablar::chr(collection.provider)
       )
     #PARSING REFERENCES
-    refs = grep("^[0-9]+\\. ",collection$isolate.name,v=T) %>%
-      str_split(pattern="\\. ",n=2,simplify = T) %>%
-      as_tibble %>%
-      rename(numref =V1, complete.ref=V2) %>%
-      mutate(year  =  str_extract(complete.ref,pattern = "\\(([0-9]{4})\\)"),
-             title =  get.longest(complete.ref),
-             ref.2 =  str_remove(complete.ref,year),
-             pages = str_extract(ref.2,"(\\d+)-(\\d+)"),
-             ref.3 =  str_remove(ref.2,title),
-             authors = str_extract(string = ref.3, pattern = '.+\\.\\.'),
-             ref.4 = str_remove(ref.3,authors),
-             journal.vol = str_extract(ref.3,pattern='\\.\\..+,'),
-             journal = str_trim(str_extract(journal.vol,pattern='.+ ')),
-             volume = str_remove(str_extract(journal.vol,pattern='[0-9]+,'),",")
-             #ref.2=NULL, ref.3=NULL, ref.4=NULL,journal.vol=NULL
-      )
+    # refs = collection = readxl::read_excel(path = todownload, sheet = 1, progress = T,skip = 1013,col_names = F) %>%
+    #   str_split(pattern="\\. ",n=2,simplify = T) %>%
+    #   as_tibble %>%
+    #   rename(numref =V1, complete.ref=V2) %>%
+    #   mutate(year  = str_extract(complete.ref,pattern = "\\(([0-9]{4})\\)"),
+    #          title = get.longest(complete.ref),
+    #          ref.2 = str_remove(complete.ref,year),
+    #          pages = str_extract(ref.2,"(\\d+)-(\\d+)"),
+    #          ref.3 = str_remove(ref.2,title),
+    #          authors = str_extract(string = ref.3, pattern = '.+\\.\\.'),
+    #          ref.4 = str_remove(ref.3,authors),
+    #          journal.vol = str_extract(ref.3,pattern='\\.\\..+,'),
+    #          journal = str_trim(str_extract(journal.vol,pattern='.+ ')),
+    #          volume = str_remove(str_extract(journal.vol,pattern='[0-9]+,'),",")
+    #          #ref.2=NULL, ref.3=NULL, ref.4=NULL,journal.vol=NULL
+    #   )
     file.remove(todownload)
     return(strains)
   }else{
@@ -319,7 +203,7 @@ load.geisberg2014.data = function(nodesc=T){
   return(mrna.half)
 }
 
-load.merged.abundance = function(noauto = T,
+load.ho2018.data = function(noauto = T,
                                  nogfp  = F,
                                  noms   = F,
                                  notap  = F) {
@@ -420,3 +304,42 @@ load.byrne2005.data = function() {
     dplyr::select(WGD_anc, orf, gname, ref, dup.orf, dup.gname, pid, rlen)
   return(ygob)
 }
+
+get.ygob.pair = function(ygob = load.ygob.ohnologs() ){
+  return(ygob[, c('orf', 'dup.orf')])
+}
+
+get.sc.ohno = function(myseq) {
+  ygob = load.byrne2005.data()
+  bogy = ygob %>%
+    dplyr::rename( orf = dup.orf, gname = dup.gname, dup.orf = orf, dup.gname = gname ) %>%
+    mutate(ref = 2) %>%
+    dplyr::select(WGD_anc, orf, gname, ref, dup.orf, dup.gname, pid, rlen)
+  ohno = ygob %>% bind_rows(bogy)
+
+  if(missing(myseq)){ myseq = load.sgd.proteome() }
+  ohno.seq = get.pair.prot(prot=myseq, pair = get.ygob.pair(ohno))
+  ohno.ali = align.pair.prot(p1=ohno.seq$s1, p2=ohno.seq$s2, mat='BLOSUM62')
+  aafreq = alphabetFrequency(alignedSubject(ohno.ali))
+  gaps = rowSums(aafreq[,c("-","+")])
+
+  pair = get.ygob.pair(ohno) %>%
+    mutate( L1 = width(ohno.seq$s1),
+            L2 = width(ohno.seq$s2),
+            RLEN = round(pmin(L1,L2) / pmax(L1,L2), 2),
+            PID1 = round(pid( ohno.ali, "PID1" ),1),
+            PID2 = round(pid( ohno.ali, "PID2" ),1),
+            PID3 = round(pid( ohno.ali, "PID3" ),1),
+            PID4 = round(pid( ohno.ali, "PID4" ),1),
+            SCORE.B100 = score( ohno.ali ),
+            S = nmatch( ohno.ali ),
+            N = nmismatch( ohno.ali ),
+            G = gaps,
+            SGDID = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$orf,columns ="SGD",keytype = 'ORF')[,2],
+            SGDID.dup = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$dup.orf,columns ="SGD",keytype = 'ORF')[,2]
+    ) %>% right_join(ohno)
+
+  return(pair)
+}
+
+

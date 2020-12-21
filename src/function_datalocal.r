@@ -1,12 +1,14 @@
-source("utils.r")
-# Local proteome data ----------------------------------------------------------
+source("src/utils.r",local = T)
+source("src/function_sequence.r",local = T)
 
+# Local proteome data ----------------------------------------------------------
 load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_general.R"){
   source(toolbox,local = T)
-  library(AnnotationDbi)
-  library(org.Sc.sgd.db)
-  library(GO.db)
-  library(dplyr)
+  require(AnnotationDbi)
+  require(org.Sc.sgd.db)
+  require(GO.db)
+  require(tidyverse)
+
   SC = get.proteome.table() %>%
     mutate(
       has_len = !is.na(len),
@@ -20,14 +22,32 @@ load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_
   return(SC)
 }
 
+load.1011.strains = function(seqdir){
+  if( !dir.exists(seqdir) ) stop("Directory of proteome sequences not found!")
+  fastas =list.files(path=seqdir, pattern = "fasta", full.names = T, ignore.case = T, include.dirs = F)
+  return(read.proteomes(fastas))
+}
+
 # Evolution Sequence/Structure -------------------------------------------------
 # Precomputed data #
 #==================#
-# raw.aligned.dataset = file.path(data.path, "202-aligned-residues-datasets.rds")
-#if( !file.exists(dataset) ){ stop(sprintf("Cannot find the dataset at : %s",dataset)) }
 # PROTEOME=readRDS('./data/PROTEIN-EVORATE.rds')
 # ALIGNED.DATA = readRDS('./data/RESIDUE-EVORATE.rds')
 #==================#
+load.wapinsky2007.data = function(path.data="./data/"){
+  require(tictoc)
+  doing = "Get rate4site data for yeast based on wapinsky 2007 fungi lineage"
+  tic(doing)
+  #rate4site-yeast-fungi_lineage.tsv.gz
+  r4s.dataset=sprintf("%s/rate4site-yeast-fungi_lineage.tsv.gz", path.data)
+  r4s.orf = read.csv(file = r4s.dataset, sep='\t', skip=0, header=T, fill=T,
+                     strip.white=T, stringsAsFactors = F,
+                     col.names = c('r4s_orf','r4s_size','r4s_pos','r4s_aa','r4s_res',
+                                   'r4s_std','r4s_nmsa','species','r4s_qq1','r4s_qq2',
+                                   'R4S_num','R4S_aa','R4S_res','R4S_qq1','R4S_qq2','R4S_std','R4S_nmsa'))
+  toc()
+  return(r4s.orf)
+}
 
 load.aligned.data = function(data.path='../data/'){
   message("
@@ -38,6 +58,8 @@ load.aligned.data = function(data.path='../data/'){
           (4) Rate4Site based on fungi lineage Wapinsky et al. (2007) of 14 yeast species
           (5) 3Dcomplex for yeast quaternary structures (based on X-Ray from PDB)"
   )
+  dataset = file.path(data.path, "sgduni-yeast-aligned-datasets.rds")
+  if( !file.exists(dataset) ){ stop(sprintf("Cannot find the dataset at : %s",dataset)) }
   return(readRDS(dataset))
 }
 
@@ -104,7 +126,7 @@ fetch.d2p2 = function(id,quiet=F){ # Get the d2p2 predictions for single id
   require(rjson)
   # id='YDR134C'
   d2p2.url = sprintf('http://d2p2.pro/api/seqid/["%s"]',id)
-  res = fromJSON(readLines(d2p2.url, warn=FALSE))
+  res = rjson::fromJSON(readLines(d2p2.url, warn=FALSE))
   nodata = length(res[[id]]) == 0
   if( !nodata ){
     # response$YCL051W[[1]][[3]]$disorder$consensus
@@ -180,7 +202,7 @@ load.codon.usage = function(inputseq,
   ord.codonR = get.codons4tai()
 
   if( !require(tAI) ){ devtools::install_github("mariodosreis/tai") } # Install this package first
-  library(tAI)
+  require(tAI)
   tai.R = sprintf("%s/tAI.R",url.codonR)
   # Can use local address
   #if(file.exists(codonR)){ tai.R = sprintf("%s/tAI.R",codonR) }

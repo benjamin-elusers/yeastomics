@@ -1,20 +1,4 @@
-source("utils.r")
-# load.proteome = function(url,nostop=T) {
-#   p = Biostrings::readAAStringSet(filepath = url)
-#   if(nostop){
-#     # Remove the trailing star from amino acid sequence (stop codon)
-#     star = Biostrings::subseq(p,start=-1) == '*'
-#     p = Biostrings::subseq(p,start=1,  end=width(p)-star)
-#   }
-#   return(p)
-# }
-#
-# load.genome = function(url) {
-#   g = Biostrings::readDNAStringSet(filepath = url)
-#   return(g)
-# }
-#
-
+source("src/utils.r",local = T)
 ### Playing with SGD (Saccharomyces Genome Database) ---------------------------
 SGD.nomenclature = function(coding=T,rna=F){
   nuclear = "[Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?"
@@ -100,3 +84,16 @@ load.uniprot.proteome = function() {
   names(UNI) = str_extract(names(UNI), regexUNIPROTAC)
   return(UNI)
 }
+
+read.proteomes = function(seqfiles){
+  require(Biostrings)
+  require(biomartr)
+  cat("Reading proteomes from fasta sequences...")
+  P=mapply(seqfiles, FUN=read_proteome, MoreArgs = list(format = "fasta", obj.type = "Biostrings"))
+  return(P)
+}
+
+get.orf.filename = function(seqfile){
+  return( gsub(x=seqfile,pattern='\\.(fasta)$',replacement = "", ignore.case = F, perl=T) )
+}
+

@@ -5,6 +5,14 @@
 #
 #colored_fruits = c('yellow','banana','red','apple','green','grape')
 
+# I/O --------------------------------------------------------------------------
+open.url <- function(file_url) {
+  con <- gzcon(url(file_url))
+  txt <- readLines(con)
+  closeAllConnections()
+  return(textConnection(txt))
+}
+
 # Testing/Subsetting -----------------------------------------------------------
 is.whole  <- function(x){ all(floor(x) == x) }      # checks if a value has decimal part (not necessarily integer e.g. 1.0 is whole)
 is.binary <- function(x){ all(1*x %in% 0:1) }       # checks if a value is 0/1 (binary/logical)
@@ -167,7 +175,7 @@ load.proteome = function(url,nostop=T) {
   p = Biostrings::readAAStringSet(filepath = url)
   if(nostop){ # Remove the trailing star from amino acid sequence (stop codon)
     star = Biostrings::subseq(p,start=-1) == '*'
-    p = Biostrings::subseq(p,start=1,  end=width(p)-star)
+    p = Biostrings::subseq(p,start=1,  end=Biostrings::width(p)-star)
   }
   return(p)
 }
@@ -228,9 +236,12 @@ gg_color_hue <- function(n) {
 }
 
 # Environment ------------------------------------------------------------------
-script.to.env = function(src,nm){
-  # load script object into separate environment
-  env = attach(what = NULL,name = nm);
+script.to.env = function(src,nm){ # load script object into separate environment
+  if( !(nm %in% search()) ){
+    env = attach(what = NULL,name = nm);
+  }else{
+    env = as.environment(nm)
+  }
   sys.source(file=src,env)
 }
 
