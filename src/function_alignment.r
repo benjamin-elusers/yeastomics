@@ -1,4 +1,5 @@
 source("utils.r")
+# Pairwise alignment -----------------------------------------------------------
 get.pair.prot = function(prot, pair){
   seq.1 = prot[pair[[1]]]
   seq.2 = prot[pair[[2]]]
