@@ -1,3 +1,8 @@
+# author: Benjamin Dubreuil
+# created: 20/12/2020
+# comments: general purpose functions
+# ```{r}Sys.time()```
+#
 #colored_fruits = c('yellow','banana','red','apple','green','grape')
 
 # Testing/Subsetting -----------------------------------------------------------
@@ -6,35 +11,51 @@ is.binary <- function(x){ all(1*x %in% 0:1) }       # checks if a value is 0/1 (
 is.even   <- function(x){ as.integer(x) %% 2 == 0 } # checks if a value is even
 is.odd    <- function(x){ as.integer(x) %% 2 != 0 } # checks if a value is odd
 is.dup    <- function(x){ x %in% x[duplicated(x)] } # detects duplicates
+
+is.outlier <- function(x,thr=0.1,coef=1.5) { # return outliers outliers from distribution
+  whiskers = coef * IQR(x,na.rm=T)
+  return(x < quantile(x, thr,na.rm=T) - whiskers | x > quantile(x, 1-thr,na.rm=T) + whiskers)
+}
+
 mid       <- function(x){ ifelse(is.even(length(x)), length(x)/2, (length(x)+1)/2) }
 
-get.even  <- function(x){ x[is.even(x)] } # returns even values
-get.odd   <- function(x){ x[is.odd(x)]  } # returns odd values
-get.dup   <- function(x){ x[is.dup(x)]  } # returns duplicates
-get.mid   <- function(x){ x[mid(x)] }     # returns the middle value
-get.half1 <- function(x){ x[seq(1,mid(x))] }  # returns first half of vector
-get.half2 <- function(x){ x[seq(mid(x)+1,length(x))] }   # returns last half of vector
 evens     <- function(x){ x[seq(1,length(x),by=2)] } # returns values at even indexes
-odds     <- function(x){ x[seq(2,length(x),by=2)] }  # returns values at odd indexes
+odds      <- function(x){ x[seq(2,length(x),by=2)] }  # returns values at odd indexes
 
 last      <- function(x){ tail(x, n = 1) }             # returns last element of a vector
 b4.last   <- function(x){ head( tail(x,n=2) , n = 1) } # returns element before last
 but.last  <- function(x){ head(x, n = -1) }            # returns vector w/o last element
 from.last <- function(x,n=2){ head(x, n = -abs(n)) }   # returns vector w/o last element
 
-unfactor <- function(x){ as.numeric(as.character(x)) } # forces conversion of factors to numbers
-compact  <- function(x){ Filter(Negate(is.null), x) }  # removes null element in list
+unfactor  <- function(x){ as.numeric(as.character(x)) } # forces conversion of factors to numbers
+compact   <- function(x){ Filter(Negate(is.null), x) }  # removes null element in list
 
 # Counting ---------------------------------------------------------------------
-ulen   <- function(x){ return( length(unique(x)) ) } # gets length of unique values
-norm01 <- function(x){ return( scale(x,center=min(x),scale=diff(range(x)))[,1] ) } # scales values between 0 and 1
-maxrep <- function(x,n){ sort(table(x), decreasing = TRUE)[1:n] } # gets the Nth most repeated values
-sum.na <- function (x,notNA=FALSE){ sum(is.na(x) == !notNA) } # returns sum of NA or not-NA values
+ulen    <- function(x){ return( length(unique(x)) ) } # gets length of unique values
+norm01  <- function(x){ return( scale(x,center=min(x),scale=diff(range(x)))[,1] ) } # scales values between 0 and 1
+maxrep  <- function(x,n){ sort(table(x), decreasing = TRUE)[1:n] } # gets the Nth most repeated values
+sum.na  <- function (x,notNA=FALSE){ sum(is.na(x) == !notNA) } # returns sum of NA or not-NA values
+geomean <- function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) } # returns geometrical mean
+geosd   <- function(x) {  exp(sd(log(x[x != 0 & !is.na(x)]))) } # returns geometrical standard deviation
+
 rowsNA = function(m){ # counts how many rows have NAs
   nas = apply(as.matrix(m),1,sum.na)
   if(sum(nas)>0){ message(sprintf('%s rows contain NA values.',sum(nas))) }
   return(nas)
 }
+
+sum_mean <- function (x,na.rm=T,as.list=T){ # returns sum and mean with/out NA value
+  res = list( 'n'= length(x), 'sum'=sum(x,na.rm=na.rm), 'mean' = mean(x,na.rm=na.rm), 'na' = sum(is.na(x)))
+  if( !as.list ){  return(unlist(res)) }
+  return(res)
+}
+
+getmode <- function(v) { # returns the mode (most frequent value)
+  uniqv <- unique(v)
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+
 
 # Strings ----------------------------------------------------------------------
 str2chr  <- function(x){ return( unlist(strsplit(x,sep='')) ) } # split string by character
@@ -43,12 +64,13 @@ Pxx      <- function(x,px,s='.'){ paste0(px,s,x) } # Add prefix to a string
 starting <- function(str,pre){ str[ startsWith(str,pre) ] }
 ending   <- function(str,suf){ str[ endsWith(str,suf) ] }
 
+trim.lead  <- function (x){ sub("^\\s+", "", x) } # returns string w/o leading whitespace
+trim.trail <- function (x){ sub("\\s+$", "", x) }# returns string w/o trailing whitespace
+trim       <- function (x){ gsub("^\\s+|\\s+$", "", x) } # returns string w/o leading or trailing whitespace
+trim.NaN   <- function(d){ d[apply(d,2,function(x) any(is.nan(x))),] } # returns a vector without NaN
+
 paste.even <- function(x,s='-'){ paste(evens(x),odds(x),sep=s) }
 paste.odd  <- function(x,s='-'){ c(paste.even(but.last(x),s), last(x)) }
-paste.pair <- function(x,s='-'){
-  if( is.even(length(x)) ){ return(paste.even(x,s)) }
-  return(paste.odd(x,s))
-}
 
 rm.dup.str = function(str,sep='.'){ # removes duplicated word in string
   words = strsplit(str,paste0("\\",sep))
@@ -72,53 +94,7 @@ strfind = function(strings, patterns){ # search multiple patterns in character v
   sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
 }
 
-# Sequences --------------------------------------------------------------------
-load.proteome = function(url,nostop=T) {
-  require(Biostrings)
-  p = Biostrings::readAAStringSet(filepath = url)
-  if(nostop){ # Remove the trailing star from amino acid sequence (stop codon)
-    star = Biostrings::subseq(p,start=-1) == '*'
-    p = Biostrings::subseq(p,start=1,  end=width(p)-star)
-  }
-  return(p)
-}
-
-load.genome = function(url) {
-  require(Biostrings)
-  g = Biostrings::readDNAStringSet(filepath = url)
-  return(g)
-}
-
-
-
-
-
-
-
-
-getmode <- function(v) {
-  uniqv <- unique(v)
-  uniqv[which.max(tabulate(match(v, uniqv)))]
-}
-
-
-
-trim.lead <- function (x)  sub("^\\s+", "", x) # returns string w/o leading whitespace
-trim.trail <- function (x) sub("\\s+$", "", x) # returns string w/o trailing whitespace
-trim <- function (x) gsub("^\\s+|\\s+$", "", x) # returns string w/o leading or trailing whitespace
-
-trim.NaN <- function(d=data) d[apply(d,2,function(x) any(is.nan(x))),] # returns a vector without NaN
-
-
-
-
-# returns sum and mean with/out NA value
-sum_mean <- function (x,na.rm=T,as.list=T){
-  res = list( 'n'= length(x), 'sum'=sum(x,na.rm=na.rm), 'mu' = mean(x,na.rm=na.rm), 'na' = sum(is.na(x)))
-  if( !as.list ){  return(unlist(res)) }
-  return(res)
-}
-
+# Format values ----------------------------------------------------------------
 
 RoundUpToNearest <- function(nb, roundto=1){ # Round up numbers to unit or decimal specified
   if (roundto){ return(nb) }
@@ -130,15 +106,7 @@ RoundDownToNearest <- function(nb, roundto=1){ # Round down numbers to unit or d
   else{ return( floor(nb / roundto) * roundto ) }
 }
 
-RoundToNearest <- function(nb,roundto){
-  a = RoundDownToNearest(nb,roundto);
-  b = RoundUpToNearest(nb,roundto);
-  if( abs(nb-a) < abs(nb-b) ){ return(a) }
-  else if( abs(nb-a) > abs(nb-b) ){ return(b) }
-  else{ return(nb) }
-}
 
-# Format text ------------------------------------------------------------------
 percent <- function(x, digits = 2, format = "f", ...) {
   if(all(x>=0) & all(x<=1)){
     paste0(formatC(100 * x, format = format, digits = digits, ...), "%")
@@ -193,19 +161,37 @@ toUnits <- function(x){
   else if( x <= 1e-24 ){ return(c(pre="y",x=format(x/1e-24,digit=1)))  }
 }
 
-# Amino-acids charge (SEQ must be a character vector)
-is.pos <- function(SEQ){ SEQ == "K" | SEQ == "R" }
-is.neg <- function(SEQ){ SEQ == "D" | SEQ == "E" }
-POS <- function(SEQ){ sum(is.pos(SEQ)) }
-NEG <- function(SEQ){ sum(is.neg(SEQ)) }
-fpos <- function(SEQ){ mean(is.pos(SEQ)) }
-fneg <- function(SEQ){ mean(is.neg(SEQ)) }
-CHARGED <- function(SEQ){ return( POS(SEQ) + NEG(SEQ) ) }
-FCR  <- function(SEQ){ return( fpos(SEQ) + fneg(SEQ)  ) }
-NCPR <- function(SEQ){ return( abs( fpos(SEQ) - fneg(SEQ) )  ) }
-CHARGE.ASYM <- function(p,n){ return( (p-n)**2 / (p+n) ) }
+# Sequences --------------------------------------------------------------------
+load.proteome = function(url,nostop=T) {
+  require(Biostrings)
+  p = Biostrings::readAAStringSet(filepath = url)
+  if(nostop){ # Remove the trailing star from amino acid sequence (stop codon)
+    star = Biostrings::subseq(p,start=-1) == '*'
+    p = Biostrings::subseq(p,start=1,  end=width(p)-star)
+  }
+  return(p)
+}
 
-# Amino-acid sequence
+load.genome = function(url) {
+  require(Biostrings)
+  g = Biostrings::readDNAStringSet(filepath = url)
+  return(g)
+}
+
+# Amino acids ------------------------------------------------------------------
+# SEQ must be a character vector
+is.pos  <- function(SEQ){ SEQ == "K" | SEQ == "R" }
+is.neg  <- function(SEQ){ SEQ == "D" | SEQ == "E" }
+pos     <- function(SEQ){ sum(is.pos(SEQ)) }
+neg     <- function(SEQ){ sum(is.neg(SEQ)) }
+fpos    <- function(SEQ){ mean(is.pos(SEQ)) }
+fneg    <- function(SEQ){ mean(is.neg(SEQ)) }
+charged <- function(SEQ){ return( pos(SEQ) + neg(SEQ) ) }
+fcr     <- function(SEQ){ return( fpos(SEQ) + fneg(SEQ)  ) }
+npcr    <- function(SEQ){ return( abs( fpos(SEQ) - fneg(SEQ) )  ) }
+charge.asym <- function(p,n){ return( (p-n)**2 / (p+n) ) }
+
+# Fasta format
 seq2fasta <- function(seq, maxline=70, as.string=F){
   single = unlist(strsplit(as.character(seq),split=''))
   string = paste(single,collapse='')
@@ -222,7 +208,7 @@ seq2fasta <- function(seq, maxline=70, as.string=F){
 }
 
 # Colors -----------------------------------------------------------------------
-SetTextContrastColor <- function(color){
+set.contrast.text <- function(color){
   ifelse( mean(col2rgb(color)) > 127, "black", "white")
 }
 
@@ -240,7 +226,6 @@ gg_color_hue <- function(n) {
   hues = seq(15, 375, length = n + 1)
   hcl(h = hues, l = 65, c = 100)[1:n]
 }
-
 
 # Environment ------------------------------------------------------------------
 script.to.env = function(src,nm){
@@ -276,7 +261,7 @@ showMemoryUse <- function(sort="size", decreasing=FALSE, limit) {
   return(invisible(memListing))
 }
 
-.ls.objects <- function (pos = 1, pattern, order.by, decreasing=FALSE, head=FALSE, n=5) {
+ls.objects <- function (pos = 1, pattern, order.by, decreasing=FALSE, head=FALSE, n=5) {
   napply <- function(names, fn) sapply(names, function(x) fn(get(x, pos = pos)))
   names <- ls(pos = pos, pattern = pattern)
   obj.class <- napply(names, function(x) as.character(class(x))[1])
@@ -296,10 +281,46 @@ showMemoryUse <- function(sort="size", decreasing=FALSE, limit) {
 }
 
 # shorthands -------------------------------------------------------------------
-
 lsos <- function(..., n=10) { # checks top10 memory consumption from R objects
-  .ls.objects(..., order.by="Size", decreasing=TRUE, head=TRUE, n=n)
+  ls.objects(..., order.by="Size", decreasing=TRUE, head=TRUE, n=n)
 }
+
+paste.pair <- function(x,s='-'){ # join by pair (last value remains alone if odd number of values)
+  if( is.even(length(x)) ){ return(paste.even(x,s)) }
+  return(paste.odd(x,s))
+}
+
+get.even  <- function(x){ x[is.even(x)] } # returns even values
+get.odd   <- function(x){ x[is.odd(x)]  } # returns odd values
+get.dup   <- function(x){ x[is.dup(x)]  } # returns duplicates
+get.mid   <- function(x){ x[mid(x)] }     # returns the middle value
+get.half1 <- function(x){ x[seq(1,mid(x))] }  # returns first half of vector
+get.half2 <- function(x){ x[seq(mid(x)+1,length(x))] }   # returns last half of vector
+
+round2near <- function(nb,roundto){ # returns the nearest number up to the specified decimal
+  a = RoundDownToNearest(nb,roundto);
+  b = RoundUpToNearest(nb,roundto);
+  if( abs(nb-a) < abs(nb-b) ){ return(a) }
+  else if( abs(nb-a) > abs(nb-b) ){ return(b) }
+  else{ return(nb) }
+}
+
+Round2Nearest <- function(...){
+  round2near(...)
+}
+
+mad_      <- function(...){ mad(na.rm=T,...) } # Median absoluted deviations without NA
+quantile_ <- function(x,...){  quantile(x,...,na.rm=T) } # quantile with no error message for missing values
+
+# Correlation with spearman method (ranks) and pairwise value
+scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){ cor.test(x,y,method = met, use=use, exact=F) }
+spearman <- function(X,Y){
+  res = cor.test(x = X, y=Y , method = "spearman",use='pairwise.complete',exact=F) %>% broom::tidy()
+  return(res)
+}
+
+# Extract correlation parameters as dataframe
+get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','p.value')]) }
 
 # precomputed data -------------------------------------------------------------
 sticky = c("A"= 0.0062, "C"= 1.0372, "D"=-0.7485, "E"=-0.7893, "F"= 1.2727,

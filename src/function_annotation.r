@@ -201,3 +201,15 @@ get.uniprot.localization = function(annot,loc_to_columns=T){
 }
 
 
+## ___1 protein families -------------------------------------------------------
+url.similar="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/docs/similar.txt"
+
+## ___2 subcellular locations --------------------------------------------------
+url.subcell="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/docs/subcell.txt"
+uni2loc = get.uniprot.localization(sgd2uni,loc_to_columns = F)
+uni_isloc = get.uniprot.localization(sgd2uni,loc_to_columns = T)
+LOC = unique(uni2loc$loc)
+uni_isloc %>% ungroup() %>% summarise_at(LOC,sum) %>% pivot_longer(everything()) %>% arrange(value) %>% filter(value > 30)
+
+## ___3 pathways ---------------------------------------------------------------
+url.pathway="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/docs/pathway.txt"
