@@ -16,17 +16,6 @@ SGD.nomenclature = function(coding=T,rna=F){
   if( !coding & !rna ){ return(nuclear) }
 }
 
-load.sgd.features = function(){
-  require(stringr)
-  sgd_feat.url = "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"
-  sgd.feat = read.delim2(sgd_feat.url, sep='\t', quote = "",
-                         header=F, fill=T, strip.white=T,stringsAsFactors = F,
-                         col.names = c('sgdid','type','qual','name',
-                                       'gname','alias','parent','sgdid2',
-                                       'chr','start','end','strand','gpos',
-                                       'coordv','seqv','desc')  )
-  return(sgd.feat)
-}
 
 load.sgd.CDS = function(withORF=T) {
   require(stringr)
@@ -76,9 +65,13 @@ load.pombase.proteome = function(withORF=T) {
   return(Pombase)
 }
 
-load.uniprot.proteome = function() {
+load.uniprot.proteome = function(species='yeast') {
   require(stringr)
-  uniprot.url = "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000002311_559292.fasta.gz"
+  uniprot.url = "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota"
+  taxon=match.arg(species, choices = c('yeast','human'), several.ok = F)
+  proteomes=c(human="UP000005640_9606.fasta.gz",yeast="UP000002311_559292.fasta.gz")
+  uniprot.url = sprintf("%s/%s",uniprot.url,proteomes[taxon])
+
   UNI = load.proteome(uniprot.url)
   regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
   names(UNI) = str_extract(names(UNI), regexUNIPROTAC)
@@ -97,3 +90,28 @@ get.orf.filename = function(seqfile){
   return( gsub(x=seqfile,pattern='\\.(fasta)$',replacement = "", ignore.case = F, perl=T) )
 }
 
+
+load.sgd.features = function(){ # Gene/Protein features from SGD
+  require(stringr)
+  sgd_feat.url = "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"
+  sgd.feat = read.delim2(sgd_feat.url, sep='\t', quote = "",
+                         header=F, fill=T, strip.white=T,stringsAsFactors = F,
+                         col.names = c('sgdid','type','qual','name',
+                                       'gname','alias','parent','sgdid2',
+                                       'chr','start','end','strand','gpos',
+                                       'coordv','seqv','desc')  )
+  return(sgd.feat)
+}
+
+
+load.uniprot.features = function(tax,input){ # Gene/Protein features from Uniprot
+  require(UniProt.ws)
+  uniprot  = UniProt.ws::UniProt.ws(taxId=tax)
+  tic('Retrieving mapping between uniprot accession and SGD ID...')
+  # TAKES ~50sec for about 7000 ids
+  mapped = UniProt.ws::select(x=uniprot,
+                              keys=unique(input),  keytype = "SGD",
+                              columns = c("SGD","UNIPROTKB")) %>%
+    filter(!is.na(UNIPROTKB)) %>% distinct()
+  toc(log=T)
+}

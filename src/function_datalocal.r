@@ -49,6 +49,28 @@ load.wapinsky2007.data = function(path.data="./data/"){
   return(r4s.orf)
 }
 
+load.rate4site1011.data = function(path.r4s = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0/src/rate4site/RUN-1011G"){
+
+  res = list.dirs(path.r4s,full.names = T,recursive = F)
+  orfs
+  seqin = paste(res, "/seqin")
+
+  length(seqin)
+  read.delim(res)
+
+  #nb = read.delim(file = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0/src/rate4site/RUN-1011G/NB_SPECIES", header=F, sep=' ')
+  #nb$orf = gsub(patt="\\.\\/(.+)\\/seqin", x = nb$V1, replacement = '\\1')
+
+  #nr = read.table(file = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0/src/rate4site/RUN-1011G/NRES",header=F)
+  #nr$orf = gsub(patt="\\.\\/(.+)\\/(.+)_norm.r4s", x = nr$V2, replacement = '\\1')
+  #length(intersect( nb$orf[ nb$V2 == 1011 ], nr$orf[nr$V1 == 0]))
+
+  #table(nb$V2 != 1011)
+  #table(nr$V1 > 0)
+
+}
+
+
 load.aligned.data = function(data.path='../data/'){
   message("
           Merged dataset with residue-level informations from:
@@ -142,11 +164,19 @@ fetch.d2p2 = function(id,quiet=F){ # Get the d2p2 predictions for single id
   }
 }
 
-load.d2p2 = function(ids){ # Get the d2p2 predictions for multiple ids
-  if(!is.vector(ids)){
-    stop('Input must be a vector of identifiers as character...')
+load.d2p2 = function(ids,saved){ # Get the d2p2 predictions for multiple ids
+  if(!is.vector(ids)){ stop('Input must be a vector of identifiers as character...') }
+
+  require(tools)
+  require(tictoc)
+  if( file.exists(saved) ){
+    if( file_ext(saved) != 'rds' ){ warning("File type not recognized ! (should be RDS object)") }
+    return( readRDS(saved) )
   }
+
   N=length(ids)
+
+  tic(sprintf("Loading d2p2 predictions for %s protein identifiers",N))
   d2p2 = list()
   for( i in 1:N ){
     ID = ids[i]
@@ -154,9 +184,11 @@ load.d2p2 = function(ids){ # Get the d2p2 predictions for multiple ids
     d2p2[[ID]] = fetch.d2p2(ID,quiet=T)
     cat(prg)
   }
+  toc()
+  message(sprintf("Saving D2P2 predictions to : %s",saved))
+  saveRDS(d2p2, saved)
   return(d2p2)
 }
-
 
 get.d2p2.pred = function(d2p2){ return(d2p2$diso$consensus) }
 get.d2p2.id = function(d2p2){ return(d2p2$id) }

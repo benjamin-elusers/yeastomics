@@ -7,10 +7,11 @@ load.dubreuil2019.data = function(d){
   message("REF: Dubreuil, Matalon and Levy ")
   message("Protein Abundance Biases the Amino Acid Composition of Disordered Regions to Minimize Non-functional Interactions")
   dubreuil=data.frame(stringsAsFactors = F,
-                      name   = c("1.1 yeast.prot", "1.2 yeast.res", "1.3 yeast.res (full proteome)", "2.1 human.prot", "2.2 human.res") ,
-                      num    = c('16924922', '16920611', '23164307', '16924925', '16920581'),
-                      base_url =  rep('https://ndownloader.figshare.com/files/',5),
-                      format = c('XLSX','TSV','TSV.GZ','XLSX','TSV')
+                      name   = c("1.1 yeast.prot", "1.2 yeast.res", "1.3 yeast.res (full proteome)",
+                                 "2.1 human.prot", "2.2 human.res", "2.3 human.res (full proteome)") ,
+                      num    = c('16924922', '16920611', '23164307', '16924925', '16920581','25859607'),
+                      base_url =  rep('https://ndownloader.figshare.com/files/',6),
+                      format = c('XLSX','TSV','TSV.GZ','XLSX','TSV','TSV.GZ')
   )
   if( missing(d) || !(d %in% seq_along(dubreuil$name)) ){
     d = menu(sprintf("%s (%s)",dubreuil$name,dubreuil$format), graphics = FALSE, title = "Which dataset do you want to use?")
@@ -36,7 +37,7 @@ load.leunberger2017.data = function(species='S. cerevisiae',rawdata=F){
   require(tidyverse)
   message("REF: P. Leuenberger et al., 2017, Science")
   message("Cell-wide analysis of protein thermal unfolding reveals determinants of thermostability")
-  match.arg(species, choices = c('S. cerevisiae','E. coli', 'Human HeLa Cells','T. thermophilus'), several.ok = F)
+  species=match.arg(species, choices = c('S. cerevisiae','E. coli', 'Human HeLa Cells','T. thermophilus'), several.ok = F)
   S3.url = "https://science.sciencemag.org/highwire/filestream/690833/field_highwire_adjunct_files/2/aai7825_Leuenberger_Table-S3.xlsx"
   #download.file(S3.url, destfile = "aai7825_Leuenberger_Table-S3.xlsx" )
   LIP_MS = read.xlsx(xlsxFile = S3.url,

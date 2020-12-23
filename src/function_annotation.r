@@ -206,10 +206,44 @@ url.similar="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowled
 
 ## ___2 subcellular locations --------------------------------------------------
 url.subcell="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/docs/subcell.txt"
-uni2loc = get.uniprot.localization(sgd2uni,loc_to_columns = F)
-uni_isloc = get.uniprot.localization(sgd2uni,loc_to_columns = T)
-LOC = unique(uni2loc$loc)
-uni_isloc %>% ungroup() %>% summarise_at(LOC,sum) %>% pivot_longer(everything()) %>% arrange(value) %>% filter(value > 30)
+#@uni2loc = get.uniprot.localization(sgd2uni,loc_to_columns = F)
+#uni_isloc = get.uniprot.localization(sgd2uni,loc_to_columns = T)
+#LOC = unique(uni2loc$loc)
+#uni_isloc %>% ungroup() %>% summarise_at(LOC,sum) %>% pivot_longer(everything()) %>% arrange(value) %>% filter(value > 30)
 
 ## ___3 pathways ---------------------------------------------------------------
 url.pathway="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/docs/pathway.txt"
+
+## ___4 functional categories --------------------------------------------------
+load.yeast.biofunctions = function(){
+  message("REF: J. van Leeuwen et al., Science, 2016")
+  message("Exploring genetic suppression interactions on a global scale")
+  biofunctions = readxl::read_xlsx(path ="https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx",
+                                sheet = 2)
+}
+
+
+load.sgd.features = function(){ # Gene/Protein features from SGD
+  require(stringr)
+  sgd_feat.url = "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"
+  sgd.feat = read.delim2(sgd_feat.url, sep='\t', quote = "",
+                         header=F, fill=T, strip.white=T,stringsAsFactors = F,
+                         col.names = c('sgdid','type','qual','name',
+                                       'gname','alias','parent','sgdid2',
+                                       'chr','start','end','strand','gpos',
+                                       'coordv','seqv','desc')  )
+  return(sgd.feat)
+}
+
+
+load.uniprot.features = function(tax,input){ # Gene/Protein features from Uniprot
+  require(UniProt.ws)
+  uniprot  = UniProt.ws::UniProt.ws(taxId=tax)
+  tic('Retrieving mapping between uniprot accession and SGD ID...')
+  # TAKES ~50sec for about 7000 ids
+  mapped = UniProt.ws::select(x=uniprot,
+                              keys=unique(input),  keytype = "SGD",
+                              columns = c("SGD","UNIPROTKB")) %>%
+    filter(!is.na(UNIPROTKB)) %>% distinct()
+  toc(log=T)
+}
