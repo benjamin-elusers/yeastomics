@@ -26,13 +26,13 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
   # Extract lowest/highest bin and find the breakpoint value for each
   low = sort(tobin)[1:idx_low]
   lowval = tail(low,n=1)
-  message(sprintf("Lowest  bin: p=%02.0f%% n=%.0f (value = %.1f)",Plow*100,length(low),lowval))
+  message(sprintf("Lowest  bin: p=%02.0f%% n=%.0f (value = %.1f)\n",Plow*100,length(low),lowval))
   high = sort(tobin,dec=T)[1:idx_high]
   highval = tail(high,n=1)
-  message(sprintf("Highest  bin: p=%02.0f%% n=%.0f (value = %.1f)",Phigh*100,length(high),highval))
+  message(sprintf("Highest  bin: p=%02.0f%% n=%.0f (value = %.1f)\n",Phigh*100,length(high),highval))
 
   mid = tobin[ between(tobin,lowval,highval) ]
-  message(sprintf("Remaining values to bin: %s",length(mid)))
+  message(sprintf("Remaining values to bin: %s\n",length(mid)))
 
   # Finding breaking points for middle values
   mode = match.arg(arg = mode, choices = c("equals", "distrib"))
@@ -58,7 +58,7 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
   if( !is.factor(BYCOL) ){ BINS = na.exclude(unique(BYCOL)) }
   BINS = levels(BYCOL)
   nby = length(BINS)
-  message(sprintf("Number of groups: %s",nby))
+  message(sprintf("Number of groups: %s\n",nby))
   bins = sprintf("[%s] %s",seq_along(BINS),as.character(levels(BINS)))
   cat(str_wrap(toString(bins), width = 90))
   cat("\n")

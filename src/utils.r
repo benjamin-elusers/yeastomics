@@ -66,7 +66,8 @@ getmode <- function(v) { # returns the mode (most frequent value)
 
 
 # Strings ----------------------------------------------------------------------
-str2chr  <- function(x){ return( unlist(strsplit(x,sep='')) ) } # split string by character
+str2chr  <- function(x){ return( unlist(strsplit(x,split='')) ) } # split string by character
+towords  <- function(x){ return( unlist(strsplit(x,split="\\s")) ) } # split string by any white space
 xxS      <- function(x,sx,s='.'){ paste0(x,s,sx) } # Add suffix to a string
 Pxx      <- function(x,px,s='.'){ paste0(px,s,x) } # Add prefix to a string
 starting <- function(str,pre){ str[ startsWith(str,pre) ] }
@@ -334,7 +335,84 @@ spearman <- function(X,Y){
 get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','p.value')]) }
 
 # precomputed data -------------------------------------------------------------
-sticky = c("A"= 0.0062, "C"= 1.0372, "D"=-0.7485, "E"=-0.7893, "F"= 1.2727,
-           "G"=-0.1771, "H"= 0.1204, "I"= 1.1109, "K"=-1.1806, "L"= 0.9138,
-           "M"= 1.0124, "N"=-0.2693, "P"=-0.1799, "Q"=-0.4114, "R"=-0.0876,
-           "S"= 0.1376, "T"= 0.1031, "V"= 0.7599, "W"= 0.7925, "Y"= 0.8806)
+get.AA1 = function(){ str2chr("ACDEFGHIKLMNPQRSTVWY") }
+
+get.aggrescan = function(){
+  setNames(
+    object=c(-0.036, 0.604, -1.836, -1.412, 1.754, -0.535, -1.033, 1.822, -0.931, 1.38,
+        0.91, -1.302, -0.334, -1.231, -1.24, -0.294, -0.159, 1.594, 1.037, 1.159),
+    nm=get.AA1()
+  )
+}
+
+get.camsol = function(){
+  setNames(
+    object=c(-0.4533509211, -3.039164569,   3.806164055,  4.112172118, -3.922859742,
+         0.809691392,  -0.2864452149, -2.986464178,  3.64837007,  -2.150991033,
+        -1.649718164,   1.353162125,   1.405662227,  0.2038292233, 4.093823461,
+         0.5372203047, -0.9718594221, -3.593600781, -3.759140236, -2.931244491),
+    nm = get.AA1()
+  )
+}
+
+get.foldamyloid = function(){
+  setNames(
+    object = c(0.086, 0.568, -0.776, -0.632, 0.958, -1.088, 0.025, 1.217, -0.565, 1.015, 0.725,
+  -0.713, -2.303, -0.271, 0.032, -0.73, -0.349, 0.92, 1.027, 0.851),
+    nm = get.AA1()
+  )
+}
+
+get.kytedoolittle = function(){
+  setNames(
+    object=c(1.8, 2.5, -3.5, -3.5, 2.8, -0.4, -3.2, 4.5, -3.9, 3.8, 1.9, -3.5, -1.6, -3.5,
+  -4.5, -0.8, -0.7, 4.2, -0.9, -1.3),
+    nm=get.AA1()
+  )
+}
+
+get.pawar_ph7 = function(){
+  setNames(
+    object=c(-3.31, 1.61, -9.42, -10.38, 2.8, -3.96, -4.31, 0.93, -9.55, -0.25, -1.06, -6.02,
+  -11.96, -6, -11.93, -5.08, -2.12, 0.49, 2.92, 1.03),
+    nm=get.AA1()
+  )
+}
+
+get.roseman = function(){
+  setNames(
+    object=c(0.39, 0.25, -3.81, -2.91, 2.27, 0, -0.64, 1.82, -2.77, 1.82,  0.96, -1.91, 0.99,
+  -1.3, -3.95, -1.24, -1, 1.3, 2.13, 1.47),
+    nm=get.AA1()
+  )
+}
+
+get.stickiness = function(){
+  setNames(
+    object=c(0.0062, 1.0372, -0.7485, -0.7893, 1.2727, -0.1771, 0.1204, 1.1109, -1.1806,
+  0.9138, 1.0124, -0.2693, -0.1799, -0.4114, -0.0876, 0.1376, 0.1031, 0.7599,
+  0.7925, 0.8806),
+    nm=get.AA1()
+  )
+}
+
+get.voronoi_stickiness = function(){
+  setNames(
+    object=c(-0.040638565,  0.739811788, -0.281053408, -0.392609711, 0.855804199,
+      -0.015564908,  0.189364177,  0.593731643, -0.546173776, 0.560032835,
+       0.569250951, -0.163722093, -0.089014045, -0.142636678, 0.027334912,
+      -0.101035135, -0.024028749,  0.372857295,  0.913761361, 0.79208657),
+    nm=get.AA1()
+  )
+
+}
+get.wimleywhite = function(){
+  setNames(
+     object=c(4.08, 4.49, 3.02, 2.23, 5.38, 4.24, 4.08, 4.52, 3.77, 4.81, 4.48, 3.83, 3.8,
+     3.67, 3.91, 4.12, 4.11, 4.18, 6.1, 5.19),
+     nm=get.AA1()
+  )
+}
+
+sticky = get.stickiness()
+

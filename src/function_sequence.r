@@ -78,16 +78,21 @@ load.uniprot.proteome = function(species='yeast') {
   return(UNI)
 }
 
-read.proteomes = function(seqfiles){
+read.proteomes = function(seqfiles,strip.fname=T){
   require(Biostrings)
   require(biomartr)
-  cat("Reading proteomes from fasta sequences...")
+  require(tictoc)
+  task="Reading proteomes from fasta sequences..."
+  tic(msg = task)
+  message(task)
   P=mapply(seqfiles, FUN=read_proteome, MoreArgs = list(format = "fasta", obj.type = "Biostrings"))
+  if(strip.fname){ names(P) = sapply(seqfiles,get.orf.filename) }
+  toc()
   return(P)
 }
 
 get.orf.filename = function(seqfile){
-  return( gsub(x=seqfile,pattern='\\.(fasta)$',replacement = "", ignore.case = F, perl=T) )
+  return( gsub(x=basename(seqfile),pattern='\\.(fasta)$',replacement = "", ignore.case = F, perl=T) )
 }
 
 
@@ -107,11 +112,21 @@ load.sgd.features = function(){ # Gene/Protein features from SGD
 load.uniprot.features = function(tax,input){ # Gene/Protein features from Uniprot
   require(UniProt.ws)
   uniprot  = UniProt.ws::UniProt.ws(taxId=tax)
-  tic('Retrieving mapping between uniprot accession and SGD ID...')
+  do='Retrieving mapping between uniprot accession and SGD ID...'
+  tic(msg=do)
+  message(do)
   # TAKES ~50sec for about 7000 ids
   mapped = UniProt.ws::select(x=uniprot,
                               keys=unique(input),  keytype = "SGD",
                               columns = c("SGD","UNIPROTKB")) %>%
     filter(!is.na(UNIPROTKB)) %>% distinct()
-  toc(log=T)
+  toc()
+}
+
+widths = function(BS){
+  if(is.list(BS)){
+    return( sapply(BS,width) )
+  }else{
+    width(BS)
+  }
 }

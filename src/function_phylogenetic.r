@@ -150,3 +150,58 @@ find.common.ancestor= function(lineage){
   MRCA = sapply(L,function(x){ setdiff(unlist(but.last(x)), LCA) })
   return(MRCA)
 }
+
+read.R4S = function(r4s, id=NULL,verbose=T){
+  require(tidyverse)
+  if(is.null(id)){ id = basename(r4s) }
+  if(verbose){ message(sprintf('reading r4s results %s\n',basename(r4s))) }
+  #Rates were calculated using the expectation of the posterior rate distribution
+  #Prior distribution is Gamma with 16 discrete categories
+
+  #SEQ: the amino acid in the reference sequence in one letter code.
+  #SCORE: The conservation scores. lower value = higher conservation.
+  #QQ-INTERVAL: the confidence interval for the rate estimates. The default interval is 25-75 percentiles
+  #STD: the standard deviation of the posterior rate distribution.
+  #MSA DATA: The number of aligned sequences having an amino acid (non-gapped) from the overall number of sequences at each position.
+
+  #POS SEQ  SCORE    QQ-INTERVAL     STD      MSA DATA
+  #The alpha parameter 0.05
+  #The likelihood of the data given alpha and the tree is:
+  #LL=-9966.53
+  #1     M 0.0002242   [9.65e-19,3.989e-06] 0.001014 1011/1011
+  #2     V  0.0168   [0.002948,0.01779] 0.003824 1011/1011
+  #3     L 0.0004615   [9.65e-19,4.613e-05] 0.002097 1011/1011
+  #4     T 0.006544   [0.0004101,0.01779] 0.006853 1011/1011
+  #5     I 0.0002452   [9.65e-19,3.989e-06] 0.001131 1011/1011
+  r4s.col = c('POS','SEQ','SCORE','QQ_INTERVAL','STD','MSA')
+
+  # Make sure QQ-INTERVAL does not have space after the comma
+  clean_r4s = readLines(r4s) %>% gsub("(,\\s)",",",x = .)
+
+  df.r4s = readr::read_table2(file = clean_r4s, comment = '#', col_names = r4s.col) %>%
+           mutate(
+             ID = id,
+             QQ = str_remove_all(QQ_INTERVAL, pattern = "\\[|\\]"),
+             QQ1 = as.double(str_split_fixed(QQ,',',n=2)[,1]),
+             QQ2 = as.double(str_split_fixed(QQ,',',n=2)[,2])
+           ) %>% select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
+
+  return(df.r4s)
+}
+
+read.R4S.param = function(r4s, as.df=F){
+  require(tidyverse)
+  r4s.param = readLines(r4s) %>% grep(pattern="^#", x = ., value = T)
+  if(as.df){
+    df.param = tibble(
+      id = basename(r4s),
+      prior =  r4s.param %>% grep(x=.,"Prior",v=T) %>% gsub(pat="#Prior distribution is (\\w)",repl="\\1",x=.),
+      alpha = r4s.param %>% grep(x=.,"alpha parameter",v=T) %>% gsub(pat="#The alpha parameter ",repl=""),
+      LL =  r4s.param %>% grep(x=.,"LL",v=T) %>% gsub(pat="#LL=",repl=""),
+      r4s.avg =  r4s.param %>% grep(x=.,"Average",v=T) %>% gsub(pat="#Average = ",repl=""),
+      r4s.std=  r4s.param %>% grep(x=.,"Deviation",v=T) %>% gsub(pat="#Standard Deviation = ",repl="")
+    )
+    return(df.param)
+  }
+  return(r4s.param)
+}

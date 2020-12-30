@@ -1,5 +1,6 @@
 source("src/utils.r",local = T)
 source("src/function_sequence.r",local = T)
+source("src/function_phylogenetic.r",local = T)
 
 # Local proteome data ----------------------------------------------------------
 load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_general.R"){
@@ -22,18 +23,22 @@ load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_
   return(SC)
 }
 
-load.1011.strains = function(seqdir){
+load.1011.strains = function(seqdir="/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/"){
   if( !dir.exists(seqdir) ) stop("Directory of proteome sequences not found!")
   fastas =list.files(path=seqdir, pattern = "fasta", full.names = T, ignore.case = T, include.dirs = F)
-  return(read.proteomes(fastas))
+  return(read.proteomes(fastas,strip.fname=T))
 }
 
+#test = load.1011.strains()
+#length(test)
 # Evolution Sequence/Structure -------------------------------------------------
 # Precomputed data #
 #==================#
 # PROTEOME=readRDS('./data/PROTEIN-EVORATE.rds')
 # ALIGNED.DATA = readRDS('./data/RESIDUE-EVORATE.rds')
 #==================#
+
+
 load.wapinsky2007.data = function(path.data="./data/"){
   require(tictoc)
   doing = "Get rate4site data for yeast based on wapinsky 2007 fungi lineage"
@@ -49,24 +54,38 @@ load.wapinsky2007.data = function(path.data="./data/"){
   return(r4s.orf)
 }
 
-load.rate4site1011.data = function(path.r4s = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0/src/rate4site/RUN-1011G"){
+load.rate4site_1011.data = function(path.r4s = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0",
+                                    path.res = paste0(path.r4s,"/src/rate4site/RUN-1011G")
+                                   ){
+  require(tictoc)
+  doing = "Get rate4site data for 1011 isolated yeast strains"
+  message(doing)
+  tic(doing)
+  res = list.dirs(path.res,full.names = T,recursive = F)
+  orfs = get.orf.filename(res)
+  names(res)=orfs
 
-  res = list.dirs(path.r4s,full.names = T,recursive = F)
-  orfs
-  seqin = paste(res, "/seqin")
+  seqin = read.proteomes(paste0(res, "/seqin"))
+  names(seqin)=orfs
+  ws = sapply(widths(seqin),unique)
+  r4s = tibble( orf = orfs, len=ws, strains=lengths(seqin) )
 
-  length(seqin)
-  read.delim(res)
+  S288C  = load.sgd.proteome()
+  wr= setNames(widths(S288C),names(S288C))
+  sgd = tibble( orf= names(S288C), len=wr )
 
-  #nb = read.delim(file = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0/src/rate4site/RUN-1011G/NB_SPECIES", header=F, sep=' ')
-  #nb$orf = gsub(patt="\\.\\/(.+)\\/seqin", x = nb$V1, replacement = '\\1')
+  r4s.seq = left_join(r4s,sgd, by=c('orf'='orf'), suffix=c('.1k11','.s288c')) %>%
+            mutate( matched_sgd = (len.1k11 == len.s288c+1))
 
-  #nr = read.table(file = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0/src/rate4site/RUN-1011G/NRES",header=F)
-  #nr$orf = gsub(patt="\\.\\/(.+)\\/(.+)_norm.r4s", x = nr$V2, replacement = '\\1')
-  #length(intersect( nb$orf[ nb$V2 == 1011 ], nr$orf[nr$V1 == 0]))
+  r4s.raw = r4s.seq %>%
+    rowwise() %>%
+    mutate(r4s.file = sprintf("%s/%s_raw.r4s",res[orf],orf),
+           found=file.exists(r4s.file),
+           size=file.size(r4s.file))
 
-  #table(nb$V2 != 1011)
-  #table(nr$V1 > 0)
+  r4s.raw %>% map(read.R4S(r4s=r4s.file, orf=orf))
+  r4s.raw$found
+  toc(log=T)
 
 }
 
@@ -112,7 +131,7 @@ get.evo3d =  function(path.data='../data/'){
 
 # Evolutionary rate per regions on quaternary structure with ASA cutoff
 get.evo3d.byasa = function(asa,aligned.data=NULL){
-  message(sprintf('Surface is ASA above %s%%.',asa))
+  message(sprintf('Surface is ASA above %s%%.\n',asa))
   if(is.null(aligned.data)){  aligned.data = get.evo3d() }
   byasa = aligned.data %>%
     group_by(UNIPROTKB.id,SGD.id,ORF.id,code.chain.id) %>%
@@ -154,12 +173,12 @@ fetch.d2p2 = function(id,quiet=F){ # Get the d2p2 predictions for single id
     # response$YCL051W[[1]][[3]]$disorder$consensus
     d = res[[id]]
     sp = d[[1]][[2]]
-    if(!quiet){ message(sprintf("= %s from %s =",id,sp)) }
+    if(!quiet){ message(sprintf("= %s from %s =\n",id,sp)) }
     consensus = d[[1]][[3]]$disorder$consensus
     record = list(id=id,from=sp,diso=d[[1]][[3]]$disorder, structure=d[[1]][[3]]$structure)
     return(record)
   }else{
-    message(sprintf("id='%s' not recognized!",id))
+    message(sprintf("id='%s' not recognized!\n",id))
     return(list(id=id,from=NULL,diso=NULL,structure=NULL))
   }
 }
@@ -175,8 +194,9 @@ load.d2p2 = function(ids,saved){ # Get the d2p2 predictions for multiple ids
   }
 
   N=length(ids)
-
-  tic(sprintf("Loading d2p2 predictions for %s protein identifiers",N))
+  doing =sprintf("Loading d2p2 predictions for %s protein identifiers\n",N)
+  tic(doing)
+  message(doing)
   d2p2 = list()
   for( i in 1:N ){
     ID = ids[i]
@@ -185,7 +205,7 @@ load.d2p2 = function(ids,saved){ # Get the d2p2 predictions for multiple ids
     cat(prg)
   }
   toc()
-  message(sprintf("Saving D2P2 predictions to : %s",saved))
+  message(sprintf("Saving D2P2 predictions to : %s\n",saved))
   saveRDS(d2p2, saved)
   return(d2p2)
 }
@@ -264,26 +284,43 @@ load.codon.usage = function(inputseq,
 }
 
 # Amino Acid features ----------------------------------------------------------
-# path$scales = "/media/elusers/users/emmanuel/PAPERS/013_disorder_stickiness/data/Scales/"
-get.scales = function(SCALE_PATH = path$scales, byAA = T) {
-  scale.files = list.files(SCALE_PATH, pattern = 'scale.csv')
-  names(scale.files) = subname(scale.files, sep = "\\.", lc = T)
-  L.scales = lapply(scale.files, function(x) { read.csv(paste0(SCALE_PATH, x), stringsAsFactors = F) })
-  df.scales = Reduce(f = merge, x = L.scales)
-  if (!byAA) {
-    numcol = sapply(df.scales, is.numeric)
-    aa.val = t(df.scales[, numcol])
-    colnames(aa.val) = df.scales$AA
-    df.scales = data.frame(aa.val)
-  }
-  return(df.scales)
+# mypath = list(scales = "/media/elusers/users/emmanuel/PAPERS/013_disorder_stickiness/data/Scales/")
+# get.scales = function(SCALE_PATH = mypath$scales, byAA = T) {
+#   scale.files = list.files(SCALE_PATH, pattern = 'scale.csv')
+#   names(scale.files) = subname(scale.files, sep = "\\.", lc = T)
+#   L.scales = lapply(scale.files, function(x) { read.csv(paste0(SCALE_PATH, x), stringsAsFactors = F) })
+#   df.scales = Reduce(f = merge, x = L.scales)
+#   if (!byAA) {
+#     numcol = sapply(df.scales, is.numeric)
+#     aa.val = t(df.scales[, numcol])
+#     colnames(aa.val) = df.scales$AA
+#     df.scales = data.frame(aa.val)
+#   }
+#   return(df.scales)
+# }
+
+get.aascales=function(){
+  data.frame(
+    AA=get.AA1(),
+    aggrescan=get.aggrescan(),
+    camsol=get.camsol(),
+    foldamyloid=get.foldamyloid(),
+    kytedoolittle=get.kytedoolittle(),
+    pawar=get.pawar_ph7(),
+    roseman=get.roseman(),
+    stickiness=get.stickiness(),
+    voronoi_sickiness=get.voronoi_stickiness(),
+    wimleywhite=get.wimleywhite()
+  )
 }
+
 
 # Quaternary structures (3d-complex) -------------------------------------------
 load.3dcomplex.yeast = function(limit = F, n = 1000) {
   require(tictoc)
   require(RMySQL)
-  message("Get 3d complex yeast protein structures by residues...")
+  doing="Get 3d complex yeast protein structures by residues..."
+  message(doing)
   ## Establish a connection with mySQL database
   V6 = dbConnect( MySQL(), user = "elevy", password = "Mysql1!", dbname = "3dcomplexV6", host = "mata")
   ## Prepare mySQL query
@@ -310,12 +347,15 @@ load.3dcomplex.yeast = function(limit = F, n = 1000) {
   cond = "CH.org_ref='sc'"
   # D) Build final query as a string
   query = sprintf("SELECT\n%s\nFROM\n%s\nWHERE\n%s\n", select.fields, from.tables, cond)
+
   ## Run mySQL query if test on 1000 rows is successfully passed
   Qtest = dbGetQuery(V6, paste0(query, " LIMIT ", n))
-  if (limit) { return(Qtest) }
+  if (limit) { treturn(Qtest) }
 
   if (exists("Qtest") && nrow(Qtest) > 0) {
+    tic(doing)
     Q = dbGetQuery(V6, query)
+    toc()
   } else{
     stop(sprintf("Something went wrong with your query!\n\n%s\n", query))
   }
@@ -333,7 +373,8 @@ load.3dcomplex.yeast = function(limit = F, n = 1000) {
 get.mapping.3dcomplex.yeast = function(limit = F, n = 1000) {
   require(tictoc)
   require(RMySQL)
-  message("Get mapping between uniprot and pdb id for yeast protein complexes...")
+  doing="Get mapping between uniprot and pdb id for yeast protein complexes..."
+  message(doing)
   #'select C.code, CH.chain_name, resol, seqid, ident, overlap from complex C, chain CH where C.code = CH.code and org_ref = "sc" and ident > 90 and CH.overlap > 20 and resol < 2.5 order by CH.overlap DESC'
 
   ## Establish a connection with mySQL database
@@ -363,7 +404,9 @@ get.mapping.3dcomplex.yeast = function(limit = F, n = 1000) {
   if (limit) { return(Qtest) }
 
   if (exists("Qtest") && nrow(Qtest) > 0) {
+    tic(doing)
     Q = dbGetQuery(V6, query)
+    toc()
   } else{
     stop(sprintf("Something went wrong with your query!\n\n%s\n", query))
   }

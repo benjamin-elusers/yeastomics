@@ -7,8 +7,7 @@ script.to.env = function(src,nm){ # load script object into separate environment
   }
   sys.source(file=src,env)
 }
-d2p2.orf=readRDS("data/d2p2-yeast-orf.rds")
-d2p2.uni=readRDS("data/d2p2-yeast-uniprotKB.rds")
+
 
 # REFERENCE DATA
 library(AnnotationDbi)
@@ -23,6 +22,13 @@ script.to.env("src/function_sequence.r",'seq')
 
 SGD  = load.sgd.features()
 S288C  = load.sgd.proteome()
+UNI.SC = load.uniprot.proteome('yeast')
+UNI.HS = load.uniprot.proteome('human')
+# QUITE LONG! 2hours for 7000 ids (6600 retrieved)
+# d2p2.4932 = load.d2p2(ids = names(S288C),saved="data/d2p2-yeast-orf.rds")
+# d2p2.4932 = load.d2p2(ids = names(UNI.SC),saved="data/d2p2-yeast-uniprotKB.rds")
+# VERY LONG! 5hours for 20000 ids (18000 retrieved)
+# d2p2.9606 = load.d2p2(ids = names(UNI.HS),saveto="data/d2p2-human-uniprotKB.rds")
 
 ## LOAD DATASETS ---------------------------------------------------------------
 #==============================================================================#
@@ -30,9 +36,10 @@ S288C  = load.sgd.proteome()
 script.to.env("src/function_datalocal.r",'localdata')
 EDL = load.emmanuel.data()                     # Yeast data from emmanuel levy
 TAI = load.codon.usage(inputseq=load.sgd.CDS())
-#DP2 = load.d2p2(ids = names(S288C)) # QUITE LONG ~ 2hours for 7000ids -> load as RDS object
+#
 WAP = load.wapinsky2007.data()
 R4S = load.aligned.data(data.path="data/" )    # Aligned evolutionary rate
+
 
 # REMOTE DATA
 script.to.env("src/function_datapub.r",'remotedata')
@@ -43,6 +50,7 @@ HO   = load.ho2018.data()               # Unified protein abundance (MS,TAP,GFP)
 VIL  = load.villen2017.data()           # Protein Turnover (half-life)
 BEL  = load.belle2006.data()            # Protein Half-lives (NOT CORRELATED WITH THE REST)
 GEI  = load.geisberg2014.data(nodesc=T) # mRNA half-lives
+
 # load.byrne2005.data()                 # ohnologs are on different columns (~550 rows)
 WGD  = get.sc.ohno()                    # Whole-genome duplication data (ohnologs are a single column ~ 1000 rows)
 JAC  = load.jackson2018.data()          # 1011 strains project details

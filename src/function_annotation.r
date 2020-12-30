@@ -89,13 +89,15 @@ get.mapping.sgd.to.uniprot = function(tax=559292,input=id_sgd){
   require(tictoc)
   require(UniProt.ws)
   uniprot  = UniProt.ws::UniProt.ws(taxId=tax) # 559292 S. cerevisiae 288C (maintained by SGD)
-  tic('Retrieving mapping between uniprot accession and SGD ID...')
+  doing='Retrieving mapping between uniprot accession and SGD ID...'
+  tic(doing)
+  message(doing)
   # TAKES ~50sec for about 7000 ids
   mapped = UniProt.ws::select(x=uniprot,
                               keys=unique(input),  keytype = "SGD",
                               columns = c("SGD","UNIPROTKB")) %>%
     filter(!is.na(UNIPROTKB)) %>% distinct()
-  toc(log=T)
+  toc()
   return(mapped)
 }
 
@@ -105,7 +107,9 @@ load.sgd.to.uniprot = function(tax=559292,input_id=id_sgd){
   sgd_mapped = get.mapping.sgd.to.uniprot(input=input_id)
   require(UniProt.ws)
   uniprot  = UniProt.ws::UniProt.ws(taxId=tax) # 559292 = S. cerevisiae 288C (maintained by SGD)
-  tic('Retrieving infos (sequence,annotations...) for SGD mapped uniprot entry...')
+  doing='Retrieving infos (sequence,annotations...) for SGD mapped uniprot entry...'
+  message(doing)
+  tic(doing)
   # TAKES ~220sec for about 7000 ids
   sgd2uni_info = UniProt.ws::select(
     x=uniprot, keys=sgd_mapped$UNIPROTKB, keytype = "UNIPROTKB",
@@ -239,8 +243,10 @@ load.sgd.features = function(){ # Gene/Protein features from SGD
 load.uniprot.features = function(tax,input){ # Gene/Protein features from Uniprot
   require(UniProt.ws)
   uniprot  = UniProt.ws::UniProt.ws(taxId=tax)
-  tic('Retrieving mapping between uniprot accession and SGD ID...')
+  doing='Retrieving mapping between uniprot accession and SGD ID...'
+  message(doing)
   # TAKES ~50sec for about 7000 ids
+  tic(doing)
   mapped = UniProt.ws::select(x=uniprot,
                               keys=unique(input),  keytype = "SGD",
                               columns = c("SGD","UNIPROTKB")) %>%
