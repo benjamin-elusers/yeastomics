@@ -18,7 +18,7 @@ SGD.nomenclature = function(coding=T,rna=F){
 
 
 load.sgd.CDS = function(withORF=T) {
-  require(stringr)
+  library(stringr)
   sgd.url = "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_dna/orf_coding_all.fasta.gz"
   SGD = load.genome(sgd.url)
   regexSGD = "(S[0-9]{9})"
@@ -34,7 +34,7 @@ load.sgd.CDS = function(withORF=T) {
 }
 
 load.sgd.proteome = function(withORF=T) {
-  require(stringr)
+  library(stringr)
   sgd.url = "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_protein/orf_trans_all.fasta.gz"
   SGD = load.proteome(sgd.url)
   regexSGD = "(S[0-9]{9})"
@@ -50,7 +50,7 @@ load.sgd.proteome = function(withORF=T) {
 }
 
 load.pombase.proteome = function(withORF=T) {
-  require(stringr)
+  library(stringr)
   pombase.url = "ftp://ftp.pombase.org/pombe/genome_sequence_and_features/feature_sequences/peptide.fa.gz"
   Pombase = load.proteome(pombase.url)
   regexPombaseID = "(SP[^ ]+)(?=:pep)"
@@ -66,7 +66,7 @@ load.pombase.proteome = function(withORF=T) {
 }
 
 load.uniprot.proteome = function(species='yeast') {
-  require(stringr)
+  library(stringr)
   uniprot.url = "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota"
   taxon=match.arg(species, choices = c('yeast','human'), several.ok = F)
   proteomes=c(human="UP000005640_9606.fasta.gz",yeast="UP000002311_559292.fasta.gz")
@@ -79,11 +79,11 @@ load.uniprot.proteome = function(species='yeast') {
 }
 
 read.proteomes = function(seqfiles,strip.fname=F){
-  require(Biostrings)
-  require(tictoc)
-  require(progress)
-  #require(biomartr) # NOT REQUIRED
-  #require(purrr)    # NOT REQUIRED
+  library(Biostrings)
+  library(tictoc)
+  library(progress)
+  #library(biomartr) # NOT libraryD
+  #library(purrr)    # NOT libraryD
 
   task="Reading proteomes from fasta sequences..."
   tic(msg = task)
@@ -114,7 +114,7 @@ count.fasta = function(fastafile){
 }
 
 get.orf.fasta = function(fastafile){
-  require(Biostrings)
+  library(Biostrings)
   fasta = Biostrings::readAAStringSet(fastafile)
   return(names(fasta))
 }

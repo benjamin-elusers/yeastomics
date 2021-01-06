@@ -24,7 +24,7 @@ load.dubreuil2019.data = function(d){
   data.url = sprintf('%s/%s',dubreuil$base_url[d], dubreuil$num[d])
 
   if( dubreuil$format[d] == 'XLSX' ){
-    require(openxlsx)
+    library(openxlsx)
     res = openxlsx::read.xlsx(data.url,colNames=T,sheet=1, startRow=1)
   } else if( dubreuil$format[d] == 'TSV'){
     res = read.delim(file = data.url, header=T, sep='\t', stringsAsFactors = F)
@@ -36,8 +36,8 @@ load.dubreuil2019.data = function(d){
 
 load.leunberger2017.data = function(species='S. cerevisiae',rawdata=F){
   # Load protein stability data
-  require(openxlsx)
-  require(tidyverse)
+  library(openxlsx)
+  library(tidyverse)
   message("REF: P. Leuenberger et al., 2017, Science")
   message("Cell-wide analysis of protein thermal unfolding reveals determinants of thermostability")
   species=match.arg(species, choices = c('S. cerevisiae','E. coli', 'Human HeLa Cells','T. thermophilus'), several.ok = F)
@@ -76,10 +76,10 @@ load.leunberger2017.data = function(species='S. cerevisiae',rawdata=F){
 load.jackson2018.data =function(){
   # Load 1011 yeast strains data
   # Sheet 1 = Strains details
-  require(tidyverse)
-  require(hablar)
+  library(tidyverse)
+  library(hablar)
   get.longest = function(S, s='\\.'){
-    require(stringr)
+    library(stringr)
     L = str_split(string = S, pattern = s)
     long=sapply(L,function(x){ nc=nchar(x); which.max(nc)})
     sapply(1:length(L),function(i){ L[[i]][long[i]] })
@@ -142,7 +142,7 @@ load.jackson2018.data =function(){
 }
 
 load.vanleeuwen2020.data = function(){
-  require(openxlsx)
+  library(openxlsx)
   # Load gene dispensability inferred from bypass suppression of essential genes
   message("REF: Van Leeuwen et al., 2020, Molecular Systems Biology")
   message("Systematic analysis of bypass suppression of essential genes")
@@ -158,7 +158,7 @@ load.vanleeuwen2020.data = function(){
 }
 
 load.villen2017.data = function(){
-  require(openxlsx)
+  library(openxlsx)
 
   # Load protein turnover (half-lives)
   message("REF: M. Martin-Perez and J. Villén, 2017, Cell Systems")
@@ -195,7 +195,7 @@ load.belle2006.data = function(){
 }
 
 load.geisberg2014.data = function(nodesc=T){
-  require(openxlsx)
+  library(openxlsx)
   # Load mRNA half-lives
   message("REF: J.V. Geisberg et al., 2014, Cell")
   message("Global Analysis of mRNA Isoform Half-Lives Reveals Stabilizing and Destabilizing Elements in Yeast")
@@ -215,7 +215,7 @@ load.ho2018.data = function(noauto = T,
                                  nogfp  = F,
                                  noms   = F,
                                  notap  = F) {
-  require(openxlsx)
+  library(openxlsx)
   message("REF: B. Ho et al., 2018, Cell Systems")
   message("Unification of Protein Abundance Datasets Yields a Quantitative Saccharomyces cerevisiae Proteome")
   # https://doi.org/10.1016/j.cels.2017.12.004

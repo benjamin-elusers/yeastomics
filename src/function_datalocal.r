@@ -5,10 +5,10 @@ source("src/function_phylogenetic.r",local = T)
 # Local proteome data ----------------------------------------------------------
 load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_general.R"){
   source(toolbox,local = T)
-  require(AnnotationDbi)
-  require(org.Sc.sgd.db)
-  require(GO.db)
-  require(tidyverse)
+  library(AnnotationDbi)
+  library(org.Sc.sgd.db)
+  library(GO.db)
+  library(tidyverse)
 
   SC = get.proteome.table() %>%
     mutate(
@@ -38,7 +38,7 @@ load.1011.strains= function(seqdir="/media/elusers/users/benjamin/A-PROJECTS/01_
 #==================#
 
 load.wapinsky2007.data = function(path.data="./data/"){
-  require(tictoc)
+  library(tictoc)
   doing = "Get rate4site data for yeast based on wapinsky 2007 fungi lineage"
   tic(doing)
   #rate4site-yeast-fungi_lineage.tsv.gz
@@ -55,10 +55,10 @@ load.wapinsky2007.data = function(path.data="./data/"){
 path.r4s = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0"
 load.rate4site_1011.data = function(path.res = paste0(path.r4s,"/src/rate4site/RUN-1011G"),
                                     only_results=T){
-  require(tictoc)
-  require(purrr)
-  require(progress)
-  require(tidyverse)
+  library(tictoc)
+  library(purrr)
+  library(progress)
+  library(tidyverse)
 
   doing = "Get rate4site data for 1011 isolated yeast strains"
   message(doing)
@@ -178,7 +178,7 @@ get.evo3d.byasa = function(asa,aligned.data=NULL){
 
 # Disorder predictions ---------------------------------------------------------
 fetch.d2p2 = function(id,quiet=F){ # Get the d2p2 predictions for single id
-  require(rjson)
+  library(rjson)
   # id='YDR134C'
   d2p2.url = sprintf('http://d2p2.pro/api/seqid/["%s"]',id)
   res = rjson::fromJSON(readLines(d2p2.url, warn=FALSE))
@@ -200,8 +200,8 @@ fetch.d2p2 = function(id,quiet=F){ # Get the d2p2 predictions for single id
 load.d2p2 = function(ids,saved){ # Get the d2p2 predictions for multiple ids
   if(!is.vector(ids)){ stop('Input must be a vector of identifiers as character...') }
 
-  require(tools)
-  require(tictoc)
+  library(tools)
+  library(tictoc)
   if( file.exists(saved) ){
     if( file_ext(saved) != 'rds' ){ warning("File type not recognized ! (should be RDS object)") }
     return( readRDS(saved) )
@@ -267,8 +267,8 @@ load.codon.usage = function(inputseq,
   url.codonR="https://raw.githubusercontent.com/mariodosreis/tai/master/R/tAI.R"
   ord.codonR = get.codons4tai()
 
-  if( !require(tAI) ){ devtools::install_github("mariodosreis/tai") } # Install this package first
-  require(tAI)
+  if( !library(tAI) ){ devtools::install_github("mariodosreis/tai") } # Install this package first
+  library(tAI)
   tai.R = sprintf("%s/tAI.R",url.codonR)
   # Can use local address
   #if(file.exists(codonR)){ tai.R = sprintf("%s/tAI.R",codonR) }
@@ -331,8 +331,8 @@ get.aascales=function(){
 
 # Quaternary structures (3d-complex) -------------------------------------------
 load.3dcomplex.yeast = function(limit = F, n = 1000) {
-  require(tictoc)
-  require(RMySQL)
+  library(tictoc)
+  library(RMySQL)
   doing="Get 3d complex yeast protein structures by residues..."
   message(doing)
   ## Establish a connection with mySQL database
@@ -385,8 +385,8 @@ load.3dcomplex.yeast = function(limit = F, n = 1000) {
 }
 
 get.mapping.3dcomplex.yeast = function(limit = F, n = 1000) {
-  require(tictoc)
-  require(RMySQL)
+  library(tictoc)
+  library(RMySQL)
   doing="Get mapping between uniprot and pdb id for yeast protein complexes..."
   message(doing)
   #'select C.code, CH.chain_name, resol, seqid, ident, overlap from complex C, chain CH where C.code = CH.code and org_ref = "sc" and ident > 90 and CH.overlap > 20 and resol < 2.5 order by CH.overlap DESC'

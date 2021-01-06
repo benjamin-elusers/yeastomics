@@ -1,0 +1,72 @@
+---
+title: "Protein Categories"
+author: "Benjamin Dubreuil"
+date: "January 6, 2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("src/utils.r")
+source("src/function_annotation.r")
+source("src/function_sequence.r")
+source("src/function_phylogenetic.r")
+source("src/function_analysis.r")
+source("src/function_datalocal.r")
+source("src/function_datapub.r")
+library(tictoc)
+library(tidyverse)
+```
+
+## Reference proteome sequence
+```{r reference}
+# MAIN PROTEIN FEATURES
+SGD  = load.sgd.features()
+UNIPROT = load.uniprot.features() # Takes >60sec
+saveRDS(UNIPROT,"data/uniprot-features.rds")
+
+
+# PRIMARY REFERENCE SEQUENCES
+S288C  = load.sgd.proteome(withORF=F)
+UNI.SC = load.uniprot.proteome('yeast')
+id_sgd = names(S288C)
+sgduni = get.mapping.sgd.to.uniprot(input = id_sgd)
+head(sgduni)
+
+width(S288C)
+width(UNI.SC)
+```
+
+## Genetic features
+```{r genetic}
+
+reviewed
+verified
+with_intron
+
+
+
+```
+
+## Biophysical features
+```{r biophysical}
+
+```
+
+## Interactions features
+```{r interactions}
+
+```
+
+## Phenotypes features
+```{r phenotype}
+# Essentiality
+# Dispensability
+```
+
+## Subcellular localization
+```{r localization}
+
+```

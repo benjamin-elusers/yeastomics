@@ -3,8 +3,8 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
                       lowest=50, highest=50){
   # Generate bins of a vector based on quantile or with equal number of observations
   # First and last bin can be adjusted manually
-  require(hablar)
-  require(dplyr)
+  library(hablar)
+  library(dplyr)
   N = length(tobin)
   # Define the lowest/highest bin according to number or fraction of values
   if( between(lowest,0,1) ){

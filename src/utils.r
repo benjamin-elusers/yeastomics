@@ -172,7 +172,7 @@ toUnits <- function(x){
 
 # Sequences --------------------------------------------------------------------
 load.proteome = function(url,nostop=T) {
-  require(Biostrings)
+  library(Biostrings)
   p = Biostrings::readAAStringSet(filepath = url)
   if(nostop){ # Remove the trailing star from amino acid sequence (stop codon)
     star = Biostrings::subseq(p,start=-1) == '*'
@@ -182,7 +182,7 @@ load.proteome = function(url,nostop=T) {
 }
 
 load.genome = function(url) {
-  require(Biostrings)
+  library(Biostrings)
   g = Biostrings::readDNAStringSet(filepath = url)
   return(g)
 }
