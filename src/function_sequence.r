@@ -78,15 +78,29 @@ load.uniprot.proteome = function(species='yeast') {
   return(UNI)
 }
 
-read.proteomes = function(seqfiles,strip.fname=T){
+read.proteomes = function(seqfiles,strip.fname=F){
   require(Biostrings)
-  require(biomartr)
   require(tictoc)
+  require(progress)
+  #require(biomartr) # NOT REQUIRED
+  #require(purrr)    # NOT REQUIRED
+
   task="Reading proteomes from fasta sequences..."
   tic(msg = task)
   message(task)
-  P=mapply(seqfiles, FUN=read_proteome, MoreArgs = list(format = "fasta", obj.type = "Biostrings"))
-  if(strip.fname){ names(P) = sapply(seqfiles,get.orf.filename) }
+  pb = progress::progress_bar$new(total = length(seqfiles), width = 100, clear=T,
+                         format = " (:spin) :what [:bar] :percent (:current/:total # :elapsed eta: ~:eta)")
+
+  readProteome = function(file, format = "fasta", obj.type = "Biostrings", .pb=NULL, ...){
+    if(!.pb$finished){ .pb$tick(tokens=list(what=task)) }
+    #return( biomartr::read_proteome(file,format,obj.type,...) )
+    return(Biostrings::readAAStringSet(file, format = 'fasta' ))
+  }
+  P = mapply( seqfiles, FUN=readProteome,  MoreArgs = list(.pb=pb))
+  if(strip.fname){
+    warning("filename will be used as the proteome identifier")
+    names(P) = get.orf.filename(seqfiles)
+  }
   toc()
   return(P)
 }
@@ -95,32 +109,14 @@ get.orf.filename = function(seqfile){
   return( gsub(x=basename(seqfile),pattern='\\.(fasta)$',replacement = "", ignore.case = F, perl=T) )
 }
 
-
-load.sgd.features = function(){ # Gene/Protein features from SGD
-  require(stringr)
-  sgd_feat.url = "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"
-  sgd.feat = read.delim2(sgd_feat.url, sep='\t', quote = "",
-                         header=F, fill=T, strip.white=T,stringsAsFactors = F,
-                         col.names = c('sgdid','type','qual','name',
-                                       'gname','alias','parent','sgdid2',
-                                       'chr','start','end','strand','gpos',
-                                       'coordv','seqv','desc')  )
-  return(sgd.feat)
+count.fasta = function(fastafile){
+  return(sum(grepl("^>",readLines(fastafile))))
 }
 
-
-load.uniprot.features = function(tax,input){ # Gene/Protein features from Uniprot
-  require(UniProt.ws)
-  uniprot  = UniProt.ws::UniProt.ws(taxId=tax)
-  do='Retrieving mapping between uniprot accession and SGD ID...'
-  tic(msg=do)
-  message(do)
-  # TAKES ~50sec for about 7000 ids
-  mapped = UniProt.ws::select(x=uniprot,
-                              keys=unique(input),  keytype = "SGD",
-                              columns = c("SGD","UNIPROTKB")) %>%
-    filter(!is.na(UNIPROTKB)) %>% distinct()
-  toc()
+get.orf.fasta = function(fastafile){
+  require(Biostrings)
+  fasta = Biostrings::readAAStringSet(fastafile)
+  return(names(fasta))
 }
 
 widths = function(BS){

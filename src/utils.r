@@ -198,7 +198,7 @@ fneg    <- function(SEQ){ mean(is.neg(SEQ)) }
 charged <- function(SEQ){ return( pos(SEQ) + neg(SEQ) ) }
 fcr     <- function(SEQ){ return( fpos(SEQ) + fneg(SEQ)  ) }
 npcr    <- function(SEQ){ return( abs( fpos(SEQ) - fneg(SEQ) )  ) }
-charge.asym <- function(p,n){ return( (p-n)**2 / (p+n) ) }
+charge.asym <- function(p,n){ return( (p-n)**2 / (p+n) ) } #p=positives n=negatives (sums)
 
 # Fasta format
 seq2fasta <- function(seq, maxline=70, as.string=F){
@@ -316,10 +316,7 @@ round2near <- function(nb,roundto){ # returns the nearest number up to the speci
   else if( abs(nb-a) > abs(nb-b) ){ return(b) }
   else{ return(nb) }
 }
-
-Round2Nearest <- function(...){
-  round2near(...)
-}
+Round2Nearest <- function(...){ round2near(...) }
 
 mad_      <- function(...){ mad(na.rm=T,...) } # Median absoluted deviations without NA
 quantile_ <- function(x,...){  quantile(x,...,na.rm=T) } # quantile with no error message for missing values
@@ -335,7 +332,11 @@ spearman <- function(X,Y){
 get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','p.value')]) }
 
 # precomputed data -------------------------------------------------------------
-get.AA1 = function(){ str2chr("ACDEFGHIKLMNPQRSTVWY") }
+get.AA1 = function(){ unlist(strsplit("ACDEFGHIKLMNPQRSTVWY","")) }
+get.AA3 = function(){ c('A'="ALA",'C'="CYS",'D'="ASP",'E'="GLU",'F'="PHE",
+                        'G'="GLY",'H'="HIS",'I'="ILE",'K'="LYS",'L'="LEU",
+                        'M'="MET",'N'="ASN",'P'="PRO",'Q'="GLN",'R'="ARG",
+                        'S'="SER",'T'="THR",'V'="VAL",'W'="TRP",'Y'="TYR") }
 
 get.aggrescan = function(){
   setNames(

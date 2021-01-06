@@ -1,6 +1,9 @@
 source("src/utils.r",local = T)
 source("src/function_sequence.r",local = T)
 source('src/function_alignment.r',local = T)
+source('src/function_phylogenetic.r',local = T)
+library(openxlsx)
+
 # Remote published proteome data -----------------------------------------------
 load.dubreuil2019.data = function(d){
   # Load stickiness and disorder data
@@ -40,7 +43,7 @@ load.leunberger2017.data = function(species='S. cerevisiae',rawdata=F){
   species=match.arg(species, choices = c('S. cerevisiae','E. coli', 'Human HeLa Cells','T. thermophilus'), several.ok = F)
   S3.url = "https://science.sciencemag.org/highwire/filestream/690833/field_highwire_adjunct_files/2/aai7825_Leuenberger_Table-S3.xlsx"
   #download.file(S3.url, destfile = "aai7825_Leuenberger_Table-S3.xlsx" )
-  LIP_MS = read.xlsx(xlsxFile = S3.url,
+  LIP_MS = openxlsx::read.xlsx(xlsxFile = S3.url,
                      sheet = species, detectDates = T,
                      skipEmptyRows = T, skipEmptyCols = T)
 
@@ -139,13 +142,14 @@ load.jackson2018.data =function(){
 }
 
 load.vanleeuwen2020.data = function(){
+  require(openxlsx)
   # Load gene dispensability inferred from bypass suppression of essential genes
   message("REF: Van Leeuwen et al., 2020, Molecular Systems Biology")
   message("Systematic analysis of bypass suppression of essential genes")
   #"https://www.embopress.org/doi/full/10.15252/msb.20209828"
   EV13.url = "https://www.embopress.org/action/downloadSupplement?doi=10.15252%2Fmsb.20209828&file=msb209828-sup-0014-DatasetEV13.xlsx"
   #download.file(EV13.url, destfile = "msb209828-sup-0014-datasetev13.xlsx" )
-  dispensable = read.xlsx(xlsxFile = EV13.url,
+  dispensable = openxlsx::read.xlsx(xlsxFile = EV13.url,
                           sheet = 2, detectDates = F,
                           skipEmptyRows = T, skipEmptyCols = T
   )
@@ -154,13 +158,15 @@ load.vanleeuwen2020.data = function(){
 }
 
 load.villen2017.data = function(){
+  require(openxlsx)
+
   # Load protein turnover (half-lives)
   message("REF: M. Martin-Perez and J. Villén, 2017, Cell Systems")
   message("Determinants and Regulation of Protein Turnover in Yeast")
   #"https://doi.org/10.1016/j.cels.2017.08.008"
   S1.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217303411-mmc2.xlsx"
   #download.file(S1.url, destfile = "1-s2.0-S2405471217303411-mmc2.xlsx")
-  turnover = read.xlsx(xlsxFile = S1.url,
+  turnover = openxlsx::read.xlsx(xlsxFile = S1.url,
                        sheet = 1, detectDates = F,
                        skipEmptyRows = T, skipEmptyCols = T, startRow = 4)
 
@@ -189,13 +195,14 @@ load.belle2006.data = function(){
 }
 
 load.geisberg2014.data = function(nodesc=T){
+  require(openxlsx)
   # Load mRNA half-lives
   message("REF: J.V. Geisberg et al., 2014, Cell")
   message("Global Analysis of mRNA Isoform Half-Lives Reveals Stabilizing and Destabilizing Elements in Yeast")
   #https://doi.org/10.1016/j.cell.2013.12.026
   S1.url = "https://ars.els-cdn.com/content/image/1-s2.0-S009286741301595X-mmc1.xlsx"
   #download.file(S1.url, destfile = "mmc1.xlsx")
-  mrna.half = read.xlsx(xlsxFile = S1.url,
+  mrna.half = openxlsx::read.xlsx(xlsxFile = S1.url,
                         sheet = 1, detectDates = F,
                         skipEmptyRows = T, skipEmptyCols = T, startRow = 1)
 
@@ -224,7 +231,7 @@ load.ho2018.data = function(noauto = T,
             sprintf("%s.%s", tap, gro[1])
   )
   # Table S3. Protein Abundance in Molecules per Cell, before GFP Autofluorescence Filtering
-  S3 =  read.xlsx(
+  S3 =  openxlsx::read.xlsx(
     xlsxFile = "https://ars.els-cdn.com/content/image/1-s2.0-S240547121730546X-mmc4.xlsx",
     sheet = 1, rows = 3:5751,
     colNames = T, skipEmptyRows = T, skipEmptyCols = T, na.strings = c("")
@@ -232,7 +239,7 @@ load.ho2018.data = function(noauto = T,
   colnames(S3) = cols
 
   # Table S4. Protein Abundance in Molecules per Cell, after GFP Autofluorescence Filtering,
-  S4 =  read.xlsx(
+  S4 =  openxlsx::read.xlsx(
     xlsxFile = "https://ars.els-cdn.com/content/image/1-s2.0-S240547121730546X-mmc5.xlsx",
     sheet = 1, rows = 3:5861,
     colNames = T, skipEmptyRows = T, skipEmptyCols = T, na.strings = c("")
@@ -305,42 +312,4 @@ load.byrne2005.data = function() {
     dplyr::select(WGD_anc, orf, gname, ref, dup.orf, dup.gname, pid, rlen)
   return(ygob)
 }
-
-get.ygob.pair = function(ygob = load.ygob.ohnologs() ){
-  return(ygob[, c('orf', 'dup.orf')])
-}
-
-get.sc.ohno = function(myseq) {
-  ygob = load.byrne2005.data()
-  bogy = ygob %>%
-    dplyr::rename( orf = dup.orf, gname = dup.gname, dup.orf = orf, dup.gname = gname ) %>%
-    mutate(ref = 2) %>%
-    dplyr::select(WGD_anc, orf, gname, ref, dup.orf, dup.gname, pid, rlen)
-  ohno = ygob %>% bind_rows(bogy)
-
-  if(missing(myseq)){ myseq = load.sgd.proteome() }
-  ohno.seq = get.pair.prot(prot=myseq, pair = get.ygob.pair(ohno))
-  ohno.ali = align.pair.prot(p1=ohno.seq$s1, p2=ohno.seq$s2, mat='BLOSUM62')
-  aafreq = alphabetFrequency(alignedSubject(ohno.ali))
-  gaps = rowSums(aafreq[,c("-","+")])
-
-  pair = get.ygob.pair(ohno) %>%
-    mutate( L1 = width(ohno.seq$s1),
-            L2 = width(ohno.seq$s2),
-            RLEN = round(pmin(L1,L2) / pmax(L1,L2), 2),
-            PID1 = round(pid( ohno.ali, "PID1" ),1),
-            PID2 = round(pid( ohno.ali, "PID2" ),1),
-            PID3 = round(pid( ohno.ali, "PID3" ),1),
-            PID4 = round(pid( ohno.ali, "PID4" ),1),
-            SCORE.B100 = score( ohno.ali ),
-            S = nmatch( ohno.ali ),
-            N = nmismatch( ohno.ali ),
-            G = gaps,
-            SGDID = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$orf,columns ="SGD",keytype = 'ORF')[,2],
-            SGDID.dup = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$dup.orf,columns ="SGD",keytype = 'ORF')[,2]
-    ) %>% right_join(ohno)
-
-  return(pair)
-}
-
 

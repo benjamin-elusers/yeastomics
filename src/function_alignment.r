@@ -1,4 +1,4 @@
-source("src/utils.r")
+source("src/utils.r",local = T)
 # Pairwise alignment -----------------------------------------------------------
 get.pair.prot = function(prot, pair){
   seq.1 = prot[pair[[1]]]

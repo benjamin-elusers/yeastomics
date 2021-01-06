@@ -1,4 +1,4 @@
-set.seed(09122020)
+set.seed(04012021)
 script.to.env = function(src,nm){ # load script object into separate environment
   if( !(nm %in% search()) ){
     env = attach(what = NULL,name = nm);
@@ -17,13 +17,20 @@ library(Biostrings)
 library(tidyverse)
 library(stringr)
 library(tictoc)
+library(openxlsx)
 script.to.env("src/utils.r",'utils')
 script.to.env("src/function_sequence.r",'seq')
+script.to.env("src/function_annotation.r",'annot')
 
+# MAIN PROTEIN FEATURES
 SGD  = load.sgd.features()
+UNIPROT = load.uniprot.features()
+#saveRDS(UNIPROT, "data/uniprot-features.rds")
+
+# PRIMARY SEQUENCES
 S288C  = load.sgd.proteome()
 UNI.SC = load.uniprot.proteome('yeast')
-UNI.HS = load.uniprot.proteome('human')
+#UNI.HS = load.uniprot.proteome('human')
 # QUITE LONG! 2hours for 7000 ids (6600 retrieved)
 # d2p2.4932 = load.d2p2(ids = names(S288C),saved="data/d2p2-yeast-orf.rds")
 # d2p2.4932 = load.d2p2(ids = names(UNI.SC),saved="data/d2p2-yeast-uniprotKB.rds")
@@ -37,13 +44,16 @@ script.to.env("src/function_datalocal.r",'localdata')
 EDL = load.emmanuel.data()                     # Yeast data from emmanuel levy
 TAI = load.codon.usage(inputseq=load.sgd.CDS())
 #
-WAP = load.wapinsky2007.data()
-R4S = load.aligned.data(data.path="data/" )    # Aligned evolutionary rate
+WAP = load.wapinsky2007.data()       # Evolutionary rate from fungi lineage
+K11.R4S = load.rate4site_1011.data() # Evolutionary rate from 1011 strains
+#K11 = load.1011.strains()           # 1011 strains proteomes sequences
+head(K11.R4S)
 
+R4S = load.aligned.data(data.path="data/" ) # Aligned evolutionary rate
 
 # REMOTE DATA
 script.to.env("src/function_datapub.r",'remotedata')
-DUB  = load.dubreuil2019.data()         # Stickiness disorder
+DUB  = load.dubreuil2019.data(1)         # Stickiness disorder
 LEU  = load.leunberger2017.data()       # Limited proteolysis (stability)
 VAN  = load.vanleeuwen2020.data()       # Gene dispensability (essentiality)
 HO   = load.ho2018.data()               # Unified protein abundance (MS,TAP,GFP)
@@ -55,4 +65,22 @@ GEI  = load.geisberg2014.data(nodesc=T) # mRNA half-lives
 WGD  = get.sc.ohno()                    # Whole-genome duplication data (ohnologs are a single column ~ 1000 rows)
 JAC  = load.jackson2018.data()          # 1011 strains project details
 
-G1011 = load.proteome
+
+#saveRDS(SGD,file='/media/elusers/users/benjamin/A-PROJECTS/02_Scripts/R/forMeta/sgd-features.rds')
+#saveRDS(DUB,file='/media/elusers/users/benjamin/A-PROJECTS/02_Scripts/R/forMeta/dubreuil-2019.rds')
+#saveRDS(UNIPROT, "/media/elusers/users/benjamin/A-PROJECTS/02_Scripts/R/forMeta/uniprot-features.rds")
+#saveRDS(VAN,"/media/elusers/users/benjamin/A-PROJECTS/02_Scripts/R/forMeta/essential-dispensable.rds")
+
+GO   = get.uniprot.go(names(UNI.SC))
+LOC  = get.uniprot.localization(annot = UNIPROT,loc_to_columns = T)
+PMID = get.uniprot.pmid(names(UNI.SC))
+UNISGD  = get.uniprot.sgd(names(UNI.SC))
+
+head(PMID)
+head(LOC)
+head(GO)
+
+
+script.to.env("src/function_annotation.r",'annot')
+get.uniprot.sgd()
+load.uniprot.features(tax = 559292)

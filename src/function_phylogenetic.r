@@ -7,10 +7,6 @@ source("src/utils.r",local = T)
 #   #scinfo = readRDS('yeast-proteome-sgd_infos.rds')
 # }
 
-get.ygob.pair = function(ygob = load.ygob.ohnologs() ){
-  return(ygob[, c('orf', 'dup.orf')])
-}
-
 
 load.ygob.ohnologs = function() {
   message("REF: Byrne and Wolfe, 2005, Genome Research")
@@ -44,6 +40,46 @@ load.ygob.ohnologs = function() {
   return(ygob)
 }
 
+get.ygob.pair = function(ygob = load.ygob.ohnologs() ){
+  return(ygob[, c('orf', 'dup.orf')])
+}
+
+get.sc.ohno = function(myseq) {
+  ygob = load.byrne2005.data()
+  bogy = ygob %>%
+    dplyr::rename( orf = dup.orf, gname = dup.gname, dup.orf = orf, dup.gname = gname ) %>%
+    mutate(ref = 2) %>%
+    dplyr::select(WGD_anc, orf, gname, ref, dup.orf, dup.gname, pid, rlen)
+  ohno = ygob %>% bind_rows(bogy)
+
+  if(missing(myseq)){ myseq = load.sgd.proteome() }
+  ohno.seq = get.pair.prot(prot=myseq, pair = get.ygob.pair(ohno))
+  ohno.ali = align.pair.prot(p1=ohno.seq$s1, p2=ohno.seq$s2, mat='BLOSUM62')
+  aafreq = alphabetFrequency(alignedSubject(ohno.ali))
+  gaps = rowSums(aafreq[,c("-","+")])
+
+  pair = get.ygob.pair(ohno) %>%
+    mutate( L1 = width(ohno.seq$s1),
+            L2 = width(ohno.seq$s2),
+            RLEN = round(pmin(L1,L2) / pmax(L1,L2), 2),
+            PID1 = round(pid( ohno.ali, "PID1" ),1),
+            PID2 = round(pid( ohno.ali, "PID2" ),1),
+            PID3 = round(pid( ohno.ali, "PID3" ),1),
+            PID4 = round(pid( ohno.ali, "PID4" ),1),
+            SCORE.B100 = score( ohno.ali ),
+            S = nmatch( ohno.ali ),
+            N = nmismatch( ohno.ali ),
+            G = gaps,
+            SGDID = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$orf,columns ="SGD",keytype = 'ORF')[,2],
+            SGDID.dup = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$dup.orf,columns ="SGD",keytype = 'ORF')[,2]
+    ) %>% right_join(ohno)
+
+  return(pair)
+}
+
+
+
+
 load.pombe.orthologs = function() {
   url.orthologs = "ftp://ftp.pombase.org/pombe/orthologs/cerevisiae-orthologs.txt"
   sp.sc = read.delim(url.orthologs, comment.char = "#", stringsAsFactors = F,
@@ -67,11 +103,6 @@ load.pombe.orthologs = function() {
 get.ortho.pair = function(ortho = load.pombe.orthologs() ){
   return(ortho[,c('PombaseID','ORF')])
 }
-
-get.ygob.pair = function(ygob = load.ygob.ohnologs() ){
-  return(ygob[, c('orf', 'dup.orf')])
-}
-
 
 compare.to.ancestors = function(ancestor, current){
   ancestral.genome = read.delim(file = ancestor, header = T,sep = '\t',stringsAsFactors = F)
@@ -175,9 +206,17 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   #5     I 0.0002452   [9.65e-19,3.989e-06] 0.001131 1011/1011
   r4s.col = c('POS','SEQ','SCORE','QQ_INTERVAL','STD','MSA')
 
-  # Make sure QQ-INTERVAL does not have space after the comma
-  clean_r4s = readLines(r4s) %>% gsub("(,\\s)",",",x = .)
+  # Make sure QQ-INTERVAL does not have any space in between brackets
+  # LOOKBEHIND AND LOOKAHEAD requires perl regex engine
+  gsub(x = "   34     I 0.005863   [0.0001698, 0.004] 0.00562 1011/1011",  pattern = "(?<=\\[)([^\\]]*)( +)","\\1",perl = T)
+  gsub(x = "  131     L    2.02   [0.4701,  2.02]       0 1011/1011",  pattern = "(?<=\\[)([^\\]]*)(\\s\\s?)([^\\s\\]]*)(?=\\])","\\1\\3",perl = T)
+  test="  131     L    2.02   [0.4701,  2.02]       0 1011/1011"
+  test="   34     I 0.005863   [0.0001698, 0.004] 0.00562 1011/1011"
 
+  clean_r4s =readLines(r4s) %>% str_replace_all(string = ., pattern = "\\s+(?=[^\\[\\]]*\\])", replacement="")
+  #gsub(x = .,  pattern = "(?<=\\[)([^\\]]*)( +)([^\\]]*)(?=\\])","\\1\\3",perl = T)
+    #gsub("(?<=\\[)(\\s+)","",x = .,perl = T) # Remove spaces after bracket
+    #gsub("(\\s+)(?=\\])","",x = .,perl = T) # Remove spaces before bracket
   df.r4s = readr::read_table2(file = clean_r4s, comment = '#', col_names = r4s.col) %>%
            mutate(
              ID = id,
@@ -205,3 +244,37 @@ read.R4S.param = function(r4s, as.df=F){
   }
   return(r4s.param)
 }
+get.sc.ohno = function(myseq) {
+  ygob = load.byrne2005.data()
+  bogy = ygob %>%
+    dplyr::rename( orf = dup.orf, gname = dup.gname, dup.orf = orf, dup.gname = gname ) %>%
+    mutate(ref = 2) %>%
+    dplyr::select(WGD_anc, orf, gname, ref, dup.orf, dup.gname, pid, rlen)
+  ohno = ygob %>% bind_rows(bogy)
+
+  if(missing(myseq)){ myseq = load.sgd.proteome() }
+  ohno.seq = get.pair.prot(prot=myseq, pair = get.ygob.pair(ohno))
+  ohno.ali = align.pair.prot(p1=ohno.seq$s1, p2=ohno.seq$s2, mat='BLOSUM62')
+  aafreq = alphabetFrequency(alignedSubject(ohno.ali))
+  gaps = rowSums(aafreq[,c("-","+")])
+
+  pair = get.ygob.pair(ohno) %>%
+    mutate( L1 = width(ohno.seq$s1),
+            L2 = width(ohno.seq$s2),
+            RLEN = round(pmin(L1,L2) / pmax(L1,L2), 2),
+            PID1 = round(pid( ohno.ali, "PID1" ),1),
+            PID2 = round(pid( ohno.ali, "PID2" ),1),
+            PID3 = round(pid( ohno.ali, "PID3" ),1),
+            PID4 = round(pid( ohno.ali, "PID4" ),1),
+            SCORE.B100 = score( ohno.ali ),
+            S = nmatch( ohno.ali ),
+            N = nmismatch( ohno.ali ),
+            G = gaps,
+            SGDID = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$orf,columns ="SGD",keytype = 'ORF')[,2],
+            SGDID.dup = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$dup.orf,columns ="SGD",keytype = 'ORF')[,2]
+    ) %>% right_join(ohno)
+
+  return(pair)
+}
+
+

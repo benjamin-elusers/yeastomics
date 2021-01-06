@@ -23,21 +23,19 @@ load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_
   return(SC)
 }
 
-load.1011.strains = function(seqdir="/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/"){
+load.1011.strains= function(seqdir="/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/",
+                             .recursive=F){
   if( !dir.exists(seqdir) ) stop("Directory of proteome sequences not found!")
-  fastas =list.files(path=seqdir, pattern = "fasta", full.names = T, ignore.case = T, include.dirs = F)
+  fastas =list.files(path=seqdir, pattern = "fasta", full.names = T, ignore.case = T, include.dirs = F,recursive = .recursive)
   return(read.proteomes(fastas,strip.fname=T))
 }
 
-#test = load.1011.strains()
-#length(test)
 # Evolution Sequence/Structure -------------------------------------------------
 # Precomputed data #
 #==================#
 # PROTEOME=readRDS('./data/PROTEIN-EVORATE.rds')
 # ALIGNED.DATA = readRDS('./data/RESIDUE-EVORATE.rds')
 #==================#
-
 
 load.wapinsky2007.data = function(path.data="./data/"){
   require(tictoc)
@@ -54,41 +52,57 @@ load.wapinsky2007.data = function(path.data="./data/"){
   return(r4s.orf)
 }
 
-load.rate4site_1011.data = function(path.r4s = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0",
-                                    path.res = paste0(path.r4s,"/src/rate4site/RUN-1011G")
-                                   ){
+path.r4s = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0"
+load.rate4site_1011.data = function(path.res = paste0(path.r4s,"/src/rate4site/RUN-1011G"),
+                                    only_results=T){
   require(tictoc)
+  require(purrr)
+  require(progress)
+  require(tidyverse)
+
   doing = "Get rate4site data for 1011 isolated yeast strains"
   message(doing)
   tic(doing)
-  res = list.dirs(path.res,full.names = T,recursive = F)
-  orfs = get.orf.filename(res)
-  names(res)=orfs
 
-  seqin = read.proteomes(paste0(res, "/seqin"))
-  names(seqin)=orfs
-  ws = sapply(widths(seqin),unique)
-  r4s = tibble( orf = orfs, len=ws, strains=lengths(seqin) )
+  resdir = list.dirs(path.res,full.names = T,recursive = F)
+  orfs = get.orf.filename(resdir)
+  names(resdir)=orfs
+
+  #seqin = read.proteomes(paste0(res, "/seqin"))
+  #names(seqin)=orfs
+  #ws = sapply(widths(seqin),unique)
+  #r4s = tibble( orf = orfs, len=ws, strains=lengths(seqin) )
 
   S288C  = load.sgd.proteome()
   wr= setNames(widths(S288C),names(S288C))
-  sgd = tibble( orf= names(S288C), len=wr )
+  sgd = tibble( orf= names(S288C), len.s288c=wr )
 
-  r4s.seq = left_join(r4s,sgd, by=c('orf'='orf'), suffix=c('.1k11','.s288c')) %>%
-            mutate( matched_sgd = (len.1k11 == len.s288c+1))
+  r4s.seq = sgd %>% #left_join(r4s,sgd, by=c('orf'='orf'), suffix=c('.1k11','.s288c')) %>%
+            mutate( r4s.file = sprintf("%s/%s_raw.r4s",resdir[orf],orf),
+                    found=file.exists(r4s.file),
+                    size=file.size(r4s.file))
 
-  r4s.raw = r4s.seq %>%
+  get.r4s.raw = function(file,name,.verb=F,.pb=NULL){
+    if(!.pb$finished){ .pb$tick() }
+    r4s.raw = NA
+    if(file.exists(file)){ r4s.raw = read.R4S(r4s=file, id=name,verbose = .verb) }
+    return(r4s.raw)
+  }
+
+  pb =  progress::progress_bar$new(total = nrow(r4s.seq), width = 70,
+                         format = " (:spin) reading r4s [:bar] :percent (elapsed: :elapsed # eta: :eta)")
+
+  r4s.data = r4s.seq %>%
     rowwise() %>%
-    mutate(r4s.file = sprintf("%s/%s_raw.r4s",res[orf],orf),
-           found=file.exists(r4s.file),
-           size=file.size(r4s.file))
+    mutate( r4s.res = pmap( list(file=r4s.file, name=orf),
+                            get.r4s.raw, .pb = pb, .verb=F)
+    )
 
-  r4s.raw %>% map(read.R4S(r4s=r4s.file, orf=orf))
-  r4s.raw$found
+  r4s.df = r4s.data %>% unnest(cols = r4s.res) %>% select(-r4s.res)
   toc(log=T)
-
+  if(only_results){ res = r4s.df %>% select(-c(r4s.file,found,size) ) }
+  return(res)
 }
-
 
 load.aligned.data = function(data.path='../data/'){
   message("

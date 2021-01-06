@@ -1,4 +1,26 @@
 source('src/utils.r',local = T)
+
+load.sgd.features = function(){ # Gene/Protein features from SGD
+  require(stringr)
+  sgd_feat.url = "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"
+  sgd.feat = read.delim2(sgd_feat.url, sep='\t', quote = "",
+                         header=F, fill=T, strip.white=T,stringsAsFactors = F,
+                         col.names = c('sgdid','type','qual','name',
+                                       'gname','alias','parent','sgdid2',
+                                       'chr','start','end','strand','gpos',
+                                       'coordv','seqv','desc')  )
+  return(sgd.feat)
+}
+
+load.sgd.orf = function(sgd.feat){
+  if(missing(sgd.feat)){ sgd.feat = load.sgd.features() }
+  ORF             = sgd.feat$type == 'ORF'
+  #Verified        = sgd.feat$qual == 'Verified'
+  #Uncharacterized = sgd.feat$qual == 'Uncharacterized'
+  #notDubious      = c(Verified,Uncharacterized)
+  return( sgd.feat$name[ORF] )
+}
+
 # Biological annotations (mapped to Uniprot) -----------------------------------
 get.uniprot.pmid = function(uniprot) {
   require(AnnotationDbi)
@@ -101,6 +123,7 @@ get.mapping.sgd.to.uniprot = function(tax=559292,input=id_sgd){
   return(mapped)
 }
 
+#id_sgd=load.sgd.features()
 load.sgd.to.uniprot = function(tax=559292,input_id=id_sgd){
   if(missing(input_id)){ id_sgd = unique(load.sgd.features()[['sgdid']]) }
   # Download uniprot information (sequence,annotations...) for mapped SGD identifiers
@@ -164,7 +187,7 @@ parse.uniprot.subcellular_locations = function(subloc){
   uni.loc = enframe(LOC,name='id',value='loc') %>% bind_cols(SUBLOC = subloc) %>%
     unnest(cols=c(loc)) %>%
     mutate( loc = str_replace_all( str_trim(loc,side="both"), c("-" = ".", "[ ]+" = "_")) ) %>%
-    filter(!is.na(loc)) %>%
+    dplyr::filter(!is.na(loc)) %>%
     distinct() %>%
     mutate( HAS_FOCI = str_detect(string = SUBLOC, pattern = punc) ) %>%
     mutate( HAS_ISOFORM = str_detect(string = SUBLOC, pattern = isoform) ) %>%
@@ -190,7 +213,7 @@ get.uniprot.localization = function(annot,loc_to_columns=T){
             has_LOC = !is.na(SUBLOC))
 
   # GET UNIPROT ANNOTATION OF SUBCELLULAR LOCATIONS AS NAMED VECTOR
-  subloc = uni.annot  %>% filter(has_LOC) %>% dplyr::select(UNIPROTKB,SUBLOC) %>% deframe()
+  subloc = uni.annot  %>% dplyr::filter(has_LOC) %>% dplyr::select(UNIPROTKB,SUBLOC) %>% deframe()
   uni.loc = parse.uniprot.subcellular_locations(subloc)
 
   if( loc_to_columns ){
@@ -220,36 +243,45 @@ url.pathway="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowled
 
 ## ___4 functional categories --------------------------------------------------
 load.yeast.biofunctions = function(){
+  require(openxlsx)
+
   message("REF: J. van Leeuwen et al., Science, 2016")
   message("Exploring genetic suppression interactions on a global scale")
-  biofunctions = readxl::read_xlsx(path ="https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx",
-                                sheet = 2)
+  #biofunctions = readxl::read_excel(path ="https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx",
+  #                              sheet = 2)
+  biofunctions = read.xlsx( xlsxFile = "https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx",
+                                    sheet = 2)
+  return(biofunctions)
 }
 
-
-load.sgd.features = function(){ # Gene/Protein features from SGD
-  require(stringr)
-  sgd_feat.url = "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"
-  sgd.feat = read.delim2(sgd_feat.url, sep='\t', quote = "",
-                         header=F, fill=T, strip.white=T,stringsAsFactors = F,
-                         col.names = c('sgdid','type','qual','name',
-                                       'gname','alias','parent','sgdid2',
-                                       'chr','start','end','strand','gpos',
-                                       'coordv','seqv','desc')  )
-  return(sgd.feat)
-}
-
-
-load.uniprot.features = function(tax,input){ # Gene/Protein features from Uniprot
+load.uniprot.features = function(tax=559292,refdb='SGD'){ # Gene/Protein features from Uniprot
   require(UniProt.ws)
+  # 559292 S. cerevisiae 288C (maintained by SGD)
+
   uniprot  = UniProt.ws::UniProt.ws(taxId=tax)
-  doing='Retrieving mapping between uniprot accession and SGD ID...'
+  refkey=match.arg(arg=refdb,choices=UniProt.ws::keytypes(uniprot),several.ok = F)
+
+  doing=sprintf('Retrieving mapping between uniprot accession and ID...',refdb)
   message(doing)
   # TAKES ~50sec for about 7000 ids
   tic(doing)
-  mapped = UniProt.ws::select(x=uniprot,
-                              keys=unique(input),  keytype = "SGD",
-                              columns = c("SGD","UNIPROTKB")) %>%
-    filter(!is.na(UNIPROTKB)) %>% distinct()
+
+  ids = keys(uniprot, refdb)
+  FEATURES = c("SGD","UNIPROTKB","REVIEWED","EXISTENCE","SCORE","LENGTH","FAMILIES",
+              "PROTEIN-NAMES","SUBCELLULAR-LOCATIONS","COMMENTS","KEYWORDS")
+
+  up.feat = UniProt.ws::select(x=uniprot,
+                              keys=ids,  keytype = refkey,
+                              columns = FEATURES) %>%
+    dplyr::filter(!is.na(UNIPROTKB)) %>%
+    group_by(UNIPROTKB) %>%
+    mutate( is_uniref = UNIPROTKB %in% id_uniref, one2one = n()==1, LENGTH = as.numeric(LENGTH) ) %>%
+    dplyr::rename(SUBLOC =`SUBCELLULAR-LOCATIONS`, PNAMES = `PROTEIN-NAMES`) %>%
+    transmute(L = as.numeric(LENGTH)) %>%
+
+
+    distinct()
   toc(log=T)
+  return(up.feat)
 }
+
