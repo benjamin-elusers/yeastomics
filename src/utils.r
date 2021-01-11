@@ -67,6 +67,8 @@ getmode <- function(v) { # returns the mode (most frequent value)
 
 # Strings ----------------------------------------------------------------------
 str2chr  <- function(x){ return( unlist(strsplit(x,split='')) ) } # split string by character
+concat   <- function(x){ return( paste(x,collapse='') ) }        # concatenate characters to string
+
 towords  <- function(x){ return( unlist(strsplit(x,split="\\s")) ) } # split string by any white space
 xxS      <- function(x,sx,s='.'){ paste0(x,s,sx) } # Add suffix to a string
 Pxx      <- function(x,px,s='.'){ paste0(px,s,x) } # Add prefix to a string

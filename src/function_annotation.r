@@ -43,7 +43,7 @@ load.uniprot.features = function(tax=559292,refdb='UNIPROTKB'){ # Gene/Protein f
                                columns = FEATURES) %>%
     dplyr::filter(!is.na(UNIPROTKB)) %>%
     dplyr::rename(SUBLOC =`SUBCELLULAR-LOCATIONS`, PNAME = `PROTEIN-NAMES`) %>%
-    transmute(L = as.numeric(LENGTH)) %>%
+    mutate(L = as.numeric(LENGTH)) %>% dplyr::select(-LENGTH) %>%
     distinct()
   toc(log=T)
   return(up.feat)

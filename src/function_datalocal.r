@@ -267,7 +267,7 @@ load.codon.usage = function(inputseq,
   url.codonR="https://raw.githubusercontent.com/mariodosreis/tai/master/R/tAI.R"
   ord.codonR = get.codons4tai()
 
-  if( !library(tAI) ){ devtools::install_github("mariodosreis/tai") } # Install this package first
+  if( !require(tAI) ){ devtools::install_github("mariodosreis/tai") } # Install this package first
   library(tAI)
   tai.R = sprintf("%s/tAI.R",url.codonR)
   # Can use local address

@@ -1,0 +1,146 @@
+---
+title: "yeast-proteome-evolution"
+author: "Benjamin Dubreuil"
+date: "January 11, 2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+  code_download: true
+  code_folding: hide
+---
+
+```{r setup, include=F, echo=F, warnings=F, message=F}
+knitr::opts_chunk$set(echo = T, collapse = T, cache = T)
+source("src/utils.r")
+source("src/function_annotation.r")
+source("src/function_sequence.r")
+source("src/function_phylogenetic.r")
+source("src/function_analysis.r")
+source("src/function_datalocal.r")
+source("src/function_datapub.r")
+library(tictoc)
+library(tidyverse)
+xfun::embed_dir('data/YK11/', text = 'Download full data')
+```
+
+
+## Reference proteomes {.tabset .tabset-pills}
+
+### Saccharomyces Genome Database (SGD)
+
+The reference genome sequences of the widely used Baker's yeast are maintained by
+tbe SGD, corresponding to the strain **S. cerevisiae S288C**.
+
+The SGD also gather many key information such as:
+
+- genome assembly
+- Protein-coding sequence
+- gene/protein nomenclature
+- biological activity (interaction/regulation/complexes)
+- curated annotations and descriptins (gene ontology)
+- gene and protein expression
+- accurate scientific literature,
+- genotype/phenotype experiments
+...
+
+```{r sgd}
+# YEAST REFERENCE SEQUENCES
+## SGD
+S288C  = load.sgd.proteome(withORF=T) # Reference SGD protein sequences
+S288C.cds = load.sgd.CDS(withORF=T) # Reference coding sequences (CDS)
+SGD = load.sgd.features() # main SGD gene/protein features
+```
+
+### Universal Protein resource (UniProt) 
+
+UniProt provides the most comprehensive resource of protein sequence and functional information.
+Most protein features are typically stored on the database called UniProt KnowledgeBase (UniProtKB).
+This database is a major hub for many specialized databases and webservers that helps understand proteins role.
+
+Their reference proteome gather proteins for which expression or proof of physical existence has been shown.
+
+```{r unip}
+## UNIPROT
+# saveRDS(load.uniprot.features(),"data/uniprot-features.rds") # Takes >250sec for ~6700 ids
+UNI.SC = load.uniprot.proteome('yeast') # Reference UniprotKB sequences (Uniref)
+UNI = readRDS("data/uniprot-features.rds") %>% # main UNIPROT gene/protein features
+        group_by(UNIPROTKB) %>%
+        mutate( is_uniref = UNIPROTKB %in% names(UNI.SC), one2one = (n()==1) ) 
+```
+
+### Isolates proteome (1011 yeast strains)
+```{r y1k11}
+## 1011 strains
+# saveRDS(load.1011.strains(),"data/proteome-1011-strains.rds") # Takes >5mn for 6575 ids
+YK11 = readRDS("proteome-1011-strains.rds")  # 1011 strains proteomes sequences
+strains.info = load.jackson2018.data() # strains info from supp mat of Science paper
+```
+
+### Yeast proteome statistics
+
+```{r ref-id-map}
+id_orf = names(S288C)
+id_sgd = SGD %>% filter( name %in% id_orf) %>% pull(sgdid)
+map_sgd2orf = SGD %>% filter(name %in% id_orf) %>% dplyr::select(sgdid,name) 
+
+UNI.1 = UNI # Backup of Uniprot features table
+UNI   = left_join(UNI,map_sgd2orf, by=c('SGD'='sgdid')) %>% dplyr::rename(ORF=name)
+
+id_uni = names(UNI.SC)
+map_uni2sgd = UNI %>% filter(UNIPROTKB %in% id_uni & one2one & !is.na(SGD)) %>% dplyr::select(UNIPROTKB,SGD,ORF) 
+id_y1k = names(YK11)
+
+n_sgd = length(S288C) %>% as.character()
+n_uni = length(UNI.SC) %>% as.character()
+n_y1k = length(YK11) %>% as.character()
+```
+
+Sequences of both SGD and UNIPROTKB proteomes are quite similar.
+However, they do not contain the same number of proteins.
+SGD contains `r n_sgd` while UNIPROTKB has `r n_uni` sequences.
+
+```{r ref-ali}
+uniseq = UNI.SC[map_uni2sgd$UNIPROTKB]
+sgdseq = S288C[map_uni2sgd$ORF]
+aliref = align.pair.prot(uniseq, sgdseq) # Takes ~20s for 6042 ids
+#saveRDS(pairwise.alignment.to.df(aliref),"data/sgduni-aligned-proteome.rds") # Takes ~8mn for 6042 ids
+ALI_REF = readRDS("data/sgduni-aligned-proteome.rds")
+
+ALI_STAT = group_by(ALI_REF,s1) %>%
+           summarise( not_aligned=sum(!aligned), OL = mean(ol.12), PID = mean(pid.long) )
+## OVERALL PROTEOME ALIGNMENT
+# 99.89% (+/- 2.02%) identity on average for 6000 proteins
+n_aligned = sum(ALI_STAT$PID==1) %>% as.character()
+pid_avg = mean(ALI_STAT$PID) %>% as.character()
+pid_sd  = sd(ALI_STAT$PID) %>% as.character()
+
+## FOR MISALIGNED PROTEINS
+n_misaligned = sum(ALI_STAT$PID<1) %>% as.character()
+# 83.81% (+/- 20.08%) identity on average
+pid_avg.2 = mean(ALI_STAT$PID[ALI_STAT$not_aligned!=0]) %>% as.character()
+pid_sd.2 = sd(ALI_STAT$PID[ALI_STAT$not_aligned!=0]) %>% as.character()
+n_unaligned = sum(ALI_STAT$not_aligned) %>% as.character()
+```
+
+On average, the corresponding sequences share `r pid_avg`% identity (+/- `r pid_sd`%).
+`r n_aligned` proteins are exactly identical (i.e. 100% identity) between the two proteomes.
+`r n_misaligned` proteins contains mismatches/indels for at least `r n_unaligned` residues.
+
+## Proteome datasets {.tabset .tabset-pills}
+
+### Site-specific evolutionary rates
+
+```{r load-evorate}
+WAP.r4s = load.wapinsky2007.data()   # Evolutionary rate for fungi lineage (~20s to load)
+saveRDS(load.rate4site_1011.data(), "data/rate4site-1011-strains.rds")
+K11.r4s = readRDS("data/rate4site-1011-strains.rds") # Evolutionary rate for 1011 strains (~3mn to load)
+EVO = load.aligned.data(data.path="data/" ) # Protein dataset with aligned evolutionary rate
+```
+
+### Expression data
+
+```{r load-expression}
+TAI = load.codon.usage(S288C.cds)
+PAB = load.ho2018.data()
+```
+

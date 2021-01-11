@@ -21,6 +21,9 @@ pairwise.alignment.to.df  = function(ali){
   library(dplyr)
   N=length(ali)
   ali.list=list()
+  doing="Global alignnment of pairwise sequences..."
+  message(doing)
+  tic(doing)
   for( i in 1:N ){
     prg = sprintf("%.1f %% [%5s/%5s]        \r", 100*(i/N), i,N)
     cat(prg)
@@ -44,6 +47,7 @@ pairwise.alignment.to.df  = function(ali){
       ungroup() %>% distinct()
     ali.list[[i]] = m.ali
   }
+  toc()
   return( bind_rows(ali.list) )
 }
 
