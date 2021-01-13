@@ -23,6 +23,7 @@ CAT=list()
 ```
 
 ## Reference proteome sequence
+
 ```{r reference}
 # MAIN PROTEIN FEATURES
 SGD  = load.sgd.features()

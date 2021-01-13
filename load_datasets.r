@@ -53,7 +53,7 @@ R4S = load.aligned.data(data.path="data/" ) # Aligned evolutionary rate
 
 # REMOTE DATA
 script.to.env("src/function_datapub.r",'remotedata')
-DUB  = load.dubreuil2019.data(1)         # Stickiness disorder
+DUB  = load.dubreuil2019.data(1)        # Stickiness disorder
 LEU  = load.leunberger2017.data()       # Limited proteolysis (stability)
 VAN  = load.vanleeuwen2020.data()       # Gene dispensability (essentiality)
 HO   = load.ho2018.data()               # Unified protein abundance (MS,TAP,GFP)

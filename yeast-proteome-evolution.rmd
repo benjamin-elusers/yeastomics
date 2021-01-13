@@ -1,35 +1,55 @@
 ---
-title: "yeast-proteome-evolution"
-author: "Benjamin Dubreuil"
-date: "January 11, 2021"
-output: html_document
-editor_options: 
-  chunk_output_type: console
-  code_download: true
-  code_folding: hide
+title: "Yeast Proteome Evolution"
+subtitle: "Integrating timescales in protein evolution from distant species to populations"
+author: "Benjamin Dubreuil (WIS)"
+date: "`r format(Sys.time(), 'Last Modified: %d-%b-%Y %R %p')`"
+website: "https://github.com/benjamin-elusers/yeastomics/"
+output:
+  rmdformats::downcute:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: tango
+#  html_document: 
+    code_download: true
+    code_folding: hide
+    fig_caption: yes
+    keep_md: yes
+#    toc: yes
+    toc_depth: 3
+    toc_float:
+      toc_collapsed: true
+    number_sections: true
+    theme: lumen
+  editor_options: 
+    chunk_output_type: console
 ---
 
 ```{r setup, include=F, echo=F, warnings=F, message=F}
-knitr::opts_chunk$set(echo = T, collapse = T, cache = T)
-source("src/utils.r")
-source("src/function_annotation.r")
-source("src/function_sequence.r")
-source("src/function_phylogenetic.r")
-source("src/function_analysis.r")
-source("src/function_datalocal.r")
-source("src/function_datapub.r")
+knitr::opts_chunk$set(echo = T, collapse = T, cache.lazy = F,autodep = T)
+suppressPackageStartupMessages({
+  source("src/utils.r")
+  source("src/function_annotation.r")
+  source("src/function_sequence.r")
+  source("src/function_phylogenetic.r")
+  source("src/function_analysis.r")
+  source("src/function_datalocal.r")
+  source("src/function_datapub.r")
 library(tictoc)
 library(tidyverse)
-xfun::embed_dir('data/YK11/', text = 'Download full data')
+})
 ```
 
 
-## Reference proteomes {.tabset .tabset-pills}
+# Reference proteomes {.tabset .tabset-pills}
 
-### Saccharomyces Genome Database (SGD)
+## SGD
+
+_Saccharomyces Genome Database_
 
 The reference genome sequences of the widely used Baker's yeast are maintained by
-tbe SGD, corresponding to the strain **S. cerevisiae S288C**.
+tbe [SGD](www.yeastgenome.org), corresponding to the strain **S. cerevisiae S288C**.
 
 The SGD also gather many key information such as:
 
@@ -43,7 +63,7 @@ The SGD also gather many key information such as:
 - genotype/phenotype experiments
 ...
 
-```{r sgd}
+```{r sgd,cache=T}
 # YEAST REFERENCE SEQUENCES
 ## SGD
 S288C  = load.sgd.proteome(withORF=T) # Reference SGD protein sequences
@@ -51,15 +71,17 @@ S288C.cds = load.sgd.CDS(withORF=T) # Reference coding sequences (CDS)
 SGD = load.sgd.features() # main SGD gene/protein features
 ```
 
-### Universal Protein resource (UniProt) 
+## UniProt
 
-UniProt provides the most comprehensive resource of protein sequence and functional information.
+_Universal Protein resource_
+
+[UniProt](www.uniprot.org) provides the most comprehensive resource of protein sequence and functional information.
 Most protein features are typically stored on the database called UniProt KnowledgeBase (UniProtKB).
 This database is a major hub for many specialized databases and webservers that helps understand proteins role.
 
-Their reference proteome gather proteins for which expression or proof of physical existence has been shown.
+Their [reference proteome](https://www.uniprot.org/uniprot/?query=proteome:UP000002311) gather proteins for which expression or proof of physical existence has been shown.
 
-```{r unip}
+```{r unip,cache=T}
 ## UNIPROT
 # saveRDS(load.uniprot.features(),"data/uniprot-features.rds") # Takes >250sec for ~6700 ids
 UNI.SC = load.uniprot.proteome('yeast') # Reference UniprotKB sequences (Uniref)
@@ -68,17 +90,30 @@ UNI = readRDS("data/uniprot-features.rds") %>% # main UNIPROT gene/protein featu
         mutate( is_uniref = UNIPROTKB %in% names(UNI.SC), one2one = (n()==1) ) 
 ```
 
-### Isolates proteome (1011 yeast strains)
+## YK11
+
+_1,011 Saccharomyces cerevisiae isolates_
+
+The [1002 Yeast Genomes project](http://1002genomes.u-strasbg.fr/) constitutes the most comprehensive genomic dataset on a single species of yeast.
+Ultimately provide the most extensive view of the genetic and phenotypic diversity within this model species to date.
+
+The project was originally slated to include 1002 strains from diverse global locations,
+as well as a variety of ecological sources.
+
+A total of 1011 whole genome sequences have been produced and published in [*J. Peter et al.*, Nature 2018](https://doi.org/10.1038/s41586-018-0030-5).
+
 ```{r y1k11}
 ## 1011 strains
 # saveRDS(load.1011.strains(),"data/proteome-1011-strains.rds") # Takes >5mn for 6575 ids
-YK11 = readRDS("proteome-1011-strains.rds")  # 1011 strains proteomes sequences
+YK11 = readRDS("data/proteome-1011-strains.rds")  # 1011 strains proteomes sequences
 strains.info = load.jackson2018.data() # strains info from supp mat of Science paper
 ```
 
-### Yeast proteome statistics
+## Statistics
 
-```{r ref-id-map}
+Below we calculate some general statistics on the reference yeast proteome.
+
+```{r ref-id-map, cache=T, cache.vars=T}
 id_orf = names(S288C)
 id_sgd = SGD %>% filter( name %in% id_orf) %>% pull(sgdid)
 map_sgd2orf = SGD %>% filter(name %in% id_orf) %>% dplyr::select(sgdid,name) 
@@ -97,9 +132,9 @@ n_y1k = length(YK11) %>% as.character()
 
 Sequences of both SGD and UNIPROTKB proteomes are quite similar.
 However, they do not contain the same number of proteins.
-SGD contains `r n_sgd` while UNIPROTKB has `r n_uni` sequences.
+SGD contains **`r n_sgd`** while UNIPROTKB has **`r n_uni`** sequences.
 
-```{r ref-ali}
+```{r ref-ali,cache=T}
 uniseq = UNI.SC[map_uni2sgd$UNIPROTKB]
 sgdseq = S288C[map_uni2sgd$ORF]
 aliref = align.pair.prot(uniseq, sgdseq) # Takes ~20s for 6042 ids
@@ -109,38 +144,142 @@ ALI_REF = readRDS("data/sgduni-aligned-proteome.rds")
 ALI_STAT = group_by(ALI_REF,s1) %>%
            summarise( not_aligned=sum(!aligned), OL = mean(ol.12), PID = mean(pid.long) )
 ## OVERALL PROTEOME ALIGNMENT
-# 99.89% (+/- 2.02%) identity on average for 6000 proteins
-n_aligned = sum(ALI_STAT$PID==1) %>% as.character()
-pid_avg = mean(ALI_STAT$PID) %>% as.character()
-pid_sd  = sd(ALI_STAT$PID) %>% as.character()
+# 99.93% (+/- 1.44%) identity on average for 6014 proteins
+n_aligned = sum(ALI_STAT$PID==100) %>% as.character()
+pid_avg = mean(ALI_STAT$PID) %>% round(2) %>% as.character()
+pid_sd  = sd(ALI_STAT$PID) %>% round(2) %>% as.character()
 
 ## FOR MISALIGNED PROTEINS
-n_misaligned = sum(ALI_STAT$PID<1) %>% as.character()
-# 83.81% (+/- 20.08%) identity on average
-pid_avg.2 = mean(ALI_STAT$PID[ALI_STAT$not_aligned!=0]) %>% as.character()
-pid_sd.2 = sd(ALI_STAT$PID[ALI_STAT$not_aligned!=0]) %>% as.character()
+n_misaligned = sum(ALI_STAT$PID<100) %>% as.character()
+# 85.97% (+/- 16.10%) identity on average for 28 proteins
+pid_avg.2 = mean(ALI_STAT$PID[ALI_STAT$not_aligned!=0]) %>% round(2) %>% as.character()
+pid_sd.2 = sd(ALI_STAT$PID[ALI_STAT$not_aligned!=0]) %>%  round(2) %>% as.character()
 n_unaligned = sum(ALI_STAT$not_aligned) %>% as.character()
 ```
 
-On average, the corresponding sequences share `r pid_avg`% identity (+/- `r pid_sd`%).
-`r n_aligned` proteins are exactly identical (i.e. 100% identity) between the two proteomes.
-`r n_misaligned` proteins contains mismatches/indels for at least `r n_unaligned` residues.
+On average, the corresponding sequences share **`r pid_avg`%** identity **(+/- `r pid_sd`%)**
+**`r n_aligned`** proteins are exactly identical (i.e. 100% identity) between the two proteomes.
+**`r n_misaligned`** proteins contains mismatches/indels for at least **`r n_unaligned`** residues.
 
-## Proteome datasets {.tabset .tabset-pills}
+# Proteome datasets {.tabset .tabset-pills}
 
-### Site-specific evolutionary rates
+## Conservation
+
+_Site-specific evolutionary rates_
+
+[Rate4Site](https://www.tau.ac.il/~itaymay/cp/rate4site.html) is a program for detecting conserved amino-acid sites by computing 
+the relative evolutionary rate for each site in the multiple sequence alignment (MSA).
+
+For the fungi lineage, we calculated the evolutionary rates of the orthologs defined in [*Wapinsky et al.*, Nature 2007](https://www.nature.com/articles/nature06107). 
+
+For the S. cerevisiae population, we calculated the rate of evolution at every site of the 1011 isolates proteomes.
+This rate is expected to be better than a non-synonymous SNP frequency. 
+Indeed, the phylogenetic tree of the 1011 strains is taken into account to account for SNPs that occur in closely related strains.
 
 ```{r load-evorate}
 WAP.r4s = load.wapinsky2007.data()   # Evolutionary rate for fungi lineage (~20s to load)
-saveRDS(load.rate4site_1011.data(), "data/rate4site-1011-strains.rds")
-K11.r4s = readRDS("data/rate4site-1011-strains.rds") # Evolutionary rate for 1011 strains (~3mn to load)
+#saveRDS(load.rate4site_1011.data(), "data/rate4site-1011-strains.rds") (~3mn to load)
+K11.r4s = readRDS("data/rate4site-1011-strains.rds") # Evolutionary rate for 1011 strains 
 EVO = load.aligned.data(data.path="data/" ) # Protein dataset with aligned evolutionary rate
 ```
 
-### Expression data
+## Expression
 
-```{r load-expression}
+Protein expression is taken from [*Ho et al.*, Cell Systems, 2018](https://doi.org/10.1016/j.cels.2017.12.004) which attempts to unify protein abundance datasets from the [Protein Abundance database](www.paxdb.org).
+
+tRNA adapation index is calculated as in [*Dos Reis et al.*, NAR, 2004](https://doi.org/10.1093/nar/gkh834)
+using the CDS from SGD.
+
+```{r load-expression,cache=T}
 TAI = load.codon.usage(S288C.cds)
 PAB = load.ho2018.data()
 ```
 
+## Localization
+
+The protein localizations can be obtained from curated annotations from 
+Gene Ontology (GO) and the subcellular locations from Uniprot.
+
+```{r load-annotations,cache=T}
+GO   = get.uniprot.go(id_uni)
+CC   = GO %>% filter(ONTOLOGY == CC) 
+LOC  = get.uniprot.localization(annot = UNI,loc_to_columns = T)
+DESC = get.uniprot.sgd(id_uni)
+```
+
+# Yeast SNP
+
+Using the translated protein sequences from the 1011 isolates proteomes, I calculated
+the frequency of amino acids at every site of each ORF.
+
+```{r snp-proc, cache=T}
+SNP_FREQ=0.05
+source("src/function_YK11.r")
+P = tibble( orf=names(YK11), 
+            n_strains=lengths(YK11),
+            len = sapply(widths(YK11),unique)
+)
+
+task1="Extract WT amino-acid..."
+message(task1)
+tic(task1)
+REF = map_df(YK11, get.REF, p=SNP_FREQ)
+toc()
+
+task2="Extract ALT amino-acid..."
+message(task2)
+tic(task2)
+SNP = map_df(YK11, get.SNP, p=SNP_FREQ)
+toc()
+
+REF_SNP = left_join(REF,SNP,by=c('pos_ref'='pos_alt', 'orf'='orf'))
+dim(REF_SNP)
+
+PROT_SNP = left_join(P,REF_SNP,by=c('orf'='orf'))
+
+
+# ROWS = BIN 0-100%
+# COLS = # SNPS per ORF
+snppos = map_df( YK11, count.SNP.bypos, p=SNP_FREQ,nbin=100 )
+snpbin = pivot_wider(snppos, id_cols = c('orf','bin.pos'), names_from=bin.pos, names_prefix = "b", values_from = n_snp)
+```
+
+Some sites are ambiguous between strains, meaning that some strains may have an alternative amino-acid at that position.
+SNPs are considered when the most frequent variant has a frequency above **`r as.character(SNP_FREQ)`%**.
+
+Similarly, I calculated the number of "early-STOP" codons i.e. STOP codons which occur before the last amino acid.
+
+```{r snp-plot}
+n_snp= PROT_SNP %>% group_by(orf) %>% summarize( nsnp = n_distinct(pos_ref), len=mean(len))
+p0 = ggplot(n_snp) + geom_point(aes(y=nsnp,x=len))
+
+test = snppos %>% group_by(bin.pos) %>% 
+       summarize( avgSNP=mean(n_snp), sdSNP=sd(n_snp), maxSNP=max(n_snp))
+library(ggplot2)
+p1 = ggplot(test,aes(x=bin.pos,y=avgSNP)) +
+  geom_point() + 
+  geom_line() + 
+  geom_line(aes(y=maxSNP),col='red') +
+  geom_linerange(aes(ymin=avgSNP-sdSNP,ymax=avgSNP+sdSNP)) +
+  geom_vline(xintercept=seq(5,95,by=5),size=0.1,linetype='dashed')
+library(gridExtra)
+#p = grid.arrange(p0,p1,ncol=2)
+#plot(p)
+```
+
+# References
+
+Jackson et al.: Genome evolution across 1,011 Saccharomyces cerevisiae isolates
+[Publisher link](https://doi.org/10.1038/s41586-018-0030-5)
+
+Rate4site: Comparison of site-specific rate-inference methods: Bayesian methods are superior
+[Publisher link](https://doi.org/10.1093/molbev/msh194)
+
+Wapinski et al.: Natural history and evolutionary principles of gene duplication in fungi
+[Publisher link](https://www.nature.com/articles/nature06107)
+
+Ho et al.: Unification of Protein Abundance Datasets Yields a Quantitative Saccharomyces cerevisiae Proteome
+[Publisher link](https://doi.org/10.1016/j.cels.2017.12.004)
+
+Dos Reis et al.: Solving the riddle of codon usage preferences: a test for translational selection
+[Publisher link](https://doi.org/10.1093/nar/gkh834)
