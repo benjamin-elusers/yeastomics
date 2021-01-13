@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+yeast-proteome-evolution.html
+yeast-proteome-evolution_cache/*
+yeast-proteome-evolution.md
