@@ -63,7 +63,7 @@ GEI  = load.geisberg2014.data(nodesc=T) # mRNA half-lives
 
 # load.byrne2005.data()                 # ohnologs are on different columns (~550 rows)
 WGD  = get.sc.ohno()                    # Whole-genome duplication data (ohnologs are a single column ~ 1000 rows)
-JAC  = load.jackson2018.data()          # 1011 strains project details
+JAC  = load.peter2018.data()          # 1011 strains project details
 
 
 #saveRDS(SGD,file='/media/elusers/users/benjamin/A-PROJECTS/02_Scripts/R/forMeta/sgd-features.rds')

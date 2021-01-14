@@ -73,7 +73,7 @@ load.leunberger2017.data = function(species='S. cerevisiae',rawdata=F){
   return(peptides)
 }
 
-load.jackson2018.data =function(){
+load.peter2018.data =function(){
   # Load 1011 yeast strains data
   # Sheet 1 = Strains details
   library(tidyverse)

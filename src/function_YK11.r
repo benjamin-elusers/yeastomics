@@ -11,7 +11,7 @@ get.SNP.positions = function(S,pmin=0.05,as.ind=T){
 
 count.SNP.bypos = function(s,p,nbin=100,.id=NULL){
   # if no id given, extract the yeast ORF (locus name) from the sequnece names
-  if(is.null(.id)){ .id = get.strain_orf(s,only.orf=T,only.strains = F) }
+  if(is.null(.id)){ .id = get.strain_orf(s,what='orf') }
   snp = get.SNP.positions(s,p,as.ind=F)
   snppos = tibble( orf=.id, bin.pos = dplyr::ntile(seq_along(snp), nbin), snp=snp*1) %>%
     group_by(orf,bin.pos) %>%
@@ -55,25 +55,29 @@ is.ref = function(s,p){
   return(is_ref)
 }
 
-get.strain_orf= function(BS,only.orf=T,only.strains=F){
+get.strain_orf= function(x,what=c('orf','strains','both')){
   library(stringr)
   library(hutils)
-  genericName = hutils::longest_suffix(names(BS))
+  if (!is.character(x) && !is(x, "XStringSet"))
+    stop("'x' must be a character vector, or a XStringSet object")
+  nms = x
+  if ( is(x, "XStringSet")) { nms <- names(x) }
+
+  genericName = hutils::longest_suffix(nms)
   orf = stringr::str_extract( string=genericName, pattern="([Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?)|(Q[0-9]{4})|(R[0-9]{4}[WC])")
-  strains = stringr::str_replace(string = names(BS), pattern = genericName, replacement = "")
+  strains = stringr::str_replace(string = nms, pattern = genericName, replacement = "")
   res = data.frame( strain_orf = orf, strain_name = strains, stringsAsFactors = F)
 
-  if(only.orf & !only.strains){ return(orf) }
-  else if(!only.orf & only.strains){ return(strains) }
-  else{
-    warning('Returning both strains and orf!')
+  what = match.arg(arg=tolower(what),choices = c('orf','strains','both'), several.ok = F)
+
+  if(what == 'orf'){ return(unique(res$strain_orf)) }
+  else if(what == 'strains'){ return(res$strain_name)}
   return(res)
-  }
 }
 
 get.REF = function(s,p,.id=NULL){
   # if no id given, extract the yeast ORF (locus name) from the sequnece names
-  if(is.null(.id)){ .id = get.strain_orf(s,only.orf=T,only.strains = F) }
+  if(is.null(.id)){ .id = get.strain_orf(s,what='orf') }
   #ref=data.frame(orf=character(0),pos_ref=numeric(0),aa_ref=character(0),fr_ref=numeric(0),stringsAsFactors = F)
   ref = NULL
   if( count.SNP(s,p) > 0 ){
@@ -118,7 +122,7 @@ get.SNP.freq = function(s,p,addSNP=T){
 
 get.SNP =function(s,p,.id=NULL){
   #  library(tidyverse)
-  if(is.null(.id)){ .id = get.strain_orf(s,only.orf=T,only.strains = F) }
+  if(is.null(.id)){ .id = get.strain_orf(s,what='orf') }
   alt=NULL
   #alt= data.frame(stringsAsFactors = F, row.names = NULL,
   #                orf=character(0),pos_alt=numeric(0),aa_alt=character(0), fr_alt=numeric(0))
@@ -151,6 +155,20 @@ get.SNPscore = function(S, scoremat = "BLOSUM100", masked=c()){
   msaConservationScore(ali,scoremat)
 }
 
+# show.positions(orf,pos,letter){
+#   pos = c(19,54,79,85)
+#   ipos = IRangesList(pos)
+#   extract
+# }
+
+# Get strains name sharing base/residue at position pos in fasta sequences (DNA/AA)
+which.strains = function(orf,pos,letter){
+  if(length(pos)>1){ warning("More than one position provided, only the first will be used!") }
+  if(any(pos[1]>widths(orf))){ stop(sprintf("Position %s is out of bounds!",pos[1])) }
+  matched =  names(orf)[hasLetterAt(orf,letter[1],at=pos[1])]
+  matched_strains = get.strain_orf(matched,what='strains')
+  return(matched_strains)
+}
 
 #http://sgd-archive.yeastgenome.org/sequence/S288C_reference/genome_releases/S288C_reference_genome_Current_Release.tgz
 # SNPDIR="/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/Matrix/RefGenome_SNP_indel/"

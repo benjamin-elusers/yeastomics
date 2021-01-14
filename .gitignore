@@ -33,3 +33,4 @@ vignettes/*.pdf
 # R package: bookdown caching files
 /*_files/
 yeast-proteome-evolution.html
+.Rproj.user

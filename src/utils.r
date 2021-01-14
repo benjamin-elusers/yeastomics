@@ -326,10 +326,18 @@ quantile_ <- function(x,...){  quantile(x,...,na.rm=T) } # quantile with no erro
 # Correlation with spearman method (ranks) and pairwise value
 scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){ cor.test(x,y,method = met, use=use, exact=F) }
 spearman <- function(X,Y){
+  library(broom)
   res = cor.test(x = X, y=Y , method = "spearman",use='pairwise.complete',exact=F) %>% broom::tidy()
   return(res)
 }
 
+# Get spearman correlation parameters ready to plot
+spearman.toplot = function(X,Y){
+  s   = spearman(X,Y)
+  s$N = sum(complete.cases(X,Y))
+  s$toshow = sprintf("r=%.3f\np=%.1e\nn=%s",s$estimate,s$p.value,s$N)
+  return(s)
+}
 # Extract correlation parameters as dataframe
 get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','p.value')]) }
 
