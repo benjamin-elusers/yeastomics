@@ -29,13 +29,13 @@ read Rate4site (R4S) output
 ## Published datasets _(remote access via URL)_
 -------------
 
-- 2014
+- Dubreuil et al., 2019
 - Leueunberger et al., 2017
 - Van Leeuwen et al., 2020
 - Ho et al., 2018
 - Belle et al., 2006
 - Villen et al., 2017
-- Jackson et al., 2018
+- Peter et al., 2018
 
 ## Local datasets _(E. Levy inhouse data)_
 -------------
@@ -47,7 +47,6 @@ read Rate4site (R4S) output
 
 ## Analysis
 -------------
-
 
 make equal bins (1st and last bin manual)
 
