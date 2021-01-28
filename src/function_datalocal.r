@@ -73,7 +73,7 @@ load.rate4site_1011.data = function(path.res = paste0(path.r4s,"/src/rate4site/R
   #ws = sapply(widths(seqin),unique)
   #r4s = tibble( orf = orfs, len=ws, strains=lengths(seqin) )
 
-  S288C  = load.sgd.proteome()
+  S288C  = load.sgd.proteome(withORF = T,rm.stop = F)
   wr= setNames(widths(S288C),names(S288C))
   sgd = tibble( orf= names(S288C), len.s288c=wr )
 
