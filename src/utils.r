@@ -15,21 +15,32 @@ open.url <- function(file_url) {
 
 # Testing/Subsetting -----------------------------------------------------------
 is.whole  <- function(x){ all(floor(x) == x) }      # checks if a value has decimal part (not necessarily integer e.g. 1.0 is whole)
+is.string <- function(x){ is.character(x) && length(x) == 1 } # cheks if a value is a single string of letters
 is.binary <- function(x){ all(1*x %in% 0:1) }       # checks if a value is 0/1 (binary/logical)
 is.even   <- function(x){ as.integer(x) %% 2 == 0 } # checks if a value is even
 is.odd    <- function(x){ as.integer(x) %% 2 != 0 } # checks if a value is odd
 is.dup    <- function(x){ x %in% x[duplicated(x)] } # detects duplicates
+
+is.in = function(el,set,case.sensitive=T,withNames=T){
+  found = el %in% set
+  if(!case.sensitive){ found = toupper(el) %in% toupper(set) }
+  if(withNames) return(setNames(found,el))
+  return(found)
+}
 
 is.outlier <- function(x,thr=0.1,coef=1.5) { # return outliers outliers from distribution
   whiskers = coef * IQR(x,na.rm=T)
   return(x < quantile(x, thr,na.rm=T) - whiskers | x > quantile(x, 1-thr,na.rm=T) + whiskers)
 }
 
+
+
 mid       <- function(x){ ifelse(is.even(length(x)), length(x)/2, (length(x)+1)/2) }
 
 evens     <- function(x){ x[seq(1,length(x),by=2)] } # returns values at even indexes
 odds      <- function(x){ x[seq(2,length(x),by=2)] }  # returns values at odd indexes
 
+is.last   <- function(x){ which(x) == length(x) }
 last      <- function(x){ tail(x, n = 1) }             # returns last element of a vector
 b4.last   <- function(x){ head( tail(x,n=2) , n = 1) } # returns element before last
 but.last  <- function(x){ head(x, n = -1) }            # returns vector w/o last element
@@ -40,6 +51,7 @@ compact   <- function(x){ Filter(Negate(is.null), x) }  # removes null element i
 
 # Counting ---------------------------------------------------------------------
 ulen    <- function(x){ return( length(unique(x)) ) } # gets length of unique values
+normin  <- function(x){ return( scale(x,center=min(x),scale=1)[,1] ) } # adds minimum to values (keeps original range)
 norm01  <- function(x){ return( scale(x,center=min(x),scale=diff(range(x)))[,1] ) } # scales values between 0 and 1
 maxrep  <- function(x,n){ sort(table(x), decreasing = TRUE)[1:n] } # gets the Nth most repeated values
 sum.na  <- function (x,notNA=FALSE){ sum(is.na(x) == !notNA) } # returns sum of NA or not-NA values
@@ -299,9 +311,17 @@ lsos <- function(..., n=10) { # checks top10 memory consumption from R objects
   ls.objects(..., order.by="Size", decreasing=TRUE, head=TRUE, n=n)
 }
 
-paste.pair <- function(x,s='-'){ # join by pair (last value remains alone if odd number of values)
+paste.paired <- function(x,s='-'){ # join by pair (last value remains alone if odd number of values)
   if( is.even(length(x)) ){ return(paste.even(x,s)) }
   return(paste.odd(x,s))
+}
+
+paste.pair = function(x,s='_'){ # join by pair (upper limit of pair i is the lower_limit of pair i+1)
+  pair=c()
+  for (i in seq_along(x[-1]) ){
+    pair[i] = paste(x[i],x[i+1],sep=s)
+  }
+  return(pair)
 }
 
 get.even  <- function(x){ x[is.even(x)] } # returns even values
@@ -322,6 +342,7 @@ Round2Nearest <- function(...){ round2near(...) }
 
 mad_      <- function(...){ mad(na.rm=T,...) } # Median absoluted deviations without NA
 quantile_ <- function(x,...){  quantile(x,...,na.rm=T) } # quantile with no error message for missing values
+range_ <- function(x,...){  range(x,...,na.rm=T) } # range with no error message for missing values
 
 # Correlation with spearman method (ranks) and pairwise value
 scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){ cor.test(x,y,method = met, use=use, exact=F) }
@@ -335,14 +356,39 @@ spearman <- function(X,Y){
 spearman.toplot = function(X,Y){
   s   = spearman(X,Y)
   s$N = sum(complete.cases(X,Y))
-  s$toshow = sprintf("r=%.3f\np=%.1e\nn=%s",s$estimate,s$p.value,s$N)
+  s$toshow = sprintf(" r %.3f \n p %.1e \n N %s \n",s$estimate,s$p.value,s$N)
+  s$xmax = max_(X)
+  s$ymax = max_(Y)
+  s$xmin = min_(X)
+  s$ymin = min_(Y)
   return(s)
 }
 # Extract correlation parameters as dataframe
 get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','p.value')]) }
 
 # precomputed data -------------------------------------------------------------
+# Amino acid scores used in Dubreuil et al. 2019
 get.AA1 = function(){ unlist(strsplit("ACDEFGHIKLMNPQRSTVWY","")) }
+
+
+#aaa=c('ALA',"TYR","K","ser","Thr")
+
+# Checks wether character corresponds to 1-letter amino acid code
+is.aa1    <- function(x,.add.names=T,.ignore.case=T){
+  return( is.in(x,get.AA1(),
+                case.sensitive=!.ignore.case,
+                withNames=.add.names)
+        )
+}
+
+# Checks wether character corresponds to 3-letter amino acid code
+is.aa3    <- function(x,.add.names=T,.ignore.case=T){
+  return( is.in(x,get.AA3(),
+                case.sensitive=!.ignore.case,
+                withNames=.add.names)
+  )
+}
+
 get.AA3 = function(){ c('A'="ALA",'C'="CYS",'D'="ASP",'E'="GLU",'F'="PHE",
                         'G'="GLY",'H'="HIS",'I'="ILE",'K'="LYS",'L'="LEU",
                         'M'="MET",'N'="ASN",'P'="PRO",'Q'="GLN",'R'="ARG",
@@ -417,6 +463,7 @@ get.voronoi_stickiness = function(){
   )
 
 }
+
 get.wimleywhite = function(){
   setNames(
      object=c(4.08, 4.49, 3.02, 2.23, 5.38, 4.24, 4.08, 4.52, 3.77, 4.81, 4.48, 3.83, 3.8,
@@ -426,4 +473,32 @@ get.wimleywhite = function(){
 }
 
 sticky = get.stickiness()
+
+# Calculate the delta score between amino acids
+get.score.mutation = function(wt,mut,aascore=get.stickiness(), na.score=0){
+  if( length(wt) != length(mut)){
+    stop("Inputs have different length.")
+  }
+  validAA = all(c(wt,mut) %in% get.AA1())
+  nonAA = setdiff(c(wt,mut),get.AA1())
+
+  if( !validAA ){ warning(sprintf("Some amino acids are not recognized. (%s)",toString(nonAA))) }
+
+  # USE NORMALIZED SCORE (ONLY POSITIVE VALUES)
+  # scale(aascore,center=min(aascore),scale=1)
+  aascore.norm = normin(aascore)
+
+  # REPLACE NA VALUES BY FIXED SCORE
+  wt.score= aascore.norm[wt]
+  wt.score[is.na(wt.score)] = na.score
+
+  mut.score= aascore.norm[mut]
+  mut.score[is.na(mut.score)] = na.score
+
+  deltascore = (mut.score - wt.score)
+
+  names(deltascore) = paste0(wt,"->",mut)
+
+  return(deltascore)
+}
 
