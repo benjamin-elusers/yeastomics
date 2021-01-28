@@ -101,7 +101,18 @@ CX=EBI.complextab %>% dplyr::select("CPLX_NAME",
 ## Phenotypes features
 ```{r phenotype}
 # Essentiality
+ESS = load.vanleeuwen2020.data()
+CAT$essential = ESS %>% 
+                filter(disp !='Dispensable') %>% 
+                filter(disp == 'Core' | (KO_exp =='Indispensable' & disp_score < 0.4 )) %>%
+                pull(ORF)
+
 # Dispensability
+CAT$dispensable = ESS %>% filter(disp =='Dispensable' ) %>% pull(ORF)
+
+table(ESS$disp[ESS$ORF %in% CAT$dispensable])
+table(ESS$disp[ESS$ORF %in% CAT$essential])
+
 ```
 
 ## Subcellular localization
@@ -159,5 +170,11 @@ multiloc = UNILOC %>%
             dplyr::select('id','HAS_FOCI','HAS_ISOFORM','nloc','nloc50','localized50')
   
 head(multiloc)
+
+```
+
+
+```{r categories-table}
+# Make categories table with:
 
 ```
