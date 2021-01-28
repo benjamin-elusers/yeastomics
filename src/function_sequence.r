@@ -33,10 +33,10 @@ load.sgd.CDS = function(withORF=T) {
   return(SGD)
 }
 
-load.sgd.proteome = function(withORF=T) {
+load.sgd.proteome = function(withORF=T,rm.stop=T) {
   library(stringr)
   sgd.url = "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_protein/orf_trans_all.fasta.gz"
-  SGD = load.proteome(sgd.url)
+  SGD = load.proteome(sgd.url,nostop = rm.stop)
   regexSGD = "(S[0-9]{9})"
   if(withORF){
     # ORF identifier
@@ -125,4 +125,28 @@ widths = function(BS){
   }else{
     width(BS)
   }
+}
+
+get.width = function(BS){
+  df.width = data.frame(
+    orf=names(BS),
+    len=widths(BS),
+    stringsAsFactors = F, row.names = NULL
+  )
+  return(df.width)
+}
+
+get.positions = function(BS){
+  df.pos = data.frame(
+    orf=rep(names(BS),width(BS)),
+    len=widths(BS),
+    wt_pos=unlist(lapply(width(BS),seq_len)),
+    wt_aa = str2chr(as.character(BS)),
+    stringsAsFactors = F, row.names = NULL
+  )
+  return(df.pos)
+}
+
+rm.stop = function(BS){
+  subseq(BS,start = 1,end=width(BS)-1)
 }
