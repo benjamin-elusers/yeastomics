@@ -416,7 +416,6 @@ A total of **`r TOTAL_SNP_VAR`** variants have been identified spread over
 ## SNP count
 
 ```{r snp-plot}
-path.plot="plots/"
 
 # COUNT ALL
 singletons = PROT_SNP$nvar==1
@@ -461,7 +460,14 @@ p1.0 = ggplot(snp_byfreq, aes(x=factor(nvar),group=fr_bin)) +
 
 p1.1 = p1 + facet_wrap(~fr_bin,scales = 'free_y') + theme(legend.pos='non')
 
-p2.0 = ggplot(snp_byfreq, aes(x=1,fill=fr_bin)) + 
+
+p2.0 = ggplot(snp_byfreq, aes(x=fr_bin,fill=fr_bin)) + 
+     geom_bar(aes(y=var_mean_byfreq),stat='identity')+
+     scale_y_continuous(labels = scales::percent) +
+     scale_fill_wsj(name='SNP%') + scale_color_wsj() + theme(legend.position = 'top', legend.text = element_text(size=9))+
+     scale_x_discrete('Variant frequency bin')  + ylab('% variants')
+
+p2.1 = ggplot(snp_byfreq, aes(x=1,fill=fr_bin)) + 
      geom_bar(aes(y=var_mean_byfreq),stat='identity', position = 'stack') +
      geom_text_repel(data=subset(snp_byfreq,nvar==1),segment.size = 1, direction = "y",
                mapping=aes(y=var_mean_byfreq,x=0,color=fr_bin,label=sprintf("%.f%% (%s)\n",100*var_mean_byfreq,var_total_byfreq)),
@@ -470,18 +476,13 @@ p2.0 = ggplot(snp_byfreq, aes(x=1,fill=fr_bin)) +
      scale_y_continuous(labels = scales::percent) +
      scale_x_discrete('Variant frequency bin')  + ylab('% variants')
 
-p2.1 = ggplot(snp_byfreq, aes(x=fr_bin,fill=fr_bin)) + 
-     geom_bar(aes(y=var_mean_byfreq),stat='identity')+
-     scale_y_continuous(labels = scales::percent) +
-     scale_fill_wsj(name='SNP%') + scale_color_wsj() + theme(legend.position = 'top', legend.text = element_text(size=9))+
-     scale_x_discrete('Variant frequency bin')  + ylab('% variants')
-
 # Histogram for number of SNP
 p3.0 = get_snp_orf_plot(FREQMIN = 0)
 p3.1 = get_snp_orf_plot()
 # SNP count vs Protein Length
 p4.0 = get_snp_protlen_plot(get_snp_protlen(PROT_SNP,0))
-p4.1 = get_snp_protlen_anim(animated=T,psnp=PROT_SNP)
+p4.1 = get_snp_protlen_anim(animated=T,psnp=PROT_SNP, width = 1920/2, height = 1080/2, units = "px")
+
 # SNP count along protein length
 p5.0=get_snp_pos_plot(FREQMIN = 0)
 p5.1=get_snp_pos_plot(PROT_SNP)
@@ -617,75 +618,46 @@ library(shiny)
 #)
 ```
 
-```{r all-plot, echo=F, include=F,}
-PLOTS = tribble( ~ggplot, ~fname,
-p0.0, '0.0_var_count.png', 
-p0.1, '0.1_var_prop.png', 
-p1.0, '1.0_var_count_by_freq_stacked.png', 
-'1.1_var_count_by_freq.png', p1.1,
-'2.0_var_prop_by_freq_stacked.png', p2.0,
-'2.1_var_prop_by_freq.png',   p2.1,
-'3.0_snp_orf.png',p3.0,
-'3.1_snp_orf_by_minfreq.png',p3.1,
-'4.0_snp_protlen.png', p4.0,
-'4.1_snp_protlen.gif', p4.1,
-'5.0_snp_pos.png', p5.0,
-'5.1_snp_pos_by_minfreq', p5.1,
-
-'6.0_evo_fungi_vs_pop.png', p6.0,
-'6.1_evo_fungi_snp.png', p6.1,
-'6.2_evo_pop_snp.png', p6.2,
-
-'7.0_snp_exp.png', p7.0,
-'7.1_evo_pop_exp.png', p7.1,
-'7.2_evo_fungi_exp.png', p7.2,
-)
-
-for( p in 1:nrow(PLOTS) ){
+```{r all-plot, echo=F, include=F}
+PATH.PLOT="plots/"
+SAVED.PLOTS = list.files(PATH.PLOT)
 SCALE_PLOT=1.2
-ggsave(path = path.plot,plot = p0, filename = "0_var_count.png",scale = SCALE_PLOT)
-  
+EXT_GGPLOT2=c("eps", "ps", "tex" , "pdf", "jpeg", "tiff", "png", "bmp", "svg")
+
+PLOTS = tribble( ~gplot, ~scalingf, ~fname, 
+p0.0, SCALE_PLOT,     '0.0_var_count.png', 
+p0.1, SCALE_PLOT,     '0.1_var_prop.png', 
+p1.0, SCALE_PLOT,     '1.0_var_count_by_freq_stacked.png', 
+p1.1, SCALE_PLOT,     '1.1_var_count_by_freq.png', 
+p2.0, SCALE_PLOT,     '2.0_var_prop_by_freq_stacked.png', 
+p2.1, SCALE_PLOT,     '2.1_var_prop_by_freq.png',  
+p3.0, SCALE_PLOT,     '3.0_snp_orf.png',
+p3.1, SCALE_PLOT,     '3.1_snp_orf_by_minfreq.png',
+p4.0, SCALE_PLOT,     '4.0_snp_protlen.png', 
+p4.1, SCALE_PLOT,     '4.1_snp_protlen.gif', 
+p5.0, SCALE_PLOT,     '5.0_snp_pos.png', 
+p5.1, SCALE_PLOT,     '5.1_snp_pos_by_minfreq.png', 
+p6.0, SCALE_PLOT,     '6.0_evo_fungi_vs_pop.png', 
+p6.1, SCALE_PLOT*0.6, '6.1_evo_fungi_snp.png', 
+p6.2, SCALE_PLOT*0.8, '6.2_evo_pop_snp.png', 
+p7.0, SCALE_PLOT,     '7.0_snp_exp.png', 
+p7.1, SCALE_PLOT*0.8, '7.1_evo_pop_exp.png', 
+p7.2, SCALE_PLOT*0.6, '7.2_evo_fungi_exp.png', 
+)
+RM.PLOTS = FALSE
+if( interactive() ){ RM.PLOTS = askYesNo("About to delete all saved plots...", default=F) }
+if( RM.PLOTS ){ unlink(file.path(PATH.PLOT,SAVED.PLOTS)) }
+for( i in 1:nrow(PLOTS) ){
+  S = PLOTS$scalingf[i]
+  FILE_EXT = tolower(file_ext(PLOTS$fname[i]))
+  if(FILE_EXT %in%  EXT_GGPLOT2){
+    ggsave(path = PATH.PLOT, plot = PLOTS$gplot[[i]], filename = PLOTS$fname[i],scale =S )
+  }else if(FILE_EXT == 'gif'){
+    anim_save(path = PATH.PLOT, PLOTS$fname[i], animation =  PLOTS$gplot[[i]])
+  }else{
+    warning(sprintf("Unrecognized file extension for: %s",PLOTS$fname))
+  }
 }
-
-# plot(F1)
-# plot(F2)
-# plot(F3)
-# plot(F4)
-# plot(F5)
-# plot(F6)
-# plot(F7)
-# plot(F8)
-# plot(F9)
-# plot(F10)
-# plot(F11)
-# plot(F12)
-# plot(F13)
-ggsave(path = path.plot,plot = p00, filename = "00_var_prop.png",scale = SCALE_PLOT)
-ggsave(path = path.plot,plot = p1, filename = "1_freq_by_var_count.png",scale = SCALE_PLOT)
-ggsave(path = path.plot,plot = p2, filename = "2_var_count_by_freq.png",scale = SCALE_PLOT)
-ggsave(path = path.plot,plot = p3, filename = "3_var_prop.png",scale = SCALE_PLOT)
-ggsave(path = path.plot,plot = p4, filename = "4_var_prop_by_freq.png",scale = SCALE_PLOT)
-ggsave(path = path.plot, filename = '5_snp_hist.png', plot=F3, scale = SCALE_PLOT)
-
-ggsave(path = path.plot, filename = '6_snp_protlen.png', plot=F4, scale = SCALE_PLOT)
-p6.1 =  get_snp_pos_plot()
-ggsave(path = path.plot, filename = '6.1_snp_protlen.png', plot=p6.1, scale = SCALE_PLOT)
-#outfile =file.path("plots/6_snp_protlen.gif")
-#anim_save(outfile, animation =  anim )
-
-ggsave(path = path.plot, filename = '7_snp_pos.png', plot=F5, scale = SCALE_PLOT)
-outfile =file.path("plots/7_snp_pos.gif")
-anim_save(outfile, animation =  get_snp_pos_anim())
-
-ggsave(path = path.plot, filename = '8_evo_fungi_pop.png', F1,scale=SCALE_PLOT )
-ggsave(path = path.plot, filename = '9_evo_fungi_snp.png', F9,scale=SCALE_PLOT/2 )
-ggsave(path = path.plot, filename = '10_evo_pop_snp.png', F10,scale=SCALE_PLOT/2 )
-
-
-ggsave(path = path.plot, filename = '11_snp_exp.png', F11,scale=SCALE_PLOT )
-ggsave(path = path.plot, filename = '12_evo_pop_exp.png', F12,scale=SCALE_PLOT/2 )
-ggsave(path = path.plot, filename = '13_evo_fungi_exp.png', F13,scale=SCALE_PLOT/2 )
-
 ```
 
 # References {-}

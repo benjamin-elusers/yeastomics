@@ -117,6 +117,19 @@ strfind = function(strings, patterns){ # search multiple patterns in character v
   sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
 }
 
+file_ext <- function (fn) {
+  # remove a path
+  splitted    <- strsplit(x=fn, split='/')[[1]]
+  # or use .Platform$file.sep in stead of '/'
+  fn          <- splitted [length(splitted)]
+  ext         <- ''
+  splitted    <- strsplit(x=fn, split='\\.')[[1]]
+  l           <-length (splitted)
+  if (l > 1 && sum(splitted[1:(l-1)] != ''))  ext <-splitted [l]
+  # the extention must be the suffix of a non-empty name
+  ext
+}
+
 # Format values ----------------------------------------------------------------
 
 RoundUpToNearest <- function(nb, roundto=1){ # Round up numbers to unit or decimal specified
