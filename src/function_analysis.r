@@ -73,7 +73,7 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
     )
   if(na.rm){
     message('removing NAs...')
-    return( CC %>% filter( !is.na(!!sym(BY)) ) )
+    return( CC %>% dplyr::filter( !is.na(!!sym(BY)) ) )
   }
   return(CC)
 }
