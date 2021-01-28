@@ -26,6 +26,8 @@ output:
     theme: lumen
   editor_options: 
     chunk_output_type: console
+  bibliography: bibliography.bib
+  csl: biomed-central.csl
 ---
 
 <!-- Github Logo -->
@@ -67,9 +69,29 @@ suppressPackageStartupMessages({
   source("src/function_datapub.r")
   source("src/function_YK11.r")
   source("src/theme_black.r")
+
 })
 # turn off annoying messages from dplyr::summarise
 options(dplyr.summarise.inform = FALSE)
+
+preload = function(saved.file,loading.call,doing='create data...'){
+  library(tictoc)
+  if( !file.exists(saved.file) ){
+    cat(doing)
+    tic(doing)
+    res = eval(substitute(loading.call))
+    saveRDS(res,saved.file)
+    toc()
+  }else{
+    res = readRDS(saved.file)
+  }
+  return(res)
+}
+
+#theme_set(theme_black())
+theme_set(theme_bw(base_size=16,base_line_size = 0.5) +theme(plot.background = element_blank()))
+
+MAIN.COLOR = 'black'
 ```
 
 # Reference proteomes {.tabset .tabset-pills}
@@ -96,7 +118,7 @@ The SGD also gather many key information such as:
 ```{r sgd}
 # YEAST REFERENCE SEQUENCES
 ## SGD
-S288C  = load.sgd.proteome(withORF=T) # Reference SGD protein sequences
+S288C = load.sgd.proteome(withORF=T,rm.stop=F) # Reference SGD protein sequences
 S288C.cds = load.sgd.CDS(withORF=T) # Reference coding sequences (CDS)
 SGD = load.sgd.features() # main SGD gene/protein features
 ```
@@ -180,9 +202,10 @@ SGD contains **`r n_sgd`** sequences while UNIPROTKB has **`r n_uni`** sequences
 
 ```{r ref-ali}
 uniseq = UNI.SC[map_uni2sgd$UNIPROTKB]
-sgdseq = S288C[map_uni2sgd$ORF]
+sgdseq = rm.stop(S288C[map_uni2sgd$ORF])
 aliref = align.pair.prot(uniseq, sgdseq) # Takes ~20s for 6042 ids
-#saveRDS(pairwise.alignment.to.df(aliref),"data/sgduni-aligned-proteome.rds") # Takes ~8mn for 6042 ids
+#saveRDS(pairwise.alignment.to.df(aliref),"data/sgduni-aligned-proteome.rds") 
+# Takes ~8mn for 6042 ids
 ALI_REF = readRDS("data/sgduni-aligned-proteome.rds")
 
 ALI_STAT = group_by(ALI_REF,s1) %>%
@@ -220,13 +243,25 @@ The protein localizations can be obtained from curated annotations from
 Gene Ontology (GO) and the subcellular locations from Uniprot.
 
 ```{r load-annotations}
+
 GO   = get.uniprot.go(id_uni)
 CC   = GO %>% dplyr::filter(ONTOLOGY == CC) 
-LOC  = get.uniprot.localization(annot = UNI,loc_to_columns = T)
+LOC.m  = get.uniprot.localization(annot = UNI,loc_to_columns = T)
+LOC.df  = get.uniprot.localization(annot = UNI,loc_to_columns = F)
 DESC = get.uniprot.sgd(id_uni) 
 DESC.UNI = DESC %>% 
-            left_join(UNI, by=c('UNIPROT'='UNIPROTKB','ORF'='ORF','SGD'='SGD')) %>%
-            dplyr::filter(one2one)
+           left_join(UNI, by=c('UNIPROT'='UNIPROTKB','ORF'='ORF','SGD'='SGD'))
+
+CAT.ORF=list()
+CAT.ORF$has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(id_orf)
+
+ESS = load.vanleeuwen2020.data()
+CAT.ORF$essential = ESS %>% 
+                filter(disp !='Dispensable') %>% 
+                filter(disp == 'Core' | (KO_exp =='Indispensable' & disp_score < 0.4 )) %>%
+                pull(ORF)
+CAT.ORF$dispensable = ESS %>% filter(disp =='Dispensable' ) %>% pull(ORF)
+
 ```
 
 ## Conservation
@@ -263,20 +298,19 @@ FUNGI = WAP.r4s %>%
 POP  = K11.r4s %>% dplyr::filter( !is.na(ID) ) %>% 
        group_by(orf,len.s288c) %>%
        summarise(r4s.yk11 = mean_(SCORE),
-                max_r4s.yk11 = max_(SCORE)
+                 max_r4s.yk11 = max_(SCORE)
        )
-R4S = left_join(POP,FUNGI, by=c('orf'='r4s_orf', 'len.s288c'='r4s_size'))
+R4S = left_join(POP,FUNGI, by=c('orf'='r4s_orf', 'len.s288c'='r4s_size')) %>%
+      mutate( log10.r4s.fungi = log10(r4s.fungi),
+              log10.r4s.yk11 =log10(r4s.yk11))
 
-R4S.desc = left_join(R4S,DESC.UNI,by=c('orf'='ORF')) %>% 
-             filter(complete.cases(r4s.yk11,r4s.fungi))
-C1 =  spearman.toplot(X=R4S.desc$r4s.fungi,Y=R4S.desc$r4s.yk11)
-F1 = ggplot(R4S.desc) + 
-     geom_point(aes(y=r4s.fungi,x=r4s.yk11,text=orf,func=FUNCTION), color='white', fill=NA,,shape=21,size=0.8) + 
-     geom_text(data=C1, aes(x=Inf,y=Inf,label=toshow), hjust='inward',vjust='inward',color='white',size=4) +
-     xlab("1011 strains evolutionary rate") + ylab('Fungi Evolutionary rate') +
-     scale_x_log10() +
-     theme_black()
-plot(F1)
+CAT.ORF$ohnologs = load.byrne2005.data()$orf
+
+# FIND OUTLIERS
+# fit = lm(log10.r4s.fungi ~ log10.r4s.yk11, data = R4S) %>% broom::augment_columns(data=R4S,interval='confidence')
+# cutoff.outlier= 20*mean(fit$.cooksd)
+# R4S = fit %>% mutate(outlier = .cooksd > cutoff.outlier)
+
 ```
 
 ## Expression
@@ -311,168 +345,264 @@ gene_exp = c('tAI','mean.mpc','median.mpc','GFP.avg','MS.avg')
 log10_exp = paste0("log10_",gene_exp[-1])
 EXP = left_join(TAI,PAB, by=c('prot'='orf')) %>% 
         mutate( across(all_of(gene_exp[-1]), .fns = log10, .names = "log10_{col}" ) )
+
+gg_point <- wrap(ggally_points, size = 0.5, color = MAIN.COLOR, alpha=0.3)
+gg_cor <-  wrap(ggally_cor, title='r', method = "spearman", 
+              color=MAIN.COLOR, bg='black', display_grid = FALSE)
 F2 = ggpairs(data = EXP, 
              columns=c(gene_exp[1],log10_exp),
-             upper = list(continuous = wrap("cor", method = "spearman")),
-            ) 
+             upper = list(continuous = gg_cor),
+             lower = list(continuous = gg_point),
+             diag  = list(continuous = wrap("densityDiag", col=MAIN.COLOR, lwd=0.5))
+            )
 F2
       
 ```
 
+
 # Yeast SNP {.tabset .tabset-pills}
 
-## SNP from 1011 strains
-
-Using the translated protein sequences from the 1011 isolates proteomes, I have
-calculated the frequency of amino acids at every site of each ORF across strains.
-
-```{r snp-proc}
-SNP_FREQ=0.05
-ref.file = 'data/YK11_REF.rds'
-snp.file = 'data/YK11_SNP.rds'
-ref.snp.file = 'data/YK11_REF_SNP.rds'
-P = tibble( orf=names(YK11), 
-            n_strains=lengths(YK11),
-            len = sapply(widths(YK11),unique)
-)
-
-if( !file.exists(ref.file) ){
-  task1="Extract WT amino-acid..."
-  cat(task1)
-  tic(task1)
-  REF = map_df(YK11, get.REF, p=SNP_FREQ)
-  saveRDS(REF,ref.file)
-  toc()
-}else{
-  REF = readRDS(ref.file)
-}
-
-if( !file.exists(snp.file) ){
-  task2="Extract ALT amino-acid..."
-  cat(task2)
-  tic(task2)
-  SNP = map_df(YK11, get.SNP, p=SNP_FREQ)
-  saveRDS(SNP,snp.file)
-  toc()
-}else{
-  SNP = readRDS(snp.file)
-}
-REF_SNP = left_join(REF,SNP,by=c('pos_ref'='pos_alt', 'orf'='orf'))
-#saveRDS(REF_SNP,ref.snp.file)
-#REF_SNP = readRDS('data/YK11_REF_SNP.rds')
-
-TOTAL_SNP_VAR = nrow(REF_SNP) %>% as.character()
-TOTAL_SNP_POS = nrow(REF) %>% as.character()
-
-PROT_SNP = left_join(P,REF_SNP,by=c('orf'='orf'))
-snppos = map_df( YK11, count.SNP.bypos, p=SNP_FREQ,nbin=100 )
-snpbin = pivot_wider(snppos, id_cols = c('orf','bin.pos'), names_from=bin.pos, names_prefix = "b", values_from = n_snp)
-```
-
+Using the translated protein sequences from the 1011 isolates proteomes, I calculate
+the frequency of amino acids at every site from each ORF across strains.
+<br>
 Some sites are ambiguous between strains, meaning that some strains may have an
 alternative amino-acid at that position.
 <br>
 
-To get the SNPs, I considered the frequency of all variants must be above a 
-cutoff of **`r as.character(100*SNP_FREQ)`%**. 
+
+## SNP from 1011 strains
 
 Since, I am looking at amino-acid frequencies we can only consider non-synonymous mutations.
 <br>
 Indels are not incorporated in the strains sequences.
 
+```{r snp-proc}
+SNP_FREQ=round(1/1011,4)
+wt.file = 'data/YK11_WT.rds'
+var.file = 'data/YK11_VAR.rds'
+snppos.file = 'data/YK11_SNP_pos.rds'
+
+P = tibble( orf=names(YK11), 
+            n_strains=lengths(YK11),
+            len = sapply(widths(YK11),unique)
+    ) %>% left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
+    mutate( match_wt = len == len.s288c )
+VAR = preload(var.file, loading.call = map_df(YK11, get.variants,verbose=F),doing='Find all variants...')
+SNP = get.variants.to.SNP(VAR) %>% 
+        add_count(id,ref_pos,name='nvar') %>%
+        group_by(id,ref_pos) %>% 
+        mutate( alt_cumfr=sum(alt_fr)) %>% 
+        left_join(P,by=c('id'='orf'))
+WT = BS.to.df(S288C) %>% 
+     group_by(orf) %>% 
+     mutate(bin.pos=dplyr::ntile(wt_pos,100))
+
+PROT_SNP = left_join(SNP,WT, by=c('id'='orf','ref_pos'='wt_pos')) %>%
+      mutate(wt_low = alt_aa == wt_aa, 
+             wt_missing=is.na(wt_aa),
+             early_stop = (alt_aa == "*" & ref_pos != len), 
+             dSTI.ref=get.score.mutation(ref_aa,alt_aa),
+             dSTI.wt=get.score.mutation(wt_aa,alt_aa))
+```
+
+**SNP** is defined as a position containing at least **`r as.character(100*SNP_FREQ)`%**
+alternative amino acids (*i.e variants*) across strains. 
+<br>
+The "wildtype" residue is the amino acid with the highest frequency across all strains.
+
 A total of **`r TOTAL_SNP_VAR`** variants have been identified spread over
 **`r TOTAL_SNP_POS`** positions of the proteome.
 
+## SNP count
+
 ```{r snp-plot}
-n_snp= PROT_SNP %>% 
-        group_by(orf) %>%
-        summarize( nsnp = n_distinct(pos_ref), len=mean(len)) %>%
-        left_join(DESC,by=c('orf'='ORF'))
+path.plot="plots/"
+
+# COUNT ALL
+singletons = PROT_SNP$nvar==1
+earlystop = PROT_SNP$early_stop
+TOTAL_SNP_VAR = nrow(PROT_SNP) %>% as.character()
+TOTAL_SNP_POS = n_distinct(PROT_SNP$id,PROT_SNP$ref_pos) %>% as.character()
+TOTAL_SNP_SINGLE = sum(singletons) %>% as.character()
+TOTAL_SNP_MULTI = sum(!singletons) %>% as.character()
+TOTAL_SNP_STOP = sum_(earlystop) %>% as.character()
+
+BRK.FREQ = c(0,0.0001,1e-3,1e-2,5e-2,1e-1,5e-1)
+LAB.FREQ = paste.pair(trimws(sprintf("%.4f",BRK.FREQ), whitespace = '0', which = 'right'),s='-')
+
+PROT_SNP$fr_bin = cut(PROT_SNP$alt_fr,breaks = BRK.FREQ,labels = LAB.FREQ,ordered_result = T,include.lowest = T)
+snp_count = PROT_SNP %>% 
+            group_by(nvar) %>%
+            summarize(var_count=sum(nvar)) %>% 
+            ungroup() %>% mutate(var_mean = var_count / sum(var_count))
+
+snp_byfreq =  PROT_SNP %>% 
+              group_by(nvar,fr_bin) %>%
+              summarize( var_count_byfreq = n()) %>%
+              group_by(fr_bin) %>% 
+              mutate(var_total_byfreq= sum(var_count_byfreq)) %>%
+              ungroup() %>%
+              mutate( var_mean_byfreq = var_count_byfreq / sum(var_count_byfreq),
+                      total_mean = cumsum(var_mean_byfreq )) %>% 
+              arrange(total_mean)
+
+p0.0 = ggplot(snp_count, aes(x=factor(nvar))) +
+     geom_bar(aes(y=var_count),stat='identity') + 
+     xlab('# parallel variants')  + ylab('Count')
+p0.1 = ggplot(snp_count, aes(x=factor(nvar))) +
+     geom_bar(aes(y=var_mean),stat='identity') + 
+     xlab('# parallel variants')  + ylab('variants %') +
+     scale_y_continuous(labels = scales::percent) 
+
+p1.0 = ggplot(snp_byfreq, aes(x=factor(nvar),group=fr_bin)) +
+     geom_bar(aes(y=var_count_byfreq,fill=fr_bin),stat='identity') + 
+     scale_fill_wsj(name='SNP%') + theme(legend.position = 'top', legend.text = element_text(size=9))+
+     xlab('# parallel variants')  + ylab('Count')
+
+p1.1 = p1 + facet_wrap(~fr_bin,scales = 'free_y') + theme(legend.pos='non')
+
+p2.0 = ggplot(snp_byfreq, aes(x=1,fill=fr_bin)) + 
+     geom_bar(aes(y=var_mean_byfreq),stat='identity', position = 'stack') +
+     geom_text_repel(data=subset(snp_byfreq,nvar==1),segment.size = 1, direction = "y",
+               mapping=aes(y=var_mean_byfreq,x=0,color=fr_bin,label=sprintf("%.f%% (%s)\n",100*var_mean_byfreq,var_total_byfreq)),
+               position='stack',fontface='bold',show.legend = F)+
+     scale_fill_wsj(name='SNP%') + scale_color_wsj() + theme(legend.position = 'top', legend.text = element_text(size=9))+
+     scale_y_continuous(labels = scales::percent) +
+     scale_x_discrete('Variant frequency bin')  + ylab('% variants')
+
+p2.1 = ggplot(snp_byfreq, aes(x=fr_bin,fill=fr_bin)) + 
+     geom_bar(aes(y=var_mean_byfreq),stat='identity')+
+     scale_y_continuous(labels = scales::percent) +
+     scale_fill_wsj(name='SNP%') + scale_color_wsj() + theme(legend.position = 'top', legend.text = element_text(size=9))+
+     scale_x_discrete('Variant frequency bin')  + ylab('% variants')
+
 # Histogram for number of SNP
-F3 = ggplot(n_snp) + 
-      geom_histogram(aes(nsnp),binwidth = 1, fill='white',color='black') +
-      xlab("Number of SNP") + ylab('# ORFS') +
-      theme_black()
-ggplotly(F3)
-
+p3.0 = get_snp_orf_plot(FREQMIN = 0)
+p3.1 = get_snp_orf_plot()
 # SNP count vs Protein Length
-F4 = ggplot(n_snp) + 
-     geom_point(aes(y=nsnp,x=len,text=orf,func=FUNCTION), color='white', fill=NA,,shape=21,size=0.8) + 
-     xlab("Protein Length (AA)") + ylab('SNP count') +
-     theme_black()
-ggplotly(F4)
-
+p4.0 = get_snp_protlen_plot(get_snp_protlen(PROT_SNP,0))
+p4.1 = get_snp_protlen_anim(animated=T,psnp=PROT_SNP)
 # SNP count along protein length
-snp_by_pos = snppos %>% 
-              group_by(bin.pos) %>% 
-              summarize( avgSNP=mean(n_snp), sdSNP=sd(n_snp), maxSNP=max(n_snp))
-
-F5 = ggplot(snp_by_pos,aes(x=bin.pos,y=avgSNP)) +
-      #geom_point() + 
-      geom_line(col='white') + 
-      geom_line(aes(y=maxSNP),col='red') + 
-      geom_linerange(aes(ymin=avgSNP-sdSNP,ymax=avgSNP+sdSNP),col='white') +
-      geom_vline(xintercept=seq(5,95,by=5),size=0.1,linetype='dashed') +
-      ylab('SNP count') + xlab('Sequence position (%)') +
-      theme_black() 
-ggplotly(F5)
-      
-#p = grid.arrange(p0,p1,ncol=2)
+p5.0=get_snp_pos_plot(FREQMIN = 0)
+p5.1=get_snp_pos_plot(PROT_SNP)
 ```
+
 
 Similarly, I calculated the number of "early-STOP" codons,
 *i.e.* STOP codons which occur before the last amino acid.
 
 ```{r stop-plot}
+stop_count = PROT_SNP %>% dplyr::filter(alt_fr>0.1) %>% 
+        group_by(id) %>%
+        summarize( nstop = sum(early_stop),len=mean(len)) %>%
+        left_join(DESC,by=c('id'='ORF')) %>% 
+        left_join(EXP,by=c('id'='prot')) %>%
+        mutate(has_introns = (id %in% CAT.ORF$has_intron))
+# Histogram for number of early STOP 
+F6 = ggplot(stop_count,aes(x=nstop)) + 
+      geom_histogram(binwidth = 1, fill=MAIN.COLOR,color='black') +
+      xlab("early-STOP count") + ylab('# ORFS') + scale_y_log10()
+plot(F6)
+
+# early STOP count vs Protein Length
+F7 = ggplot(stop_count %>% filter(nstop >0)) + 
+     geom_point(aes(y=nstop,x=log10_mean.mpc,text=id,func=FUNCTION,color=factor(has_introns)), shape=21,size=0.8) + 
+     xlab("Protein Length (AA)") + ylab('early-STOP count')
+ggplotly(F7)
 ```
 
-```{r snp-exp}
-SNP.PROT = left_join(n_snp, EXP , by=c('orf'='prot')) %>% # Add expression data 
-  left_join(R4S, by=c('orf'='orf'))# %>% # Add conservation data 
-  #left_join(DESC.UNI,by=c('orf'='ORF')) # Add annotation data
+## SNP vs. evolution
+
+```{r snp-evo}
+
+R4S.desc = left_join(R4S,DESC,by=c('orf'='ORF')) %>%
+           left_join(SGD,by=c('SGD'='sgdid')) %>%
+           filter(complete.cases(r4s.yk11,r4s.fungi)) %>%
+           ungroup() %>%
+           mutate( has_introns=orf %in% CAT.ORF$has_intron,
+                   has_ohnologs=orf %in% CAT.ORF$ohnologs,
+                   sizerange= cut_number(len.s288c,n = 4),
+                   is_dispensable = orf %in% CAT.ORF$dispensable,
+                   is_essential = orf %in% CAT.ORF$essential
+                  )# %>%
+          #left_join(LOC.df,by=c('UNIPROT'='id')) %>%
+          #add_count(loc,name = 'nloc') %>% filter(nloc > 100)
+# CC=cor.sub.by(R4S.desc, XX='log10.r4s.yk11',YY='log10.r4s.fungi',BY='loc', ID = 'orf', na.rm = T) %>% 
+#       mutate( toshow=sprintf("r=%.3f\np=%.1e\nn=%s",r,p,N) )
+
+C6.0 =  spearman.toplot(Y=R4S.desc$log10.r4s.fungi,X=R4S.desc$log10.r4s.yk11)
+p6.0 = ggplot(R4S.desc, aes(y=log10.r4s.fungi,x=log10.r4s.yk11,text=orf,func=FUNCTION)) + 
+     geom_point(fill=MAIN.COLOR,alpha=0.4,shape=21,size=0.8) + 
+     #geom_point(data=subset(R4S.desc,has_introns),color='red',fill=NA,shape=1,size=1.4,stroke=0.2)+
+     #geom_point(data=subset(R4S.desc,has_ohnologs),color='blue',fill=NA,shape=1,size=1.4,stroke=0.2)+
+     #geom_point(data=subset(R4S.desc,is_essential),color='green',fill=NA,shape=1,size=1.4,stroke=0.2)+
+     #geom_point(data=subset(R4S.desc,is_dispensable),color='purple',fill=NA,shape=1,size=1.4,stroke=0.2)+
+     geom_text(data=C6.0, aes(x=Inf,y=-Inf,label=toshow),color=MAIN.COLOR,size=4,inherit.aes = F,hjust='inward',vjust='inward') +
+     #geom_text(data=subset(R4S.desc,outlier), mapping=aes(label=orf),color='white',size=2) +
+     xlab("1011 strains evolutionary rate") + ylab('Fungi Evolutionary rate')  
+#    facet_wrap(~loc)
+plot(p6.0)
   
+
+snp_count_orf=get_snp_orf(PROT_SNP,0)
+SNP.PROT = left_join(snp_count_orf, EXP , by=c('id'='prot')) %>% # Add expression data
+           left_join(R4S, by=c('id'='orf')) %>% # Add conservation data 
+           left_join(DESC,by=c('id'='ORF')) # Add annotation data
+
 # SNP count vs Evolutionary rate fungi
-F6 = ggplot(SNP.PROT) + 
-     geom_point(aes(x=nsnp,y=r4s.fungi,text=orf,func=FUNCTION), color='white', fill=NA,,shape=21,size=0.8) + 
+C6.1 =  spearman.toplot(SNP.PROT$sites,SNP.PROT$log10.r4s.fungi)
+p6.1 = ggplot(SNP.PROT) + 
+     geom_point(aes(x=sites,y=log10.r4s.fungi,text=id,func=FUNCTION), color=MAIN.COLOR, fill=NA,shape=21,size=0.8) + 
+     geom_text(C6.1, mapping=aes(x=1,y=0.5,label=toshow),hjust='inward',vjust='inward',check_overlap =T,size=4) + 
      xlab('SNP count') + ylab("Fungi Evolutionary rate") +
-     scale_x_continuous(trans='log2') +
-     theme_black()
-ggplotly(F6)
+     scale_x_continuous(trans='log2')
+ggplotly(p6.1)
+plot(p6.1)
 
 # SNP count vs Evolutionary rate 1011 strains
-F7 = ggplot(SNP.PROT) + 
-     geom_point(aes(x=nsnp,y=r4s.yk11,text=orf,func=FUNCTION), color='white', fill=NA,,shape=21,size=0.8) + 
-     xlab('SNP count') + ylab("1011 strains evolutionary rate") + 
-     scale_y_log10() + scale_x_continuous(trans='log2') +
-     theme_black()
+C6.2 =  spearman.toplot(SNP.PROT$sites,SNP.PROT$log10.r4s.yk11)
+p6.2= ggplot(SNP.PROT) + 
+      geom_point(aes(x=sites,y=log10.r4s.yk11,text=id,func=FUNCTION), color=MAIN.COLOR, fill=NA,shape=21,size=0.8) + 
+      geom_text(C6.2, mapping=aes(x=1,y=0.5,label=toshow),hjust='inward',vjust='inward',check_overlap =T,size=4) + 
+      xlab('SNP count') + ylab("1011 strains evolutionary rate") + 
+      scale_x_continuous(trans='log2')
+ggplotly(p6.2)
+plot(p6.2)
+```
 
-ggplotly(F7)
+## SNP vs. expression
+
+```{r snp-exp}
+SNP.PROT$has_ortho = SNP.PROT$id %in% FUNGI$r4s_orf # filter for orthologs
 
 # SNP count vs Median protein expression 
-F8 = ggplot(SNP.PROT) + 
-     geom_point(aes(y=nsnp,x=log10_median.mpc,text=orf,func=FUNCTION), color='white', fill=NA,,shape=21,size=0.8) + 
-     xlab("Molecules per cell (log10 median)") + ylab('SNP count') +
-     scale_y_continuous(trans='log2') +
-     theme_black()
-ggplotly(F8)
-
-
+C7.0 =   cor.sub.by(SNP.PROT, "log10_median.mpc", "sites", 'has_ortho') %>%
+         mutate( toshow = sprintf("r %.3f \n p %.1e \n n %s",r,p,n))
+p7.0 = ggplot(SNP.PROT) + 
+      geom_point(aes(y=sites,x=log10_median.mpc,text=id,func=FUNCTION), color=MAIN.COLOR, fill=NA,shape=21,size=0.8) + 
+      geom_text(C7.0, mapping=aes(x=0,y=1,label=toshow),hjust='inward',vjust='inward',check_overlap =T,size=4) + 
+      xlab("Molecules per cell (log10 median)") + ylab('SNP count') +
+      scale_y_continuous(trans='log2') + facet_wrap(~has_ortho,labeller = label_both)
+ggplotly(p7.0 )
+plot(p7.0 )
 # Evolutionary rate 1011 strains vs Median protein expression 
-F9 = ggplot(SNP.PROT) + 
-     geom_point(aes(y=r4s.yk11,x=log10_median.mpc,text=orf,func=FUNCTION), color='white', fill=NA,,shape=21,size=0.8) + 
-     ylab("1011 strains evolutionary rate") + xlab('Molecules per cell (log10 median)') +
-     scale_y_log10() +
-     theme_black()
-ggplotly(F9)
+C7.1 =   cor.sub.by(SNP.PROT, "log10_median.mpc", "log10.r4s.yk11", 'has_ortho') %>%
+        mutate( toshow = sprintf("r %.3f \n p %.1e \n n %s",r,p,n))
 
-
+p7.1 = ggplot(SNP.PROT) + 
+      geom_point(aes(y=log10.r4s.yk11,x=log10_median.mpc,text=id,func=FUNCTION), color=MAIN.COLOR, fill=NA,shape=21,size=0.8) +
+      geom_text(C7.1, mapping=aes(x=0,y=-4,label=toshow),hjust='inward',vjust='inward',check_overlap =T,size=4) + 
+      ylab("1011 strains evolutionary rate") + xlab('Molecules per cell (log10 median)') + facet_wrap(~has_ortho,labeller=label_both)
+ggplotly(p7.1)
+plot(p7.1)
 # Evolutionary rate fungi vs Median protein expression 
-F10 = ggplot(SNP.PROT) + 
-     geom_point(aes(y=r4s.fungi,x=log10_median.mpc,text=orf,func=FUNCTION), color='white', fill=NA,,shape=21,size=0.8) + 
-     ylab("fungi evolutionary rate") + xlab('Molecules per cell (log10 median)') +
-     theme_black()
-ggplotly(F10)
-
+C7.2 =  spearman.toplot(SNP.PROT$log10_median.mpc,SNP.PROT$log10.r4s.fungi)
+p7.2 = ggplot(SNP.PROT) + 
+      geom_point(aes(y=log10.r4s.fungi,x=log10_median.mpc,text=id,func=FUNCTION), color=MAIN.COLOR, fill=NA,shape=21,size=0.8) +
+      geom_text(C7.2, mapping=aes(x=6,y=0.5,label=toshow),hjust='inward',vjust='inward',check_overlap =T,size=4) + 
+     ylab("fungi evolutionary rate") + xlab('Molecules per cell (log10 median)') 
+ggplotly(p7.2)
+plot(p7.2)
 
 ```
 
@@ -487,7 +617,78 @@ library(shiny)
 #)
 ```
 
-# References
+```{r all-plot, echo=F, include=F,}
+PLOTS = tribble( ~ggplot, ~fname,
+p0.0, '0.0_var_count.png', 
+p0.1, '0.1_var_prop.png', 
+p1.0, '1.0_var_count_by_freq_stacked.png', 
+'1.1_var_count_by_freq.png', p1.1,
+'2.0_var_prop_by_freq_stacked.png', p2.0,
+'2.1_var_prop_by_freq.png',   p2.1,
+'3.0_snp_orf.png',p3.0,
+'3.1_snp_orf_by_minfreq.png',p3.1,
+'4.0_snp_protlen.png', p4.0,
+'4.1_snp_protlen.gif', p4.1,
+'5.0_snp_pos.png', p5.0,
+'5.1_snp_pos_by_minfreq', p5.1,
+
+'6.0_evo_fungi_vs_pop.png', p6.0,
+'6.1_evo_fungi_snp.png', p6.1,
+'6.2_evo_pop_snp.png', p6.2,
+
+'7.0_snp_exp.png', p7.0,
+'7.1_evo_pop_exp.png', p7.1,
+'7.2_evo_fungi_exp.png', p7.2,
+)
+
+for( p in 1:nrow(PLOTS) ){
+SCALE_PLOT=1.2
+ggsave(path = path.plot,plot = p0, filename = "0_var_count.png",scale = SCALE_PLOT)
+  
+}
+
+# plot(F1)
+# plot(F2)
+# plot(F3)
+# plot(F4)
+# plot(F5)
+# plot(F6)
+# plot(F7)
+# plot(F8)
+# plot(F9)
+# plot(F10)
+# plot(F11)
+# plot(F12)
+# plot(F13)
+ggsave(path = path.plot,plot = p00, filename = "00_var_prop.png",scale = SCALE_PLOT)
+ggsave(path = path.plot,plot = p1, filename = "1_freq_by_var_count.png",scale = SCALE_PLOT)
+ggsave(path = path.plot,plot = p2, filename = "2_var_count_by_freq.png",scale = SCALE_PLOT)
+ggsave(path = path.plot,plot = p3, filename = "3_var_prop.png",scale = SCALE_PLOT)
+ggsave(path = path.plot,plot = p4, filename = "4_var_prop_by_freq.png",scale = SCALE_PLOT)
+ggsave(path = path.plot, filename = '5_snp_hist.png', plot=F3, scale = SCALE_PLOT)
+
+ggsave(path = path.plot, filename = '6_snp_protlen.png', plot=F4, scale = SCALE_PLOT)
+p6.1 =  get_snp_pos_plot()
+ggsave(path = path.plot, filename = '6.1_snp_protlen.png', plot=p6.1, scale = SCALE_PLOT)
+#outfile =file.path("plots/6_snp_protlen.gif")
+#anim_save(outfile, animation =  anim )
+
+ggsave(path = path.plot, filename = '7_snp_pos.png', plot=F5, scale = SCALE_PLOT)
+outfile =file.path("plots/7_snp_pos.gif")
+anim_save(outfile, animation =  get_snp_pos_anim())
+
+ggsave(path = path.plot, filename = '8_evo_fungi_pop.png', F1,scale=SCALE_PLOT )
+ggsave(path = path.plot, filename = '9_evo_fungi_snp.png', F9,scale=SCALE_PLOT/2 )
+ggsave(path = path.plot, filename = '10_evo_pop_snp.png', F10,scale=SCALE_PLOT/2 )
+
+
+ggsave(path = path.plot, filename = '11_snp_exp.png', F11,scale=SCALE_PLOT )
+ggsave(path = path.plot, filename = '12_evo_pop_exp.png', F12,scale=SCALE_PLOT/2 )
+ggsave(path = path.plot, filename = '13_evo_fungi_exp.png', F13,scale=SCALE_PLOT/2 )
+
+```
+
+# References {-}
 
 Jackson et al.: 
 [***Genome evolution across 1,011 Saccharomyces cerevisiae isolates***](https://doi.org/10.1038/s41586-018-0030-5)

@@ -1,63 +1,24 @@
 library(Biostrings)
+library(tidyverse)
+library(stringr)
+library(hutils)
+library(hablar)
 
-get.SNP.positions = function(S,pmin=0.05,as.ind=T){
-  M = consensusMatrix(S, as.prob = T)
-  q=1-pmin
-  WT.freq = apply(M,2,max) # Find max AA frequency (likely wildtype)
-  SNP = WT.freq <= q  # SNP are AA with max frequency below q = (1-p)
-  if(as.ind) SNP = which(SNP)
-  return(SNP)
+### Strains --------------------------------------------------------------------
+
+# Get strains with identical residues at a certain position in sequences
+which.strains = function(orf,pos,letter){
+  if(length(pos)>1){ warning("More than one position provided, only the first will be used!") }
+  if(any(pos[1]>widths(orf))){ stop(sprintf("Position %s is out of bounds!",pos[1])) }
+  matched =  names(orf)[hasLetterAt(orf,letter[1],at=pos[1])]
+  matched_strains = get.strain_orf(matched,what='strains')
+  return(matched_strains)
 }
 
-count.SNP.bypos = function(s,p,nbin=100,.id=NULL){
-  # if no id given, extract the yeast ORF (locus name) from the sequnece names
-  if(is.null(.id)){ .id = get.strain_orf(s,what='orf') }
-  snp = get.SNP.positions(s,p,as.ind=F)
-  snppos = tibble( orf=.id, bin.pos = dplyr::ntile(seq_along(snp), nbin), snp=snp*1) %>%
-    group_by(orf,bin.pos) %>%
-    summarize( n_snp=sum(snp))
-  return(snppos)
-}
-
-get.noSNP = function(S){ !get.SNP.positions(S,pmin= 1e-7,as.ind=F) } # the lowest aa frequency allowed is 1e-7 (7 digits precision)
-count.SNP = function(s,p){ sum(get.SNP.positions(S=s,pmin=p,as.ind=F)) }
-count.STOP = function(s,p){ sum(get.SNP.positions(S=s,pmin=p,as.ind=F)) }
-
-freq.SNP = function(s,p,zero2na=T){
-  M = consensusMatrix(s, as.prob = T)
-  pos = get.SNP.positions(S=s,pmin=p,as.ind=T)
-  freq.snp = M[,pos,drop=F] # drop=F to keep data.frame format even for single columns
-  colnames(freq.snp) = pos
-  if(zero2na) freq.snp = replace(freq.snp,freq.snp==0,NA)
-  return(freq.snp)
-}
-
-
-### REF = Wildtype or most frequent amino-acid
-get.REF.aa = function(s,p){
-  FR=freq.SNP(s,p)
-  AA = rownames(FR)
-  REF = AA[apply(FR,2,which.max)]
-  names(REF)=names(FR)
-  return(REF)
-}
-
-get.REF.freq = function(s,p){
-  FR=freq.SNP(s,p,zero2na = T)
-  REF = apply(FR,2,max,na.rm=T)
-  names(REF)=colnames(FR)
-  return(REF)
-}
-
-is.ref = function(s,p){
-  FR=freq.SNP(s,p,zero2na = F)
-  is_ref = apply(FR,2,function(x){ x==max(x,na.rm=T) })
-  return(is_ref)
-}
-
+# Extract the isolate id (standardized name) or the orf from string in format "strain_orf_gene"
 get.strain_orf= function(x,what=c('orf','strains','both')){
-  library(stringr)
-  library(hutils)
+  #library(stringr)
+  #library(hutils)
   if (!is.character(x) && !is(x, "XStringSet"))
     stop("'x' must be a character vector, or a XStringSet object")
   nms = x
@@ -75,108 +36,270 @@ get.strain_orf= function(x,what=c('orf','strains','both')){
   return(res)
 }
 
-get.REF = function(s,p,.id=NULL){
-  # if no id given, extract the yeast ORF (locus name) from the sequnece names
-  if(is.null(.id)){ .id = get.strain_orf(s,what='orf') }
-  #ref=data.frame(orf=character(0),pos_ref=numeric(0),aa_ref=character(0),fr_ref=numeric(0),stringsAsFactors = F)
-  ref = NULL
-  if( count.SNP(s,p) > 0 ){
-    ref = data.frame(row.names = NULL, stringsAsFactors = F,
-            orf = .id,
-            pos_ref = get.SNP.positions(s,p,as.ind=T),
-            aa_ref = get.REF.aa(s,p),
-            fr_ref = get.REF.freq(s,p)
-    )
+### Variants -------------------------------------------------------------------
+
+# Get the number of variants per position which cumulative frequency is over pmin
+get.variants.count = function(S){
+  FREQ = consensusMatrix(S, as.prob = T)
+  max.freq = apply(FREQ,2,max) # Find max AA frequency
+  VARCOUNT = colSums(FREQ[,drop=F]>0) - 1*(max.freq==1) # counting variants per position (should be min 2)
+  invariant = VARCOUNT == 1
+  if( any(invariant) ){ warning(sprintf("The following positions are invariants (single aa): %s",toString(which(invariant)))) }
+# q=1-PMIN
+# VAR = max.freq <= q  # variants are AA with max frequency below q = (1-p)
+# TEST = replace(VAR,VAR==TRUE,colSums(M[,VAR,drop=F]>0,2))
+# if( !all(VARCOUNT==TEST) ){ warning("DEBUG: DID NOT PASSED THE CHECK FOR COUNTING THE VARIANTS") }
+  return(VARCOUNT)
+}
+count.variants = function(S){ sum(get.variants.count(S)) }
+
+# Get the positions of variants which cumulative frequency is over pmin
+get.variants.positions = function(S,as.ind=T){
+  POSVAR = get.variants.count(S) != 0
+  if(as.ind) return(which(POSVAR))
+  return(POSVAR)
+}
+
+filter.variants.freq = function(S,zero2na=T){
+  FR = consensusMatrix(S, as.prob = T)
+  varpos = get.variants.positions(S,as.ind=T)
+  freq.var = FR[,varpos,drop=F] # drop=F to keep data.frame format even for single columns
+  colnames(freq.var) = varpos
+  if(zero2na) freq.var[ freq.var == 0 ] = NA
+  return(freq.var)
+}
+
+# Get the frequencies of variants positions
+get.variants.freq = function(S,as.vec=T){
+  VARFREQ = filter.variants.freq(S,zero2na = T)
+  if(as.vec) return(VARFREQ[!is.na(VARFREQ)])
+  return(VARFREQ)
+}
+
+# Get the variants residues (positions, residue, frequency, counts)
+get.variants= function(S,verbose=T){
+  #library(tidyverse)
+  id = get.strain_orf(S,what='orf')
+  if(verbose){ message(id) }
+  if( count.variants(S) > 0  ){
+    varfreq = stack( get.variants.freq(S,as.vec=F) )
+    variants = na.omit(varfreq)
+    colnames(variants) = c('var_aa','var_pos','var_fr')
+    VAR = as_tibble(variants) %>%
+      mutate(var_pos=as.integer(as.character(var_pos)), var_aa=as.character(var_aa)) %>%
+      group_by(var_pos) %>%
+      mutate( id=id, maxfreq = var_fr == max(var_fr)) %>%
+      dplyr::select(id,everything())
+    return(VAR)
   }
-  return(ref)
 }
 
-### SNP = non-WT amino acid present in at least q=(1-p) strains
-get.SNP.aa = function(s,p,as.df=T){
-  FR=freq.SNP(s,p,zero2na =T)
-  AA=rownames(FR)
-  aa.snp = !is.na(FR) & !is.ref(s,p)
-  ALT = apply(aa.snp,2,function(aa){ paste0(AA[aa],collapse="|") })
-  if(as.df){
-    if( length(ALT) > 0){
-      alt = stack( strsplit(ALT,split="\\|") )[,c('ind','values')]
-      alt$ind = unfactor(alt$ind)
-      ALT = setNames(alt,c('pos_alt','aa_alt'))
-      #ALT = tidyr::separate_rows( tibble::enframe(ALT), value, sep='\\|') %>% dplyr::rename(pos_alt=name, aa_alt = value)
-    }else{
-      ALT=data.frame(pos_alt=numeric(0),aa_alt=character(0),stringsAsFactors = F)
-    }
-  }
-  return(ALT)
-}
-
-get.SNP.freq = function(s,p,addSNP=T){
-  FR=freq.SNP(s,p,zero2na =T)
-  aa.snp = !is.na(FR) & !is.ref(s,p)
-  fr.snp = FR[aa.snp]
-  if(addSNP){
-    fr.snp = colSums(replace(FR,is.ref(s,p),NA),na.rm = T)
-  }
-  return(fr.snp)
-}
-
-get.SNP =function(s,p,.id=NULL){
-  #  library(tidyverse)
-  if(is.null(.id)){ .id = get.strain_orf(s,what='orf') }
-  alt=NULL
-  #alt= data.frame(stringsAsFactors = F, row.names = NULL,
-  #                orf=character(0),pos_alt=numeric(0),aa_alt=character(0), fr_alt=numeric(0))
-  if( count.SNP(s,p) > 0 ){
-    alt = data.frame(stringsAsFactors = F, row.names = NULL,
-                     orf = .id,
-                     get.SNP.aa(s,p),
-                     fr_alt=get.SNP.freq(s,p,addSNP=F) )
-  } # %>%
-  # TO CALCULATE FREQUENCIES OF JOINED VARIANTS
-  # as_tibble %>%
-  # group_by(pos_alt) %>%
-  # mutate(fr_SNP = sum(fr_alt), single_SNP = n()== 1)
-  return(alt)
-}
-
-get.STOP = function(S,pmin=0.05,as.count=T){
+# Get the early STOP with frequency above pmin
+get.STOP = function(S){
   M = consensusMatrix(S, as.prob = T)
-  STOP = which(M["*",] > pmin & M["*",] < 1)
-  earlySTOP = STOP[STOP != ncol(M)]
-  if(as.count) return(length(earlySTOP))
-  return(earlySTOP)
+  STOP = (M["*",])
+  if( M['*',ncol(M)] == 1  ){ STOP[ncol(M)] = FALSE }
+  return(1*STOP)
+}
+
+# Count number of SNPS along the sequence using a fixed-window non-overlapping window
+count.SNP.bypos = function(s,nbin=100,.id=NULL){
+  snp = get.variants.count(s)
+  earlySTOP = get.STOP(s)
+  len =unique(width(s))
+
+  snppos = tibble( orf=.id, bin.pos = dplyr::ntile(1:len, nbin), sites=snp!=0, snp=snp, earlystop=earlySTOP) %>%
+    group_by(orf,bin.pos) %>%
+    summarize( n_sites=sum(sites), n_snp=sum(snp), n_stop = sum(earlySTOP), n_pos = n() )
+  return(snppos)
+}
+
+get.maxfreq = function(VAR){
+  MAXFREQ = VAR %>%
+    dplyr::filter(maxfreq) %>%
+    rename_with(~sub(x=.x,"var_","ref_")) %>%
+    dplyr::select(-maxfreq)
+  return(MAXFREQ)
+}
+
+get.lowfreq = function(VAR){
+  LOWFREQ = VAR %>%
+    dplyr::filter(!maxfreq) %>%
+    rename_with(~sub(x=.x,"var_","alt_")) %>%
+    dplyr::select(-maxfreq)
+  return(LOWFREQ)
+}
+
+get.variants.to.SNP = function(VAR){
+  ALT = get.lowfreq(VAR)
+  REF = get.maxfreq(VAR)
+  SNP = left_join(REF, ALT, by = c('id'='id','ref_pos'='alt_pos'))
+  return(SNP)
+}
+
+get.ALT = function(S,VAR,verbose=F){
+  if( count.variants(S) > 0  ){
+    ALT = get.lowfreq(VAR = get.variants(S,verbose))
+    return(ALT)
+  }
+}
+
+### REF = most frequent variant
+get.REF = function(S,verbose=F){
+  if( count.variants(S) > 0  ){
+    REF = get.maxfreq(VAR = get.variants(S,verbose))
+    return(REF)
+  }
+}
+
+
+get.SNP = function(S,verbose=F){
+  if( count.variants(S) > 0  ){
+    V = get.variants(S,verbose)
+    SNP = get.variants.to.SNP(V)
+    return(SNP)
+  }
+}
+
+get.aa.pos = function(S,POS){
+  OOB = POS>length(S)
+  if(OOB){
+    warning(sprintf("The following position is out of bounds: %s",toString(POS)))
+  }
+  validPOS = POS[-OOB]
+  if(is.null(validPOS)){ return(NA) }
+  else{
+    return(Biostrings::letter(S,validPOS))
+  }
 }
 
 get.SNPscore = function(S, scoremat = "BLOSUM100", masked=c()){
+  library(msa)
   mat.sub = grep( data(package="Biostrings")$results[,'Item'], pattern="(BLOSUM)|(PAM)", value=TRUE)
   scoremat = match.arg(scoremat, choices=mat.sub, several.ok = F)
-  require(msa)
   ali = msa(S)
   msaConservationScore(ali,scoremat)
 }
 
-# show.positions(orf,pos,letter){
-#   pos = c(19,54,79,85)
-#   ipos = IRangesList(pos)
-#   extract
-# }
+#http://sgd-archive.yeastgenome.org/sequence/S288C_reference/genome_releases/S288C_reference_genome_Current_Release.tgz
 
-# Get strains name sharing base/residue at position pos in fasta sequences (DNA/AA)
-which.strains = function(orf,pos,letter){
-  if(length(pos)>1){ warning("More than one position provided, only the first will be used!") }
-  if(any(pos[1]>widths(orf))){ stop(sprintf("Position %s is out of bounds!",pos[1])) }
-  matched =  names(orf)[hasLetterAt(orf,letter[1],at=pos[1])]
-  matched_strains = get.strain_orf(matched,what='strains')
-  return(matched_strains)
+preload = function(saved.file,loading.call,doing='create data...'){
+  library(tictoc)
+  if( !file.exists(saved.file) ){
+    cat(doing)
+    tic(doing)
+    res = eval(substitute(loading.call))
+    saveRDS(res,saved.file)
+    toc()
+  }else{
+    res = readRDS(saved.file)
+  }
+  return(res)
+}
+#ref.file = 'data/YK11_REF.rds'
+#alt.file = 'data/YK11_ALT.rds'
+#snp.file = 'data/YK11_SNP.rds'
+
+#ALT = preload(alt.file, loading.call = map_df(YK11, get.ALT,verbose=F),doing='Extract ALT amino-acid...')
+#REF = preload(ref.file, loading.call = map_df(YK11, get.REF,verbose=F),doing='Extract REF amino-acid...')
+#SNP = preload(snp.file, loading.call = map_df(YK11, get.SNP,verbose=T), doing='Find all SNPs...')
+# WT  = preload(wt.file, loading.call = map2_df(unfactor(SNP$ref_pos),SNP$id,get.aa,S=S288C),
+#               doing='Extract WT amino-acid...'
+#              )
+
+
+get_snp_orf = function(PSNP,pmin){
+  SNPORF = PSNP %>%
+            dplyr::filter(alt_fr >= pmin) %>%
+            group_by(id) %>%
+            summarize(sites=n_distinct(ref_pos), var_count = n(), PMIN=pmin) %>%
+            ungroup() %>% mutate(md_sites=median(sites))
+  return(SNPORF)
 }
 
-#http://sgd-archive.yeastgenome.org/sequence/S288C_reference/genome_releases/S288C_reference_genome_Current_Release.tgz
-# SNPDIR="/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/Matrix/RefGenome_SNP_indel/"
-# yal001c=Biostrings::readDNAStringSet(file.path(SNPDIR,"YAL001C.fasta"))
-# yal001c.freq = consensusMatrix(yal001c,as.prob = T)
-# noSNP  = colSums(yal001c.freq==1) == 1
-# SNP.freq = apply(yal001c.freq[,!noSNP],2,max)
-# SNP.05 = SNP.freq < (1-0.5)
-#sum(noSNP)
-#sum(SNP.05)
-#colMeans( letterFrequency( x = subseq(yal001c,start=which(SNP.05)[1],width=1), letter=c("A","C","G","T")) )
+get_snp_orf_plot = function(psnp=PROT_SNP,BIN=5,FREQMIN=c(0.0001,1e-3,1e-2,5e-2,1e-1,2e-1,3e-1,4e-1)){
+  require(ggplot2)
+  require(ggthemes)
+
+  tmp = map_df(.x = FREQMIN, .f = get_snp_orf, PSNP=psnp)
+
+  P = ggplot(tmp,aes(label=sites,x=sites)) +
+        geom_histogram(binwidth = BIN, fill=MAIN.COLOR,color='black') +
+        geom_vline(aes(xintercept=md_sites),color='red') +
+        geom_text(aes(x=md_sites,y=0,label=paste("median =",md_sites)),color='red',size=4,hjust=-0.1,vjust='inward',check_overlap = T) +
+        xlab("Number of SNP") + ylab('# ORFS')
+  if(length(FREQMIN)>1){ P = P + facet_wrap(~PMIN,scales='free') }
+  return(P)
+}
+
+###
+get_snp_protlen = function(PSNP,pmin){
+  snp_by_len = PSNP %>%
+    dplyr::filter(alt_fr >= pmin) %>%
+    group_by(id) %>%
+    summarize(var_count=sum(nvar), sites_count=n_distinct(ref_pos),len = mean(len)) %>%
+    mutate(PMIN = factor(pmin)) %>%
+    left_join(DESC,by=c('id'='ORF'))
+
+  C=cor.sub.by(snp_by_len,XX='len',YY='sites_count', BY = 'PMIN',na.rm=T) %>%
+    mutate( toshow=sprintf("r %.3f\np %.1e\nn %s ",r,p,N) )
+
+  SNPLEN = left_join(snp_by_len,C,c('PMIN'='PMIN'))
+
+  return(SNPLEN)
+}
+
+get_snp_protlen_plot = function(SNPLEN){
+  require(ggplot2)
+  require(ggthemes)
+  P = ggplot(SNPLEN) +
+       geom_point(aes(y=sites_count,x=len,text=id,func=FUNCTION),shape=21,size=0.8) +
+       geom_text(aes(y=0,x=5000,label=toshow),hjust='inward',vjust='inward',check_overlap =T,size=4)+
+       xlab("Protein Length (AA)") + ylab('SNP count')
+  return(P)
+}
+
+
+get_snp_protlen_anim = function(animated=T, psnp = PROT_SNP, FREQMIN=c(0.0001,1e-3,1e-2,5e-2,1e-1,2e-1,3e-1,4e-1), ...){
+  library(gganimate)
+  library(gifski)
+  #require(magick)
+  #require(av)
+  tmp = map_df(.x = FREQMIN, .f = get_snp_protlen, PSNP=psnp)
+  anim =  get_snp_protlen_plot(tmp) +
+    theme(legend.position='none') +
+    geom_text(aes(y=0,x=5000,label=toshow),hjust='inward',vjust='inward',check_overlap =T,size=4)+
+    transition_states(PMIN,wrap=F,transition_length = 2, state_length = 3) +
+    ggtitle("Minimum SNP% > {closest_state}")+
+    view_follow(fixed_y = FALSE)+
+    ease_aes()
+  if(!animated){ return(anim) }
+  animate(plot = anim, ... )
+}
+
+###
+get_snp_pos = function(PSNP,pmin){
+  SNPPOS=snp_by_pos = PSNP %>% dplyr::filter(alt_fr > pmin)%>%
+    group_by(bin.pos) %>%
+    summarize( sites=n_distinct(id,ref_pos), var_count=n(), PMIN=pmin) %>%
+    group_by(PMIN) %>%
+    mutate(YMAX=max(var_count))
+  return(SNPPOS)
+}
+
+get_snp_pos_plot =function(psnp=PROT_SNP,FREQMIN=c(0.0001,1e-3,1e-2,5e-2,1e-1,2e-1,3e-1,4e-1)){
+  require(ggplot2)
+  require(ggthemes)
+  tmp = map_df(.x = FREQMIN, .f = get_snp_pos, PSNP=psnp)
+  P = ggplot( tmp,aes(x=bin.pos)) +
+    geom_line(col='red',aes(y=sites)) + #geom_point(aes(y=sites),col=MAIN.COLOR,size=0.3) +
+    annotate('text',col='red',label='SNP count',y=0,x=100,vjust='inward',hjust='inward') +
+    geom_line(aes(y=var_count),col='dodgerblue') +# geom_point(aes(y=var_count),col=MAIN.COLOR,size=0.3) +
+    geom_text(col='dodgerblue',label='Variants count',aes(y=YMAX),x=100,vjust='inward',hjust='inward',check_overlap = T) +
+    #geom_vline(xintercept=seq(5,95,by=5),size=0.1,linetype='dotted') +
+    ylab('# SNP') + xlab('Sequence position (%)') +
+    theme(legend.position='none')
+    if( length(FREQMIN) > 1){ P = P + facet_wrap(~PMIN, scales = 'free_y') }
+    return(P)
+}
+
