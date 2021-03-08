@@ -1,7 +1,7 @@
 ---
 title: "Protein Categories"
 author: "Benjamin Dubreuil"
-date: "January 6, 2021"
+date: "Last compiled on `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -18,100 +18,131 @@ source("src/function_datalocal.r")
 source("src/function_datapub.r")
 library(tictoc)
 library(tidyverse)
-
-CAT=list()
 ```
+
+To understand the organization of the yeast proteome, he factors that influence its evolution?
+A concise answer designates protein expression as the driver for molecular evolution.
+Indeed, highly expressed proteins are the most conserved.
+the influence on its organization, we would like to 
+
+- Protein categories
+
+Each category corresponds to a set of protein identifiers which share a common non-quantitative trait (e.g. localization, pathway, function...)
+
+- Protein features
+
+A feature is a quantitative measure related to proteins parameter (e.g. disorder content, sequence length)
 
 ## Reference proteome sequence
 
 ```{r reference}
-# MAIN PROTEIN FEATURES
+# REFERENCE PROTEIN DATABASE
+# Saccharomyces genome database (SGD)
 SGD  = load.sgd.features()
-
-if( !file.exists("data/uniprot-features.rds") ){
-  saveRDS(load.uniprot.features(),"data/uniprot-features.rds") # Takes >250sec for ~6700 ids
+# Universal protein resource (UNIPROT)
+file.uniprot.feature="data/uniprot-features.rds"
+if( !file.exists(file.uniprot.feature) ){
+  saveRDS(load.uniprot.features(),file.uniprot.feature) # Takes >250sec for ~6700 ids
 }
-UNIPROT = readRDS("data/uniprot-features.rds")
-#UNIPROT =  
-# PRIMARY REFERENCE SEQUENCES
+
+# REFERENCE PROTEOME SEQUENCES
 S288C  = load.sgd.proteome(withORF=T)
 CDS    = load.sgd.CDS(withORF = T)
 UNI.SC = load.uniprot.proteome('yeast')
 
-UNIPROT = UNIPROT %>%
+UNIPROT = readRDS(file.uniprot.feature) %>%
           group_by(UNIPROTKB) %>%
-          mutate( is_uniref = UNIPROTKB %in% names(UNI.SC), one2one = (n()==1) ) 
+          mutate( is_uniref = UNIPROTKB %in% names(UNI.SC), one2one = (n()==1) ) %>% 
+          left_join(SGD %>% dplyr::select(sgdid,name,qual,gname,chr), by = c("SGD" = 'sgdid')) %>%
+          dplyr::rename(ORF = name, GNAME=gname, CHR=chr)
+
+# CROSS-REFERENCE PROTEOME
+PROTEOME = UNIPROT %>% dplyr::select(UNIPROTKB, SGD, ORF, GNAME, PNAME)
+CATEGORIES = PROTEOME
+```
+
+## Sequence features
+```{r genetic}
+has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
+CATEGORIES$has_intron = CATEGORIES$ORF %in% has_intron
 
 orf.len = tibble(orf=names(S288C),len=width(S288C))
 Qlen=quantile(orf.len$len,seq(0,1,0.01))
 orf.gc  = tibble(orf=names(CDS),pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
 QGC = quantile(orf.gc$pGC,seq(0,1,0.01))
-```
+
+longest  = orf.len %>% filter(len > Qlen['75%']) %>% pull(orf)
+shortest = orf.len %>% filter(len < Qlen['25%']) %>% pull(orf)
+average  = orf.len %>% filter(between(len,Qlen['25%'],Qlen['75%'])) %>% pull(orf)
+midGC  = orf.gc %>% filter(between(pGC,QGC['25%'],QGC['75%'])) %>% pull(orf)
+loGC   = orf.gc %>% filter(pGC<QGC['25%']) %>% pull(orf)
+hiGC   = orf.gc %>% filter(pGC>QGC['75%']) %>% pull(orf)
 
 
+CAT$longest = CAT$ORF %in% longest
+CAT$average = CAT$ORF %in% average
+CAT$shortest = CAT$ORF %in% shortest
+CAT$midGC = CAT$ORF %in% midGC
+CAT$lowGC = CAT$ORF %in% loGC
+CAT$highGC = CAT$ORF %in% hiGC
 
-## Genetic features
-```{r genetic}
-CAT$has_intron = SGD   %>% filter(type=='intron')    %>% pull(parent)
-
-CAT$longest  = orf.len %>% filter(len > Qlen['75%']) %>% pull(orf)
-CAT$shortest = orf.len %>% filter(len < Qlen['25%']) %>% pull(orf)
-CAT$average  = orf.len %>% filter(between(len,Qlen['25%'],Qlen['75%'])) %>% pull(orf)
-
-CAT$midGC  = orf.gc %>% filter(between(pGC,QGC['25%'],QGC['75%'])) %>% pull(orf)
-CAT$loGC   = orf.gc %>% filter(pGC<QGC['25%']) %>% pull(orf)
-CAT$hiGC   = orf.gc %>% filter(pGC>QGC['75%']) %>% pull(orf)
 ```
 
 ## Biophysical features
 ```{r biophysical}
-letterFrequency(UNI.SC,as.prob = T,letters = get.AA1())
+AAFREQ = letterFrequency(UNI.SC,as.prob = T,letters = get.AA1())
+AABIN = apply(AAFREQ,2,quantile,probs=seq(0,1,len=11))
+pheatmap::pheatmap(AABIN,cluster_rows = F)
+
 DUB = load.dubreuil2019.data(3)
-head(DUB)
+NDOM = DUB %>%
+        group_by(id) %>%
+        count(pfam_ids, name='n.pfam')
 
 
 ```
 
 ## Interactions features
 ```{r interactions}
+# PROTEIN-PROTEIN INTERACTIONS
 #/media/elusers/users/hugo/07_3DComplex_scripts/scripts_PPIs_networks/stack_studies_PPIs_nored_PMID_28122020_INTACT.R
+PPI = read.csv("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_cerevisiae.txt",sep = "\t", quote = "", stringsAsFactors = F)
+colnames(PPI) = c("protA","protB","altA","altB","aliasA","aliasB","method","pub.author1","pub.id","taxA","taxB","typeAB","src.db","int.id","conf","expansion.method","bio.roleA","bio.roleB","exp.roleA","exp.roleB","typeA","typeB","xrefA","xrefB","xrefAB","annotA","annotB","annotAB","host","parAB","created","updated","checksumA","checksumB","checksumAB","negative","featA","featB","stoichioA","stoichioB","id.met.protA","id.met.protB")
+# remove duplicated interactions (with different Pubmed ID)
+# 
+# keep only protein interactions (uniprot/orf)
+# filter for direct method
+# return the matrix of interactions
 
-#PPI = read.csv("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_cerevisiae.txt",sep = "\t", quote = "", stringsAsFactors = F)
-
-head(PPI)
+dplyr::select(-c(created,updated,checksumA,checksumB,checksumAB,taxA,taxB))
 
 # COMPLEXES
-EBI.complextab = read.delim("ftp://ftp.ebi.ac.uk/pub/databases/intact/complex/current/complextab/559292.tsv",
-                            stringsAsFactors = F,header = T, sep = '\t', 
-                            col.names = c('CPLX_ID','CPLX_NAME','CPLX_ALIAS','TAX_ID',
-                                          'MEMBERS_STOCHIO','CONF','EXP_EVID','GO_ANNOT',
-                                          'CROSSREF','DESC',
-                                          'CPLX_PROP','CPLX_ASSEMBLY',
-                                          'LIG','DISEASE','AGONIST','ANTAGONIST',
-                                          'COMMENT','SOURCE','EXPANDED_MEMBERS'))
-
-CX=EBI.complextab %>% dplyr::select("CPLX_NAME", 
-                                    "MEMBERS_STOCHIO", "EXPANDED_MEMBERS",
-                                    "CONF","EXP_EVID","CPLX_PROP","CPLX_ASSEMBLY",
-                                    "LIG","DISEASE","AGONIST","ANTAGONIST") %>%
-                   mutate( members = strsplit(EXPANDED_MEMBERS,split="\\|") )
-
+CYC = load.pu.2008.data() # BASED ON ORF
+CPX = load.meldal.2019.data() # BASED ON UNIPROT
+test = CYC %>% filter(n_members > 5) %>% pivot_wider(names_from = Complex,values_from = c(ORF))
+test[11:50,]
 ```
 
 ## Phenotypes features
 ```{r phenotype}
 # Essentiality
 ESS = load.vanleeuwen2020.data()
-CAT$essential = ESS %>% 
+essential = ESS %>% 
                 filter(disp !='Dispensable') %>% 
                 filter(disp == 'Core' | (KO_exp =='Indispensable' & disp_score < 0.4 )) %>%
                 pull(ORF)
 
 # Dispensability
-CAT$dispensable = ESS %>% filter(disp =='Dispensable' ) %>% pull(ORF)
+dispensable = ESS %>% filter(disp =='Dispensable' ) %>% pull(ORF)
+
+CAT$phenotype.essential =  CAT$ORF %in% essential
+CAT$phenotype.dispensable =  CAT$ORF %in% dispensable
 
 table(ESS$disp[ESS$ORF %in% CAT$dispensable])
 table(ESS$disp[ESS$ORF %in% CAT$essential])
+
+CHM = load.lee2014.data() # Chemogenomic fitness signatures
+# MDR -> multi-drug resistance (>20% fitness)
 
 ```
 
@@ -173,6 +204,10 @@ head(multiloc)
 
 ```
 
+```{python}
+
+
+```
 
 ```{r categories-table}
 # Make categories table with:
