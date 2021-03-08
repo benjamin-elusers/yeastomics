@@ -313,3 +313,79 @@ load.byrne2005.data = function() {
   return(ygob)
 }
 
+load.meldal.2019.data = function(species='yeast'){
+  # Load macromolecular protein complexes from yeast
+  message("REF: B. Meldal et al., 2019, Nucleic Acids Research")
+  message("Complex Portal 2018: extended content and enhanced visualization tools for macromolecular complexes")
+  # https://doi.org/10.1093/nar/gky1001
+  complextab.url = "ftp://ftp.ebi.ac.uk/pub/databases/intact/complex/current/complextab"
+
+  taxon=match.arg(species, choices = c('559292'='yeast','9606'='human'), several.ok = F)
+  UNI_AC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
+
+  COMPLEXES = read.delim(file = sprintf("%s/%s.tsv",complextab.url,names(taxon)),
+                         stringsAsFactors = F,header = T, sep = '\t', na.strings = '-',
+                         col.names = c('CPLX_ID','CPLX_NAME','CPLX_ALIAS','TAX_ID',
+                                       'MEMBERS_STOCHIO','CONF','EXP_EVID','GO_ANNOT',
+                                       'CROSSREF','DESC',
+                                       'CPLX_PROP','CPLX_ASSEMBLY',
+                                       'LIG','DISEASE','AGONIST','ANTAGONIST',
+                                       'COMMENT','SOURCE','EXPANDED_MEMBERS')
+                        ) %>% as_tibble()
+
+  # Some members of complexes are also complexes
+  # Expanded members contains only the uniprot references
+  # i.e. all members are proteins i.e. complexes are flatter to their constituents)
+  CX=COMPLEXES %>%
+     dplyr::select("CPLX_ID","CPLX_NAME", "EXPANDED_MEMBERS",
+                   "EXP_EVID","CPLX_ASSEMBLY","GO_ANNOT",
+                   "LIG","DISEASE","AGONIST","ANTAGONIST") %>%
+     separate_rows( EXPANDED_MEMBERS, sep='\\|') %>%
+     mutate( members = str_remove(EXPANDED_MEMBERS,"\\([0-9]+\\)"),
+             stochio = as.integer( str_replace(EXPANDED_MEMBERS,".+\\(([0-9]+)\\)","\\1"))) %>%
+     add_count(name='n_members',CPLX_ID) %>%
+     mutate(is_uniprot = str_detect(members,UNI_AC),
+            is_RNA = str_detect(members,"^URS[0-9A-Z]"),
+            is_complex = str_detect(members,"^CPX\\-[0-9]+"),
+            is_small_molecule = str_detect(members,"^CHEBI:")) %>%
+     group_by(CPLX_ID) %>% mutate( n_uniprot= sum(is_uniprot) ) %>%
+     dplyr::select(-EXPANDED_MEMBERS)
+
+    return(CX)
+}
+
+load.pu.2008.data = function(){
+  # Load macromolecular protein complexes from yeast
+  message("REF: S. Pu et al., 2008, Nucleic Acids Research")
+  message("Up-to-date catalogues of yeast protein complexes")
+
+  CYC2008.url = "http://wodaklab.org/cyc2008/resources/CYC2008_complex.tab"
+  CYC2008 = read.delim(file = CYC2008.url, sep='\t', stringsAsFactors = F,header = T, na.strings = "") %>%
+              as_tibble() %>%
+              group_by(Complex) %>%
+              fill(PubMed_id:Jaccard_Index, .direction = "down") %>%
+              add_count(name="n_members")
+  return(CYC2008)
+}
+
+load.lee2014.data = function(){
+  # Load chemogenomic fitness signatures
+  message("REF: A.Y. Lee,  R.P. St.Onge et al., 2014, Science")
+  message("Mapping the Cellular Response to Small Molecules Using Chemogenomic Fitness Signatures")
+  # https://doi.org/10.1126/science.1250217
+  # Related to this first paper: The chemical genomic portrait of yeast: Uncovering a phenotype for all genes
+  # E. Hillenmeyer, et al. Science 320,362–365 (2008).doi:10.1126/science.1150021
+
+  library(openxlsx)
+  # Compound library
+  compound.library =  openxlsx::read.xlsx(
+    xlsxFile = "http://chemogenomics.pharmacy.ubc.ca/hiphop/files/supplemental/leesupptableS1.xlsx",
+    sheet = 2, colNames = T, skipEmptyRows = T, skipEmptyCols = T, na.strings = c(""))
+
+  # Fitness Defect Score Matrix, homozygous strains (right-click to download, tab-delimited text, 280 Mb)
+  # [Rows=Yeast Deletion Strain, Identified by Systematic ORF name; Columns=Fitness Screens, Identified by Screen ID (SGTC_N)]
+  # Fitness defect on homozygous deletion strain for 3000 small molecules screen
+  chemofit = read.delim(file="http://chemogenomics.pharmacy.ubc.ca/hiphop/files/supplemental/fitness_defect_matrix_hom.txt",
+                        header=T, sep="\t", stringsAsFactors = F)
+  return(chemofit)
+}
