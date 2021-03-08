@@ -16,6 +16,10 @@ SGD.nomenclature = function(coding=T,rna=F){
   if( !coding & !rna ){ return(nuclear) }
 }
 
+UNIPROT.nomenclature = function(){
+  ACCESSION = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
+  return(ACCESSION)
+}
 
 load.sgd.CDS = function(withORF=T) {
   library(stringr)
@@ -68,9 +72,11 @@ load.pombase.proteome = function(withORF=T) {
 load.uniprot.proteome = function(species='yeast') {
   library(stringr)
   uniprot.url = "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota"
+  ## CHANGE ON FEB 2021 - Added a subdirectory per each proteome
   taxon=match.arg(species, choices = c('yeast','human'), several.ok = F)
   proteomes=c(human="UP000005640_9606.fasta.gz",yeast="UP000002311_559292.fasta.gz")
-  uniprot.url = sprintf("%s/%s",uniprot.url,proteomes[taxon])
+  UP=word(proteomes[taxon],1,sep = "_")
+  uniprot.url = sprintf("%s/%s/%s",uniprot.url,UP,proteomes[taxon])
 
   UNI = load.proteome(uniprot.url)
   regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
@@ -139,7 +145,7 @@ get.width = function(BS){
 get.positions = function(BS){
   df.pos = data.frame(
     orf=rep(names(BS),width(BS)),
-    len=widths(BS),
+    len=rep(widths(BS),times=widths(BS)),
     wt_pos=unlist(lapply(width(BS),seq_len)),
     wt_aa = str2chr(as.character(BS)),
     stringsAsFactors = F, row.names = NULL
