@@ -38,19 +38,22 @@ A feature is a quantitative measure related to proteins parameter (e.g. disorder
 ```{r reference}
 # REFERENCE PROTEIN DATABASE
 # Saccharomyces genome database (SGD)
-SGD  = load.sgd.features()
+SGD  = load.sgd.features(by.chr=T) %>% 
+       mutate(chr.f = factor(chr, 
+                               levels=unique(chr),
+                               labels = paste0("chr_",c(NA,LETTERS[1:2],"2-mu",LETTERS[3:16],"mito"))))
+
+       
 # Universal protein resource (UNIPROT)
 file.uniprot.feature="data/uniprot-features.rds"
-if( !file.exists(file.uniprot.feature) ){
-  saveRDS(load.uniprot.features(),file.uniprot.feature) # Takes >250sec for ~6700 ids
-}
+UNI = preload(file.uniprot.feature,loading.call = load.uniprot.features(),"Load uniprot features")
 
 # REFERENCE PROTEOME SEQUENCES
 S288C  = load.sgd.proteome(withORF=T)
 CDS    = load.sgd.CDS(withORF = T)
 UNI.SC = load.uniprot.proteome('yeast')
 
-UNIPROT = readRDS(file.uniprot.feature) %>%
+UNIPROT = UNI %>%
           group_by(UNIPROTKB) %>%
           mutate( is_uniref = UNIPROTKB %in% names(UNI.SC), one2one = (n()==1) ) %>% 
           left_join(SGD %>% dplyr::select(sgdid,name,qual,gname,chr), by = c("SGD" = 'sgdid')) %>%
@@ -58,46 +61,85 @@ UNIPROT = readRDS(file.uniprot.feature) %>%
 
 # CROSS-REFERENCE PROTEOME
 PROTEOME = UNIPROT %>% dplyr::select(UNIPROTKB, SGD, ORF, GNAME, PNAME)
-CATEGORIES = PROTEOME
 ```
 
 ## Sequence features
 ```{r genetic}
-has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
-CATEGORIES$has_intron = CATEGORIES$ORF %in% has_intron
+SEQ.FEAT=list()
 
+# Intron containing genes
+SEQ.FEAT$has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
+
+# Proteins length
 orf.len = tibble(orf=names(S288C),len=width(S288C))
 Qlen=quantile(orf.len$len,seq(0,1,0.01))
+# range of protein length
+SEQ.FEAT$shortest = orf.len %>% filter(len < Qlen['10%']) %>% pull(orf)
+SEQ.FEAT$shorter = orf.len %>% filter(len < Qlen['25%']) %>% pull(orf)
+SEQ.FEAT$average  = orf.len %>% filter(between(len,Qlen['25%'],Qlen['75%'])) %>% pull(orf)
+SEQ.FEAT$longest  = orf.len %>% filter(len > Qlen['75%']) %>% pull(orf)
+SEQ.FEAT$longest  = orf.len %>% filter(len > Qlen['90%']) %>% pull(orf)
+
+# %GC content in genes
 orf.gc  = tibble(orf=names(CDS),pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
 QGC = quantile(orf.gc$pGC,seq(0,1,0.01))
+# range of GC content
+SEQ.FEAT$GC_lower  = orf.gc %>% filter(pGC<QGC['10%']) %>% pull(orf)
+SEQ.FEAT$GC_low    = orf.gc %>% filter(pGC<QGC['25%']) %>% pull(orf)
+SEQ.FEAT$GC_mid    = orf.gc %>% filter(between(pGC,QGC['25%'],QGC['75%'])) %>% pull(orf)
+SEQ.FEAT$GC_high   = orf.gc %>% filter(pGC>QGC['75%']) %>% pull(orf)
+SEQ.FEAT$GC_higher = orf.gc %>% filter(pGC>QGC['90%']) %>% pull(orf)
 
-longest  = orf.len %>% filter(len > Qlen['75%']) %>% pull(orf)
-shortest = orf.len %>% filter(len < Qlen['25%']) %>% pull(orf)
-average  = orf.len %>% filter(between(len,Qlen['25%'],Qlen['75%'])) %>% pull(orf)
-midGC  = orf.gc %>% filter(between(pGC,QGC['25%'],QGC['75%'])) %>% pull(orf)
-loGC   = orf.gc %>% filter(pGC<QGC['25%']) %>% pull(orf)
-hiGC   = orf.gc %>% filter(pGC>QGC['75%']) %>% pull(orf)
+# Chromosome Number
+CHR = SGD %>%
+      filter(type=="ORF") %>%
+      group_by(chr.f) %>% 
+      dplyr::select(name)
+chr.orf =  split(CHR$name,CHR$chr.f,drop=T)
+
+SEQ.FEAT = append(SEQ.FEAT,chr.orf)
 
 
-CAT$longest = CAT$ORF %in% longest
-CAT$average = CAT$ORF %in% average
-CAT$shortest = CAT$ORF %in% shortest
-CAT$midGC = CAT$ORF %in% midGC
-CAT$lowGC = CAT$ORF %in% loGC
-CAT$highGC = CAT$ORF %in% hiGC
+# Domains (nodom,single,multi)
 
+DUB = load.dubreuil2019.data(3)
+
+NDOM = DUB %>%
+        group_by(id) %>%
+        summarize( ndom = max(domain.seg) )
+
+quantile(NDOM$ndom)
+
+table( DUB[DUB$id == "D6W196","superfamily_ids"] )
+names(SEQ.FEAT)
+sapply(SEQ.FEAT,n_distinct)
+
+
+SUPFAM = load.superfamily() %>% 
+           group_by(`Sequence ID`) %>% 
+           count(`Model ID`,name='n_uniq') %>%
+           add_count(`Sequence ID`,name="n_dom")
+table(SUPFAM$n_uniq)
+table(SUPFAM$n_dom)
+PFAM= load.pfam() %>% 
+        group_by(seq_id) %>%
+        count(hmm_acc,name='n_uniq') %>%
+        add_count(seq_id,name="n_dom")
+quantile(SUPFAM$n_uniq)
+quantile(PFAM$n_uniq)
+
+quantile(SUPFAM$n_dom)
+quantile(PFAM$n_dom)
 ```
 
 ## Biophysical features
 ```{r biophysical}
+BIOPHY.FEAT=list()
+
 AAFREQ = letterFrequency(UNI.SC,as.prob = T,letters = get.AA1())
 AABIN = apply(AAFREQ,2,quantile,probs=seq(0,1,len=11))
 pheatmap::pheatmap(AABIN,cluster_rows = F)
 
-DUB = load.dubreuil2019.data(3)
-NDOM = DUB %>%
-        group_by(id) %>%
-        count(pfam_ids, name='n.pfam')
 
 
 ```
