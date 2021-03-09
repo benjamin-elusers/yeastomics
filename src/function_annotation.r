@@ -1,6 +1,6 @@
 source('src/utils.r',local = T)
 
-load.sgd.features = function(){ # Gene/Protein features from SGD
+load.sgd.features = function(by.chr=T){ # Gene/Protein features from SGD
   library(stringr)
   sgd_feat.url = "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"
   sgd.feat = read.delim2(sgd_feat.url, sep='\t', quote = "",
@@ -9,7 +9,9 @@ load.sgd.features = function(){ # Gene/Protein features from SGD
                                        'gname','alias','parent','sgdid2',
                                        'chr','start','end','strand','gpos',
                                        'coordv','seqv','desc')  )
-  return(sgd.feat)
+  ord = 1:nrow(sgd.feat)
+  if(by.chr){ ord = gtools::mixedorder(sgd.feat$chr) }
+  return(sgd.feat[ord,])
 }
 
 load.sgd.orf = function(sgd.feat){
