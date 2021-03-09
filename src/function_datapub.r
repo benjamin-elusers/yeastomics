@@ -389,3 +389,30 @@ load.lee2014.data = function(){
                         header=T, sep="\t", stringsAsFactors = F)
   return(chemofit)
 }
+
+load.superfamily = function(tax='xs'){
+  # Load domain assignments from superfamily SCOP level (SUPFAM.org)
+  # xs = saccharomyces cerevisiae
+  library(httr)
+  library(readr)
+  download.request =  httr::GET(sprintf("http://supfam.org/SUPERFAMILY/cgi-bin/save.cgi?var=%s;type=ass",tax))
+  superfamily.txt = httr::content(download.request,as = 'text')
+  superfamily.assignment = unlist(stringi::stri_split_lines(superfamily.txt,omit_empty = T))[-c(1:2)]
+  supfam = readr::read_delim(superfamily.assignment,comment = "#",delim="\t", escape_double = F)
+  return(supfam)
+}
+
+load.pfam = function(tax='559292'){
+  # Load domains assignments based of HMM profiles (PFAM)
+  # 559292 = S.cerevisiae
+  library(readr)
+  url.pfam = sprintf("http://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/%s.tsv.gz",tax)
+  header = readLines(open.url(url.pfam))[3]
+  # parse the header (3rd commented rows)
+  columns = header %>%
+            str_split(pattern = "> <") %>% unlist %>%
+            str_replace_all("[ \\-]","_") %>% str_remove_all("[#<>]")
+  pfam = readr::read_delim(file = url.pfam, skip=2,comment = "#",delim="\t", col_names = columns,escape_double = F,guess_max = 100)
+  return(pfam)
+}
+
