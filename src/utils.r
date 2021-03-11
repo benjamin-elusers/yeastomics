@@ -369,6 +369,7 @@ round2near <- function(nb,roundto){ # returns the nearest number up to the speci
 }
 Round2Nearest <- function(...){ round2near(...) }
 
+table_ = function(x,...){ addmargins(table(x),...) }
 mad_      <- function(...){ mad(na.rm=T,...) } # Median absoluted deviations without NA
 quantile_ <- function(x,...){  quantile(x,...,na.rm=T) } # quantile with no error message for missing values
 range_ <- function(x,...){  range(x,...,na.rm=T) } # range with no error message for missing values
