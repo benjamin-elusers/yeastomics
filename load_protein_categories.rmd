@@ -1,7 +1,7 @@
 ---
 title: "Protein Categories"
 author: "Benjamin Dubreuil"
-date: "January 6, 2021"
+date: "Last compiled on `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -18,117 +18,254 @@ source("src/function_datalocal.r")
 source("src/function_datapub.r")
 library(tictoc)
 library(tidyverse)
+d10  = function(x,...){ slice_min(x,prop=0.1,with_ties = T,...) }
+d90  = function(x,...){ slice_max(x,prop=0.1,with_ties = T,...) }
+q25  = function(x,...){ slice_min(x,prop=0.25,with_ties = T,...) }
+q75  = function(x,...){ slice_max(x,prop=0.75,with_ties = T,...) }
 
-CAT=list()
+semi.quantitative = function(df){}
+
 ```
+
+# Introduction to "yeast-omics"
+
+Yeast is a model unicellular organism belonging to the fungi kingdom,
+within the eukaryotes ("true nucleus") domain of life.
+The yeast genome of 12Mbp seems tiny when compared to higher eukaryotes,
+which is at least one order of magnitude more compact in size.
+Nonetheless, the yeast proteome contains ~6000 protein-coding genes,
+making it only 3 to 4 times smaller than eukaryotes.
+Strictly quantitatively, the yeast genome/proteome would be comparable to
+the largest bacteria, similar to those of E.coli (4.5Mbp/4300) or B.subtilis (4.3Mbp/4800).
+
+The yeast cellular volume is estimated around 50um^3 for haploid cells 
+which is occupied at 80% by the cellular proteome (42 Millions of expressed macromolecules).
+The cell interior is incredibly crowded with a protein density
+of around 3-4 millions of molecules per femtoliter.
+Despite the crowdedness, proteins are freely diffusing within the cell 
+at an admirably fast pace of around 0.2us from one extremity to another.
+
+Yet, the dynamic arrangements between millions of macromolecules within the cell is not trivial.
+
+# Proteome evolution 
+
+The approach to understand the organization of the yeast proteome consist in
+searching for factors influencing the evolution of proteins. 
+
+As previously reported, protein abundance holds a particularly important role in
+driving molecular evolution of protein, explaining up to 50% of the variability
+in conservation rate among proteins. 
+
+The general trend is that highly expressed proteins are the most conserved
+following the chemical law of mass action.
+
+The association of protein expression with sequence conservation was found to be
+supported by several underlying mechanisms, yet their degree of complementarity
+is still a matter of active debate. 
+
+How abundance really affects protein evolution is likely to require multi-causal explanations which we will not expand here. 
+(e.g. translation cost, protein/mRNA stability and degradation, misinteractions ...) 
+
+Nonetheless, protein abundance cannot fully account for the conservation of all 
+residues in proteins. Even worse, the effect of abundance is likely to be 
+involved in many biological processes, creating a potentially strong confounding
+factor that may bias most evolutionary comparison between proteins.
+
+Here, we explore a number of quantitative and qualitative variables
+(referred as features and properties) derived from proteins, in order to unveil
+the dark side of proteome evolution. 
+
+However, we investigated how residual differences of protein conservation can be
+explained by those features and properties after controlling for abundance.
+Finally, we analyzed it within different protein categories which correspond to 
+lists of related properties and features  (Sequence, Biophysics, Phenotypes...).
+
+# Definitions
+
+A protein feature is a measurable quantity related to its activity, composition...
+The numerical values will be stored in a vector as a column of proteome data table. 
+(e.g. disorder content, sequence length)
+
+A protein property is a shared non-quantitative trait among a subset of proteins.
+A vector named after the common characteristic will store the identifiers (ORF, UNIPROT...) of the subset members. (e.g. localization, pathway, function...)
+
+Finally, a protein category correspond to a list of features or properties (Sequence, Biophysics, Phenotypes...)
+Quantitative variables will be aggregated in one Proteome table (rows=proteins, columns=variables)
 
 ## Reference proteome sequence
 
-```{r reference}
-# MAIN PROTEIN FEATURES
-SGD  = load.sgd.features()
+SGD and Uniprot are the most reliable database gathering information about genes and proteins sequences.
+SGD is the main provider for the assembled genome of S. cerevisiae as well as annotations about the genes.
+Uniprot is a primary resource for protein information aggregating data from multiple specialized databases (structure, interactions, evolution, expression ...)
 
-if( !file.exists("data/uniprot-features.rds") ){
-  saveRDS(load.uniprot.features(),"data/uniprot-features.rds") # Takes >250sec for ~6700 ids
-}
-UNIPROT = readRDS("data/uniprot-features.rds")
-#UNIPROT =  
-# PRIMARY REFERENCE SEQUENCES
+
+```{r reference}
+# REFERENCE PROTEIN DATABASE ---------------------------------------------------
+# Saccharomyces genome database (SGD) ------------------------------------------
+SGD  = load.sgd.features(by.chr=T) %>% 
+       mutate(chr.f = factor(chr, 
+                               levels=unique(chr),
+                               labels = paste0("chr_",c(NA,LETTERS[1:2],"2-mu",LETTERS[3:16],"mito"))))
+
+       
+# Universal protein resource (UNIPROT) -----------------------------------------
+file.uniprot.feature="data/uniprot-features.rds"
+UNI = preload(file.uniprot.feature,loading.call = load.uniprot.features(),"Load uniprot features")
+
+# REFERENCE PROTEOME SEQUENCES -------------------------------------------------
 S288C  = load.sgd.proteome(withORF=T)
 CDS    = load.sgd.CDS(withORF = T)
 UNI.SC = load.uniprot.proteome('yeast')
 
-UNIPROT = UNIPROT %>%
+UNIPROT = UNI %>%
           group_by(UNIPROTKB) %>%
-          mutate( is_uniref = UNIPROTKB %in% names(UNI.SC), one2one = (n()==1) ) 
+          mutate( is_uniref = UNIPROTKB %in% names(UNI.SC), one2one = (n()==1) ) %>% 
+          left_join(SGD %>% dplyr::select(sgdid,name,qual,gname,chr), by = c("SGD" = 'sgdid')) %>%
+          dplyr::rename(ORF = name, GNAME=gname, CHR=chr)
 
-orf.len = tibble(orf=names(S288C),len=width(S288C))
-Qlen=quantile(orf.len$len,seq(0,1,0.01))
-orf.gc  = tibble(orf=names(CDS),pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
-QGC = quantile(orf.gc$pGC,seq(0,1,0.01))
+# CROSS-REFERENCE PROTEOME -----------------------------------------------------
+PROTEOME = UNIPROT %>% dplyr::select(UNIPROTKB, SGD, ORF, GNAME, PNAME)
 ```
 
+## Genomic category
+```{r genomic}
+GENOMIC=list()
+### QUANTITATIVE FEATURES
+#### Proteins length --------------------------------------------------------------
+df.len = tibble(orf=names(S288C),len=width(S288C))
+# %GC content in genes ---------------------------------------------------------
+df.gc  = tibble(orf=names(CDS),pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
 
 
-## Genetic features
-```{r genetic}
-CAT$has_intron = SGD   %>% filter(type=='intron')    %>% pull(parent)
-
-CAT$longest  = orf.len %>% filter(len > Qlen['75%']) %>% pull(orf)
-CAT$shortest = orf.len %>% filter(len < Qlen['25%']) %>% pull(orf)
-CAT$average  = orf.len %>% filter(between(len,Qlen['25%'],Qlen['75%'])) %>% pull(orf)
-
-CAT$midGC  = orf.gc %>% filter(between(pGC,QGC['25%'],QGC['75%'])) %>% pull(orf)
-CAT$loGC   = orf.gc %>% filter(pGC<QGC['25%']) %>% pull(orf)
-CAT$hiGC   = orf.gc %>% filter(pGC>QGC['75%']) %>% pull(orf)
+### PROPERTIES (QUALITATIVE OR SEMI-QUANTITATIVE)
+#### Chromosome Number ------------------------------------------------------------
+CHR = SGD %>%
+      filter(type=="ORF") %>%
+      group_by(chr.f) %>% 
+      dplyr::select(name)
+chr.orf =  split(CHR$name,CHR$chr.f,drop=T)
+#### range of protein length ------------------------------------------------------
+GENOMIC$shortest = df.len %>% d10(order_by = len) %>% pull(orf)
+GENOMIC$shorter  = df.len %>% q25(order_by = len) %>% pull(orf)
+GENOMIC$average  = df.len %>% filter(between(len,Qlen['25%'],Qlen['75%'])) %>% pull(orf)
+GENOMIC$longest  = df.len %>% q75(order_by = len) %>% pull(orf)
+GENOMIC$longest  = df.len %>% d90(order_by = len) %>% pull(orf)
+#### range of GC content ----------------------------------------------------------
+GENOMIC$GC_lower  = df.gc %>% d10(order_by=pGC) %>% pull(orf)
+GENOMIC$GC_low    = df.gc %>% q25(order_by=pGC) %>%  pull(orf)
+GENOMIC$GC_mid    = df.gc %>% filter(between(pGC,QGC['25%'],QGC['75%'])) %>% pull(orf)
+GENOMIC$GC_high   = df.gc %>% q75(order_by=pGC) %>% pull(orf)
+GENOMIC$GC_higher = df.gc %>% d90(order_by=pGC) %>% pull(orf)
+#### Intron containing genes ------------------------------------------------------
+GENOMIC$has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
+#### Chromosome genes -------------------------------------------------------------
+GENOMIC = append(GENOMIC,chr.orf)
 ```
 
-## Biophysical features
+## Biophysical category
 ```{r biophysical}
-letterFrequency(UNI.SC,as.prob = T,letters = get.AA1())
+BIOPHYSICS=list()
+
+### QUANTITATIVE FEATURES
+#### Single amino-acid frequencies ------------------------------------------------
+aa.freq = letterFrequency(UNI.SC,as.prob = T,letters = get.AA1())
+df.aa = aa.freq %>% as_tibble %>% mutate(uni=names(UNI.SC)) %>% relocate(uni)
+
+#### Grouped amino-acid frequencies -----------------------------------------------
+aaprop = seqinr::SEQINR.UTIL$AA.PROPERTY
+aaenrich = function(BS,alphabet){ 
+  alphabet.freq = rowSums(letterFrequency(BS,as.prob = T,letters = alphabet))
+  prot.enrich = tibble(id=names(BS),fr=alphabet.freq)
+}
+aaset = paste0(names(aaprop), "_", map(aaprop,str_c,collapse=''))
+df.aa_class = map(aaprop, aaenrich, BS=UNI.SC ) %>% 
+  purrr::reduce(full_join,by='id') %>%
+  rename_with(~aaset, starts_with("fr"))
+# Disorder content (segment, fraction, total) ----------------------------------
+
+### PROPERTIES (QUALITATIVE OR SEMI-QUANTITATIVE)
+#### Protein domains (nodom,single,multi)  ----------------------------------------
+SUPFAM = load.superfamily() %>% count(`Sequence ID`,name="n_dom")
+#           group_by(`Sequence ID`) %>% 
+#           count(`Model ID`,name='n_uniq') %>%
+table_(SUPFAM$n_dom)
+
+PFAM= load.pfam() %>% count(seq_id,name="n_dom")
+table_(PFAM$n_dom)
+        #group_by(seq_id) %>%
+        #count(hmm_acc,name='n_uniq') %>%
+#
 DUB = load.dubreuil2019.data(3)
-head(DUB)
+NDOM = DUB %>%
+        group_by(id) %>%
+        summarize( ndom = max(domain.seg) )
+table( DUB[DUB$id == "D6W196","superfamily_ids"] )
+names(GENOMIC)
+sapply(GENOMIC,n_distinct)
 
 
 ```
 
-## Interactions features
+## Interactions category
 ```{r interactions}
+###
+#### PROTEIN-PROTEIN INTERACTIONS
 #/media/elusers/users/hugo/07_3DComplex_scripts/scripts_PPIs_networks/stack_studies_PPIs_nored_PMID_28122020_INTACT.R
+PPI = read.csv("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_cerevisiae.txt",sep = "\t", quote = "", stringsAsFactors = F)
+colnames(PPI) = c("protA","protB","altA","altB","aliasA","aliasB","method","pub.author1","pub.id","taxA","taxB","typeAB","src.db","int.id","conf","expansion.method","bio.roleA","bio.roleB","exp.roleA","exp.roleB","typeA","typeB","xrefA","xrefB","xrefAB","annotA","annotB","annotAB","host","parAB","created","updated","checksumA","checksumB","checksumAB","negative","featA","featB","stoichioA","stoichioB","id.met.protA","id.met.protB")
+# remove duplicated interactions (with different Pubmed ID)
+# 
+# keep only protein interactions (uniprot/orf)
+# filter for direct method
+# return the matrix of interactions
 
-#PPI = read.csv("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_cerevisiae.txt",sep = "\t", quote = "", stringsAsFactors = F)
+dplyr::select(-c(created,updated,checksumA,checksumB,checksumAB,taxA,taxB))
 
-head(PPI)
-
-# COMPLEXES
-EBI.complextab = read.delim("ftp://ftp.ebi.ac.uk/pub/databases/intact/complex/current/complextab/559292.tsv",
-                            stringsAsFactors = F,header = T, sep = '\t', 
-                            col.names = c('CPLX_ID','CPLX_NAME','CPLX_ALIAS','TAX_ID',
-                                          'MEMBERS_STOCHIO','CONF','EXP_EVID','GO_ANNOT',
-                                          'CROSSREF','DESC',
-                                          'CPLX_PROP','CPLX_ASSEMBLY',
-                                          'LIG','DISEASE','AGONIST','ANTAGONIST',
-                                          'COMMENT','SOURCE','EXPANDED_MEMBERS'))
-
-CX=EBI.complextab %>% dplyr::select("CPLX_NAME", 
-                                    "MEMBERS_STOCHIO", "EXPANDED_MEMBERS",
-                                    "CONF","EXP_EVID","CPLX_PROP","CPLX_ASSEMBLY",
-                                    "LIG","DISEASE","AGONIST","ANTAGONIST") %>%
-                   mutate( members = strsplit(EXPANDED_MEMBERS,split="\\|") )
-
+#### COMPLEXES
+CYC = load.pu.2008.data() # BASED ON ORF
+CPX = load.meldal.2019.data() # BASED ON UNIPROT
+test = CYC %>% filter(n_members > 5) %>% pivot_wider(names_from = Complex,values_from = c(ORF))
+test[11:50,]
 ```
 
-## Phenotypes features
+## Phenotypes category
 ```{r phenotype}
-# Essentiality
+#### essentiality
 ESS = load.vanleeuwen2020.data()
-CAT$essential = ESS %>% 
+essential = ESS %>% 
                 filter(disp !='Dispensable') %>% 
                 filter(disp == 'Core' | (KO_exp =='Indispensable' & disp_score < 0.4 )) %>%
                 pull(ORF)
 
-# Dispensability
-CAT$dispensable = ESS %>% filter(disp =='Dispensable' ) %>% pull(ORF)
+#### Dispensability
+dispensable = ESS %>% filter(disp =='Dispensable' ) %>% pull(ORF)
+
+CAT$phenotype.essential =  CAT$ORF %in% essential
+CAT$phenotype.dispensable =  CAT$ORF %in% dispensable
 
 table(ESS$disp[ESS$ORF %in% CAT$dispensable])
 table(ESS$disp[ESS$ORF %in% CAT$essential])
 
-```
+#### chemogenomics profile
+CHM = load.lee2014.data() # Chemogenomic fitness signatures
+# MDR -> multi-drug resistance (>20% fitness)
 
-## Subcellular localization
-```{r localization}
+#
 UNIGO = get.uniprot.go(UNIPROT$UNIPROTKB)
 UNILOC = get.uniprot.localization(annot=UNIPROT,loc_to_columns = T)
 uniloc = get.uniprot.localization(annot=UNIPROT,loc_to_columns = F)
 
-CAT$has_foci = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
-CAT$has_iso = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
+#### solubility
+has_foci = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
+has_iso  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
+
+#### Subcellular localization category
+
 
 THR.LOC.SIZE = 50 # MINIMUM NUMBER OF PROTEINS PER COMPARTMENT 
 LOC.size = sort(colSums(UNILOC[,-c(1:3)]))
 LOC50 = sort( names( LOC.size[LOC.size>THR.LOC.SIZE] ) )
 
-#writeLines(sprintf("CAT$loc.%s = UNILOC %%>%% filter(%s == 1) %%>%% pull(id)",LOC50,LOC50))
 CAT$loc.bud_neck = UNILOC %>% filter(bud_neck == 1) %>% pull(id)
 CAT$loc.cell_membrane = UNILOC %>% filter(cell_membrane == 1) %>% pull(id)
 CAT$loc.cell_wall = UNILOC %>% filter(cell_wall == 1) %>% pull(id)
@@ -173,6 +310,10 @@ head(multiloc)
 
 ```
 
+```{python}
+
+
+```
 
 ```{r categories-table}
 # Make categories table with:

@@ -46,7 +46,9 @@ output:
 </style>
 
 ```{r setup, include=F, echo=F, warnings=F, message=F}
-knitr::opts_chunk$set(echo = T, collapse = T, cache.lazy = F,autodep = T)
+# Make sure the install repositories for dependencies are CRAN + Bioconductor
+#options(repos = c(getOption("repos"), BiocManager::repositories()))
+knitr::opts_chunk$set(echo = T, collapse = T, cache.lazy = F,autodep = T, warning = F)
 suppressPackageStartupMessages({
   library(xfun)
   # Load dependencies package (optional) ---------------------------------------
@@ -376,7 +378,7 @@ Since, I am looking at amino-acid frequencies we can only consider non-synonymou
 <br>
 Indels are not incorporated in the strains sequences.
 
-```{r snp-proc}
+```{r snp-proc, warning=F}
 SNP_FREQ=round(1/1011,4)
 wt.file = 'data/YK11_WT.rds'
 var.file = 'data/YK11_VAR.rds'
@@ -393,29 +395,21 @@ SNP = get.variants.to.SNP(VAR) %>%
         group_by(id,ref_pos) %>% 
         mutate( alt_cumfr=sum(alt_fr)) %>% 
         left_join(P,by=c('id'='orf'))
-WT = BS.to.df(S288C) %>% 
+WT = get.positions(S288C) %>% 
      group_by(orf) %>% 
      mutate(bin.pos=dplyr::ntile(wt_pos,100))
 
-PROT_SNP = left_join(SNP,WT, by=c('id'='orf','ref_pos'='wt_pos')) %>%
+PROT_SNP = left_join(SNP,WT, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
       mutate(wt_low = alt_aa == wt_aa, 
              wt_missing=is.na(wt_aa),
              early_stop = (alt_aa == "*" & ref_pos != len), 
              dSTI.ref=get.score.mutation(ref_aa,alt_aa),
              dSTI.wt=get.score.mutation(wt_aa,alt_aa))
-```
 
-**SNP** is defined as a position containing at least **`r as.character(100*SNP_FREQ)`%**
-alternative amino acids (*i.e variants*) across strains. 
-<br>
-The "wildtype" residue is the amino acid with the highest frequency across all strains.
-
-A total of **`r TOTAL_SNP_VAR`** variants have been identified spread over
-**`r TOTAL_SNP_POS`** positions of the proteome.
-
-## SNP count
-
-```{r snp-plot}
+BRK.FREQ = c(0,0.0001,1e-3,1e-2,5e-2,1e-1,5e-1)
+LAB.FREQ = paste.pair(trimws(sprintf("%.4f",BRK.FREQ), whitespace = '0', which = 'right'),s='-')
+PROT_SNP$fr_bin = cut(PROT_SNP$alt_fr,breaks = BRK.FREQ,labels = LAB.FREQ,ordered_result = T,include.lowest = T)
+PROT_SNP$has_ortho = PROT_SNP$id %in% PROT_SNP$r4s_orf # filter for orthologs
 
 # COUNT ALL
 singletons = PROT_SNP$nvar==1
@@ -426,10 +420,27 @@ TOTAL_SNP_SINGLE = sum(singletons) %>% as.character()
 TOTAL_SNP_MULTI = sum(!singletons) %>% as.character()
 TOTAL_SNP_STOP = sum_(earlystop) %>% as.character()
 
-BRK.FREQ = c(0,0.0001,1e-3,1e-2,5e-2,1e-1,5e-1)
-LAB.FREQ = paste.pair(trimws(sprintf("%.4f",BRK.FREQ), whitespace = '0', which = 'right'),s='-')
+```
 
-PROT_SNP$fr_bin = cut(PROT_SNP$alt_fr,breaks = BRK.FREQ,labels = LAB.FREQ,ordered_result = T,include.lowest = T)
+**SNP** is defined as the segregating site where
+alternative amino acids (*i.e variants*) are observed across strains. 
+<br>
+The "reference" residue is the amino acid with the highest frequency across all strains.
+
+## SNP count
+
+A total of **`r TOTAL_SNP_VAR`** variants have been identified spread over
+**`r TOTAL_SNP_POS`** positions of the proteome. 
+
+Out of those SNPs, there are **`r TOTAL_SNP_SINGLE`**  singletons, **i.e.** an 
+alternative amino acid was acquired in a single strain.
+
+The remaining **`r TOTAL_SNP_MULTI`** sites have at least 2 residues that coexist
+in the population. 
+
+In total, there are  **`r TOTAL_SNP_STOP`** SNP that are premature STOP codons.
+
+```{r snp-plot}
 snp_count = PROT_SNP %>% 
             group_by(nvar) %>%
             summarize(var_count=sum(nvar)) %>% 
@@ -453,12 +464,18 @@ p0.1 = ggplot(snp_count, aes(x=factor(nvar))) +
      xlab('# parallel variants')  + ylab('variants %') +
      scale_y_continuous(labels = scales::percent) 
 
+plot(p0.0)
+plot(p0.1)
+
 p1.0 = ggplot(snp_byfreq, aes(x=factor(nvar),group=fr_bin)) +
      geom_bar(aes(y=var_count_byfreq,fill=fr_bin),stat='identity') + 
      scale_fill_wsj(name='SNP%') + theme(legend.position = 'top', legend.text = element_text(size=9))+
      xlab('# parallel variants')  + ylab('Count')
 
-p1.1 = p1 + facet_wrap(~fr_bin,scales = 'free_y') + theme(legend.pos='non')
+p1.1 = p1.0 + facet_wrap(~fr_bin,scales = 'free_y') + theme(legend.pos='non')
+
+plot(p1.0)
+plot(p1.1)
 
 
 p2.0 = ggplot(snp_byfreq, aes(x=fr_bin,fill=fr_bin)) + 
@@ -475,17 +492,14 @@ p2.1 = ggplot(snp_byfreq, aes(x=1,fill=fr_bin)) +
      scale_fill_wsj(name='SNP%') + scale_color_wsj() + theme(legend.position = 'top', legend.text = element_text(size=9))+
      scale_y_continuous(labels = scales::percent) +
      scale_x_discrete('Variant frequency bin')  + ylab('% variants')
+plot(p2.0)
+plot(p2.1)
 
 # Histogram for number of SNP
 p3.0 = get_snp_orf_plot(FREQMIN = 0)
 p3.1 = get_snp_orf_plot()
-# SNP count vs Protein Length
-p4.0 = get_snp_protlen_plot(get_snp_protlen(PROT_SNP,0))
-p4.1 = get_snp_protlen_anim(animated=T,psnp=PROT_SNP, width = 1920/2, height = 1080/2, units = "px")
-
-# SNP count along protein length
-p5.0=get_snp_pos_plot(FREQMIN = 0)
-p5.1=get_snp_pos_plot(PROT_SNP)
+plot(p3.0)
+plot(p3.1)
 ```
 
 
@@ -511,6 +525,22 @@ F7 = ggplot(stop_count %>% filter(nstop >0)) +
      xlab("Protein Length (AA)") + ylab('early-STOP count')
 ggplotly(F7)
 ```
+
+## SNP count vs Protein Length
+
+```{r snp-protlen}
+p4.0 = get_snp_protlen_plot(get_snp_protlen(PROT_SNP,0))
+p4.1 = get_snp_protlen_anim(animated=T,psnp=PROT_SNP, width = 1920/2, height = 1080/2, units = "px")
+plot(p4.0)
+p4.1
+
+# SNP count along protein length
+p5.0=get_snp_pos_plot(FREQMIN = 0)
+p5.1=get_snp_pos_plot(PROT_SNP)
+plot(p5.0)
+plot(p5.1)
+```
+
 
 ## SNP vs. evolution
 
@@ -542,10 +572,13 @@ p6.0 = ggplot(R4S.desc, aes(y=log10.r4s.fungi,x=log10.r4s.yk11,text=orf,func=FUN
      #geom_text(data=subset(R4S.desc,outlier), mapping=aes(label=orf),color='white',size=2) +
      xlab("1011 strains evolutionary rate") + ylab('Fungi Evolutionary rate')  
 #    facet_wrap(~loc)
-plot(p6.0)
-  
+ggplotly(p6.0)  
 
-snp_count_orf=get_snp_orf(PROT_SNP,0)
+snp_count_orf=get_snp_orf(PROT_SNP,0) %>% 
+  mutate(has_ortho = id %in% CAT.ORF$has_intron, 
+         is_essential= id %in% CAT.ORF$essential,
+         is_dispensable = id %in% CAT.ORF$dispensable,
+         has_ohnolog = id %in% CAT.ORF$ohnologs)
 SNP.PROT = left_join(snp_count_orf, EXP , by=c('id'='prot')) %>% # Add expression data
            left_join(R4S, by=c('id'='orf')) %>% # Add conservation data 
            left_join(DESC,by=c('id'='ORF')) # Add annotation data
@@ -558,7 +591,6 @@ p6.1 = ggplot(SNP.PROT) +
      xlab('SNP count') + ylab("Fungi Evolutionary rate") +
      scale_x_continuous(trans='log2')
 ggplotly(p6.1)
-plot(p6.1)
 
 # SNP count vs Evolutionary rate 1011 strains
 C6.2 =  spearman.toplot(SNP.PROT$sites,SNP.PROT$log10.r4s.yk11)
@@ -568,13 +600,11 @@ p6.2= ggplot(SNP.PROT) +
       xlab('SNP count') + ylab("1011 strains evolutionary rate") + 
       scale_x_continuous(trans='log2')
 ggplotly(p6.2)
-plot(p6.2)
 ```
 
 ## SNP vs. expression
 
 ```{r snp-exp}
-SNP.PROT$has_ortho = SNP.PROT$id %in% FUNGI$r4s_orf # filter for orthologs
 
 # SNP count vs Median protein expression 
 C7.0 =   cor.sub.by(SNP.PROT, "log10_median.mpc", "sites", 'has_ortho') %>%
@@ -585,7 +615,6 @@ p7.0 = ggplot(SNP.PROT) +
       xlab("Molecules per cell (log10 median)") + ylab('SNP count') +
       scale_y_continuous(trans='log2') + facet_wrap(~has_ortho,labeller = label_both)
 ggplotly(p7.0 )
-plot(p7.0 )
 # Evolutionary rate 1011 strains vs Median protein expression 
 C7.1 =   cor.sub.by(SNP.PROT, "log10_median.mpc", "log10.r4s.yk11", 'has_ortho') %>%
         mutate( toshow = sprintf("r %.3f \n p %.1e \n n %s",r,p,n))
@@ -595,7 +624,7 @@ p7.1 = ggplot(SNP.PROT) +
       geom_text(C7.1, mapping=aes(x=0,y=-4,label=toshow),hjust='inward',vjust='inward',check_overlap =T,size=4) + 
       ylab("1011 strains evolutionary rate") + xlab('Molecules per cell (log10 median)') + facet_wrap(~has_ortho,labeller=label_both)
 ggplotly(p7.1)
-plot(p7.1)
+
 # Evolutionary rate fungi vs Median protein expression 
 C7.2 =  spearman.toplot(SNP.PROT$log10_median.mpc,SNP.PROT$log10.r4s.fungi)
 p7.2 = ggplot(SNP.PROT) + 
@@ -603,7 +632,6 @@ p7.2 = ggplot(SNP.PROT) +
       geom_text(C7.2, mapping=aes(x=6,y=0.5,label=toshow),hjust='inward',vjust='inward',check_overlap =T,size=4) + 
      ylab("fungi evolutionary rate") + xlab('Molecules per cell (log10 median)') 
 ggplotly(p7.2)
-plot(p7.2)
 
 ```
 
@@ -616,6 +644,27 @@ library(shiny)
 #  system.file("shiny/06_tabsets", package="shiny"),
 #  options = list(width = "100%", height = 700)
 #)
+```
+
+
+# References {-}
+
+Jackson et al.: 
+[***Genome evolution across 1,011 Saccharomyces cerevisiae isolates***](https://doi.org/10.1038/s41586-018-0030-5)
+<br>
+Rate4site: 
+[***Comparison of site-specific rate-inference methods: Bayesian methods are superior***](https://doi.org/10.1093/molbev/msh194)
+<br>
+Wapinski et al.: [***Natural history and evolutionary principles of gene duplication in fungi***](https://www.nature.com/articles/nature06107)
+<br>
+Ho et al.: [***Unification of Protein Abundance Datasets Yields a Quantitative Saccharomyces cerevisiae Proteome***](https://doi.org/10.1016/j.cels.2017.12.004)
+<br>
+Dos Reis et al.: [***Solving the riddle of codon usage preferences: a test for translational selection***](https://doi.org/10.1093/nar/gkh834)
+
+# Session Info {-}
+
+```{r session-info}
+sessionInfo()
 ```
 
 ```{r all-plot, echo=F, include=F}
@@ -658,24 +707,4 @@ for( i in 1:nrow(PLOTS) ){
     warning(sprintf("Unrecognized file extension for: %s",PLOTS$fname))
   }
 }
-```
-
-# References {-}
-
-Jackson et al.: 
-[***Genome evolution across 1,011 Saccharomyces cerevisiae isolates***](https://doi.org/10.1038/s41586-018-0030-5)
-<br>
-Rate4site: 
-[***Comparison of site-specific rate-inference methods: Bayesian methods are superior***](https://doi.org/10.1093/molbev/msh194)
-<br>
-Wapinski et al.: [***Natural history and evolutionary principles of gene duplication in fungi***](https://www.nature.com/articles/nature06107)
-<br>
-Ho et al.: [***Unification of Protein Abundance Datasets Yields a Quantitative Saccharomyces cerevisiae Proteome***](https://doi.org/10.1016/j.cels.2017.12.004)
-<br>
-Dos Reis et al.: [***Solving the riddle of codon usage preferences: a test for translational selection***](https://doi.org/10.1093/nar/gkh834)
-
-# Session Info {-}
-
-```{r session-info}
-sessionInfo()
 ```

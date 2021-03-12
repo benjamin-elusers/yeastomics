@@ -3,14 +3,30 @@
 # comments: general purpose functions
 # ```{r}Sys.time()```
 #
-#colored_fruits = c('yellow','banana','red','apple','green','grape')
 
 # I/O --------------------------------------------------------------------------
+
+# Retrieve text content from URL
 open.url <- function(file_url) {
   con <- gzcon(url(file_url))
   txt <- readLines(con)
   closeAllConnections()
   return(textConnection(txt))
+}
+
+# Execute loading call and save data unless saved data already exists
+preload = function(saved.file,loading.call,doing='create data...'){
+  library(tictoc)
+  if( !file.exists(saved.file) ){
+    cat(doing)
+    tic(doing)
+    res = eval(substitute(loading.call))
+    saveRDS(res,saved.file)
+    toc()
+  }else{
+    res = readRDS(saved.file)
+  }
+  return(res)
 }
 
 # Testing/Subsetting -----------------------------------------------------------
@@ -353,6 +369,7 @@ round2near <- function(nb,roundto){ # returns the nearest number up to the speci
 }
 Round2Nearest <- function(...){ round2near(...) }
 
+table_ = function(x,...){ addmargins(table(x),...) }
 mad_      <- function(...){ mad(na.rm=T,...) } # Median absoluted deviations without NA
 quantile_ <- function(x,...){  quantile(x,...,na.rm=T) } # quantile with no error message for missing values
 range_ <- function(x,...){  range(x,...,na.rm=T) } # range with no error message for missing values

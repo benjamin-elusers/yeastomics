@@ -36,7 +36,7 @@ get.strain_orf= function(x,what=c('orf','strains','both')){
   return(res)
 }
 
-### Variants -------------------------------------------------------------------
+### Variants = alternative residues --------------------------------------------
 
 # Get the number of variants per position which cumulative frequency is over pmin
 get.variants.count = function(S){
@@ -114,6 +114,8 @@ count.SNP.bypos = function(s,nbin=100,.id=NULL){
   return(snppos)
 }
 
+### SNP = segregating sites ----------------------------------------------------
+
 get.maxfreq = function(VAR){
   MAXFREQ = VAR %>%
     dplyr::filter(maxfreq) %>%
@@ -182,20 +184,6 @@ get.SNPscore = function(S, scoremat = "BLOSUM100", masked=c()){
 }
 
 #http://sgd-archive.yeastgenome.org/sequence/S288C_reference/genome_releases/S288C_reference_genome_Current_Release.tgz
-
-preload = function(saved.file,loading.call,doing='create data...'){
-  library(tictoc)
-  if( !file.exists(saved.file) ){
-    cat(doing)
-    tic(doing)
-    res = eval(substitute(loading.call))
-    saveRDS(res,saved.file)
-    toc()
-  }else{
-    res = readRDS(saved.file)
-  }
-  return(res)
-}
 #ref.file = 'data/YK11_REF.rds'
 #alt.file = 'data/YK11_ALT.rds'
 #snp.file = 'data/YK11_SNP.rds'
@@ -207,7 +195,7 @@ preload = function(saved.file,loading.call,doing='create data...'){
 #               doing='Extract WT amino-acid...'
 #              )
 
-
+### Prepare data and plot ------------------------------------------------------
 get_snp_orf = function(PSNP,pmin){
   SNPORF = PSNP %>%
             dplyr::filter(alt_fr >= pmin) %>%
