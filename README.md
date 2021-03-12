@@ -26,16 +26,33 @@ make pairwise alignment
 read Rate4site (R4S) output
 
 
-## Published datasets _(remote access via URL)_
+## Resource databases _(remote access via URL)_
 -------------
 
-- Dubreuil et al., 2019
-- Leueunberger et al., 2017
-- Van Leeuwen et al., 2020
-- Ho et al., 2018
-- Belle et al., 2006
-- Villen et al., 2017
-- Peter et al., 2018
+- PFAM (domain assignment)
+- SUPERFAMILY (domain assignment)
+- UniprotKB (proteome sequences, features, subcellular localizations, families)
+- SGD (genome sequences, features, gene ontology annotations)
+- D2P2 (Consensus disorder predictions)
+
+
+## Published datasets _(remote access via URL)_
+-------------
+|Year|1st Author  | Journal            | Title                                                                                                                    |
+|----|------------|--------------------|--------------------------------------------------------------------------------------------------------------------------|
+|2005|Byrne       |Genome Research     |The Yeast Gene Order Browser: Combining curated homology and syntenic context reveals gene fate in polyploid species      |
+|2006|Belle       |PNAS                |Quantification of protein half-lives in the budding yeast proteome                                                        |
+|2008|Pu          |NAR                 |Up-to-date catalogues of yeast protein complexes                                                                          |
+|2014|Lee         |Science             |Mapping the Cellular Response to Small Molecules Using Chemogenomic Fitness Signatures                                    |
+|2014|Geisberg    |Cell                |Global Analysis of mRNA Isoform Half-Lives Reveals Stabilizing and Destabilizing Elements in Yeast                        |
+|2017|Villen      |Cell Systems        |Determinants and Regulation of Protein Turnover in Yeast                                                                  |
+|2017|Leueunberger|Science             |Cell-wide analysis of protein thermal unfolding reveals determinants of thermostability                                   |
+|2018|Ho          |Cell Systems        |Unification of Protein Abundance Datasets Yields a Quantitative Saccharomyces cerevisiae Proteome                         |
+|2018|Peter       |Science             |Genome evolution across 1,011 Saccharomyces cerevisiae isolates                                                           |
+|2019|Meldal      |NAR                 |Complex Portal 2018: extended content and enhanced visualization tools for macromolecular complexes                       |
+|2019|Dubreuil    |JMB                 |Protein Abundance Biases the Amino Acid Composition of Disordered Regions to Minimize Non-functional Interactions         |
+|2020|Van Leeuwen |Mol. Sys. Bio.      |Systematic analysis of bypass suppression of essential genes                                                              |
+|2021|Dubreuil    |Frontiers Mol. Biosc|Abundance imparts evolutionary constraints of similar magnitude on the buried, surface, and disordered regions of proteins|
 
 ## Local datasets _(E. Levy inhouse data)_
 -------------
