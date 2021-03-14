@@ -18,11 +18,15 @@ source("src/function_datalocal.r")
 source("src/function_datapub.r")
 library(tictoc)
 library(tidyverse)
-d10  = function(x,...){ slice_min(x,prop=0.1,with_ties = T,...) }
-d90  = function(x,...){ slice_max(x,prop=0.1,with_ties = T,...) }
-q25  = function(x,...){ slice_min(x,prop=0.25,with_ties = T,...) }
-q75  = function(x,...){ slice_max(x,prop=0.75,with_ties = T,...) }
-
+q25 = function(x){ quantile(x,0.25) }
+q75 = function(x){ quantile(x,0.75) }
+d10 = function(x){ quantile(x,0.1) }
+d90 = function(x){ quantile(x,0.9) }
+get.d10  = function(x,...){ dplyr::slice_min(x,prop=0.1,with_ties = T,...) }
+get.d90  = function(x,...){ dplyr::slice_max(x,prop=0.1,with_ties = T,...) }
+get.q25  = function(x,...){ dplyr::slice_min(x,prop=0.25,with_ties = T,...) }
+get.q75  = function(x,...){ dplyr::slice_max(x,prop=0.75,with_ties = T,...) }
+get.iqr  = function(x,...){ dplyr::filter(between(!!(x),q25(!!(x)),q75(!!(x)))) } 
 semi.quantitative = function(df){}
 
 ```
@@ -131,34 +135,33 @@ PROTEOME = UNIPROT %>% dplyr::select(UNIPROTKB, SGD, ORF, GNAME, PNAME)
 ```{r genomic}
 GENOMIC=list()
 ### QUANTITATIVE FEATURES
-#### Proteins length --------------------------------------------------------------
+#### Proteins length -----------------------------------------------------------
 df.len = tibble(orf=names(S288C),len=width(S288C))
 # %GC content in genes ---------------------------------------------------------
 df.gc  = tibble(orf=names(CDS),pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
 
-
 ### PROPERTIES (QUALITATIVE OR SEMI-QUANTITATIVE)
-#### Chromosome Number ------------------------------------------------------------
+#### Chromosome Number ---------------------------------------------------------
 CHR = SGD %>%
       filter(type=="ORF") %>%
       group_by(chr.f) %>% 
       dplyr::select(name)
 chr.orf =  split(CHR$name,CHR$chr.f,drop=T)
-#### range of protein length ------------------------------------------------------
-GENOMIC$shortest = df.len %>% d10(order_by = len) %>% pull(orf)
-GENOMIC$shorter  = df.len %>% q25(order_by = len) %>% pull(orf)
-GENOMIC$average  = df.len %>% filter(between(len,Qlen['25%'],Qlen['75%'])) %>% pull(orf)
-GENOMIC$longest  = df.len %>% q75(order_by = len) %>% pull(orf)
-GENOMIC$longest  = df.len %>% d90(order_by = len) %>% pull(orf)
-#### range of GC content ----------------------------------------------------------
-GENOMIC$GC_lower  = df.gc %>% d10(order_by=pGC) %>% pull(orf)
-GENOMIC$GC_low    = df.gc %>% q25(order_by=pGC) %>%  pull(orf)
-GENOMIC$GC_mid    = df.gc %>% filter(between(pGC,QGC['25%'],QGC['75%'])) %>% pull(orf)
-GENOMIC$GC_high   = df.gc %>% q75(order_by=pGC) %>% pull(orf)
-GENOMIC$GC_higher = df.gc %>% d90(order_by=pGC) %>% pull(orf)
-#### Intron containing genes ------------------------------------------------------
+#### range of protein length ---------------------------------------------------
+GENOMIC$shortest = df.len %>% get.d10(order_by = len) %>% pull(orf)
+GENOMIC$shorter  = df.len %>% get.q25(order_by = len) %>% pull(orf)
+GENOMIC$average  = get.iqr(x=len) %>% pull(orf)
+GENOMIC$longest  = df.len %>% get.q75(order_by = len) %>% pull(orf)
+GENOMIC$longest  = df.len %>% get.d90(order_by = len) %>% pull(orf)
+#### range of GC content -------------------------------------------------------
+GENOMIC$GC_lower  = df.gc %>% get.d10(order_by=pGC) %>% pull(orf)
+GENOMIC$GC_low    = df.gc %>% get.q25(order_by=pGC) %>%  pull(orf)
+GENOMIC$GC_mid    = df.gc %>% get.iqr(pGC) %>% pull(orf)
+GENOMIC$GC_high   = df.gc %>% get.q75(order_by=pGC) %>% pull(orf)
+GENOMIC$GC_higher = df.gc %>% get.d90(order_by=pGC) %>% pull(orf)
+#### Intron containing genes ---------------------------------------------------
 GENOMIC$has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
-#### Chromosome genes -------------------------------------------------------------
+#### Chromosome genes ----------------------------------------------------------
 GENOMIC = append(GENOMIC,chr.orf)
 ```
 
