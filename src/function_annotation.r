@@ -229,14 +229,7 @@ url.pathway="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowled
 
 ## _4_ functional categories --------------------------------------------------
 load.yeast.biofunctions = function(){
-  library(openxlsx)
-
-  message("REF: J. van Leeuwen et al., Science, 2016")
-  message("Exploring genetic suppression interactions on a global scale")
-  #biofunctions = readxl::read_excel(path ="https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx",
-  #                              sheet = 2)
-  biofunctions = read.xlsx( xlsxFile = "https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx",
-                                    sheet = 2)
-  return(biofunctions)
+  # load gene classification of biological functions (costanzo 2010, Van Leeuwen 2016)
+  A = load.costanzo2010.data()
+  B = load.vanleeuwen2016.data()
 }
-

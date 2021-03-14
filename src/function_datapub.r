@@ -402,9 +402,12 @@ load.costanzo2010.data = function(){
   downloaded=download.file(S6, destfile = todownload)
   if(!downloaded){
     costanzo = readxl::read_excel(path = todownload, sheet = 1, progress = T,
-                                  col_names = c("ORF","GENE","BIOFUNCTIONS"),na = c("unknown")) %>%
-      separate_rows(BIOFUNCTIONS,sep=";") %>%
-      mutate(BIOFUNCTIONS=str_trim(BIOFUNCTIONS))
+                                  col_names = c("ORF","GENE","FUNCTIONS"),na = c("unknown")) %>%
+      separate_rows(FUNCTIONS,sep=";") %>%
+      mutate(FUNCTION=str_trim(FUNCTIONS))
+    #         FN=factor(FUNCTION,levels=unique(FUNCTION),labels = invert(.class_function))
+    # ) %>% dplyr::select(-Function) %>%
+    #   group_by(ORF) %>% mutate(FN_all=paste0(unique(FN),collapse = ""))
     file.remove(todownload)
     return(costanzo)
 
@@ -447,9 +450,11 @@ load.vanleeuwen2016.data = function(){
 
   vanleeuwen = read.xlsx( xlsxFile = S7, sheet = 2) %>%
                separate_rows(Function,sep=",") %>%
-               mutate( FUNC = str_trim(Function),
-                       f=factor(FUNC,levels=unique(FUNC),labels = names(.function_class))
-               )
+               mutate( FUNCTION = str_trim(Function),
+                       FN=factor(FUNCTION,levels=unique(FUNCTION),labels = invert(.class_function))
+               ) %>% dplyr::select(-Function) %>%
+               group_by(ORF) %>% mutate(FN_all=paste0(unique(FN),collapse = ""))
+
   return(vanleeuwen)
 }
 
