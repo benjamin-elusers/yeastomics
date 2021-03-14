@@ -1,13 +1,37 @@
 ---
 title: "Protein Categories"
-author: "Benjamin Dubreuil"
-date: "Last compiled on `r format(Sys.time(), '%d %B, %Y')`"
-output: html_document
-editor_options: 
-  chunk_output_type: console
+subtitle: ""
+author: "[Benjamin Dubreuil](https://github.com/benjamin-elusers/)"
+home: "https://github.com/benjamin-elusers/yeastomics/"
+github: "benjamin-elusers"
+mail: "benjamin.dubreuil@weizmann.ac.il"
+date: "`r format(Sys.time(), 'Last Modified: %d-%b-%Y %R %p')`"
+output:
+  rmdformats::downcute:
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+    gallery: true
+    highlight: tango
+#  html_document: 
+    code_download: true
+    code_folding: hide
+    fig_caption: yes
+    keep_md: yes
+#    toc: yes
+    toc_depth: 3
+    toc_float:
+      toc_collapsed: true
+    number_sections: true
+    theme: lumen
+  editor_options: 
+    chunk_output_type: console
+  bibliography: bibliography.bib
+  csl: biomed-central.csl
 ---
 
 ```{r setup, include=FALSE}
+library(rmarkdown)
 knitr::opts_chunk$set(echo = TRUE)
 source("src/utils.r")
 source("src/function_annotation.r")
@@ -311,11 +335,8 @@ head(multiloc)
 ```
 
 ```{python}
-
-
 ```
 
 ```{r categories-table}
 # Make categories table with:
-
 ```

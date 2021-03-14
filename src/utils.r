@@ -64,6 +64,7 @@ from.last <- function(x,n=2){ head(x, n = -abs(n)) }   # returns vector w/o last
 
 unfactor  <- function(x){ as.numeric(as.character(x)) } # forces conversion of factors to numbers
 compact   <- function(x){ Filter(Negate(is.null), x) }  # removes null element in list
+invert    <- function(x){ setNames(names(x),make.unique(x)) }
 
 # Counting ---------------------------------------------------------------------
 ulen    <- function(x){ return( length(unique(x)) ) } # gets length of unique values
