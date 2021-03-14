@@ -34,17 +34,19 @@ read Rate4site (R4S) output
 - UniprotKB (proteome sequences, features, subcellular localizations, families)
 - SGD (genome sequences, features, gene ontology annotations)
 - D2P2 (Consensus disorder predictions)
-
+- STRING (protein-protein interactions)
 
 ## Published datasets _(remote access via URL)_
 -------------
-|Year|1st Author  | Journal            | Title                                                                                                                    |
+|Year|1st Author  |Journal             |Title                                                                                                                     |
 |----|------------|--------------------|--------------------------------------------------------------------------------------------------------------------------|
 |2005|Byrne       |Genome Research     |The Yeast Gene Order Browser: Combining curated homology and syntenic context reveals gene fate in polyploid species      |
 |2006|Belle       |PNAS                |Quantification of protein half-lives in the budding yeast proteome                                                        |
 |2008|Pu          |NAR                 |Up-to-date catalogues of yeast protein complexes                                                                          |
+|2010|Costanzo    |Science             |The Genetic Landscape of a cell                                                                                           |
 |2014|Lee         |Science             |Mapping the Cellular Response to Small Molecules Using Chemogenomic Fitness Signatures                                    |
 |2014|Geisberg    |Cell                |Global Analysis of mRNA Isoform Half-Lives Reveals Stabilizing and Destabilizing Elements in Yeast                        |
+|2016|Van Leeuwen |Science             |Exploring genetic suppression interactions on a global scale                                                               |
 |2017|Villen      |Cell Systems        |Determinants and Regulation of Protein Turnover in Yeast                                                                  |
 |2017|Leueunberger|Science             |Cell-wide analysis of protein thermal unfolding reveals determinants of thermostability                                   |
 |2018|Ho          |Cell Systems        |Unification of Protein Abundance Datasets Yields a Quantitative Saccharomyces cerevisiae Proteome                         |
@@ -59,8 +61,7 @@ read Rate4site (R4S) output
 
 - 3dcomplex *quaternary structures*
 - INTACT *curated protein interactions*
-- R4S data *for fungi lineage*
-- R4S data for 1011 yeast strains
+- R4S data *for fungi lineage* & *for 1011 yeast strains*
 
 ## Analysis
 -------------
