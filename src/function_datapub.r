@@ -390,6 +390,69 @@ load.lee2014.data = function(){
   return(chemofit)
 }
 
+load.costanzo2010.data = function(){
+  # load gene classification of biological functions
+  message("REF: M. Costanzo, A. Baryshnikova et al., 2010, Science")
+  message("The Genetic Landscape of a Cell")
+  # doi: https://doi.org/10.1126/science.1180823.
+
+  S6="https://boonelab.ccbr.utoronto.ca/supplement/costanzo2009/bioprocess_annotations_costanzo2009.xls"
+  costanzo = readxl::read_xls(path=, sheet = 1)
+  todownload="data/bioprocess_annotations_costanzo2009.xls"
+  downloaded=download.file(S6, destfile = todownload)
+  if(!downloaded){
+    costanzo = readxl::read_excel(path = todownload, sheet = 1, progress = T,
+                                  col_names = c("ORF","GENE","BIOFUNCTIONS"),na = c("unknown")) %>%
+      separate_rows(BIOFUNCTIONS,sep=";") %>%
+      mutate(BIOFUNCTIONS=str_trim(BIOFUNCTIONS))
+    file.remove(todownload)
+    return(costanzo)
+
+  }else{
+    stop("Could not download the supplementary table!")
+    return(NA)
+  }
+}
+
+load.vanleeuwen2016.data = function(){
+  # load gene classification of biological functions (based on costanzo 2010)
+  message("REF: J. Van Leeuwen et al., 2016, Science")
+  message("Exploring genetic suppression interactions on a global scale")
+  # doi: https://doi.org/10.1126/science.aag0839
+
+  # Sheet 1 is the functional classes
+  S7="https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx"
+  .class_function = c(
+    'A'="Amio acid biosynth & transport",
+    'B'="Autophagy",
+    'C'="Cell cycle progression/meiosis",
+    'D'="Cell polarity/morphogenesis",
+    'E'="Chrom. seg./kinetoch./spindle/microtub.",
+    'F'="Chromatin/transcription",
+    'G'="DNA replication & repair/HR/cohesion",
+    'H'="Drug/ion transport",
+    'I'="ER-Golgi traffic",
+    'J'="Golgi/endosome/vacuole sorting",
+    'K'="Lipid/sterol/fatty acid biosynth & transport",
+    'L'="Metabolism/mitochondria",
+    'M'="Nuclear-cytoplasmic transport",
+    'N'="Peroxisome",
+    'O'="Protein degradation/proteosome",
+    'P'="Protein folding & glycosylation/cell wall",
+    'Q'="Ribosome/translation",
+    'R'="RNA processing",
+    'S'="Signaling/stress response",
+    'X'="Highly pleiotropic"
+  )
+
+  vanleeuwen = read.xlsx( xlsxFile = S7, sheet = 2) %>%
+               separate_rows(Function,sep=",") %>%
+               mutate( FUNC = str_trim(Function),
+                       f=factor(FUNC,levels=unique(FUNC),labels = names(.function_class))
+               )
+  return(vanleeuwen)
+}
+
 load.superfamily = function(tax='xs'){
   # Load domain assignments from superfamily SCOP level (SUPFAM.org)
   # xs = saccharomyces cerevisiae
@@ -414,5 +477,21 @@ load.pfam = function(tax='559292'){
             str_replace_all("[ \\-]","_") %>% str_remove_all("[#<>]")
   pfam = readr::read_delim(file = url.pfam, skip=2,comment = "#",delim="\t", col_names = columns,escape_double = F,guess_max = 100)
   return(pfam)
+}
+
+load.STRING = function(tax="4932",phy=T,ful=T,min.score=700){
+  # Load protein links (physical PPI)
+  # 4932 = S.cerevisiae
+  STRING_baseurl = "https://stringdb-static.org/download"
+  .version = "v11.0"
+  .protein = ifelse(phy,"protein.physical","protein")
+  .links = ifelse(ful,"links.full","links")
+  STRING_dataset = sprintf("%s.%s.%s",.protein,.links,.version)
+  STRING_url = sprintf("%s/%s/%s.%s.%s",STRING_baseurl,STRING_dataset,tax,STRING_dataset,"txt.gz")
+
+  # each numeric column is an evidence score out of 1000 to asssess the existence of the link between protein
+  # _transferred means information was inferred from a different organism (homology or orthologous group)
+  STRING_net = readr::read_delim(STRING_url,delim = " ") %>% filter(combined_score >= min.score)
+  return(STRING_net)
 }
 
