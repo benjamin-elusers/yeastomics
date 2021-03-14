@@ -8,7 +8,7 @@ library(openxlsx)
 # Remote published proteome data -----------------------------------------------
 load.dubreuil2019.data = function(d){
   # Load stickiness and disorder data
-  message("REF: Dubreuil, Matalon and Levy, JMB")
+  message("REF: Dubreuil, Matalon and Levy, 2019, Journal of Molecular Biology")
   message("Protein Abundance Biases the Amino Acid Composition of Disordered Regions to Minimize Non-functional Interactions")
   dubreuil=data.frame(stringsAsFactors = F,
                       name   = c("1.1 yeast.prot", "1.2 yeast.res", "1.3 yeast.res (full proteome)",
@@ -43,7 +43,7 @@ load.dubreuil2019.data = function(d){
 
 load.dubreuil2021.data = function(d){
   # Load evolutionary rate data for yeast
-  message("REF: Dubreuil and Levy ")
+  message("REF: Dubreuil and Levy, 2021, Frontiers in Molecular Bioscences")
   message("Abundance imparts evolutionary constraints of similar magnitude on the buried, surface, and disordered regions of proteins")
   dubreuil=data.frame(stringsAsFactors = F,
                       name   = c("1.1 yeast.prot", "1.2 yeast.res", "1.3 yeast.res") ,
