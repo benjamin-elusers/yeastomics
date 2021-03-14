@@ -4,10 +4,11 @@ source('src/function_alignment.r',local = T)
 source('src/function_phylogenetic.r',local = T)
 library(openxlsx)
 
+
 # Remote published proteome data -----------------------------------------------
 load.dubreuil2019.data = function(d){
   # Load stickiness and disorder data
-  message("REF: Dubreuil, Matalon and Levy ")
+  message("REF: Dubreuil, Matalon and Levy, 2019, Journal of Molecular Biology")
   message("Protein Abundance Biases the Amino Acid Composition of Disordered Regions to Minimize Non-functional Interactions")
   dubreuil=data.frame(stringsAsFactors = F,
                       name   = c("1.1 yeast.prot", "1.2 yeast.res", "1.3 yeast.res (full proteome)",
@@ -22,11 +23,49 @@ load.dubreuil2019.data = function(d){
   choice = dubreuil[d,]
   with(choice,cat(sprintf("Your choice was:\n [%s] %s\n-----> from %s%s (formatted as %s)\n",d,name,base_url,num,format)))
   data.url = sprintf('%s/%s',dubreuil$base_url[d], dubreuil$num[d])
+  open.url <- function(file_url) {
+    con <- gzcon(url(file_url))
+    txt <- readLines(con)
+    closeAllConnections()
+    return(textConnection(txt))
+  }
 
   if( dubreuil$format[d] == 'XLSX' ){
     library(openxlsx)
     res = openxlsx::read.xlsx(data.url,colNames=T,sheet=1, startRow=1)
   } else if( dubreuil$format[d] == 'TSV'){
+    res = read.delim(file = data.url, header=T, sep='\t', stringsAsFactors = F)
+  } else if( dubreuil$format[d] == 'TSV.GZ' ){
+    res = read.delim(file=open.url(data.url), header=T, sep='\t',stringsAsFactors = F)
+  }
+  return(res)
+}
+
+load.dubreuil2021.data = function(d){
+  # Load evolutionary rate data for yeast
+  message("REF: Dubreuil and Levy, 2021, Frontiers in Molecular Bioscences")
+  message("Abundance imparts evolutionary constraints of similar magnitude on the buried, surface, and disordered regions of proteins")
+  dubreuil=data.frame(stringsAsFactors = F,
+                      name   = c("1.1 yeast.prot", "1.2 yeast.res", "1.3 yeast.res") ,
+                      num    = c('26404466', '26404475', '26404478'),
+                      base_url =  rep('https://ndownloader.figshare.com/files/',3),
+                      format = c('TSV','TSV','TSV.GZ')
+  )
+
+  if( missing(d) || !(d %in% seq_along(dubreuil$name)) ){
+    d = menu(sprintf("%s (%s)",dubreuil$name,dubreuil$format), graphics = FALSE, title = "Which dataset do you want to use?")
+  }
+  choice = dubreuil[d,]
+  with(choice,cat(sprintf("Your choice was:\n [%s] %s\n-----> from %s%s (formatted as %s)\n",d,name,base_url,num,format)))
+  data.url = sprintf('%s/%s',dubreuil$base_url[d], dubreuil$num[d])
+  open.url <- function(file_url) {
+    con <- gzcon(url(file_url))
+    txt <- readLines(con)
+    closeAllConnections()
+    return(textConnection(txt))
+  }
+
+  if( dubreuil$format[d] == 'TSV'){
     res = read.delim(file = data.url, header=T, sep='\t', stringsAsFactors = F)
   } else if( dubreuil$format[d] == 'TSV.GZ' ){
     res = read.delim(file=open.url(data.url), header=T, sep='\t',stringsAsFactors = F)
