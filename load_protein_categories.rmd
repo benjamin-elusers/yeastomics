@@ -45,25 +45,6 @@ output:
 </style>
 
 ```{r setup, include=FALSE}
-<<<<<<< HEAD
-library(rmarkdown)
-knitr::opts_chunk$set(echo = TRUE)
-source("src/utils.r")
-source("src/function_annotation.r")
-source("src/function_sequence.r")
-source("src/function_phylogenetic.r")
-source("src/function_analysis.r")
-source("src/function_datalocal.r")
-source("src/function_datapub.r")
-library(tictoc)
-library(tidyverse)
-d10  = function(x,...){ slice_min(x,prop=0.1,with_ties = T,...) }
-d90  = function(x,...){ slice_max(x,prop=0.1,with_ties = T,...) }
-q25  = function(x,...){ slice_min(x,prop=0.25,with_ties = T,...) }
-q75  = function(x,...){ slice_max(x,prop=0.75,with_ties = T,...) }
-
-semi.quantitative = function(df){}
-=======
 knitr::opts_chunk$set(echo = TRUE, 
                       collapse = TRUE,
                       cache.lazy = FALSE,
@@ -98,8 +79,6 @@ suppressPackageStartupMessages({
 
 # turn off annoying messages from dplyr::summarise
 options(dplyr.summarise.inform = FALSE)
->>>>>>> d3dc28a9bb5e2584e010701cf33be7dc63b277ca
-
 ```
 
 # Introduction to "yeast-omics"
@@ -256,6 +235,26 @@ df.aa_class = map(aaprop, aaenrich, BS=UNI.SC ) %>%
 
 # Disorder content (segment, fraction, total) ----------------------------------
 
+D2P2 = get.d2p2.diso(load.d2p2(saved = "data/d2p2-yeast-uniprotKB.rds"),as.df = T) %>%
+       mutate(d2p2_seg = find.consecutive(d2p2_diso>=7, TRUE, min=3),
+              d2p2_gap = find.consecutive(d2p2_diso>=7, FALSE, min=1)) %>%
+       group_by(d2p2_seg) %>% mutate( d2p2_seglen = sum_(d2p2_seg!=0)) %>%
+       group_by(d2p2_gap) %>% mutate( d2p2_gaplen = sum_(d2p2_gap!=0)) %>%
+       group_by(d2p2_id, d2p2_size, has_d2p2) %>% 
+       summarise(L.d2p2 = sum_(d2p2_diso>=7), 
+                 f.d2p2 = mean_(d2p2_diso>=7),
+                 n.seg = n_distinct(d2p2_seg),
+                 L.segmax = max(d2p2_seglen))
+  
+DUB = load.dubreuil2019.data(3)
+dub = load.dubreuil2019.data(1)
+IUP = DUB %>% dplyr::select()
+
+
+test = D2P2 %>% filter(d2p2_id == "P34111")
+x = test$d2p2_diso>=7
+
+
 ### PROPERTIES (QUALITATIVE OR SEMI-QUANTITATIVE)
 #### Protein domains (nodom,single,multi)  ----------------------------------------
 SUPFAM = load.superfamily() %>% 
@@ -281,7 +280,6 @@ BIOPHYSICS$pfam_single = PFAM %>% filter(n_dom==1) %>% pull(seq_id)
 BIOPHYSICS$pfam_pair   = PFAM %>% filter(n_dom==2) %>% pull(seq_id)
 BIOPHYSICS$pfam_multi  = PFAM %>% filter(n_dom>=3) %>% pull(seq_id)
 
-#DUB = load.dubreuil2019.data(3)
 #NDOM = DUB %>%
 #        group_by(id) %>%
 #        summarize( ndom = max(domain.seg) )
@@ -301,13 +299,13 @@ library(ggraph)
 
 ##### INTACT network
 #/media/elusers/users/hugo/07_3DComplex_scripts/scripts_PPIs_networks/stack_studies_PPIs_nored_PMID_28122020_INTACT.R
-INTACT_ppi.0 = read.csv("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_cerevisiae.txt",sep = "\t", quote = "", stringsAsFactors = F)
-colnames(INTACT_ppi) = c("protA","protB","altA","altB","aliasA","aliasB","method","pub.author1","pub.id","taxA","taxB","typeAB","src.db","int.id","conf","expansion.method","bio.roleA","bio.roleB","exp.roleA","exp.roleB","typeA","typeB","xrefA","xrefB","xrefAB","annotA","annotB","annotAB","host","parAB","created","updated","checksumA","checksumB","checksumAB","negative","featA","featB","stoichioA","stoichioB","id.met.protA","id.met.protB")
+INTACT = read.csv("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_cerevisiae.txt",sep = "\t", quote = "", stringsAsFactors = F)
+colnames(INTACT) = c("protA","protB","altA","altB","aliasA","aliasB","method","pub.author1","pub.id","taxA","taxB","typeAB","src.db","int.id","conf","expansion.method","bio.roleA","bio.roleB","exp.roleA","exp.roleB","typeA","typeB","xrefA","xrefB","xrefAB","annotA","annotB","annotAB","host","parAB","created","updated","checksumA","checksumB","checksumAB","negative","featA","featB","stoichioA","stoichioB","id.met.protA","id.met.protB")
 
 # remove small molecules and non-protein 
-cat("nb PPIs before rm EBI: ", nrow(INTACT_ppi.0), "\n")
-INTACT_ppi.1 = INTACT_ppi.0[!(grepl("EBI", INTACT_ppi.0$protA) | grepl("EBI", INTACT_ppi.0$protB)),]
-cat("nb PPIs after rm EBI: ", nrow(INTACT_ppi.1), "\n")
+cat("nb PPIs before rm EBI: ", nrow(INTACT), "\n")
+INTACT.1 = INTACT[!(grepl("EBI", INTACT$protA) | grepl("EBI", INTACT$protB)),]
+cat("nb PPIs after rm EBI: ", nrow(INTACT.1), "\n")
 
 # remove duplicated interactions (with different Pubmed ID)
 # 
@@ -318,12 +316,12 @@ cat("nb PPIs after rm EBI: ", nrow(INTACT_ppi.1), "\n")
 #dplyr::select(-c(created,updated,checksumA,checksumB,checksumAB,taxA,taxB))
 
 ##### STRING network
-STRING_ppi = load.STRING(tax="4932",phy=T, ful=T, min.score = 700) %>% 
+STRING = load.STRING(tax="4932",phy=T, ful=T, min.score = 700) %>% 
              mutate(ORF1 = str_extract(protein1,SGD.nomenclature()),
                     ORF2 = str_extract(protein2,SGD.nomenclature())
              ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
  
-STRING_net = as_tbl_graph(STRING_ppi)
+STRING_net = as_tbl_graph(STRING)
 
 
 #### COMPLEXES
@@ -371,14 +369,16 @@ M = cor(unigo.m[,-1], use = 'pairwise',method = 'spearman') # similarity between
 ol =  crossprod(unigo.m[,-1] %>% as.matrix)
 ol_scaled = ( ol + abs(min(ol)) )  / max(ol + abs(min(ol)))
 pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, fontsize = 4)
-                   #filename = "GO_profile_spearman.pdf", height = 18, width=10)
+                   #filename = "plots/GO_profile_spearman.pdf", height = 18, width=10)
 pheatmap::pheatmap(ol_scaled,show_colnames = F,show_rownames = T,cluster_cols =T,cluster_rows = T, fontsize = 4)
-                   #filename = "GO_profile_overlap.pdf", height = 18, width=10)
+                   #filename = "plots/GO_profile_overlap.pdf", height = 18, width=10)
 go =  split(unigo$UNIPROT,unigo$go)
-PHENOTYPES = append(PHENOTYPES,go)
+FUNCTIONS = append(FUNCTIONS,go)
 
-test = load.yeast.biofunctions()
-table( test$Function )
+# Classification of Biological functions
+
+load.vanleeuwen2016.data()
+
 
 ```
 
@@ -427,15 +427,11 @@ multiloc = UNILOC %>%
   
 head(multiloc)
 
+
 ```
 
-<<<<<<< HEAD
-```{python}
-```
 
-```{r categories-table}
-# Make categories table with:
-=======
+# Output 
 ```{r categories-table}
 # Make categories table with:
 
@@ -444,5 +440,20 @@ CATEGORIES = list(GENOMIC,BIOPHYSICS,INTERACTIONS,FUNCTIONS,PHENOTYPES)
 length(CATEGORIES)
 lapply(CATEGORIES,length)
 
->>>>>>> d3dc28a9bb5e2584e010701cf33be7dc63b277ca
+# CODON ADATAPTION
+df.tai=load.codon.usage(inputseq=load.sgd.CDS())
+# DUPLICATED GENES
+YGOB=load.ygob.ohnologs() %>%  group_by(orf, dup.orf, pid, rlen)
+OHNO = get.sc.ohno() %>%
+       left_join(S2U %>% rename_all(list(~xxS(x=.,sx='ref'))), by=c('orf'='ORF.ref')) %>%
+       left_join(S2U %>% rename_all(list(~xxS(x=.,sx='dup'))), by=c('dup.orf'='ORF.dup'))
+head(ohno)
+STAB = load.leunenberger2017.data() %>%
+  add_count(Protein_ID,name='npep') %>%
+  dplyr::select(Protein_ID,Tm.Protein,Protinfo,Protein.Coverage,Length,
+                Measured.Domains, Theoretical.Number.of.Domain,Essential,npep ) %>%
+  distinct() %>%
+  mutate( nres = round(0.01*Protein.Coverage*Length))
+
+
 ```
