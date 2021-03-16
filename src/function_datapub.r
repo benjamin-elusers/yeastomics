@@ -11,11 +11,14 @@ load.dubreuil2019.data = function(d){
   message("REF: Dubreuil, Matalon and Levy, 2019, Journal of Molecular Biology")
   message("Protein Abundance Biases the Amino Acid Composition of Disordered Regions to Minimize Non-functional Interactions")
   dubreuil=data.frame(stringsAsFactors = F,
-                      name   = c("1.1 yeast.prot", "1.2 yeast.res", "1.3 yeast.res (full proteome)",
-                                 "2.1 human.prot", "2.2 human.res", "2.3 human.res (full proteome)") ,
-                      num    = c('16924922', '16920611', '23164307', '16924925', '16920581','25859607'),
-                      base_url =  rep('https://ndownloader.figshare.com/files/',6),
-                      format = c('XLSX','TSV','TSV.GZ','XLSX','TSV','TSV.GZ')
+                      name   = c("1.1 yeast.prot", "1.2 yeast.res", "1.3 yeast.res (full proteome)","1.4 yeast.prot (full proteome)",
+                                 "2.1 human.prot", "2.2 human.res", "2.3 human.res (full proteome)","2.4 human.prot (full proteome)") ,
+
+                      num    = c('16924922', '16920611', '25863816', '26844182',
+                                 '16924925', '16920581', '25863810', '26844185'),
+                      base_url =  rep('https://ndownloader.figshare.com/files/',8),
+                      format = c('XLSX','TSV','TSV.GZ','TSV',
+                                 'XLSX','TSV','TSV.GZ','TSV')
   )
   if( missing(d) || !(d %in% seq_along(dubreuil$name)) ){
     d = menu(sprintf("%s (%s)",dubreuil$name,dubreuil$format), graphics = FALSE, title = "Which dataset do you want to use?")
