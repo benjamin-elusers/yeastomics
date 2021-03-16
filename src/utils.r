@@ -49,7 +49,21 @@ is.outlier <- function(x,thr=0.1,coef=1.5) { # return outliers outliers from dis
   return(x < quantile(x, thr,na.rm=T) - whiskers | x > quantile(x, 1-thr,na.rm=T) + whiskers)
 }
 
+find.seg = function(x,val,minilen=2){  # return stretch of identical consecutive values in vector
+  y=rle(x)
+  V=y$values
+  L=y$lengths
 
+  seg = V == val & L >= minilen
+  y$values[seg] = seq_along(v[seg])
+  y$values[!seg] = 0
+
+  return(inverse.rle(y))
+}
+
+# find.consecutive = function(x){
+#   return (cumsum(c(T, diff(x) == 0L) & !x))
+# }
 
 mid       <- function(x){ ifelse(is.even(length(x)), length(x)/2, (length(x)+1)/2) }
 
