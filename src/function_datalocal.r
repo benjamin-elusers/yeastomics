@@ -198,14 +198,14 @@ fetch.d2p2 = function(id,quiet=F){ # Get the d2p2 predictions for single id
 }
 
 load.d2p2 = function(ids,saved){ # Get the d2p2 predictions for multiple ids
-  if(!is.vector(ids)){ stop('Input must be a vector of identifiers as character...') }
-
-  library(tools)
-  library(tictoc)
   if( file.exists(saved) ){
     if( file_ext(saved) != 'rds' ){ warning("File type not recognized ! (should be RDS object)") }
     return( readRDS(saved) )
   }
+  if(!is.vector(ids)){ stop('Input must be a vector of identifiers as character...') }
+
+  library(tools)
+  library(tictoc)
 
   N=length(ids)
   doing =sprintf("Loading d2p2 predictions for %s protein identifiers\n",N)
