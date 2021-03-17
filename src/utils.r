@@ -55,7 +55,7 @@ find.consecutive = function(x,val,minilen=2){  # return stretch of identical con
   L=y$lengths
 
   seg = V == val & L >= minilen
-  y$values[seg] = seq_along(v[seg])
+  y$values[seg] = seq_along(V[seg])
   y$values[!seg] = 0
 
   return(inverse.rle(y))
