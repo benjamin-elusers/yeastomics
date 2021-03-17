@@ -1,4 +1,4 @@
-source('src/utils.r',local = T)
+#source('src/utils.r',local = T)
 
 load.sgd.features = function(by.chr=T){ # Gene/Protein features from SGD
   library(stringr)
@@ -38,7 +38,8 @@ load.uniprot.features = function(tax=559292,refdb='UNIPROTKB'){ # Gene/Protein f
   tic(doing)
 
   ids = keys(uniprot, refdb)
-  FEATURES = c("SGD","UNIPROTKB","REVIEWED","EXISTENCE","SCORE","LENGTH","FAMILIES",
+  FEATURES = c("SGD","UNIPROTKB","REVIEWED","EXISTENCE","SCORE","LENGTH",
+               "FAMILIES","FEATURES","PATHWAY","DOMAIN","DOMAINS","INTERACTOR","GO-ID","GO","GENES",
                "PROTEIN-NAMES","SUBCELLULAR-LOCATIONS","COMMENTS","KEYWORDS")
 
   up.feat = UniProt.ws::select(x=uniprot, keys=ids,  keytype = refkey,
@@ -183,6 +184,45 @@ parse.uniprot.subcellular_locations = function(subloc){
   return(uni.loc)
 }
 
+parse.uniprot.pathways = function(pathways){
+  library(stringr)
+  library(tidyverse)
+  # pathways should be a named vector
+  # Names = identifiers
+  # Values = pathways from uniprot annotation
+
+  # separate_rows(UNI.ALL[,c('UNIPROTKB','PATHWAY')], PATHWAY,sep="PATHWAY:  ")
+
+  # UNIPROT PATHWAYS contains extra information such as:
+  # Annotation always starts with "PATHWAY:"
+  # Evidence Code and PMID wrapped around curly brackets "{ECO...|PMID...}"
+  pathtag  =  "(PATHWAY: )"
+  evidence = "(\\{[^\\{\\}]+\\})"
+  #pathways = split(UNI.ALL$PATHWAY[!duplicated(UNI.ALL$UNIPROTKB)], UNI.ALL$UNIPROTKB[!duplicated(UNI.ALL$UNIPROTKB)])
+
+  PATH = pathways  %>%
+    # ERASE NON-ESSENTIAL PARTS OF ANNOTATION (keeping terms corresponding to subcellular compartments)
+    str_replace_all(pattern=pathtag,replacement="") %>%
+    str_replace_all(pattern=evidence,replacement="") %>%
+    str_to_lower() %>%
+    # REMOVE SPACE IN BETWEEN SEPARATORS OF ANNOTATIONS
+    #str_replace_all(pattern="(?<=[;.,])( +)|( +)(?=[;.,])",replacement="") %>%
+    # SPLIT BY TERMS (hopefully subcellular compartments only)
+    #stringi::stri_split_regex(pattern="[;.,]",omit_empty = T) %>%
+    # GIVE BACK THE PROTEINID TO EACH SET OF TERMS
+    set_names(nm=names(pathways)) %>%
+    purrr::discard(is.na)
+
+  uni.path = enframe(PATH,name='id',value='path') %>% bind_cols(PATH = path) %>%
+    unnest(cols=c(path)) %>%
+    mutate( path = str_replace_all( str_trim(path,side="both"), c("-" = ".", "[ ]+" = "_")) ) %>%
+    dplyr::filter(!is.na(path)) %>%
+    distinct() %>%
+    dplyr::select(-SUBLOC)
+
+  return(uni.loc)
+}
+
 get.uniprot.localization = function(annot,loc_to_columns=T){
   if(missing(annot)){
     stop("Use 'load.uniprot.features()' function to load annotations from uniprot for yeast.")
@@ -225,7 +265,60 @@ url.subcell="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowled
 #uni_isloc %>% ungroup() %>% summarise_at(LOC,sum) %>% pivot_longer(everything()) %>% arrange(value) %>% filter(value > 30)
 
 ## _3_ pathways ---------------------------------------------------------------
-url.pathway="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/docs/pathway.txt"
+get.uniprot.pathways = function(ORG="YEAST"){
+  library(tictoc)
+  library(tidyverse)
+  tic("Reading uniprot pathways...")
+  url.pathway="ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/docs/pathway.txt"
+  pathways.txt=readLines(url.pathway,)
+  pathways.division=grep("\\.$",pathways.txt,v=T)
+  pathways.members=grep("\\.$",pathways.txt,v=T)
+  toc()
+
+  if(!missing(ORG) & ORG != "" ){ message(sprintf("FILTER FOR: %s\n",ORG))}
+
+  pw.members=c()
+  pw.lvl=NULL
+  begin=F
+  tic("Parse Uniprot pathways...")
+  PATHWAY = tribble(~name,~ids)
+  for( pw in pathways.txt){
+    is.division = grepl("\\.$",pw)
+    regex.entry = "([A-Z0-9]{1,5}_[A-Z0-9]{1,5})"
+    regex.AC = UNIPROT.nomenclature()
+    is.break = grepl("^$",pw)
+    is.members = grepl(paste0(regex.entry,"\\s+\\(",regex.AC,"\\)"),pw)#,"\\s+",regex.AC,",?\\s+"),pw)
+    if( is.division ){
+      begin=T
+      pw.lvl = pw
+      #cat(sprintf("START OF [%s]\n",paste0(pw.lvl,collapse=" ->")))
+    }else if(is.members & begin){
+      AC = str_extract_all(pw,regex.AC)
+      ENTRY = str_extract_all(pw,regex.entry)
+      is.org = grep(ORG,unlist(ENTRY))
+      pw.members = c(pw.members,unlist(AC)[is.org])
+    }else if(is.break & begin){
+      #cat(sprintf("(%s)\n",paste0(pw.members,collapse=" ")))
+      #cat(sprintf("END OF [%s]\n",paste0(pw.lvl,collapse=" ->")))
+      PATHWAY=add_row(PATHWAY, name=pw.lvl, ids = ifelse(length(pw.members)>0,paste0(pw.members,collapse=","),NA))
+      pw.lvl=NULL
+      pw.members=c()
+      begin=F
+    }else{
+      #cat("\n")
+      #cat( sprintf("unrecognized format (no data?): %s \n",pw) )
+    }
+  }
+  toc()
+  return(PATHWAY)
+}
+#PP = get.uniprot.pathways(ORG='YEAST')
+#test = separate(PP,name,sep = ";", into = c('div1','div2','div3')) %>% filter(!is.na(ids)) %>% group_by(div1,div2) %>% summarise( allids= paste(ids,collapse=","), n = str_count(string = allids,",")+1)
+#  pathways.list = map( strsplit(pathways.division,";"), function(x){ x %>% str_replace("\\.","") %>% str_trim() })
+
+#first = unique(unlist(map(pathways.list,pluck,1)))
+#second = unique(unlist(map(pathways.list,pluck,2)))
+#names(pathways.list) = unlist(  )
 
 ## _4_ functional categories --------------------------------------------------
 load.yeast.biofunctions = function(){
