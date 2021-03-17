@@ -1,4 +1,5 @@
 source("src/utils.r",local = T)
+library(stringr)
 ### Playing with SGD (Saccharomyces Genome Database) ---------------------------
 SGD.nomenclature = function(coding=T,rna=F){
   nuclear = "[Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?"
