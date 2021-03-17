@@ -50,8 +50,18 @@ knitr::opts_chunk$set(echo = TRUE,
                       cache.lazy = FALSE,
                       autodep = TRUE,
                       warning = FALSE)
+if('utils' %in% search()){ detach('utils') }
+utils = attach(NULL,name = 'utils')
+if('funcs' %in% search()){ detach('funcs') }
+funcs = attach(NULL,name = 'funcs')
 
 suppressPackageStartupMessages({
+  library(tictoc)
+  library(tidyverse)
+  library(stringr)
+  library(hablar)
+  
+  
   source("src/utils.r")
   source("src/function_annotation.r")
   source("src/function_sequence.r")
@@ -59,8 +69,6 @@ suppressPackageStartupMessages({
   source("src/function_analysis.r")
   source("src/function_datalocal.r")
   source("src/function_datapub.r")
-  library(tictoc)
-  library(tidyverse)
   q25 = function(x){ quantile(x,0.25) }
   q75 = function(x){ quantile(x,0.75) }
   d10 = function(x){ quantile(x,0.1) }
@@ -75,7 +83,9 @@ suppressPackageStartupMessages({
     col <- enquo(x)
     dplyr::filter(.data,between(!!col,quantile(!!col,lower),quantile(!!col,upper)))
   }
+
 })
+
 
 # turn off annoying messages from dplyr::summarise
 options(dplyr.summarise.inform = FALSE)
@@ -187,6 +197,9 @@ GENOMIC=list()
 df.len = tibble(orf=names(S288C),len=width(S288C))
 # %GC content in genes ---------------------------------------------------------
 df.gc  = tibble(orf=names(CDS),pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
+# Codon adaptation
+#df.tai=load.codon.usage(inputseq=load.sgd.CDS())
+
 
 ### PROPERTIES (QUALITATIVE OR SEMI-QUANTITATIVE)
 #### Chromosome Number ---------------------------------------------------------
@@ -211,6 +224,9 @@ GENOMIC$GC_higher = df.gc %>% get.d90(order_by=pGC) %>% pull(orf)
 GENOMIC$has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
 #### Chromosome genes ----------------------------------------------------------
 GENOMIC = append(GENOMIC,chr.orf)
+
+#### TRANSCRIPTOMICS ----------------------------------------------------------
+
 ```
 
 ## Biophysical category
@@ -234,26 +250,26 @@ df.aa_class = map(aaprop, aaenrich, BS=UNI.SC ) %>%
   rename_with(~aaset, starts_with("fr"))
 
 # Disorder content (segment, fraction, total) ----------------------------------
-
-D2P2 = get.d2p2.diso(load.d2p2(saved = "data/d2p2-yeast-uniprotKB.rds"),as.df = T) %>%
+file.d2p2="data/d2p2-yeast-uniprotKB.rds"
+d2p2 = get.d2p2.diso(load.d2p2(saved=file.d2p2),as.df = T) %>%
        mutate(d2p2_seg = find.consecutive(d2p2_diso>=7, TRUE, min=3),
               d2p2_gap = find.consecutive(d2p2_diso>=7, FALSE, min=1)) %>%
        group_by(d2p2_seg) %>% mutate( d2p2_seglen = sum_(d2p2_seg!=0)) %>%
-       group_by(d2p2_gap) %>% mutate( d2p2_gaplen = sum_(d2p2_gap!=0)) %>%
-       group_by(d2p2_id, d2p2_size, has_d2p2) %>% 
-       summarise(L.d2p2 = sum_(d2p2_diso>=7), 
+       group_by(d2p2_gap) %>% mutate( d2p2_gaplen = sum_(d2p2_gap!=0))
+df.d2p2 = d2p2 %>%
+          group_by(d2p2_id, d2p2_size, has_d2p2) %>% 
+          summarise(L.d2p2 = sum_(d2p2_diso>=7), 
                  f.d2p2 = mean_(d2p2_diso>=7),
                  n.seg = n_distinct(d2p2_seg),
                  L.segmax = max(d2p2_seglen))
+
+table(df.d2p2$n.seg)
   
-DUB = load.dubreuil2019.data(3)
-dub = load.dubreuil2019.data(1)
-IUP = DUB %>% dplyr::select()
-
-
-test = D2P2 %>% filter(d2p2_id == "P34111")
-x = test$d2p2_diso>=7
-
+DUB = load.dubreuil2019.data(4)
+#dub = load.dubreuil2019.data(1)
+df.iup = DUB %>% dplyr::select(UNIPROT,contains("IUP",ignore.case = F))
+#test = D2P2 %>% filter(d2p2_id == "P34111")
+#x = test$d2p2_diso>=7
 
 ### PROPERTIES (QUALITATIVE OR SEMI-QUANTITATIVE)
 #### Protein domains (nodom,single,multi)  ----------------------------------------
@@ -264,7 +280,7 @@ SUPFAM = load.superfamily() %>%
 #           count(`Model ID`,name='n_uniq') %>%
 table_(SUPFAM$n_dom)
 
-BIOPHYSICS$supfam_none   = setdiff(PROTEOME$UNIPROTKB,SUPFAM$seqid)
+BIOPHYSICS$supfam_none   = setdiff(PROTEOME$ORF,SUPFAM$seqid)
 BIOPHYSICS$supfam_single = SUPFAM %>% filter(n_dom==1) %>% pull(seqid)
 BIOPHYSICS$supfam_pair   = SUPFAM %>% filter(n_dom==2) %>% pull(seqid)
 BIOPHYSICS$supfam_multi  = SUPFAM %>% filter(n_dom>=3) %>% pull(seqid)
@@ -279,11 +295,6 @@ BIOPHYSICS$pfam_none   = setdiff(PROTEOME$UNIPROTKB,PFAM$seq_id)
 BIOPHYSICS$pfam_single = PFAM %>% filter(n_dom==1) %>% pull(seq_id)
 BIOPHYSICS$pfam_pair   = PFAM %>% filter(n_dom==2) %>% pull(seq_id)
 BIOPHYSICS$pfam_multi  = PFAM %>% filter(n_dom>=3) %>% pull(seq_id)
-
-#NDOM = DUB %>%
-#        group_by(id) %>%
-#        summarize( ndom = max(domain.seg) )
-#table( DUB[DUB$id == "D6W196","superfamily_ids"] )
 
 ```
 
@@ -316,7 +327,7 @@ cat("nb PPIs after rm EBI: ", nrow(INTACT.1), "\n")
 #dplyr::select(-c(created,updated,checksumA,checksumB,checksumAB,taxA,taxB))
 
 ##### STRING network
-STRING = load.STRING(tax="4932",phy=T, ful=T, min.score = 700) %>% 
+STRING = load.string(tax="4932",phy=T, ful=T, min.score = 700) %>% 
              mutate(ORF1 = str_extract(protein1,SGD.nomenclature()),
                     ORF2 = str_extract(protein2,SGD.nomenclature())
              ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
@@ -373,12 +384,12 @@ pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluste
 pheatmap::pheatmap(ol_scaled,show_colnames = F,show_rownames = T,cluster_cols =T,cluster_rows = T, fontsize = 4)
                    #filename = "plots/GO_profile_overlap.pdf", height = 18, width=10)
 go =  split(unigo$UNIPROT,unigo$go)
-FUNCTIONS = append(FUNCTIONS,go)
+FUNCTIONS=append(FUNCTIONS,go)
 
 # Classification of Biological functions
-
-load.vanleeuwen2016.data()
-
+biofunc = load.vanleeuwen2016.data()
+func_class = split(biofunc$ORF,biofunc$FUNCTION)
+FUNCTIONS = append(FUNCTIONS,func_class)
 
 ```
 
@@ -403,7 +414,6 @@ PHENOTYPES$dispensable = dispensable
 
 
 #### Subcellular localization category
-
 UNILOC = get.uniprot.localization(annot=UNIPROT,loc_to_columns = T)
 uniloc = get.uniprot.localization(annot=UNIPROT,loc_to_columns = F)
 THR.LOC.SIZE = 50 # MINIMUM NUMBER OF PROTEINS PER COMPARTMENT 
@@ -415,17 +425,17 @@ PHENOTYPES$has_iso  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
 loc = split(uniloc$id,uniloc$loc) 
 subloc = keep(loc,function(X){ length(X)>30 })
 PHENOTYPES=append(PHENOTYPES,subloc)
-
-multiloc = UNILOC %>% 
-            group_by(id) %>% 
-            mutate( nloc = sum(c_across(!starts_with("HAS_TO"))),
-                    nloc50 = sum(c_across(LOC50)),
-                    localized = paste(sort(uniloc$loc[ uniloc$id == id ]), collapse = "#"),
-                    localized50 = paste(intersect(LOC50,sort(uniloc$loc[ uniloc$id == id ])), collapse = "#")) %>%
-            filter(nloc50>3) %>% arrange(nloc50,nloc) %>%
-            dplyr::select('id','HAS_FOCI','HAS_ISOFORM','nloc','nloc50','localized50')
-  
-head(multiloc)
+# 
+# multiloc = UNILOC %>% 
+#             group_by(id) %>% 
+#             mutate( nloc = sum(c_across(!starts_with("HAS_TO"))),
+#                     nloc50 = sum(c_across(LOC50)),
+#                     localized = paste(sort(uniloc$loc[ uniloc$id == id ]), collapse = "#"),
+#                     localized50 = paste(intersect(LOC50,sort(uniloc$loc[ uniloc$id == id ])), collapse = "#")) %>%
+#             filter(nloc50>3) %>% arrange(nloc50,nloc) %>%
+#             dplyr::select('id','HAS_FOCI','HAS_ISOFORM','nloc','nloc50','localized50')
+#   
+# head(multiloc)
 
 
 ```
@@ -439,21 +449,31 @@ CATEGORIES = list(GENOMIC,BIOPHYSICS,INTERACTIONS,FUNCTIONS,PHENOTYPES)
 
 length(CATEGORIES)
 lapply(CATEGORIES,length)
+length(flatten(CATEGORIES))
+sort( sapply(flatten(CATEGORIES),n_distinct) )
 
-# CODON ADATAPTION
-df.tai=load.codon.usage(inputseq=load.sgd.CDS())
-# DUPLICATED GENES
-YGOB=load.ygob.ohnologs() %>%  group_by(orf, dup.orf, pid, rlen)
-OHNO = get.sc.ohno() %>%
-       left_join(S2U %>% rename_all(list(~xxS(x=.,sx='ref'))), by=c('orf'='ORF.ref')) %>%
-       left_join(S2U %>% rename_all(list(~xxS(x=.,sx='dup'))), by=c('dup.orf'='ORF.dup'))
-head(ohno)
-STAB = load.leunenberger2017.data() %>%
-  add_count(Protein_ID,name='npep') %>%
-  dplyr::select(Protein_ID,Tm.Protein,Protinfo,Protein.Coverage,Length,
-                Measured.Domains, Theoretical.Number.of.Domain,Essential,npep ) %>%
-  distinct() %>%
-  mutate( nres = round(0.01*Protein.Coverage*Length))
+properties= flatten(CATEGORIES)
+# # DUPLICATED GENES
+# YGOB=load.ygob.ohnologs() %>%  group_by(orf, dup.orf, pid, rlen)
+# OHNO = get.sc.ohno() %>%
+#        left_join(S2U %>% rename_all(list(~xxS(x=.,sx='ref'))), by=c('orf'='ORF.ref')) %>%
+#        left_join(S2U %>% rename_all(list(~xxS(x=.,sx='dup'))), by=c('dup.orf'='ORF.dup'))
+# head(ohno)
+# STAB = load.leunenberger2017.data() %>%
+#   add_count(Protein_ID,name='npep') %>%
+#   dplyr::select(Protein_ID,Tm.Protein,Protinfo,Protein.Coverage,Length,
+#                 Measured.Domains, Theoretical.Number.of.Domain,Essential,npep ) %>%
+#   distinct() %>%
+#   mutate( nres = round(0.01*Protein.Coverage*Length))
 
+PROTEOME.CATEGORIES = PROTEOME
+for( C in names(properties)){
+  PROTEOME.CATEGORIES[,C] = PROTEOME.CATEGORIES$UNIPROTKB %in% properties[C] | PROTEOME.CATEGORIES$ORF %in% properties[C]
+}
+head(PROTEOME.CATEGORIES)
+
+M = cor(PROTEOME.CATEGORIES[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between go term
+pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, fontsize = 4)
+                   #filename = "plots/GO_profile_spearman.pdf", height = 18, width=10)
 
 ```
