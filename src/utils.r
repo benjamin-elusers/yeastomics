@@ -49,7 +49,7 @@ is.outlier <- function(x,thr=0.1,coef=1.5) { # return outliers outliers from dis
   return(x < quantile(x, thr,na.rm=T) - whiskers | x > quantile(x, 1-thr,na.rm=T) + whiskers)
 }
 
-find.seg = function(x,val,minilen=2){  # return stretch of identical consecutive values in vector
+find.consecutive = function(x,val,minilen=2){  # return stretch of identical consecutive values in vector
   y=rle(x)
   V=y$values
   L=y$lengths
