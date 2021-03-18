@@ -278,14 +278,7 @@ AAMW = DUB %>%
        group_by(UNIPROT) %>% 
        summarise( AA = MW/prot.size ) %>% 
        left_join(PROTEOME,by=c("UNIPROT"="UNIPROTKB"))
-df.cost= load.barton2010.data("prot") %>% left_join(AAMW, by=c('name'='ORF'))
-
-
-#test = D2P2 %>% filter(d2p2_id == "P34111")
-
-
-
-#x = test$d2p2_diso>=7
+df.cost = load.barton2010.data("prot") %>% left_join(AAMW, by=c('name'='ORF'))
 
 ### PROPERTIES (QUALITATIVE OR SEMI-QUANTITATIVE)
 #### Protein domains (nodom,single,multi)  ----------------------------------------
@@ -492,7 +485,9 @@ QUANTITATIVE = PROTEOME %>%
                left_join(df.aa_class,by=c('UNIPROTKB','id')) %>%
                left_join(df.d2p2,by=c('UNIPROTKB'='d2p2_id')) %>%
                left_join(df.iup,by=c('UNIPROTKB'='UNIPROT')) %>%
-               left_join(df.aascales,by=c('UNIPROTKB'='UNIPROT'))
+               left_join(df.aascales,by=c('UNIPROTKB'='UNIPROT')) %>% 
+               left_join(df.cost,by=c('UNIPROTKB'='UNIPROT'))
+
                 
 
 #### range of protein length ---------------------------------------------------
