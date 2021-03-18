@@ -468,12 +468,55 @@ properties= flatten(CATEGORIES)
 
 PROTEOME.CATEGORIES = PROTEOME
 for( C in names(properties)){
-  PROTEOME.CATEGORIES[,C] = PROTEOME.CATEGORIES$UNIPROTKB %in% properties[C] | PROTEOME.CATEGORIES$ORF %in% properties[C]
+  PROTEOME.CATEGORIES[,C] = (PROTEOME.CATEGORIES$UNIPROTKB %in% properties[[C]]) | (PROTEOME.CATEGORIES$ORF %in% properties[[C]])
 }
 head(PROTEOME.CATEGORIES)
 
-M = cor(PROTEOME.CATEGORIES[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between go term
+M = cor(PROTEOME.CATEGORIES[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between properties
 pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, fontsize = 4)
-                   #filename = "plots/GO_profile_spearman.pdf", height = 18, width=10)
 
 ```
+
+
+```{r fit-ER}
+init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
+ER = load.dubreuil2021.data(1) %>% dplyr::select(c('EVO.FULL','PPM','ORF','UNIPROT')) %>% convert(dbl(EVO.FULL), dbl(PPM))
+nls.fit = nls(EVO.FULL ~ SSlogis(PPM,Asym,xmid,scal),start=init.params,data = ER)
+fit.ER = broom::augment_columns(x = nls.fit, data = ER) %>% 
+           ungroup() %>% 
+           mutate(SS.resid = sum(.resid^2), total.resid = sum(.resid),
+                  SS.resid.pos= sum(.resid[.resid>0]^2),
+                  SS.resid.neg= sum(.resid[.resid<0]^2)) %>%   
+          left_join(PROTEOME.CATEGORIES,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
+library(ggplot2)
+library(ggthemes)
+MR = ggplot(fit.ER, aes(y = EVO.FULL, x = PPM)) +
+     geom_point(fill='lightgray',shape=19,alpha=0.3) +
+     geom_segment(aes(xend = PPM, yend = .fitted), col='gray',linetype='12',size=0.5) +
+     geom_point(data=subset(fit.ER,shortest),color='purple',fill=NA,shape=21,size=2)+
+     geom_line(mapping=aes(y=.fitted),size=1) +
+     xlab('Protein abundance (log10 ppm)') + ylab('Mean ER (full seq.)') +theme_clean() 
+MR
+
+MR2= ggplot(data=fit.ER, aes(y=.resid,x=PPM)) +
+  geom_point(col='lightgray',fill='black',size=2,shape=19) +
+  geom_segment(aes(xend = PPM, yend = 0),col='gray',linetype='12',size=0.5) +
+  geom_abline(slope=0,intercept = 0,size=1)+
+  geom_point(data=subset(fit.ER,shortest),color='purple',fill=NA,shape=21,size=2)+
+  geom_segment(data=subset(fit.ER,shortest),aes(xend = PPM, y=0, yend = .resid),col='purple') +
+  xlab('Protein abundance (log10 ppm)') + ylab('Residuals (ER)') +theme_clean() 
+MR2
+
+colnames(fit.ER)[1:15]
+res.cat = fit.ER %>%
+  pivot_longer(cols = 14:ncol(fit.ER),names_to = 'filter') %>% 
+  filter(value==T) %>% 
+  group_by(filter) %>% 
+  summarise( s=sum(.resid), 
+             ss.SS = sum(.resid^2)/SS.resid, 
+             ss.avg=mean(.resid^2), 
+             ss.sd= sd(.resid^2), n() ) %>% 
+  distinct() %>%
+  arrange(desc(s))
+ggplot(data=res.cat) + geom_bar(mapping=aes(y=reorder(filter, -s),x=s),orientation = 'y',stat = 'identity')
+  ```
