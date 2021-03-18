@@ -274,7 +274,13 @@ df.iup = DUB %>% dplyr::select(UNIPROT,contains("IUP",ignore.case = F))
 #### Amino-acid interactins propensities
 df.scales = DUB %>% dplyr::select(UNIPROT,ends_with(c('.dom','.iup20'),ignore.case = F))
 #### Amino-acid biosynthetic cost
-DUB %>% group_by(UNIPROTKB) %>% summarise( AAcost_MW = MW/prot.size )
+AAMW = DUB %>% 
+       group_by(UNIPROT) %>% 
+       summarise( AA = MW/prot.size ) %>% 
+       left_join(PROTEOME,by=c("UNIPROT"="UNIPROTKB"))
+df.cost= load.barton2010.data("prot") %>% left_join(AAMW, by=c('name'='ORF'))
+
+
 #test = D2P2 %>% filter(d2p2_id == "P34111")
 
 
