@@ -187,6 +187,9 @@ UNIPROT = UNI %>%
 
 # CROSS-REFERENCE PROTEOME -----------------------------------------------------
 PROTEOME = UNIPROT %>% dplyr::select(UNIPROTKB, SGD, ORF, GNAME, PNAME)
+
+# DISORDER STICKINESS PROTEOME DATA
+DUB = load.dubreuil2019.data(4)
 ```
 
 ## Genomic category
@@ -208,24 +211,24 @@ CHR = SGD %>%
       group_by(chr.f) %>% 
       dplyr::select(name)
 chr.orf =  split(CHR$name,CHR$chr.f,drop=T)
-#### range of protein length ---------------------------------------------------
-GENOMIC$shortest = df.len %>% get.d10(order_by = len) %>% pull(orf)
-GENOMIC$shorter  = df.len %>% get.q25(order_by = len) %>% pull(orf)
-GENOMIC$average  = df.len %>% get.iqr(x=len,lo=0.4,up=0.6) %>% pull(orf)
-GENOMIC$longest  = df.len %>% get.q75(order_by = len) %>% pull(orf)
-GENOMIC$longest  = df.len %>% get.d90(order_by = len) %>% pull(orf)
-#### range of GC content -------------------------------------------------------
-GENOMIC$GC_lower  = df.gc %>% get.d10(order_by=pGC) %>% pull(orf)
-GENOMIC$GC_low    = df.gc %>% get.q25(order_by=pGC) %>%  pull(orf)
-GENOMIC$GC_mid    = df.gc %>% get.iqr(x=pGC,lo=0.4,up=0.6) %>% pull(orf)
-GENOMIC$GC_high   = df.gc %>% get.q75(order_by=pGC) %>% pull(orf)
-GENOMIC$GC_higher = df.gc %>% get.d90(order_by=pGC) %>% pull(orf)
 #### Intron containing genes ---------------------------------------------------
 GENOMIC$has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
 #### Chromosome genes ----------------------------------------------------------
 GENOMIC = append(GENOMIC,chr.orf)
 
 #### TRANSCRIPTOMICS ----------------------------------------------------------
+
+#### Duplicated
+
+
+#YGOB=load.ygob.ohnologs() %>%  group_by(orf, dup.orf, pid, rlen)
+OHNO = get.sc.ohno(myseq=S288C) %>%
+        left_join(PROTEOME %>% rename_all(list(~xxS(x=.,sx='ref'))), by=c('orf'='ORF.ref')) %>%
+        left_join(PROTEOME %>% rename_all(list(~xxS(x=.,sx='dup'))), by=c('dup.orf'='ORF.dup'))
+dim(OHNO)
+GENOMICS$WGD_dup = OHNO$orf 
+GENOMICS$WGD_dup_ = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
+
 
 ```
 
@@ -264,16 +267,24 @@ df.d2p2 = d2p2 %>%
                  L.segmax = max(d2p2_seglen))
 
 table(df.d2p2$n.seg)
-  
-DUB = load.dubreuil2019.data(4)
+
 #dub = load.dubreuil2019.data(1)
 df.iup = DUB %>% dplyr::select(UNIPROT,contains("IUP",ignore.case = F))
+
+#### Amino-acid interactins propensities
+df.scales = DUB %>% dplyr::select(UNIPROT,ends_with(c('.dom','.iup20'),ignore.case = F))
+#### Amino-acid biosynthetic cost
+DUB %>% group_by(UNIPROTKB) %>% summarise( AAcost_MW = MW/prot.size )
 #test = D2P2 %>% filter(d2p2_id == "P34111")
+
+
+
 #x = test$d2p2_diso>=7
 
 ### PROPERTIES (QUALITATIVE OR SEMI-QUANTITATIVE)
 #### Protein domains (nodom,single,multi)  ----------------------------------------
-SUPFAM = load.superfamily() %>% 
+superfam=load.superfamily() 
+SUPFAM =  superfam %>% 
           dplyr::rename(seqid = "Sequence ID") %>%
           count(seqid,name="n_dom")
 #           group_by(`Sequence ID`) %>% 
@@ -285,16 +296,24 @@ BIOPHYSICS$supfam_single = SUPFAM %>% filter(n_dom==1) %>% pull(seqid)
 BIOPHYSICS$supfam_pair   = SUPFAM %>% filter(n_dom==2) %>% pull(seqid)
 BIOPHYSICS$supfam_multi  = SUPFAM %>% filter(n_dom>=3) %>% pull(seqid)
 
-PFAM= load.pfam() %>% 
+
+
+pfam=load.pfam() %>% group_by(clan) %>% mutate(np_clan = n_distinct(seq_id))
+
+split(pfam$seq_id,pfam$clan)
+PFAM= pfam %>% 
       count(seq_id,name="n_dom")
         #group_by(seq_id) %>%
         #count(hmm_acc,name='n_uniq') %>%
 table_(PFAM$n_dom)
 
+
 BIOPHYSICS$pfam_none   = setdiff(PROTEOME$UNIPROTKB,PFAM$seq_id)
 BIOPHYSICS$pfam_single = PFAM %>% filter(n_dom==1) %>% pull(seq_id)
 BIOPHYSICS$pfam_pair   = PFAM %>% filter(n_dom==2) %>% pull(seq_id)
 BIOPHYSICS$pfam_multi  = PFAM %>% filter(n_dom>=3) %>% pull(seq_id)
+pfam_clans = split(pfam$seq_id,pfam$clan)
+BIOPHYSICS = append(BIOPHYSICS,pfam_clans)
 
 ```
 
@@ -443,22 +462,72 @@ PHENOTYPES=append(PHENOTYPES,subloc)
 
 # Output 
 ```{r categories-table}
+
+
 # Make categories table with:
-
 CATEGORIES = list(GENOMIC,BIOPHYSICS,INTERACTIONS,FUNCTIONS,PHENOTYPES) 
-
 length(CATEGORIES)
 lapply(CATEGORIES,length)
 length(flatten(CATEGORIES))
 sort( sapply(flatten(CATEGORIES),n_distinct) )
 
 properties= flatten(CATEGORIES)
-# # DUPLICATED GENES
-# YGOB=load.ygob.ohnologs() %>%  group_by(orf, dup.orf, pid, rlen)
-# OHNO = get.sc.ohno() %>%
-#        left_join(S2U %>% rename_all(list(~xxS(x=.,sx='ref'))), by=c('orf'='ORF.ref')) %>%
-#        left_join(S2U %>% rename_all(list(~xxS(x=.,sx='dup'))), by=c('dup.orf'='ORF.dup'))
-# head(ohno)
+
+
+ER = load.dubreuil2021.data(1) %>% 
+     as_tibble() %>%
+     dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT'))# %>%
+     #convert(dbl(EVO.FULL), dbl(PPM))
+
+QUANTITATIVE = PROTEOME %>% 
+               left_join(df.len,by=c('ORF'='orf')) %>% 
+               left_join(df.gc,by=c('ORF'='orf')) %>% 
+               left_join(df.aa,by=c('UNIPROTKB','uni')) %>%
+               left_join(df.aa_class,by=c('UNIPROTKB','id')) %>%
+               left_join(df.d2p2,by=c('UNIPROTKB'='d2p2_id')) %>%
+               left_join(df.iup,by=c('UNIPROTKB'='UNIPROT')) %>%
+               left_join(df.aascales,by=c('UNIPROTKB'='UNIPROT'))
+                
+
+#### range of protein length ---------------------------------------------------
+GENOMIC$shortest = get.d10(QUANTITATIVE,order_by = len) %>% pull(ORF)
+GENOMIC$shorter  = get.q25(QUANTITATIVE,order_by = len) %>% pull(ORF)
+GENOMIC$average  = get.iqr(QUANTITATIVE,x=len,lo=0.4,up=0.6) %>% pull(ORF)
+GENOMIC$longest  = get.q75(QUANTITATIVE,order_by = len) %>% pull(ORF)
+GENOMIC$longest  = get.d90(QUANTITATIVE,order_by = len) %>% pull(ORF)
+#### range of GC content -------------------------------------------------------
+GENOMIC$GC_lower  = get.d10(QUANTITATIVE,order_by=pGC) %>% pull(ORF)
+GENOMIC$GC_low    = get.q25(QUANTITATIVE,order_by=pGC) %>%  pull(ORF)
+GENOMIC$GC_mid    = get.iqr(QUANTITATIVE,x=pGC,lo=0.4,up=0.6) %>% pull(ORF)
+GENOMIC$GC_high   = get.q75(QUANTITATIVE,order_by=pGC) %>% pull(ORF)
+GENOMIC$GC_higher = get.d90(QUANTITATIVE,order_by=pGC) %>% pull(ORF)
+#### range of % disorder (IUP) -----------------------------------------------------
+BIOPHYSICS$IUP_lower  = get.d10(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
+BIOPHYSICS$IUP_low    = get.q25(QUANTITATIVE,order_by=f.IUP20) %>%  pull(UNIPROTKB)
+BIOPHYSICS$IUP_mid    = get.iqr(QUANTITATIVE,x=f.IUP20,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
+BIOPHYSICS$IUP_high   = get.q75(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
+BIOPHYSICS$IUP_higher = get.d90(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
+#### range of % disorder (D2P2) -----------------------------------------------------
+BIOPHYSICS$D2P2_lower  = get.d10(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
+BIOPHYSICS$D2P2_low    = get.q25(QUANTITATIVE,order_by=f.d2p2) %>%  pull(UNIPROTKB)
+BIOPHYSICS$D2P2_mid    = get.iqr(QUANTITATIVE,x=f.d2p2,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
+BIOPHYSICS$D2P2_high   = get.q75(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
+BIOPHYSICS$D2P2_higher = get.d90(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
+#### range of % disorder (IUP) -----------------------------------------------------
+BIOPHYSICS$IUP_lower  = get.d10(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
+BIOPHYSICS$IUP_low    = get.q25(QUANTITATIVE,order_by=f.IUP20) %>%  pull(UNIPROTKB)
+BIOPHYSICS$IUP_mid    = get.iqr(QUANTITATIVE,x=f.IUP20,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
+BIOPHYSICS$IUP_high   = get.q75(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
+BIOPHYSICS$IUP_higher = get.d90(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
+#### range of % disorder (D2P2) -----------------------------------------------------
+BIOPHYSICS$D2P2_lower  = get.d10(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
+BIOPHYSICS$D2P2_low    = get.q25(QUANTITATIVE,order_by=f.d2p2) %>%  pull(UNIPROTKB)
+BIOPHYSICS$D2P2_mid    = get.iqr(QUANTITATIVE,x=f.d2p2,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
+BIOPHYSICS$D2P2_high   = get.q75(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
+BIOPHYSICS$D2P2_higher = get.d90(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
+
+
+
 # STAB = load.leunenberger2017.data() %>%
 #   add_count(Protein_ID,name='npep') %>%
 #   dplyr::select(Protein_ID,Tm.Protein,Protinfo,Protein.Coverage,Length,
@@ -480,7 +549,6 @@ pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluste
 
 ```{r fit-ER}
 init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
-ER = load.dubreuil2021.data(1) %>% dplyr::select(c('EVO.FULL','PPM','ORF','UNIPROT')) %>% convert(dbl(EVO.FULL), dbl(PPM))
 nls.fit = nls(EVO.FULL ~ SSlogis(PPM,Asym,xmid,scal),start=init.params,data = ER)
 fit.ER = broom::augment_columns(x = nls.fit, data = ER) %>% 
            ungroup() %>% 
@@ -517,6 +585,7 @@ res.cat = fit.ER %>%
              ss.avg=mean(.resid^2), 
              ss.sd= sd(.resid^2), n() ) %>% 
   distinct() %>%
-  arrange(desc(s))
+  arrange(desc(ss.avg))
 ggplot(data=res.cat) + geom_bar(mapping=aes(y=reorder(filter, -s),x=s),orientation = 'y',stat = 'identity')
-  ```
+
+```
