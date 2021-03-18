@@ -118,6 +118,21 @@ load.costanzo2010.data = function(){
   }
 }
 
+load.barton2010.data = function(by=c("aa","prot")){
+
+  message("REF: Michael D. Barton et al., PLOS One, 2010")
+  message("Evolutionary Systems Biology of Amino Acid Biosynthetic Cost in Yeast")
+  #https://doi.org/10.1371/journal.pone.0011935
+  S1.url = "https://doi.org/10.1371/journal.pone.0011935.s001" # AA biosynthetic cost
+  S4.url = "https://doi.org/10.1371/journal.pone.0011935.s004" # Protein biosynthetic cost
+  if(by=="AA"){
+    return(read.delim(S1.url, stringsAsFactors=F))
+  }else if(by=="prot"){
+    return(read.delim(S4.url),row.names=1, stringsAsFactors=F)
+  }
+}
+
+
 load.geisberg2014.data = function(nodesc=T){
   library(openxlsx)
   # Load mRNA half-lives
