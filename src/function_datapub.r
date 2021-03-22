@@ -9,6 +9,7 @@ open.url <- function(file_url) {
   closeAllConnections()
   return(textConnection(txt))
 }
+
 strfind = function(strings, patterns){
   # Find several patterns in set of strings
   sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
@@ -64,7 +65,7 @@ load.belle2006.data = function(){
   # Load protein half-lives
   message("REF: A. Belle, A. Tanay, L. Bitincka, R. Shamir, E.K. O’Shea, 2006, PNAS")
   message("Quantification of protein half-lives in the budding yeast proteome")
-  #https://doi.org./10.1073/pnas.0605420103
+  #https://doi.org/10.1073/pnas.0605420103
   Sdat1.url = "https://www.pnas.org/highwire/filestream/591690/field_highwire_adjunct_files/0/SuppDataSet.txt"
   #download.file(Sdat1.url, destfile = "SuppDataSet.txt")
   halflives = read.delim(Sdat1.url,
@@ -119,17 +120,35 @@ load.costanzo2010.data = function(){
 }
 
 load.barton2010.data = function(by=c("aa","prot")){
-
   message("REF: Michael D. Barton et al., PLOS One, 2010")
   message("Evolutionary Systems Biology of Amino Acid Biosynthetic Cost in Yeast")
   #https://doi.org/10.1371/journal.pone.0011935
   S1.url = "https://doi.org/10.1371/journal.pone.0011935.s001" # AA biosynthetic cost
   S4.url = "https://doi.org/10.1371/journal.pone.0011935.s004" # Protein biosynthetic cost
-  if(by=="AA"){
-    return(read.delim(S1.url, stringsAsFactors=F))
-  }else if(by=="prot"){
-    return(read.delim(S4.url),row.names=1, stringsAsFactors=F)
+  BY = match.arg(by,choices=c('aa','prot'),several.ok = F)
+  # Trasncript levels are obtained from 3 dilutions and 4 sources of nutrients published in:
+  # JI Castrillo et al. 2007 -> "Growth control of the eukaryote cell: a systems biology study in yeast" (Journal of Biology)
+
+  todownload=tempfile()
+  if(BY=="aa"){
+    aa.df = data.frame( aa=seqinr::a(), aaa=tolower(seqinr::aaa()))
+    downloaded=download.file(S1.url, destfile = todownload)
+    biosynth_cost = readr::read_csv(todownload) %>%
+      left_join( aa.df, by=c('amino_acid'='aaa')) %>%
+      relocate(aa)
+  }else if(BY=="prot"){
+    downloaded=download.file(S4.url, destfile = todownload)
+    raw_cost=readr::read_csv(todownload,col_types = list(X1="_"))
+    # raw_cost %>% arrange(name,environment,cost_type) %>% print(n=100)
+    # trna.var = raw_cost %>% group_by(name,dilution) %>% summarise(vtrna=var(transcript_level))
+    biosynth_cost = raw_cost %>%
+                    pivot_wider(names_from=cost_type,
+                                names_glue = "{.value}.{cost_type}",
+                                values_from=cost) %>%
+                    rename_with(.cols=contains("-"),.fn=str_replace_all,pattern="-",replacement="_")
+
   }
+  return(biosynth_cost)
 }
 
 
@@ -148,6 +167,33 @@ load.geisberg2014.data = function(nodesc=T){
   colnames(mrna.half)=c('chr','ORF','GNAME','type','mrna.half-life.mn','DESC')
   if(nodesc){ mrna.half$DESC = NULL }
   return(mrna.half)
+}
+
+load.dana2014.data = function(){
+  # Load ribosome translation efficiency
+  message("REF: A. Dana and T. Tuller, 2014, G3 (Genes|Gemomes|Genetics)")
+  message("Mean of the Typical Decoding Rates: A New Translation Efficiency Index Based on the Analysis of Ribosome Profiling Data ")
+  message("see also -> The effect of tRNA levels on decoding times of mRNA codons (Nucleic Acids Res)")
+  # https://doi.org/10.1534/g3.114.015099
+  # S. cerevisiae data based on ribosome profiling data:
+  # - Ingolia et al. 2009 : Genome-wide analysis in vivo of translation with nucleotide resolution using ribosome profiling
+  # - Brar et al. 2012    : High-resolution view of the yeast meiotic program revealed by ribosome profiling
+
+  url.MTDR = "https://www.cs.tau.ac.il/~tamirtul/MTDR/MTDR_ORF_values"
+  org = "S. cerevisiae"
+  conditions = c("A14201","gb15",
+                 "DNA replication","Recombination","anaphase","metaphase I","metaphase II","premeiotic entry",
+                 "spore packing","spores")
+  studies = c("Ingolia",paste0("Brar-",conditions), )
+  url.datasets = gsub(" ","%20", x=sprintf("%s/%s %s.txt",url.MTDR,org,studies))
+  names(url.datasets) = conditions
+  exp.names = c('ingolia.exponential','brar.exponential_A14201','brar.exponential_gb15',
+                'brar.DNA_replication', 'brar.recombination', 'brar.anaphase', 'brar.metaphase_I', 'brar.metaphase_II', 'brar.premeiotic_entry',
+                'brar.spore_packing', 'brar.spores')
+  MTDR = map(url.datasets,read.delim,header=F,col.names=c("orf","decoding_rate")) %>%
+                  purrr::reduce(.x=., .f = left_join, by = "orf") %>%
+                  rename_with(~exp.names,.cols=starts_with('decoding_rate'))
+  return(MTDR)
 }
 
 load.lee2014.data = function(){
@@ -554,4 +600,5 @@ load.string = function(tax="4932",phy=T,ful=T,min.score=700){
   STRING_net = readr::read_delim(STRING_url,delim = " ") %>% filter(combined_score >= min.score)
   return(STRING_net)
 }
+
 
