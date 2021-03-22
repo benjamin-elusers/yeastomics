@@ -414,8 +414,6 @@ get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','p.v
 # precomputed data -------------------------------------------------------------
 # Amino acid scores used in Dubreuil et al. 2019
 get.AA1 = function(){ unlist(strsplit("ACDEFGHIKLMNPQRSTVWY","")) }
-
-
 #aaa=c('ALA',"TYR","K","ser","Thr")
 
 # Checks wether character corresponds to 1-letter amino acid code
@@ -438,6 +436,11 @@ get.AA3 = function(){ c('A'="ALA",'C'="CYS",'D'="ASP",'E'="GLU",'F'="PHE",
                         'G'="GLY",'H'="HIS",'I'="ILE",'K'="LYS",'L'="LEU",
                         'M'="MET",'N'="ASN",'P'="PRO",'Q'="GLN",'R'="ARG",
                         'S'="SER",'T'="THR",'V'="VAL",'W'="TRP",'Y'="TYR") }
+
+get.AA.df = function(){
+  aaa = get.AA3()
+  return( data.frame( a=names(aaa), aaa ) )
+}
 
 get.aggrescan = function(){
   setNames(
