@@ -58,6 +58,7 @@ get.sc.ohno = function(myseq) {
   aafreq = alphabetFrequency(alignedSubject(ohno.ali))
   gaps = rowSums(aafreq[,c("-","+")])
 
+  library(org.Sc.sgd.db)
   pair = get.ygob.pair(ohno) %>%
     mutate( L1 = width(ohno.seq$s1),
             L2 = width(ohno.seq$s2),
