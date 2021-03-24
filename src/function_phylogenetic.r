@@ -78,9 +78,6 @@ get.sc.ohno = function(myseq) {
   return(pair)
 }
 
-
-
-
 load.pombe.orthologs = function() {
   url.orthologs = "ftp://ftp.pombase.org/pombe/orthologs/cerevisiae-orthologs.txt"
   sp.sc = read.delim(url.orthologs, comment.char = "#", stringsAsFactors = F,
@@ -245,37 +242,4 @@ read.R4S.param = function(r4s, as.df=F){
   }
   return(r4s.param)
 }
-get.sc.ohno = function(myseq) {
-  ygob = load.byrne2005.data()
-  bogy = ygob %>%
-    dplyr::rename( orf = dup.orf, gname = dup.gname, dup.orf = orf, dup.gname = gname ) %>%
-    mutate(ref = 2) %>%
-    dplyr::select(WGD_anc, orf, gname, ref, dup.orf, dup.gname, pid, rlen)
-  ohno = ygob %>% bind_rows(bogy)
-
-  if(missing(myseq)){ myseq = load.sgd.proteome() }
-  ohno.seq = get.pair.prot(prot=myseq, pair = get.ygob.pair(ohno))
-  ohno.ali = align.pair.prot(p1=ohno.seq$s1, p2=ohno.seq$s2, mat='BLOSUM62')
-  aafreq = alphabetFrequency(alignedSubject(ohno.ali))
-  gaps = rowSums(aafreq[,c("-","+")])
-
-  pair = get.ygob.pair(ohno) %>%
-    mutate( L1 = width(ohno.seq$s1),
-            L2 = width(ohno.seq$s2),
-            RLEN = round(pmin(L1,L2) / pmax(L1,L2), 2),
-            PID1 = round(pid( ohno.ali, "PID1" ),1),
-            PID2 = round(pid( ohno.ali, "PID2" ),1),
-            PID3 = round(pid( ohno.ali, "PID3" ),1),
-            PID4 = round(pid( ohno.ali, "PID4" ),1),
-            SCORE.B100 = score( ohno.ali ),
-            S = nmatch( ohno.ali ),
-            N = nmismatch( ohno.ali ),
-            G = gaps,
-            SGDID = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$orf,columns ="SGD",keytype = 'ORF')[,2],
-            SGDID.dup = AnnotationDbi::select(org.Sc.sgd.db,keys = ohno$dup.orf,columns ="SGD",keytype = 'ORF')[,2]
-    ) %>% right_join(ohno)
-
-  return(pair)
-}
-
 
