@@ -279,7 +279,7 @@ load.villen2017.data = function(){
   return(turnover)
 }
 
-load.leunberger2017.data = function(species='S. cerevisiae',rawdata=F){
+load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
   # Load protein stability data
   library(openxlsx)
   library(tidyverse)
@@ -600,5 +600,6 @@ load.string = function(tax="4932",phy=T,ful=T,min.score=700){
   STRING_net = readr::read_delim(STRING_url,delim = " ") %>% filter(combined_score >= min.score)
   return(STRING_net)
 }
+
 
 
