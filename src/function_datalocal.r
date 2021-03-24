@@ -298,21 +298,6 @@ load.codon.usage = function(inputseq,
 }
 
 # Amino Acid features ----------------------------------------------------------
-# mypath = list(scales = "/media/elusers/users/emmanuel/PAPERS/013_disorder_stickiness/data/Scales/")
-# get.scales = function(SCALE_PATH = mypath$scales, byAA = T) {
-#   scale.files = list.files(SCALE_PATH, pattern = 'scale.csv')
-#   names(scale.files) = subname(scale.files, sep = "\\.", lc = T)
-#   L.scales = lapply(scale.files, function(x) { read.csv(paste0(SCALE_PATH, x), stringsAsFactors = F) })
-#   df.scales = Reduce(f = merge, x = L.scales)
-#   if (!byAA) {
-#     numcol = sapply(df.scales, is.numeric)
-#     aa.val = t(df.scales[, numcol])
-#     colnames(aa.val) = df.scales$AA
-#     df.scales = data.frame(aa.val)
-#   }
-#   return(df.scales)
-# }
-
 get.aascales=function(){
   data.frame(
     AA=get.AA1(),
@@ -328,6 +313,85 @@ get.aascales=function(){
   )
 }
 
+
+# Protein-Protein interactions (intact from Hugo) ------------------------------
+
+load.intact = function(only.physical=T,
+                       orga="cerevisiae",
+                       intact.data=sprintf("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_%s.txt",orga),
+                       from.MACOS=F){
+  #/media/elusers/users/hugo/07_3DComplex_scripts/scripts_PPIs_networks/stack_studies_PPIs_nored_PMID_28122020_INTACT.R
+
+  if(from.MACOS){ intact.data=gsub("/media","/Volumes",intact.data) }
+
+  INTACT = read.csv(intact.data,sep = "\t", quote = "", stringsAsFactors = F)
+  colnames(INTACT) = c("protA","protB","altA","altB","aliasA","aliasB",
+                       "method","pub.author1","pub.id",
+                       "taxA","taxB","typeAB",
+                       "src.db","int.id","conf",
+                       "expansion.method","bio.roleA","bio.roleB",
+                       "exp.roleA","exp.roleB",
+                       "typeA","typeB",
+                       "xrefA","xrefB","xrefAB",
+                       "annotA","annotB","annotAB",
+                       "host","parAB",
+                       "created","updated",
+                       "checksumA","checksumB","checksumAB",
+                       "negative","featA","featB",
+                       "stoichioA","stoichioB",
+                       "id.met.protA","id.met.protB")
+  cat(sprintf("(0) TOTAL INTERACTIONS : %s \n",nrow(INTACT)))
+
+  # 1. remove small molecules and non-protein
+  cat("-> rm EBI and small molecules \n")
+  INTACT.1 = INTACT[!(grepl("EBI", INTACT$protA) | grepl("EBI", INTACT$protB)),]
+  cat(sprintf("(1) TOTAL INTERACTIONS : %s \n",nrow(INTACT.1)))
+
+  sort_interactions = function(ppi,pair=c('protA','protB')){
+    # Remove duplicated pairs and make undirected graph
+    sorted.pair = t(apply(ppi[,pair], 1, sort)) # sort within pair
+    ppi[,pair] = sorted.pair
+    cat("-> sort pairs...\n")
+    ppi$is.dup = duplicated(sorted.pair)
+    cat("-> check duplicates...\n")
+    ord.pair = order( paste0(sorted.pair[,1],"_",sorted.pair[,2]) )
+    ppi = ppi[ord.pair,]
+    cat("-> sort lexically...\n")
+    # Make the is.dup the first column
+    col_is.dup <- which(colnames(ppi)=="is.dup")
+    ppi.sorted <- ppi[,c(col_is.dup,1:(ncol(ppi)-1))]
+    cat("-> change columns order...\n")
+    return(ppi.sorted)
+  }
+
+  # 2. sort the PPIs, so that B-A becomes A-B
+  INTACT.2 = sort_interactions(ppi=INTACT.1)
+  cat(sprintf("(2) TOTAL INTERACTIONS : %s \n",nrow(INTACT.2)))
+
+  # 3. keep only uniprot/orf (redundant with step 1.)
+  keep.uniprot.orf = function(ppi,pair=c('protA','protB')){
+    uni_regex="([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
+    orf_regex="([Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?)|(Q[0-9]{4})|(R[0-9]{4}[WC])"
+    prot_regex = paste0(uni_regex,"|",orf_regex)
+
+    p1 = grepl(prot_regex, x=ppi[,pair[1]] )
+    p2 = grepl(prot_regex, x=ppi[,pair[2]] )
+
+    ppi.prot = ppi[p1 & p2,]
+    ppi.prot[,pair[1]] = gsub("^[a-z]+:","",ppi.prot[,pair[1]])
+    ppi.prot[,pair[2]] = gsub("^[a-z]+:","",ppi.prot[,pair[2]])
+
+    return(ppi.prot)
+  }
+  INTACT.3 = keep.uniprot.orf(INTACT.2)
+  cat(sprintf("(3) TOTAL INTERACTIONS : %s \n",nrow(INTACT.3)))
+
+  # remove duplicated interactions (with different Pubmed ID)
+
+  # filter for direct method
+  # return the matrix of interactions
+  return(INTACT.)
+}
 
 # Quaternary structures (3d-complex) -------------------------------------------
 load.3dcomplex.yeast = function(limit = F, n = 1000) {
