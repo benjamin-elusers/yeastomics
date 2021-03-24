@@ -2,6 +2,14 @@ source("src/utils.r",local = T)
 source("src/function_sequence.r",local = T)
 source("src/function_phylogenetic.r",local = T)
 
+subname=function(name,sep="\\.",lc=F){ # extracts substring until first separator
+  b4sep = sprintf("([^%s]+).+",sep)
+  part1 = sub(b4sep, "\\1", x=name)
+  if(lc){ tolower(part1) }
+  return(part1)
+}
+
+
 # Local proteome data ----------------------------------------------------------
 load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_general.R"){
   source(toolbox,local = T)
@@ -257,8 +265,69 @@ get.codons4tai = function(){
   return(codon.ord)
 }
 
-load.codon.usage = function(inputseq,
-                            codonR="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/",
+load.codon.table = function(trna.codon="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/tRNA/",
+                            species="4932"){
+    library(tidyverse)
+    if( !dir.exists(trna.codon) ){ stop("Can't find the directory containing tables of trna counts!") }
+    trna.filenames = list.files(path = trna.codon, pattern = '\\.trna')
+    trna.files = file.path(trna.codon,trna.filenames)
+    available.trna.tables = c(
+      "1064592" = "Naumovozyma_castellii_CBS_4309",
+      "1071378" = "Naumovozyma_dairenensis_CBS_421",
+      "283643"  = "Cryptococcus_neoformans_var_neoformans_B-3501A",
+      "284590"  = "Kluyveromyces_lactis_NRRL_Y-1140",
+      "284593"  = "Candida_glabrata_CBS_138",
+      "322104"  = "Scheffersomyces_stipitis_CBS_6054",
+      "4896"    = "Schizosaccharomyces_pombe",
+      "4932"    = "Saccharomyces_cerevisiae",
+      "4950"    = "Torulaspora_delbrueckii",
+      "4956"    = "Zygosaccharomyces_rouxii",
+      "573826"  = "Candida_dubliniensis_CD36",
+      "9606"    = "Homo_sapiens"
+    )
+
+    sp = match.arg(species, choices = names(available.trna.tables),several.ok = F)
+    message(sprintf("reading tRNA counts for: %s\n",available.trna.tables[sp]))
+    # # Name of the file = Taxon ID + initials of genus/species + ".trna"
+    taxid = subname(trna.files,"_")
+    # # First row starts with # followed by the name of the species
+    spnames = sapply(trna.files,read.delim,sep='\t',header=F,nrows=1) %>%
+      unlist %>% as.character %>%
+      str_sub(start=2) %>% str_replace_all(" ","_")
+
+    trna.counts = lapply(setNames(trna.files,taxid),
+                         read.delim,sep='\t',skip=1,header=F,blank.lines.skip=T )
+    mytrna = trna.counts %>% pluck(sp)
+
+    return(mytrna)
+}
+
+
+load.codon.usage= function(cds){
+  if( !require(coRdon) ){ BiocManager::install("coRdon") } # Install this package first
+  library(coRdon)
+  cT=codonTable(cds)
+  #cT.m = Biostrings::trinucleotideFrequency(CDS,step = 3)
+  CU  = bind_cols(ID=cT@ID,
+                  CU_milc=MILC(cT)[,'self'],
+                  CU_enc=ENC(cT),
+                  CU_b=B(cT)[,'self'],
+                  CU_mcb=MCB(cT)[,'self'],
+                  CU_encprime=ENCprime(cT)[,'self'],
+                  CU_scuo=SCUO(cT),
+                  CU_melp=MELP(cT),
+                  CU_e=E(cT),
+                  CU_cai=CAI(cT),
+                  CU_gcb=GCB(cT,ribo=T),
+                  CU_fop=Fop(cT,ribosomal = T),
+                  CU_count= cT@counts %>% as_tibble(),
+  )
+  return(CU)
+}
+
+load.trna.adaptation = function(inputseq,
+                            trnas="data/GtRNA-counts.rds",
+                            sp='4932',
                             exclude.counts=T
 ){
   message("REF: M. Dos Reis et al., 2004, Nucleic Acids Research")
@@ -284,16 +353,16 @@ load.codon.usage = function(inputseq,
   codons.60 = codons[,-codons.out]
 
   # Genomic tRNA database (copy/paste the species-specific tRNA gene counts to a text file)
-  trna.genes=sprintf("%s/tRNA/4932_sc.trna",codonR)
-  trna.raw = read.delim(trna.genes, col.names=c('AA3','tot','cod','count','acod'),
-                        header=F,comment.char = "#", sep = '\t', stringsAsFactors = F)
-  trna.ord = match( ord.codonR, trna.raw$acod )
-  trna = trna.raw[trna.ord,]
+  trna.count = readRDS(trnas)[[sp]]
+  colnames(trna.count)=c('AA3','tot','cod','count','acod')
+
+  trna.ord = match( ord.codonR, trna.count$acod )
+  trna = trna.count[trna.ord,]
 
   ws =  tAI::get.ws(tRNA = trna$count, sking = 0)
   tai = tAI::get.tai(codons.60, ws)
   res = data.frame(prot=names(dna),tAI=tai)
-  if(!exclude.counts){ res = data.frame(res,codons) }
+  if(!exclude.counts){ res = cbind(res,codons) }
   return(res)
 }
 
@@ -390,7 +459,7 @@ load.intact = function(only.physical=T,
 
   # filter for direct method
   # return the matrix of interactions
-  return(INTACT.)
+  return(INTACT.4)
 }
 
 # Quaternary structures (3d-complex) -------------------------------------------
