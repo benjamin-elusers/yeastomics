@@ -312,6 +312,33 @@ get.uniprot.pathways = function(ORG="YEAST"){
   toc()
   return(PATHWAY)
 }
+
+get.KEGG = function(sp='sce',type=c('pathway','module')){
+  library(KEGGREST)
+  library(tidyverse)
+
+  genes.grp = keggLink(type,sp)
+  df1 =enframe(genes.grp, name="sp.id", value="grp") %>%
+        mutate( id = sub(paste0(sp,":"),"",sp.id) )
+  if( type == 'module'){
+    df1$grp = sub(paste0(sp,"_"),"",df1$grp)
+    sp = ""
+  }
+
+  grp.desc = keggList(type,sp)
+  df2 =enframe(grp.desc, name = 'grp', value='desc')
+  if(type == 'pathway'){ df2$desc  = sub(" -[^-]+$","",df2$desc) }
+
+  ## returns gene-pathway
+  df = left_join(df2,df1,by='grp') %>%
+       filter(!is.na(id))
+
+  return( split(df$id,df$desc,drop = T) )
+}
+
+PATHWAY=get.KEGG('sce','pathway')
+MODULE=get.KEGG('sce','module')
+
 #PP = get.uniprot.pathways(ORG='YEAST')
 #test = separate(PP,name,sep = ";", into = c('div1','div2','div3')) %>% filter(!is.na(ids)) %>% group_by(div1,div2) %>% summarise( allids= paste(ids,collapse=","), n = str_count(string = allids,",")+1)
 #  pathways.list = map( strsplit(pathways.division,";"), function(x){ x %>% str_replace("\\.","") %>% str_trim() })
