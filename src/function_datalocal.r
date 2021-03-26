@@ -2,6 +2,12 @@ source("src/utils.r",local = T)
 source("src/function_sequence.r",local = T)
 source("src/function_phylogenetic.r",local = T)
 
+read.url <- function(file_url) {
+  con <- gzcon(url(file_url))
+  txt <- readLines(con)
+  return(txt)
+}
+
 subname=function(name,sep="\\.",lc=F){ # extracts substring until first separator
   b4sep = sprintf("([^%s]+).+",sep)
   part1 = sub(b4sep, "\\1", x=name)
@@ -9,6 +15,9 @@ subname=function(name,sep="\\.",lc=F){ # extracts substring until first separato
   return(part1)
 }
 
+strfind = function(strings, patterns){ # search multiple patterns in character vectors
+  sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
+}
 
 # Local proteome data ----------------------------------------------------------
 load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_general.R"){
@@ -265,12 +274,12 @@ get.codons4tai = function(){
   return(codon.ord)
 }
 
-load.codon.table = function(trna.codon="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/tRNA/",
+load.trna.table = function(trna.tab="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/tRNA/",
                             species="4932"){
     library(tidyverse)
-    if( !dir.exists(trna.codon) ){ stop("Can't find the directory containing tables of trna counts!") }
-    trna.filenames = list.files(path = trna.codon, pattern = '\\.trna')
-    trna.files = file.path(trna.codon,trna.filenames)
+    if( !dir.exists(trna.tab) ){ stop("Can't find the directory containing tables of trna counts!") }
+    trna.filenames = list.files(path = trna.tab, pattern = '\\.trna')
+    trna.files = file.path(trna.tab,trna.filenames)
     available.trna.tables = c(
       "1064592" = "Naumovozyma_castellii_CBS_4309",
       "1071378" = "Naumovozyma_dairenensis_CBS_421",
@@ -302,28 +311,6 @@ load.codon.table = function(trna.codon="/data/benjamin/NonSpecific_Interaction/D
     return(mytrna)
 }
 
-
-load.codon.usage= function(cds){
-  if( !require(coRdon) ){ BiocManager::install("coRdon") } # Install this package first
-  library(coRdon)
-  cT=codonTable(cds)
-  #cT.m = Biostrings::trinucleotideFrequency(CDS,step = 3)
-  CU  = bind_cols(ID=cT@ID,
-                  CU_milc=MILC(cT)[,'self'],
-                  CU_enc=ENC(cT),
-                  CU_b=B(cT)[,'self'],
-                  CU_mcb=MCB(cT)[,'self'],
-                  CU_encprime=ENCprime(cT)[,'self'],
-                  CU_scuo=SCUO(cT),
-                  CU_melp=MELP(cT),
-                  CU_e=E(cT),
-                  CU_cai=CAI(cT),
-                  CU_gcb=GCB(cT,ribo=T),
-                  CU_fop=Fop(cT,ribosomal = T),
-                  CU_count= cT@counts %>% as_tibble(),
-  )
-  return(CU)
-}
 
 load.trna.adaptation = function(inputseq,
                             trnas="data/GtRNA-counts.rds",
@@ -366,6 +353,35 @@ load.trna.adaptation = function(inputseq,
   return(res)
 }
 
+load.codon.usage= function(cds){
+  if( !require(coRdon) ){ BiocManager::install("coRdon") } # Install this package first
+  library(coRdon)
+  cT=codonTable(cds)
+  orf2ko = sub("ko:","",keggLink("ko",'sce'))
+  names(orf2ko) =  sub("^.+:","",names(orf2ko))
+
+  # Add KO identifiers to select ribosome
+  cT=setKO(cT,ann=orf2ko[cT@ID])
+
+  #cT.m = Biostrings::trinucleotideFrequency(CDS,step = 3)
+  CU  = bind_cols(ID=cT@ID,
+                  CU_milc=MILC(cT,ribo=T,self = F)[,1],
+                  CU_enc=ENC(cT),
+                  CU_b=B(cT,ribo=T,self = F)[,1],
+                  CU_mcb=MCB(cT,ribo=T,self = F)[,1],
+                  CU_encprime=ENCprime(cT,ribo=T,self = F)[,1],
+                  CU_scuo=SCUO(cT),
+                  CU_melp=MELP(cT,ribo=T)[,1],
+                  CU_e=E(cT,ribo=T)[,1],
+                  CU_cai=CAI(cT,ribo=T)[,1],
+                  CU_gcb=GCB(cT,ribo=T),
+                  CU_fop=Fop(cT,ribo=T)[,1],
+                  CU_count= cT@counts %>% as_tibble(),
+  )
+  return(CU)
+}
+
+
 # Amino Acid features ----------------------------------------------------------
 get.aascales=function(){
   data.frame(
@@ -385,16 +401,30 @@ get.aascales=function(){
 
 # Protein-Protein interactions (intact from Hugo) ------------------------------
 
-load.intact = function(only.physical=T,
+load.intact.yeast = function(only.direct=T,
+                       rm.useless=T,
                        orga="cerevisiae",
                        intact.data=sprintf("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_%s.txt",orga),
                        from.MACOS=F){
   #/media/elusers/users/hugo/07_3DComplex_scripts/scripts_PPIs_networks/stack_studies_PPIs_nored_PMID_28122020_INTACT.R
+  # intact.url="ftp://ftp.ebi.ac.uk/pub/databases/intact/current/psimitab/intact.txt"
 
-  if(from.MACOS){ intact.data=gsub("/media","/Volumes",intact.data) }
+  # search.keyword <- function(x, pos, keyword='cerevisiae|:4932|:559292|yeast') {
+  #   colA = grepl(keyword,x[['Taxid.interactor.A']])
+  #   colB = grepl(keyword,x[['Taxid.interactor.B']])
+  #   colH = grepl(keyword,x[['Host.organism.s.']])
+  #   x[colA & colB & colH,]
+  #
+  # }
+  # test =readr::read_delim_chunked(file=intact.url, delim="\t",
+  #                           callback = readr::DataFrameCallback$new(search.keyword),
+  #                           chunk_size = 1000)
+  #                             )
+  #sc.intact = vroom(pipe("curl ftp://ftp.ebi.ac.uk/pub/databases/intact/current/psimitab/intact.txt | grep -w cerevisiae"),)
+  #if(from.MACOS){ intact.data=gsub("/media","/Volumes",intact.data) }
 
-  INTACT = read.csv(intact.data,sep = "\t", quote = "", stringsAsFactors = F)
-  colnames(INTACT) = c("protA","protB","altA","altB","aliasA","aliasB",
+  IntAct = read.csv(intact.data,sep = "\t", quote = "", stringsAsFactors = F)
+  colnames(IntAct) = c("protA","protB","altA","altB","aliasA","aliasB",
                        "method","pub.author1","pub.id",
                        "taxA","taxB","typeAB",
                        "src.db","int.id","conf",
@@ -409,11 +439,24 @@ load.intact = function(only.physical=T,
                        "negative","featA","featB",
                        "stoichioA","stoichioB",
                        "id.met.protA","id.met.protB")
-  cat(sprintf("(0) TOTAL INTERACTIONS : %s \n",nrow(INTACT)))
+  keep.cols = colnames(IntAct)
+  if(rm.useless){
+    cat("-> rm columns that are useless...\n")
+    cols.to.remove = c("created","updated","checksumA","checksumB","checksumAB",
+                       "aliasA","aliasB","taxA","taxB","host",
+                       "featA","featB","annotA","annotB",
+                       "xrefA","xrefB","xrefAB","expansion.method")
+    keep.cols = setdiff(colnames(IntAct),cols.to.remove)
+  }
+  INTACT.0 = IntAct[,keep.cols]
+  cat(sprintf("(0) TOTAL INTERACTIONS : %s \n",nrow(INTACT.0)))
+  # Highligh PPIs obtained with one of the methods given in input
+  #INTACT$reliable = INTACT$method %in% used.methods
+
 
   # 1. remove small molecules and non-protein
   cat("-> rm EBI and small molecules \n")
-  INTACT.1 = INTACT[!(grepl("EBI", INTACT$protA) | grepl("EBI", INTACT$protB)),]
+  INTACT.1 =   INTACT.0[!(grepl("EBI",   INTACT.0$protA) | grepl("EBI",   INTACT.0$protB)),]
   cat(sprintf("(1) TOTAL INTERACTIONS : %s \n",nrow(INTACT.1)))
 
   sort_interactions = function(ppi,pair=c('protA','protB')){
@@ -452,14 +495,35 @@ load.intact = function(only.physical=T,
 
     return(ppi.prot)
   }
+  cat("-> Filter UniProt/ORF proteins...\n")
   INTACT.3 = keep.uniprot.orf(INTACT.2)
   cat(sprintf("(3) TOTAL INTERACTIONS : %s \n",nrow(INTACT.3)))
 
-  # remove duplicated interactions (with different Pubmed ID)
+  # 4. remove duplicated interactions (with different Pubmed ID)
+  INTACT.4 = INTACT.3[!duplicated(INTACT.3[,c("pub.id","protA","protB")]),]
+  cat("-> Filter duplicated interactions within PMID...\n")
+  cat(sprintf("(4) TOTAL INTERACTIONS : %s \n",nrow(INTACT.4)))
 
-  # filter for direct method
-  # return the matrix of interactions
-  return(INTACT.4)
+  if(only.direct){
+    get.biophysical.methods = function(){
+      if(!require(rols)){ BiocManager::install("rols") }
+      library(rols)
+      MI <- Ontology("MI")
+      biophysical.methods = descendants(term(MI,"MI:0013"))
+      return( as(biophysical.methods, "data.frame") )
+    }
+
+    # 5. filter for direct method
+    biophy_meth= as.character(get.biophysical.methods()['id'])
+    biophy_meth_regex= paste0(biophy_meth,'"',collapse="|")
+    #c("MI:0114","MI:0276","MI:0071","MI:0028","MI:0808","MI:0020","MI:0826","MI:0016","MI:0038","MI:0397")
+    cat("-> Filter direct physical method...\n")
+    INTACT.5 = INTACT.4[grep(biophy_meth_regex,x=INTACT.4$method), ]
+    cat(sprintf("(5) TOTAL INTERACTIONS : %s \n",nrow(INTACT.5)))
+  }else{
+    INTACT.5 = INTACT.4
+  }
+  return(INTACT.5)
 }
 
 # Quaternary structures (3d-complex) -------------------------------------------
