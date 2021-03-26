@@ -10,6 +10,11 @@ open.url <- function(file_url) {
   return(textConnection(txt))
 }
 
+read.url <- function(file_url) {
+  con <- gzcon(url(file_url))
+  txt <- readLines(con)
+  return(txt)
+}
 strfind = function(strings, patterns){
   # Find several patterns in set of strings
   sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
@@ -575,8 +580,18 @@ load.pfam = function(tax='559292'){
   # Load domains assignments based of HMM profiles (PFAM)
   # 559292 = S.cerevisiae
   library(readr)
+  .release = read.url("http://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam.version.gz") %>% paste0(sep="\n")
+  message("CURRENT RELEASE")
+  message("---------------")
+  message(.release)
+  message("---------------")
+
   url.pfam = sprintf("http://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/%s.tsv.gz",tax)
-  header = readLines(open.url(url.pfam))[3]
+  .vers = read.url(url.pfam)[1]
+  message(.vers)
+  .nprot = read.url(url.pfam)[2]
+  message(.nprot)
+  header = read.url(url.pfam)[3]
   # parse the header (3rd commented rows)
   columns = header %>%
             str_split(pattern = "> <") %>% unlist %>%
@@ -595,6 +610,9 @@ load.string = function(tax="4932",phy=T,ful=T,min.score=700){
   STRING_dataset = sprintf("%s.%s.%s",.protein,.links,.version)
   STRING_url = sprintf("%s/%s/%s.%s.%s",STRING_baseurl,STRING_dataset,tax,STRING_dataset,"txt.gz")
 
+  message("STRING VERSION: ", .version)
+  message("STRING DATASET:",STRING_dataset)
+  message(sprintf("FILTERED BY:\n physical links = %s \nAND\n full evidence =  %s \nAND\n min. score >= %s", phy, ful, min.score))
   # each numeric column is an evidence score out of 1000 to asssess the existence of the link between protein
   # _transferred means information was inferred from a different organism (homology or orthologous group)
   STRING_net = readr::read_delim(STRING_url,delim = " ") %>% filter(combined_score >= min.score)
