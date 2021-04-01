@@ -1,4 +1,4 @@
-set.seed(04012021)
+set.seed(01042021)
 script.to.env = function(src,nm){ # load script object into separate environment
   if( !(nm %in% search()) ){
     env = attach(what = NULL,name = nm);
@@ -21,6 +21,19 @@ library(openxlsx)
 script.to.env("src/utils.r",'utils')
 script.to.env("src/function_sequence.r",'seq')
 script.to.env("src/function_annotation.r",'annot')
+backup = file.path(".downloaded/")
+setup_backup = function(backup_dir ){
+  ddmmyyyy=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
+  next.backup = file.path(backup_dir,ddmmyyyy)
+  dir.create(next.backup)
+  check = dir.exists(next.backup)
+  if(!check){ stop("Failed to create a new backup directory!") }
+  return(T)
+}
+
+last.backup = list.dirs(backup)
+
+setup_backup()
 
 # MAIN PROTEIN FEATURES
 SGD  = load.sgd.features()
