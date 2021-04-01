@@ -92,76 +92,85 @@ options(dplyr.summarise.inform = FALSE)
 
 # Introduction to "yeast-omics"
 
-Yeast is a model unicellular organism belonging to the fungi kingdom,
-within the eukaryotes ("true nucleus") domain of life.
-The yeast genome of 12Mbp seems tiny when compared to higher eukaryotes,
-which is at least one order of magnitude more compact in size.
-Nonetheless, the yeast proteome contains ~6000 protein-coding genes,
-making it only 3 to 4 times smaller than eukaryotes.
-Strictly quantitatively, the yeast genome/proteome would be comparable to
-the largest bacteria, similar to those of E.coli (4.5Mbp/4300) or B.subtilis (4.3Mbp/4800).
+Yeast is a model unicellular organism belonging to the fungi kingdom, within the
+eukaryotes ("true nucleus") domain of life. The yeast genome of 12Mbp seems tiny
+when compared to higher eukaryotes, which is at least one order of magnitude
+more compact in size. Nonetheless, the yeast proteome contains ~6000
+protein-coding genes, making it only 3 to 4 times smaller than eukaryotes.
+Strictly quantitatively, the yeast genome/proteome would be comparable to the
+largest bacteria, similar to those of E.coli (4.5Mbp/4300) or B.subtilis
+(4.3Mbp/4800).
 
-The yeast cellular volume is estimated around 50um^3 for haploid cells 
-which is occupied at 80% by the cellular proteome (42 Millions of expressed macromolecules).
-The cell interior is incredibly crowded with a protein density
-of around 3-4 millions of molecules per femtoliter.
-Despite the crowdedness, proteins are freely diffusing within the cell 
-at an admirably fast pace of around 0.2us from one extremity to another.
+The yeast cellular volume is estimated around 50um^3 for haploid cells which is
+occupied at 80% by the cellular proteome (42 Millions of expressed
+macromolecules). The cell interior is incredibly crowded with a protein density
+of around 3-4 millions of molecules per femtoliter. Despite the crowdedness,
+proteins are freely diffusing within the cell at an admirably fast pace of
+around 0.2us from one extremity to another.
 
-Yet, the dynamic arrangements between millions of macromolecules within the cell is not trivial.
+Yet, the dynamic arrangements between millions of macromolecules within the cell
+is not trivial.
 
 ## Proteome evolution 
 
 The approach to understand the organization of the yeast proteome consist in
-searching for factors influencing the evolution of proteins. 
+searching for factors influencing the evolution of proteins.
 
 As previously reported, protein abundance holds a particularly important role in
 driving molecular evolution of protein, explaining up to 50% of the variability
-in conservation rate among proteins. 
+in conservation rate among proteins.
 
 The general trend is that highly expressed proteins are the most conserved
 following the chemical law of mass action.
-
 The association of protein expression with sequence conservation was found to be
 supported by several underlying mechanisms, yet their degree of complementarity
-is still a matter of active debate. 
+is still a matter of active debate.
 
-How abundance really affects protein evolution is likely to require multi-causal explanations which we will not expand here. 
-(e.g. translation cost, protein/mRNA stability and degradation, misinteractions ...) 
+How abundance really affects protein evolution is likely to require multi-causal
+explanations which we will not expand here. (e.g. translation cost, protein/mRNA
+stability and degradation, misinteractions ...)
 
-Nonetheless, protein abundance cannot fully account for the conservation of all 
-residues in proteins. Even worse, the effect of abundance is likely to be 
+Nonetheless, protein abundance cannot fully account for the conservation of all
+residues in proteins. Even worse, the effect of abundance is likely to be
 involved in many biological processes, creating a potentially strong confounding
 factor that may bias most evolutionary comparison between proteins.
 
-Here, we explore a number of quantitative and qualitative variables
-(referred as features and properties) derived from proteins, in order to unveil
-the dark side of proteome evolution. 
+Here, we explore a number of quantitative and qualitative variables (referred as
+features and properties) derived from proteins, in order to unveil the dark side
+of proteome evolution.
 
 However, we investigated how residual differences of protein conservation can be
 explained by those features and properties after controlling for abundance.
-Finally, we analyzed it within different protein categories which correspond to 
+
+Finally, we analyzed it within different protein categories which correspond to
 lists of related properties and features  (Sequence, Biophysics, Phenotypes...).
 
 ## Definitions
 
-A protein feature is a measurable quantity related to its activity, composition...
-The numerical values will be stored in a vector as a column of proteome data table. 
-(e.g. disorder content, sequence length)
+A protein feature is a measurable quantity related to its activity,
+composition... The numerical values will be stored in a vector as a column of
+proteome data table. (e.g. disorder content, sequence length)
 
-A protein property is a shared non-quantitative trait among a subset of proteins.
-A vector named after the common characteristic will store the identifiers (ORF, UNIPROT...) of the subset members. (e.g. localization, pathway, function...)
+A protein property is a shared non-quantitative trait among a subset of
+proteins. A vector named after the common characteristic will store the
+identifiers (ORF, UNIPROT...) of the subset members. (e.g. localization,
+pathway, function...)
 
-Finally, a protein category correspond to a list of features or properties (Sequence, Biophysics, Phenotypes...)
-Quantitative variables will be aggregated in one Proteome table (rows=proteins, columns=variables)
+Finally, a protein category correspond to a list of features or properties
+(Sequence, Biophysics, Phenotypes...) Quantitative variables will be aggregated
+in one Proteome table (rows=proteins, columns=variables)
 
 # Datasets
 
 ## Reference proteome sequence
 
-SGD and Uniprot are the most reliable database gathering information about genes and proteins sequences.
-SGD is the main provider for the assembled genome of S. cerevisiae as well as annotations about the genes.
-Uniprot is a primary resource for protein information aggregating data from multiple specialized databases (structure, interactions, evolution, expression ...)
+SGD and Uniprot are the most reliable database gathering information about genes
+and proteins sequences. SGD is the main provider for the assembled genome of S.
+cerevisiae as well as annotations about the genes.
+
+Uniprot is a primary resource for protein information aggregating data from
+multiple specialized databases (structure, interactions, evolution, expression
+...)
 
 ```{r reference}
 # REFERENCE PROTEIN DATABASE ---------------------------------------------------
@@ -244,22 +253,27 @@ STRING = load.string(tax="4932",phy=T, ful=T, min.score = 700) %>%
 
 
 # PROTEIN COMPLEXES  -----------------------------------------------------------
-mers= c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca')
+nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca'),"mer")
 ## CYC = Catalogue of Yeast Complexes ------------------------------------------
 CYC = load.pu.2008.data() %>% # BASED ON ORF
       mutate(oligomers = cut(n_members, breaks = c(1:10,20,81), 
-                             labels =  c(mers[2:10],'high_oligomer','molecular_machine')) )
+                             labels =  paste0("CYC_",c(nmers[2:10],'high_oligomer','molecular_machine'))) )
 ## COMPLEXTAB = Complex Portal from EBI ----------------------------------------
 CPX = load.meldal.2019.data() %>%
   filter(is_uniprot) %>% # BASED ON UNIPROT
       mutate(oligomers = cut(n_members, breaks = c(1:10,20,81), 
-                             labels = c(mers[2:10],'high_oligomer','molecular_machine')) )
+                             labels = paste0("CPX_",c(nmers[2:10],'high_oligomer','molecular_machine'))),
+             CPLX_ASSEMBLY = gsub("(.+)(\\.$)","\\1",CPLX_ASSEMBLY) )
 
 # FUNCTIONAL ANNOTATIONS -------------------------------------------------------
 ## GO Biological Process + Molecular Function ----------------------------------
 UNIGO = get.uniprot.go(UNIPROT$UNIPROTKB) %>%  # Uniprot-based GO annotation
         mutate( go = paste0(ONTOLOGY,"_",goterm)) %>% 
         arrange(go) 
+## KEGG Biological Pahtways/Modules --------------------------------------------
+PATHWAY=get.KEGG('sce','pathway',as.df=T)
+MODULE=get.KEGG('sce','module',as.df=T)
+
 
 # PHENOTYPES
 ## Essential/Dispensable genes -------------------------------------------------
@@ -274,50 +288,94 @@ LOC50 = sort( names( LOC.size[LOC.size>THR.LOC.SIZE] ) )
 # EVOLUTIONARY RATE
 ER = load.dubreuil2021.data(1) %>% 
      as_tibble() %>%
-     dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT'))# %>%
-     #convert(dbl(EVO.FULL), dbl(PPM))
+     dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT')) %>%
+     hablar::convert(dbl(EVO.FULL), dbl(PPM))
 
 ```
 
-## Proteome organization
+## Proteome organization in categories {.tabset .tabset-pills}
 
-### Genomic category
+### Genomics
 
-#### Genome arrangement (duplication, introns, chromosomes)
-#### DNA composition (GC content, coding length)
+- Genome arrangement
+      
+      * Chromosomes
+      
+          Genes are distributed along the genomic DNA which is itself organized
+          between separate chromosomal structures.
+      
+      * Gene duplications
+      
+          The genome must be duplicated at every generation to give rise to a new
+          cell. Yet, copied genomes may incorporate unidentical version of their
+          template. Single genes may be lost or duplicated in the process or
+          during genetic recombination. Rarely, whole genome duplication may occur
+          subsequently increasing the number of duplicated genes.
+      
+      * Protein-coding genes
+      
+          Protein coding genes may be splitted in translated and untranslated
+          segments (e.g. exons and introns). In yeast, very few genes contains
+          introns meaning that there is an exact correspondence between genomic and
+          proteomic sequences.
+      
+      
+  - DNA composition
+  
+      * GC content
+      
+          The genomic sequence made of DNA molecules is composed of 2 pairs of complementary nucleic acids called bases (AT & CG).
+          Variations in usage of both pairs exist.
+      
+      * Coding length
+      
+  
 
 ```{r genomic}
-GENOMIC=list()
+GENOMICS=list()
 ### Proteins length -----------------------------------------------------------
 df.len = tibble(orf=names(S288C),len=width(S288C))
 # %GC content in genes ---------------------------------------------------------
 df.gc  = tibble(orf=names(CDS),pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
 
 ### Chromosome Number ---------------------------------------------------------
-chr.orf =  split(CHR$name,CHR$chr.f,drop=T)
-GENOMIC = append(GENOMIC,chr.orf)
+chr.orf =  split(CHR$name,CHR$chr.f,drop=T) 
+names(chr.orf) = paste0("SGD.",names(chr.orf))
+
+GENOMICS = append(GENOMICS,chr.orf)
 ### Intron containing genes ---------------------------------------------------
-GENOMIC$has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
+GENOMICS$SGD.has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
 ### Gene duplication ----------------------------------------------------------
-GENOMIC$WGD = OHNO$orf 
-GENOMIC$WGD_const.size = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
+GENOMICS$BYRNE2005.WGD = OHNO$orf 
+GENOMICS$BYRNE2005.WGD_const.size = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
 ```
 
-### Transcriptomics category
+### Transcriptomics 
 
-#### Codon Usage (tRNA adapation, Fop, codons counts)
-#### Amino acid biosynthetic cost (average MW of AA, ATP consumption...)
+  - Codon Usage
+      
+      * tRNA adapation
+      
+      
+      * codon usage
+    
+    
+  - Amino acid biosynthetic cost
+  
+      * Molecular weight per AA
+      
+      * Consumption of ATP per AA
 
 ```{r transcriptomics}
-TRANSCRIPTOMIC=list()
+TRANSCRIPTOMICS=list()
 ### Codon adaptation
-df.tai=load.trna.adaptation(inputseq=CDS)
-df.CU=load.codon.usage(cds=CDS)
+df.tai=load.trna.adaptation(inputseq=CDS) %>% rename(CODONR.tAI = tAI)
+df.CU=load.codon.usage(cds=CDS) 
 
 ### Amino-acid biosynthetic cost
 df.aaMW = DUB %>% 
        group_by(UNIPROT) %>% 
-       summarise( AA.MW = MW/prot.size ) %>% 
+       summarise( PEPSTATS.AA_MW = MW/prot.size ) %>% 
        left_join(PROTEOME[,1:3],by=c("UNIPROT"="UNIPROTKB"))
 df.cost = load.barton2010.data("prot") %>% 
           group_by(name) %>%
@@ -325,14 +383,25 @@ df.cost = load.barton2010.data("prot") %>%
           dplyr::select('name','trna','cai','rna_exp',
                         contains("relative")) %>%
           distinct()
-dim(df.cost)
 ```
 
-### Biophysical category
+### Biophysics 
 
-#### Amino acid compositions (frequencies of single and classes of AA)
-#### Intrinsic Disorder in proteins (IUP, D2P2)
-#### Protein domain & families
+  - Amino acid composition
+  
+      * single AA frequencies
+  
+      * Frequencies of AA class
+  
+  - Intrinsic Disorder in proteins 
+  
+      * Number of segments
+  
+      * Relative content
+  
+      * Absolute content
+  
+  - Protein domains & families
 
 ```{r biophysical}
 BIOPHYSICS=list()
@@ -341,7 +410,21 @@ BIOPHYSICS=list()
 df.aa = AA.FR %>% mutate(uni=names(UNI.SC)) %>% relocate(uni)
 ### Grouped amino-acid frequencies -----------------------------------------------
 df.aa_class =  AACLASS.FR %>% purrr::reduce(full_join,by='id') %>% rename_with(~aa.class, starts_with('fr'))
-  
+# PFAM AA CLASSES
+# alcohol         o    S,T
+# aliphatic       l    I,L,V
+# any             .    A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y
+# aromatic        a    F,H,W,Y
+# charged         c    D,E,H,K,R
+# hydrophobic     h    A,C,F,G,H,I,K,L,M,R,T,V,W,Y
+# negative        -    D,E
+# polar           p    C,D,E,H,K,N,Q,R,S,T
+# positive        +    H,K,R
+# small           s    A,C,D,G,N,P,S,T,V
+# tiny            u    A,G,S
+# turnlike        t    A,C,D,E,G,H,K,N,Q,R,S,T
+
+
 ### Disorder content (segment, fraction, total) ----------------------------------
 df.d2p2 = D2P2 %>%
           group_by(d2p2_id, d2p2_size, has_d2p2) %>% 
@@ -353,7 +436,7 @@ df.d2p2 = D2P2 %>%
 df.iup = DUB %>% dplyr::select(UNIPROT,contains("IUP",ignore.case = F))
 
 ### Amino-acid interactions propensities
-df.scales = DUB %>% dplyr::select(UNIPROT,ends_with(c('.dom','.iup20'),ignore.case = F))
+df.aascales = DUB %>% dplyr::select(UNIPROT,ends_with(c('.dom','.iup20'),ignore.case = F))
 
 
 ### Protein domains (nodom,single,multi)  ----------------------------------------
@@ -361,10 +444,10 @@ supfam =  SUPERFAM %>% count(seqid,name="n_dom")
 #           group_by(`Sequence ID`) %>% 
 #           count(`Model ID`,name='n_uniq') %>%
 
-BIOPHYSICS$supfam_none   = setdiff(PROTEOME$ORF,supfam$seqid)
-BIOPHYSICS$supfam_single = supfam %>% filter(n_dom==1) %>% pull(seqid)
-BIOPHYSICS$supfam_pair   = supfam %>% filter(n_dom==2) %>% pull(seqid)
-BIOPHYSICS$supfam_multi  = supfam %>% filter(n_dom>=3) %>% pull(seqid)
+BIOPHYSICS$SUPERFAMILY.none   = setdiff(PROTEOME$ORF,supfam$seqid)
+BIOPHYSICS$SUPERFAMILY.single = supfam %>% filter(n_dom==1) %>% pull(seqid)
+BIOPHYSICS$SUPERFAMILY.pair   = supfam %>% filter(n_dom==2) %>% pull(seqid)
+BIOPHYSICS$SUPERFAMILY.multi  = supfam %>% filter(n_dom>=3) %>% pull(seqid)
 
 pfam = PFAM %>% 
         group_by(clan) %>% mutate(np_clan = n_distinct(seq_id)) %>%
@@ -373,20 +456,25 @@ pfam = PFAM %>%
         #count(hmm_acc,name='n_uniq') %>%
 table_(pfam$n_dom)
 
-BIOPHYSICS$pfam_none   = setdiff(PROTEOME$UNIPROTKB,pfam$seq_id)
-BIOPHYSICS$pfam_single = pfam %>% filter(n_dom==1) %>% pull(seq_id)
-BIOPHYSICS$pfam_pair   = pfam %>% filter(n_dom==2) %>% pull(seq_id)
-BIOPHYSICS$pfam_multi  = pfam %>% filter(n_dom>=3) %>% pull(seq_id)
-pfam_clans = split(pfam$seq_id,pfam$clan)
+BIOPHYSICS$PFAM.none   = setdiff(PROTEOME$UNIPROTKB,pfam$seq_id)
+BIOPHYSICS$PFAM.single = pfam %>% filter(n_dom==1) %>% pull(seq_id)
+BIOPHYSICS$PFAM.pair   = pfam %>% filter(n_dom==2) %>% pull(seq_id)
+BIOPHYSICS$PFAM.multi  = pfam %>% filter(n_dom>=3) %>% pull(seq_id)
+pfam_clans = split(pfam$seq_id,pfam$clan) %>% map(unique) %>% keep(function(x){ n_distinct(x)>9 }) 
+names(pfam_clans) = paste0("PFAM.",names(pfam_clans))
+
+
 BIOPHYSICS = append(BIOPHYSICS,pfam_clans)
 
 ```
 
-### Interactions category
+### Interactions 
 
-#### Physical interactions
-#### Predicted interactions
-#### Protein complexes
+  - Physical interactions
+  
+  - Predicted interactions
+  
+  - Protein complexes
 
 ```{r interactions}
 INTERACTIONS=list()
@@ -396,8 +484,10 @@ library(ggraph)
 
 # PPI NETWORK 
 ## INTACT physical interaction network
+test = load.intact.yeast(from.MACOS = T)
+
 file.intact = "data/intact-yeast-ppi.rds"
-#preload(file.intact, loading.call = load.intact.yeast(), doing = "loading PPIs from INTACT...")
+INTACT = preload(file.intact, loading.call = load.intact.yeast(from.MACOS = T), doing = "loading PPIs from INTACT...")
 #dplyr::select(-c(created,updated,checksumA,checksumB,checksumAB,taxA,taxB))
 
 ## STRING predicted interaction network
@@ -410,6 +500,8 @@ CYC_machines = keep(CYC_complexes,function(X){ length(X) > 9  })
 INTERACTIONS=append(INTERACTIONS,CYC_machines)
 INTERACTIONS=append(INTERACTIONS,CYC_oligomers)
 
+table(CPX$CPLX_ASSEMBLY)
+
 EBI_complexes = split(CPX$members,CPX$CPLX_NAME)
 EBI_oligomers = split(CPX$members,CPX$oligomers)
 EBI_machines = keep(EBI_complexes,function(X){ length(X) > 9  })
@@ -418,11 +510,13 @@ INTERACTIONS=append(INTERACTIONS,EBI_oligomers)
 ```
 
 
-### Functions category
+### Functions 
 
-#### Biological processes
-#### Molecular function
-#### Functional classes
+- Biological processes
+
+- Molecular function
+
+- Functional classes
 
 ```{r function}
 FUNCTIONS=list()
@@ -447,20 +541,26 @@ FUNCTIONS=append(FUNCTIONS,go)
 biofunc = load.vanleeuwen2016.data()
 func_class = split(biofunc$ORF,biofunc$FUNCTION)
 FUNCTIONS = append(FUNCTIONS,func_class)
+
+# Biological pathways (KEGG)
+
+
+
 ```
 
-### Phenotypes category
+### Phenotypes 
 
-#### Essentiality vs. Dispensability
+- Essentiality vs. Dispensability
 
-As their name suggest, essential genes are required for the cell to be viable.
-Inherited or acquired mutations in those genes can lead to pathological outcomes.
-However, a synthetic rescue can happen when the phenotypic outcome created by primary mutation is alleviated by suppressor mutations.
-Hence, those genes are dubbed dispensable (essential until bypass suppression).
+    As their name suggest, essential genes are required for the cell to be viable.
+    Inherited or acquired mutations in those genes can lead to pathological outcomes.
+    However, a synthetic rescue can happen when the phenotypic outcome created by primary mutation is alleviated by suppressor mutations.
+    Hence, those genes are dubbed dispensable (essential until bypass suppression).
 
 
-#### Subcellular localizations
-#### Drug resistance
+- Subcellular localizations
+
+- Drug resistance
 
 ```{r phenotype}
 PHENOTYPES=list()
@@ -474,7 +574,7 @@ PHENOTYPES$dispensable = dispensable
 #CHM = load.lee2014.data() # Chemogenomic fitness signatures
 # MDR -> multi-drug resistance (>20% fitness)
 
-#### Subcellular localization category
+#### Subcellular localization 
 PHENOTYPES$has_foci = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
 PHENOTYPES$has_iso  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
 
@@ -498,101 +598,129 @@ PHENOTYPES=append(PHENOTYPES,subloc)
 
 # Integrated outputs
 
-## Properties and features combined
-```{r categories-table, eval=FALSE, include=FALSE}
-# Make categories table with:
-CATEGORIES = list(GENOMIC,BIOPHYSICS,INTERACTIONS,FUNCTIONS,PHENOTYPES) 
-length(CATEGORIES)
-lapply(CATEGORIES,length)
-length(flatten(CATEGORIES))
-sort( sapply(flatten(CATEGORIES),n_distinct) )
-properties= flatten(CATEGORIES)
+## Features (Quantitative output)
 
-
-QUANTITATIVE = PROTEOME %>% 
+```{r features}
+FEATURES = PROTEOME %>% 
                left_join(df.len,by=c('ORF'='orf')) %>% 
                left_join(df.gc,by=c('ORF'='orf')) %>% 
-               left_join(df.aa,by=c('UNIPROTKB','uni')) %>%
-               left_join(df.aa_class,by=c('UNIPROTKB','id')) %>%
+               left_join(df.aa,by=c('UNIPROTKB'='uni')) %>%
+               left_join(df.aa_class,by=c('UNIPROTKB'='id')) %>%
                left_join(df.d2p2,by=c('UNIPROTKB'='d2p2_id')) %>%
                left_join(df.iup,by=c('UNIPROTKB'='UNIPROT')) %>%
                left_join(df.aascales,by=c('UNIPROTKB'='UNIPROT')) %>% 
-               left_join(df.cost,by=c('ORF'='name'))
-               left_join(df.aaMW,by=c('UNIPROTKB'='UNIPROT'))
-               left_join(df.tai,by=c('ORF'='prot'))
+               left_join(df.cost,by=c('ORF'='name')) %>% 
+               left_join(df.aaMW,by=c('UNIPROTKB'='UNIPROT', 'ORF', 'SGD')) %>% 
+               left_join(df.tai,by=c('ORF'='prot')) %>% 
                left_join(df.CU,by=c('ORF'='ID'))
+TOTAL_FEATURES= length(setdiff(colnames(FEATURES),colnames(PROTEOME)))
+```
 
+## Properties (Qualitative output)
+```{r properties}
+# List all properties
+CATEGORIES = list(cat_genomics=GENOMICS,
+                  cat_transcriptomics=TRANSCRIPTOMICS,
+                  cat_biophysics=BIOPHYSICS,
+                  cat_interactions=INTERACTIONS,
+                  cat_functions=FUNCTIONS,
+                  cat_phenotypes=PHENOTYPES) 
+TOTAL_CATEGORIES = sapply(CATEGORIES,length)
+TOTAL_PROPERTIES = length(flatten(CATEGORIES))
 
-#### range of protein length ---------------------------------------------------
-GENOMIC$shortest = get.d10(QUANTITATIVE,order_by = len) %>% pull(ORF)
-GENOMIC$shorter  = get.q25(QUANTITATIVE,order_by = len) %>% pull(ORF)
-GENOMIC$average  = get.iqr(QUANTITATIVE,x=len,lo=0.4,up=0.6) %>% pull(ORF)
-GENOMIC$longest  = get.q75(QUANTITATIVE,order_by = len) %>% pull(ORF)
-GENOMIC$longest  = get.d90(QUANTITATIVE,order_by = len) %>% pull(ORF)
-#### range of GC content -------------------------------------------------------
-GENOMIC$GC_lower  = get.d10(QUANTITATIVE,order_by=pGC) %>% pull(ORF)
-GENOMIC$GC_low    = get.q25(QUANTITATIVE,order_by=pGC) %>%  pull(ORF)
-GENOMIC$GC_mid    = get.iqr(QUANTITATIVE,x=pGC,lo=0.4,up=0.6) %>% pull(ORF)
-GENOMIC$GC_high   = get.q75(QUANTITATIVE,order_by=pGC) %>% pull(ORF)
-GENOMIC$GC_higher = get.d90(QUANTITATIVE,order_by=pGC) %>% pull(ORF)
-#### range of % disorder (IUP) -----------------------------------------------------
-BIOPHYSICS$IUP_lower  = get.d10(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
-BIOPHYSICS$IUP_low    = get.q25(QUANTITATIVE,order_by=f.IUP20) %>%  pull(UNIPROTKB)
-BIOPHYSICS$IUP_mid    = get.iqr(QUANTITATIVE,x=f.IUP20,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
-BIOPHYSICS$IUP_high   = get.q75(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
-BIOPHYSICS$IUP_higher = get.d90(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
-#### range of % disorder (D2P2) -----------------------------------------------------
-BIOPHYSICS$D2P2_lower  = get.d10(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
-BIOPHYSICS$D2P2_low    = get.q25(QUANTITATIVE,order_by=f.d2p2) %>%  pull(UNIPROTKB)
-BIOPHYSICS$D2P2_mid    = get.iqr(QUANTITATIVE,x=f.d2p2,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
-BIOPHYSICS$D2P2_high   = get.q75(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
-BIOPHYSICS$D2P2_higher = get.d90(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
-#### range of % disorder (IUP) -----------------------------------------------------
-BIOPHYSICS$IUP_lower  = get.d10(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
-BIOPHYSICS$IUP_low    = get.q25(QUANTITATIVE,order_by=f.IUP20) %>%  pull(UNIPROTKB)
-BIOPHYSICS$IUP_mid    = get.iqr(QUANTITATIVE,x=f.IUP20,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
-BIOPHYSICS$IUP_high   = get.q75(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
-BIOPHYSICS$IUP_higher = get.d90(QUANTITATIVE,order_by=f.IUP20) %>% pull(UNIPROTKB)
-#### range of % disorder (D2P2) -----------------------------------------------------
-BIOPHYSICS$D2P2_lower  = get.d10(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
-BIOPHYSICS$D2P2_low    = get.q25(QUANTITATIVE,order_by=f.d2p2) %>%  pull(UNIPROTKB)
-BIOPHYSICS$D2P2_mid    = get.iqr(QUANTITATIVE,x=f.d2p2,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
-BIOPHYSICS$D2P2_high   = get.q75(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
-BIOPHYSICS$D2P2_higher = get.d90(QUANTITATIVE,order_by=f.d2p2) %>% pull(UNIPROTKB)
+#sort( sapply(flatten(CATEGORIES),n_distinct) )
+PROPERTIES= unlist(CATEGORIES,rec=F)
 
+###mini.properties = PROPERTIES[sapply(PROPERTIES,n_distinct) < 10]
+###mega.properties = PROPERTIES[sapply(PROPERTIES,n_distinct) > 1000]
 
-
-
-PROTEOME.CATEGORIES = PROTEOME
-for( C in names(properties)){
-  PROTEOME.CATEGORIES[,C] = (PROTEOME.CATEGORIES$UNIPROTKB %in% properties[[C]]) | (PROTEOME.CATEGORIES$ORF %in% properties[[C]])
+# Make a proteome table of all properties
+PROT = PROTEOME
+for( C in names(PROPERTIES)){
+  PROT[,C] = (PROT$UNIPROTKB %in% PROPERTIES[[C]]) | (PROT$ORF %in% PROPERTIES[[C]])
 }
-head(PROTEOME.CATEGORIES)
+head(PROT)
 
-M = cor(PROTEOME.CATEGORIES[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between properties
+M = cor(PROT[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between properties
 pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, fontsize = 4)
 
+when=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
+saveRDS(PROT,sprintf("data/proteome-properties-%s.rds",when))
+saveRDS(FEATURES,sprintf("data/proteome-features-%s.rds",when))
+
 ```
+
+## Bins (Semi-quantitative output)
+```{r bins}
+BINS=list()
+#### range of protein length ---------------------------------------------------
+BINS$shortest = get.d10(FEATURES,order_by = len) %>% pull(ORF)
+BINS$shorter  = get.q25(FEATURES,order_by = len) %>% pull(ORF)
+BINS$average  = get.iqr(FEATURES,x=len,lo=0.4,up=0.6) %>% pull(ORF)
+BINS$longest  = get.q75(FEATURES,order_by = len) %>% pull(ORF)
+BINS$longest  = get.d90(FEATURES,order_by = len) %>% pull(ORF)
+#### range of GC content -------------------------------------------------------
+BINS$GC_lower  = get.d10(FEATURES,order_by=pGC) %>% pull(ORF)
+BINS$GC_low    = get.q25(FEATURES,order_by=pGC) %>%  pull(ORF)
+BINS$GC_mid    = get.iqr(FEATURES,x=pGC,lo=0.4,up=0.6) %>% pull(ORF)
+BINS$GC_high   = get.q75(FEATURES,order_by=pGC) %>% pull(ORF)
+BINS$GC_higher = get.d90(FEATURES,order_by=pGC) %>% pull(ORF)
+#### range of % disorder (IUP) -----------------------------------------------------
+BINS$IUP_lower  = get.d10(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
+BINS$IUP_low    = get.q25(FEATURES,order_by=f.IUP20) %>%  pull(UNIPROTKB)
+BINS$IUP_mid    = get.iqr(FEATURES,x=f.IUP20,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
+BINS$IUP_high   = get.q75(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
+BINS$IUP_higher = get.d90(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
+#### range of % disorder (D2P2) -----------------------------------------------------
+BINS$D2P2_lower  = get.d10(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
+BINS$D2P2_low    = get.q25(FEATURES,order_by=f.d2p2) %>%  pull(UNIPROTKB)
+BINS$D2P2_mid    = get.iqr(FEATURES,x=f.d2p2,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
+BINS$D2P2_high   = get.q75(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
+BINS$D2P2_higher = get.d90(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
+#### range of % disorder (IUP) -----------------------------------------------------
+BINS$IUP_lower  = get.d10(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
+BINS$IUP_low    = get.q25(FEATURES,order_by=f.IUP20) %>%  pull(UNIPROTKB)
+BINS$IUP_mid    = get.iqr(FEATURES,x=f.IUP20,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
+BINS$IUP_high   = get.q75(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
+BINS$IUP_higher = get.d90(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
+#### range of % disorder (D2P2) -----------------------------------------------------
+BINS$D2P2_lower  = get.d10(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
+BINS$D2P2_low    = get.q25(FEATURES,order_by=f.d2p2) %>%  pull(UNIPROTKB)
+BINS$D2P2_mid    = get.iqr(FEATURES,x=f.d2p2,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
+BINS$D2P2_high   = get.q75(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
+BINS$D2P2_higher = get.d90(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
+```
+
+So far, **`r TOTAL_PROPERTIES`** proteome properties were retrieved within the following categories:
+
+**`r kable(TOTAL_CATEGORIES)`** 
+
+We also obtain **`r TOTAL_FEATURES`** protein features.
+
 
 ## Residual evolutionary rate
 ```{r fit-ER, eval=FALSE, include=FALSE}
 # Fitting mean Evolutionary rate (eR) to Protein abundance (pA)
 init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
-nls.fit = nls(EVO.FULL ~ SSlogis(PPM,Asym,xmid,scal),start=init.params,data = ER)
+nls.fit = nls(EVO.FULL ~ SSlogis(PPM,Asym,xmid,scal),start=init.params,data = ER )
 fit.ER = broom::augment_columns(x = nls.fit, data = ER) %>% 
            ungroup() %>% 
-           mutate(SS.resid = sum(.resid^2), total.resid = sum(.resid),
-                  SS.resid.pos= sum(.resid[.resid>0]^2),
-                  SS.resid.neg= sum(.resid[.resid<0]^2)) %>%   
-          left_join(PROTEOME.CATEGORIES,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
+           mutate(SSE = sum(.resid^2), total.resid = sum(.resid),
+                  avg.resid = mean_(.resid), 
+                  neg.resid = sum(.resid[.resid<0]),
+                  pos.resid = sum(.resid[.resid>0])) %>%   
+          left_join(PROT,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
+
+
 
 # Show the residuals of the eR~pA fit 
 library(ggplot2)
 library(ggthemes)
 MR = ggplot(fit.ER, aes(y = EVO.FULL, x = PPM)) +
+     geom_abline(slope=0,intercept = mean(fit.ER$EVO.FULL),size=1)+
      geom_point(fill='lightgray',shape=19,alpha=0.3) +
      geom_segment(aes(xend = PPM, yend = .fitted), col='gray',linetype='12',size=0.5) +
-     geom_point(data=subset(fit.ER,shortest),color='purple',fill=NA,shape=21,size=2)+
+     geom_point(data=subset(fit.ER,essential),color='purple',fill=NA,shape=21,size=2)+
      geom_line(mapping=aes(y=.fitted),size=1) +
      xlab('Protein abundance (log10 ppm)') + ylab('Mean ER (full seq.)') +theme_clean() 
 MR
@@ -601,35 +729,53 @@ MR2= ggplot(data=fit.ER, aes(y=.resid,x=PPM)) +
   geom_point(col='lightgray',fill='black',size=2,shape=19) +
   geom_segment(aes(xend = PPM, yend = 0),col='gray',linetype='12',size=0.5) +
   geom_abline(slope=0,intercept = 0,size=1)+
-  geom_point(data=subset(fit.ER,shortest),color='purple',fill=NA,shape=21,size=2)+
-  geom_segment(data=subset(fit.ER,shortest),aes(xend = PPM, y=0, yend = .resid),col='purple') +
+  geom_point(data=subset(fit.ER,essential),color='purple',fill=NA,shape=21,size=2)+
+  geom_segment(data=subset(fit.ER,essential),aes(xend = PPM, y=0, yend = .resid),col='purple') +
   xlab('Protein abundance (log10 ppm)') + ylab('Residuals (ER)') +theme_clean() 
 MR2
 
 # Show most over/under estimated categories
+#colnames(fit.ER)[1:25]
 
-colnames(fit.ER)[1:15]
+fit.ER %>% 
+  pivot_longer( cols= starts_with('cat_'), 
+                names_to = c('categories','source','property'), 
+                names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+                values_to = "has_prop") %>%
+  filter(has_prop) %>%
+  relocate(SGD,GNAME,PNAME,UNIPROT,ORF,categories,source,property,has_prop) %>%
+  mutate( total.resid = sum(abs(.resid)) ) %>%
+  group_by(property) %>% 
+  summarise(  N=n(),
+              sum.resid = sum(.resid), 
+              rel.resid = sum(abs(.resid))/total.resid,
+              avg.resid = mean_(.resid), 
+              neg.resid = sum(.resid[.resid<0]), 
+              pos.resid = sum(.resid[.resid>0])) %>% 
+  distinct() %>% 
+  filter(N>10) %>%
+  arrange(desc(rel.resid))
+
+
+
+
 res.cat = fit.ER %>%
-  pivot_longer(cols = 14:ncol(fit.ER),names_to = 'filter') %>% 
+  pivot_longer(cols = 22:ncol(fit.ER),names_to = 'filter') %>% 
   filter(value==T) %>% 
-  group_by(filter) %>% 
-  summarise( sse=sum(.resid) ) %>%
-             #ss.SS = sum(.resid^2)/SS.resid, 
-             #ss.avg=mean(.resid^2), 
-             #ss.sd= sd(.resid^2), n() ) %>% 
-  distinct() %>%
-  arrange(desc(ss.avg))
-
-
 
 library(ggplot2)
 library(ggfittext)
-ggplot(beverages, aes(x = beverage, y = proportion, label = ingredient,
-                    fill = ingredient)) +
+ggplot(beverages, aes(x = beverage, y = proportion, label = ingredient)) +
   #geom_col(position = "dodge") +
   geom_bar_text(position = "dodge", grow = TRUE, reflow = TRUE, place = "left", fullheight = F) +
   coord_flip()
 
-ggplot(data=res.cat) + geom_bar(mapping=aes(y=reorder(filter, -s),x=s),orientation = 'y',stat = 'identity')
+RES.CAT =res.cat %>% filter(abs(sum.resid)>10)
+fig.1 = ggplot(data=RES.CAT, aes(y=reorder(filter, -sum.resid),x=sum.resid, label=filter)) + 
+  geom_bar_text(position = "dodge",grow=T, reflow=T, place='left', fullheight=F) +
+  theme_minimal()
+
+
+ggsave(fig.1,path = "plots/", scale=3,filename = "_PROPERTIES_1.evo_rate_properties.png")
 
 ```
