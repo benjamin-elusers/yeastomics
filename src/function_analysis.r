@@ -125,7 +125,7 @@ slice.iqr  = function(.data,x,lower,upper,...){
 }
 
 # Generate five bins arbitrarily defined at quantiles: 10, 25, 40-60, 75, 90
-fivebins = function(x,
+fivebins = function(x, applyto=NULL,
                     binnames=c('lowest','lower','mid','high','highest'),
                     b1=get.d10,
                     b2=get.q25,
@@ -134,10 +134,14 @@ fivebins = function(x,
                     b5=get.d90){
   BINS = list(B1 = b1(x), B2  = b2(x), B3  = b3(x,lower=0.4,upper=0.6), B4  = b4(x), B5  = b5(x) )
   names(BINS) = binnames
+
+  if( is.vector(applyto) && length(applyto) == length(x) ){
+      BINS = lapply(BINS,function(B){ applyto[ B ]})
+  }
   return(BINS)
 }
 
 # TESTING
 # fivebins(x = xx) %>% lapply(FUN = function(B){ xx[B] } )
 # df = data.frame(id=paste0('id',0:100), num=0:100, stringsAsFactors = F)
-# fivebins(x = df$num) %>% lapply(FUN = function(B){ df$id[B] } )
+# fivebins(x = df$num,applyto=df$id)
