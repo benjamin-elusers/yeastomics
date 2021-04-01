@@ -8,8 +8,7 @@ script.to.env = function(src,nm){ # load script object into separate environment
   sys.source(file=src,env)
 }
 
-
-# REFERENCE DATA
+# LOAD FUNCTIONS
 library(AnnotationDbi)
 library(org.Sc.sgd.db)
 library(GO.db)
@@ -18,27 +17,38 @@ library(tidyverse)
 library(stringr)
 library(tictoc)
 library(openxlsx)
+
 script.to.env("src/utils.r",'utils')
 script.to.env("src/function_sequence.r",'seq')
 script.to.env("src/function_annotation.r",'annot')
-backup = file.path(".downloaded/")
+script.to.env("src/function_datalocal.r",'localdata')
+script.to.env("src/function_datapub.r",'remotedata')
+
 setup_backup = function(backup_dir ){
-  ddmmyyyy=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
-  next.backup = file.path(backup_dir,ddmmyyyy)
-  dir.create(next.backup)
-  check = dir.exists(next.backup)
-  if(!check){ stop("Failed to create a new backup directory!") }
-  return(T)
+  ddmmyyyy=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "",quiet = T)
+  next.backup = normalizePath(file.path(backup_dir,ddmmyyyy))
+  dir.create(next.backup,showWarnings = F)
+  if(!dir.exists(next.backup)){ stop("Failed to create a new backup directory!") }
+
+  message("Data may be backed up at: ",next.backup)
+  return(next.backup)
 }
 
-last.backup = list.dirs(backup)
 
-setup_backup()
+# REFERENCE DATA
+where = file.path(".downloaded/")
+#last.backup = list.dirs(backup)
+setup_backup(where)
 
-# MAIN PROTEIN FEATURES
+# REFERENCE DATA URL
+## MAIN PROTEIN FEATURES
 SGD  = load.sgd.features()
 UNIPROT = load.uniprot.features()
 #saveRDS(UNIPROT, "data/uniprot-features.rds")
+
+# s. cerevisiae ohnologs (wgd)
+OHNO = load.read.csv("http://ygob.ucd.ie/browser/ohnologs.csv",stringsAsFactors = F)[, -1]
+
 
 # PRIMARY SEQUENCES
 S288C  = load.sgd.proteome()
@@ -53,7 +63,6 @@ UNI.SC = load.uniprot.proteome('yeast')
 ## LOAD DATASETS ---------------------------------------------------------------
 #==============================================================================#
 # LOCAL DATA
-script.to.env("src/function_datalocal.r",'localdata')
 EDL = load.emmanuel.data()                     # Yeast data from emmanuel levy
 TAI = load.codon.usage(inputseq=load.sgd.CDS())
 #
@@ -65,7 +74,6 @@ head(K11.R4S)
 R4S = load.aligned.data(data.path="data/" ) # Aligned evolutionary rate
 
 # REMOTE DATA
-script.to.env("src/function_datapub.r",'remotedata')
 DUB  = load.dubreuil2019.data(1)        # Stickiness disorder
 LEU  = load.leunberger2017.data()       # Limited proteolysis (stability)
 VAN  = load.vanleeuwen2020.data()       # Gene dispensability (essentiality)
@@ -94,6 +102,5 @@ head(LOC)
 head(GO)
 
 
-script.to.env("src/function_annotation.r",'annot')
 get.uniprot.sgd()
 load.uniprot.features(tax = 559292)
