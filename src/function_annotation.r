@@ -313,7 +313,8 @@ get.uniprot.pathways = function(ORG="YEAST"){
   return(PATHWAY)
 }
 
-get.KEGG = function(sp='sce',type=c('pathway','module')){
+get.KEGG = function(sp='sce',type=c('pathway','module'),as.df=F){
+
   library(KEGGREST)
   library(tidyverse)
 
@@ -332,12 +333,9 @@ get.KEGG = function(sp='sce',type=c('pathway','module')){
   ## returns gene-pathway
   df = left_join(df2,df1,by='grp') %>%
        filter(!is.na(id))
-
+  if(as.df){ return(df) }
   return( split(df$id,df$desc,drop = T) )
 }
-
-PATHWAY=get.KEGG('sce','pathway')
-MODULE=get.KEGG('sce','module')
 
 #PP = get.uniprot.pathways(ORG='YEAST')
 #test = separate(PP,name,sep = ";", into = c('div1','div2','div3')) %>% filter(!is.na(ids)) %>% group_by(div1,div2) %>% summarise( allids= paste(ids,collapse=","), n = str_count(string = allids,",")+1)
