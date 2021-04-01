@@ -77,3 +77,67 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
   }
   return(CC)
 }
+
+
+# Measure centrality of a network
+network.centrality = function(fromTo){
+  if(missing(fromTo)){ stop("A from-to matrix is required to build the network!") }
+  library(tidygraph)
+  net %>%
+  mutate(cent_alpha = centrality_authority())
+
+  }
+
+# Find the specific quantiles
+q25 = function(x){ quantile(x,0.25) }
+q75 = function(x){ quantile(x,0.75) }
+d10 = function(x){ quantile(x,0.1) }
+d40 = function(x){ quantile(x,0.4) }
+d60 = function(x){ quantile(x,0.6) }
+d90 = function(x){ quantile(x,0.9) }
+
+# Get the values below/above a specified quantile
+get.d10 = function(x,with_ties=T){ as.logical( with_ties*(x==d10(x)) + (x < d10(x)) ) }
+get.q25 = function(x,with_ties=T){ as.logical( with_ties*(x==q25(x)) + (x < q25(x)) ) }
+get.q75 = function(x,with_ties=T){ as.logical( with_ties*(x==q75(x)) + (x > q75(x)) ) }
+get.d90 = function(x,with_ties=T){ as.logical( with_ties*(x==d90(x)) + (x > d90(x)) ) }
+# xx= 0:100
+# xx[ get.d10(xx,with_ties = F) ]
+# xx[ get.q25(xx,with_ties = F) ]
+
+# Get values in interquantile range
+get.iqr = function(x,lower,upper,with_ties=T){
+    if(with_ties){
+      x >= quantile(x,lower) & x <= quantile(x,upper)
+    }else{
+      x > quantile(x,lower) & x < quantile(x,upper)
+    }
+}
+
+# Slice tibble data for specicic quantiles or interquantile range
+slice.d10  = function(x,...){ dplyr::slice_min(x,prop=0.1,with_ties = T,...) }
+slice.d90  = function(x,...){ dplyr::slice_max(x,prop=0.1,with_ties = T,...) }
+slice.q25  = function(x,...){ dplyr::slice_min(x,prop=0.25,with_ties = T,...) }
+slice.q75  = function(x,...){ dplyr::slice_max(x,prop=0.25,with_ties = T,...) }
+slice.iqr  = function(.data,x,lower,upper,...){
+  col <- enquo(x)
+  dplyr::filter(.data,between(!!col,quantile(!!col,lower),quantile(!!col,upper)))
+}
+
+# Generate five bins arbitrarily defined at quantiles: 10, 25, 40-60, 75, 90
+fivebins = function(x,
+                    binnames=c('lowest','lower','mid','high','highest'),
+                    b1=get.d10,
+                    b2=get.q25,
+                    b3=get.iqr,
+                    b4=get.q75,
+                    b5=get.d90){
+  BINS = list(B1 = b1(x), B2  = b2(x), B3  = b3(x,lower=0.4,upper=0.6), B4  = b4(x), B5  = b5(x) )
+  names(BINS) = binnames
+  return(BINS)
+}
+
+# TESTING
+# fivebins(x = xx) %>% lapply(FUN = function(B){ xx[B] } )
+# df = data.frame(id=paste0('id',0:100), num=0:100, stringsAsFactors = F)
+# fivebins(x = df$num) %>% lapply(FUN = function(B){ df$id[B] } )
