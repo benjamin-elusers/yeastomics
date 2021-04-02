@@ -399,13 +399,13 @@ get.aascales=function(){
 }
 
 
-# Protein-Protein interactions (intact from Hugo) ------------------------------
-
+# Protein-Protein interactions (intact dataset from Hugo) ------------------------------
 load.intact.yeast = function(only.direct=T,
-                       rm.useless=T,
-                       orga="cerevisiae",
-                       intact.data=sprintf("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_%s.txt",orga),
-                       from.MACOS=F){
+                             rm.useless=T,
+                             orga="cerevisiae",
+                             intact.data=sprintf("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_%s.txt",orga),
+                             from.MACOS=F){
+
   #/media/elusers/users/hugo/07_3DComplex_scripts/scripts_PPIs_networks/stack_studies_PPIs_nored_PMID_28122020_INTACT.R
   # intact.url="ftp://ftp.ebi.ac.uk/pub/databases/intact/current/psimitab/intact.txt"
 
@@ -421,7 +421,7 @@ load.intact.yeast = function(only.direct=T,
   #                           chunk_size = 1000)
   #                             )
   #sc.intact = vroom(pipe("curl ftp://ftp.ebi.ac.uk/pub/databases/intact/current/psimitab/intact.txt | grep -w cerevisiae"),)
-  #if(from.MACOS){ intact.data=gsub("/media","/Volumes",intact.data) }
+  if(from.MACOS){ intact.data=gsub("/media","/Volumes",intact.data) }
 
   IntAct = read.csv(intact.data,sep = "\t", quote = "", stringsAsFactors = F)
   colnames(IntAct) = c("protA","protB","altA","altB","aliasA","aliasB",
@@ -509,13 +509,17 @@ load.intact.yeast = function(only.direct=T,
       if(!require(rols)){ BiocManager::install("rols") }
       library(rols)
       MI <- Ontology("MI")
+      # MI:0013 Biophysical methods
       biophysical.methods = descendants(term(MI,"MI:0013"))
       return( as(biophysical.methods, "data.frame") )
     }
 
+
     # 5. filter for direct method
     biophy_meth= as.character(get.biophysical.methods()['id'])
     biophy_meth_regex= paste0(biophy_meth,'"',collapse="|")
+    biophy_meth =
+
     #c("MI:0114","MI:0276","MI:0071","MI:0028","MI:0808","MI:0020","MI:0826","MI:0016","MI:0038","MI:0397")
     cat("-> Filter direct physical method...\n")
     INTACT.5 = INTACT.4[grep(biophy_meth_regex,x=INTACT.4$method), ]
@@ -623,4 +627,9 @@ get.mapping.3dcomplex.yeast = function(limit = F, n = 1000) {
   }
   return(Q)
 }
+
+
+
+
+
 
