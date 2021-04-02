@@ -95,6 +95,7 @@ network.centrality = function(fromTo){
   cat("Components sizes (# count) :\n")
   cat("----------------------------\n")
   cat(sprintf("\n%-5s (# %-3s)",names(comp.sizes),comp.sizes))
+  cat("\n\n")
   toc()
 
   # Get the largest connected component
@@ -124,6 +125,7 @@ network.centrality = function(fromTo){
   # Benchmark correlation for the centrality measures
   tic(" - Find correlation between centrality measures...")
   corrplot::corrplot(cor(centrality[,-1],use = 'complete',method ='spearman'))
+  toc()
   return(centrality)
 }
 
