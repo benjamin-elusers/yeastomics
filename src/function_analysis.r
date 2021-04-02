@@ -82,52 +82,50 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
 
 # Measure centrality of a network
 network.centrality = function(fromTo){
-  ft_string = STRING %>%
-              dplyr::filter(experiments>100) %>%
-              dplyr::select(ORF1,ORF2)
-  fromTo=ft_string
   if(missing(fromTo)){ stop("A from-to matrix is required to build the network!") }
-  library(tidygraph)
   library(igraph)
-  library(netrankr)
+  library(tictoc)
+  #library(tidygraph)
+  #library(netrankr)
+  tic(" - Build graph...")
+  fullnet = graph_from_data_frame(fromTo,directed = F)
+  comp = components(fullnet)
+  message("Number of components: ",comp$no)
+  comp.sizes = table(comp$csize)
+  cat("Components sizes (# count) :\n")
+  cat("----------------------------\n")
+  cat(sprintf("\n%-5s (# %-3s)",names(comp.sizes),comp.sizes))
+  toc()
 
-  fullnet = as_tbl_graph(fromTo)
-  ranknet = fullnet %>% activate(nodes) %>%
-        mutate(
-          # FAILED (out of memory issue)
-          #cen.alpha                       = centrality_alpha(),
-          #cen.power                       = centrality_power(),
-          # IRRELEVANT
-          #cen.manual                      = centrality_manual(),
-          #cen.communicability_odd         = centrality_communicability_odd(),
-          #cen.communicability_even        = centrality_communicability_even(),
-          #cen.subgraph_odd                = centrality_subgraph_odd(),
-          #cen.subgraph_even               = centrality_subgraph_even(),
-          # CENTRALITY MEASURES TO USE
-          cen.degree                      = centrality_degree(),      # degree = regulatory relevance (signaling hubs)
-          cen.betweenness                 = centrality_betweenness(cutoff = 20), # number of shortest path going through a node
-          cen.closeness                   = centrality_closeness(cutoff = 20), # inverse average length of shortest path
-          cen.eigen                       = centrality_eigen(),       # node centrality index (important proteins interact with other important proteins)
-          cen.authority                   = centrality_authority(),   # authority = receive from hubs (authority and hub can overlap)
-          cen.hub                         = centrality_hub(),         # hub = connected to authorities (authority and hub can overlap)
-          cen.pagerank                    = centrality_pagerank(),    # similar to eigen centrality
-          cen.subgraph                    = centrality_subgraph(),    # number of subgraphs connected (closed loops from this node)
-          cen.integration                 = centrality_integration(), # walk counts
-          cen.communicability             = centrality_communicability(),
-          cen.katz                        = centrality_katz()
-          #cen.betweenness_network         = centrality_betweenness_network(),
-          #cen.betweenness_current         = centrality_betweenness_current(),
-          #cen.betweenness_communicability = centrality_betweenness_communicability(),
-          #cen.betweenness_rsp_simple      = centrality_betweenness_rsp_simple(), # SP = capability of a protein to bring in communication distant proteins
-          #cen.betweenness_rsp_net         = centrality_betweenness_rsp_net(),
-          #cen.information                 = centrality_information(),
-          #cen.decay                       = centrality_decay(),
-          #cen.random_walk                 = centrality_random_walk(),
-          #cen.expected                    = centrality_expected()
-        )
+  # Get the largest connected component
+  tic(" - Find largest connected component...")
+  connet = decompose(fullnet,max.comps=1)[[1]]
+  nnodes= length(V(connet))
+  message("Maximum number of nodes :",nnodes)
+  toc()
 
+  # Compute centrality measures for nodes of largest connected component
+  tic(" - Compute centrality measures in connected component...")
+  centrality = as_ids(V(connet)) %>% as_tibble %>%
+    mutate(
+      cent.alpha = igraph::alpha_centrality(connet),
+      cent.authority = igraph::authority_score(connet)$vector,
+      cent.deg = igraph::degree(connet),
+      cent.betweenness = igraph::betweenness(connet),
+      cent.closeness = igraph::closeness(connet),
+      cent.eigen = igraph::eigen_centrality(connet)$vector,
+      cent.eccentricity = igraph::eccentricity(connet),
+      cent.hub = igraph::hub.score(connet)$vector,
+      cent.pagerank = igraph::page_rank(connet)$vector,
+      cent.subgraph= igraph::subgraph_centrality(connet)
+  )
+  toc()
 
-  }
+  # Benchmark correlation for the centrality measures
+  tic(" - Find correlation between centrality measures...")
+  corrplot::corrplot(cor(centrality[,-1],use = 'complete',method ='spearman'))
+  return(centrality)
+}
 
 # Find the specific quantiles
 q25 = function(x){ quantile(x,0.25) }
