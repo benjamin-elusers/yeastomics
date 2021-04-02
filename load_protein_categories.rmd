@@ -69,21 +69,6 @@ suppressPackageStartupMessages({
   source("src/function_analysis.r")
   source("src/function_datalocal.r")
   source("src/function_datapub.r")
-  q25 = function(x){ quantile(x,0.25) }
-  q75 = function(x){ quantile(x,0.75) }
-  d10 = function(x){ quantile(x,0.1) }
-  d40 = function(x){ quantile(x,0.4) }
-  d60 = function(x){ quantile(x,0.6) }
-  d90 = function(x){ quantile(x,0.9) }
-  get.d10  = function(x,...){ dplyr::slice_min(x,prop=0.1,with_ties = T,...) }
-  get.d90  = function(x,...){ dplyr::slice_max(x,prop=0.1,with_ties = T,...) }
-  get.q25  = function(x,...){ dplyr::slice_min(x,prop=0.25,with_ties = T,...) }
-  get.q75  = function(x,...){ dplyr::slice_max(x,prop=0.25,with_ties = T,...) }
-  get.iqr  = function(.data,x,lower,upper,...){ 
-    col <- enquo(x)
-    dplyr::filter(.data,between(!!col,quantile(!!col,lower),quantile(!!col,upper)))
-  }
-
 })
 
 # turn off annoying messages from dplyr::summarise
@@ -204,9 +189,7 @@ PROTEOME = UNIPROT %>% dplyr::select(UNIPROTKB, SGD, ORF, GNAME, PNAME)
 # DISORDER STICKINESS PROTEOME DATA --------------------------------------------
 DUB = load.dubreuil2019.data(4)
 # DUPLICATED GENES (OHNOLOGS)  -------------------------------------------------
-OHNO = get.sc.ohno(myseq=S288C) #%>%
-#         left_join(PROTEOME %>% rename_with(.fn = xxS,sx='ref'), by=c('orf'='ORF.ref')) %>%
-#         left_join(PROTEOME %>% rename_with(.fn = xxS,sx='dup'), by=c('dup.orf'='ORF.dup'))
+OHNO = get.sc.ohno(myseq=S288C)
 
 # CHROMOSOME GENES  ------------------------------------------------------------
 CHR = SGD %>%
@@ -246,10 +229,15 @@ STABILITY = load.leuenberger2017.data() %>%
    mutate( nres = round(0.01*Protein.Coverage*Length))
 
 # PROTEIN-PROTEIN INTERACTIONS  ------------------------------------------------
+## STRING functional protein association networks ------------------------------
 STRING = load.string(tax="4932",phy=T, ful=T, min.score = 700) %>% 
              mutate(ORF1 = str_extract(protein1,SGD.nomenclature()),
                     ORF2 = str_extract(protein2,SGD.nomenclature())
              ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
+## INTACT Molecular Interaction Database ---------------------------------------
+#test = load.intact.yeast(from.MACOS = T)
+#file.intact = "data/intact-yeast-ppi.rds"
+#INTACT = preload(file.intact, loading.call = load.intact.yeast(from.MACOS = T), doing = "loading PPIs from INTACT...")
 
 
 # PROTEIN COMPLEXES  -----------------------------------------------------------
@@ -273,7 +261,6 @@ UNIGO = get.uniprot.go(UNIPROT$UNIPROTKB) %>%  # Uniprot-based GO annotation
 ## KEGG Biological Pahtways/Modules --------------------------------------------
 PATHWAY=get.KEGG('sce','pathway',as.df=T)
 MODULE=get.KEGG('sce','module',as.df=T)
-
 
 # PHENOTYPES
 ## Essential/Dispensable genes -------------------------------------------------
@@ -483,11 +470,6 @@ library(tidygraph)
 library(ggraph)
 
 # PPI NETWORK 
-## INTACT physical interaction network
-test = load.intact.yeast(from.MACOS = T)
-
-file.intact = "data/intact-yeast-ppi.rds"
-INTACT = preload(file.intact, loading.call = load.intact.yeast(from.MACOS = T), doing = "loading PPIs from INTACT...")
 #dplyr::select(-c(created,updated,checksumA,checksumB,checksumAB,taxA,taxB))
 
 ## STRING predicted interaction network
@@ -654,41 +636,18 @@ saveRDS(FEATURES,sprintf("data/proteome-features-%s.rds",when))
 ```{r bins}
 BINS=list()
 #### range of protein length ---------------------------------------------------
-BINS$shortest = get.d10(FEATURES,order_by = len) %>% pull(ORF)
-BINS$shorter  = get.q25(FEATURES,order_by = len) %>% pull(ORF)
-BINS$average  = get.iqr(FEATURES,x=len,lo=0.4,up=0.6) %>% pull(ORF)
-BINS$longest  = get.q75(FEATURES,order_by = len) %>% pull(ORF)
-BINS$longest  = get.d90(FEATURES,order_by = len) %>% pull(ORF)
+PROTLEN = fivebins(x = FEATURES$len, applyto = FEATURES$ORF, 
+                   binnames = c("shortest","shorter","average","longer","longest"))
+BINS = append(BINS,PROTLEN)
 #### range of GC content -------------------------------------------------------
-BINS$GC_lower  = get.d10(FEATURES,order_by=pGC) %>% pull(ORF)
-BINS$GC_low    = get.q25(FEATURES,order_by=pGC) %>%  pull(ORF)
-BINS$GC_mid    = get.iqr(FEATURES,x=pGC,lo=0.4,up=0.6) %>% pull(ORF)
-BINS$GC_high   = get.q75(FEATURES,order_by=pGC) %>% pull(ORF)
-BINS$GC_higher = get.d90(FEATURES,order_by=pGC) %>% pull(ORF)
+GCPERC = fivebins(x = FEATURES$pGC, applyto = FEATURES$ORF)
+BINS = append(BINS,GCPERC)
 #### range of % disorder (IUP) -----------------------------------------------------
-BINS$IUP_lower  = get.d10(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
-BINS$IUP_low    = get.q25(FEATURES,order_by=f.IUP20) %>%  pull(UNIPROTKB)
-BINS$IUP_mid    = get.iqr(FEATURES,x=f.IUP20,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
-BINS$IUP_high   = get.q75(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
-BINS$IUP_higher = get.d90(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
+IUPPERC = fivebins(x = FEATURES$f.IUP20, applyto = FEATURES$ORF)
+BINS = append(BINS,IUPPERC)
 #### range of % disorder (D2P2) -----------------------------------------------------
-BINS$D2P2_lower  = get.d10(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
-BINS$D2P2_low    = get.q25(FEATURES,order_by=f.d2p2) %>%  pull(UNIPROTKB)
-BINS$D2P2_mid    = get.iqr(FEATURES,x=f.d2p2,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
-BINS$D2P2_high   = get.q75(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
-BINS$D2P2_higher = get.d90(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
-#### range of % disorder (IUP) -----------------------------------------------------
-BINS$IUP_lower  = get.d10(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
-BINS$IUP_low    = get.q25(FEATURES,order_by=f.IUP20) %>%  pull(UNIPROTKB)
-BINS$IUP_mid    = get.iqr(FEATURES,x=f.IUP20,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
-BINS$IUP_high   = get.q75(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
-BINS$IUP_higher = get.d90(FEATURES,order_by=f.IUP20) %>% pull(UNIPROTKB)
-#### range of % disorder (D2P2) -----------------------------------------------------
-BINS$D2P2_lower  = get.d10(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
-BINS$D2P2_low    = get.q25(FEATURES,order_by=f.d2p2) %>%  pull(UNIPROTKB)
-BINS$D2P2_mid    = get.iqr(FEATURES,x=f.d2p2,lo=0.4,up=0.6) %>% pull(UNIPROTKB)
-BINS$D2P2_high   = get.q75(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
-BINS$D2P2_higher = get.d90(FEATURES,order_by=f.d2p2) %>% pull(UNIPROTKB)
+D2P2PERC = fivebins(x = FEATURES$f.d2p2, applyto = FEATURES$ORF)
+BINS = append(BINS,D2P2PERC)
 ```
 
 So far, **`r TOTAL_PROPERTIES`** proteome properties were retrieved within the following categories:
