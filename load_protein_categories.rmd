@@ -465,15 +465,13 @@ BIOPHYSICS = append(BIOPHYSICS,pfam_clans)
 
 ```{r interactions}
 INTERACTIONS=list()
-library(network)
-library(tidygraph)
-library(ggraph)
 
 # PPI NETWORK 
-#dplyr::select(-c(created,updated,checksumA,checksumB,checksumAB,taxA,taxB))
 
 ## STRING predicted interaction network
-STRING_net = as_tbl_graph(STRING)
+df.STRING_centrality = network.centrality(STRING)
+
+
 
 # PROTEIN COMPLEXES
 CYC_complexes = split(CYC$ORF,CYC$Complex)
