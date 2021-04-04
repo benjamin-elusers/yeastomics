@@ -590,7 +590,7 @@ load.intact.yeast = function(with_direct=T,with_biophysical=T,with_reliable=T,
 
   above_miscore = (INTACT.4$intact_miscore >= min.intact.score)
   to_keep = (above_miscore|is_direct|is_biophysical|is_reliable)
-  cat("  >>> high MI confidence (>",min.intact.score,") :",sum(above_miscore),"\n")
+  cat(" >>> high MI confidence (>",min.intact.score,") :",sum(above_miscore),"\n")
   cat("-------------------------------------------------\n")
 
   INTACT.5 = INTACT.4[to_keep, ]
