@@ -23,6 +23,25 @@ load.sgd.orf = function(sgd.feat){
   return( sgd.feat$name[ORF] )
 }
 
+# Molecular Interaction controlled vocabulary
+get.MI.annotation= function(id="MI:0013",
+                            relation=c('descendants','children','ancestors','parents','siblings'),
+                            include=T){
+  library(rols)
+  ol = rols::Ontologies()
+  MI <- ol[['mi']]
+  ID = term(MI,id)
+  related = match.arg(relation, choices =c('descendants','children','ancestors','parents'), several.ok = F )
+  message("looking for ",relation," of ",id," [",termLabel(ID),"] ...")
+  if(related == 'children'   ){ MI.annot = children(ID)    }
+  if(related == 'descendants'){ MI.annot = descendants(ID) }
+  if(related == 'ancestors'  ){ MI.annot = ancestors(ID)   }
+  if(related == 'parents'    ){ MI.annot = parents(ID)     }
+  if(related == 'siblings'    ){ MI.annot = children(parents(ID)[[1]])     }
+  if(include){ return( rbind( as(ID,"data.frame"), as(MI.annot, "data.frame") ) ) }
+  return( as(MI.annot, "data.frame") )
+}
+
 # Biological annotations (mapped to Uniprot) -----------------------------------
 
 load.uniprot.features = function(tax=559292,refdb='UNIPROTKB'){ # Gene/Protein features from Uniprot
