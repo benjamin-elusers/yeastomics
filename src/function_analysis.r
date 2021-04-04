@@ -107,18 +107,18 @@ network.centrality = function(fromTo){
 
   # Compute centrality measures for nodes of largest connected component
   tic(" - Compute centrality measures in connected component...")
-  centrality = as_ids(V(connet)) %>% as_tibble %>%
+  centrality = tibble( ids = as_ids(V(connet)) ) %>%
     mutate(
       cent.alpha = igraph::alpha_centrality(connet),
-      cent.authority = igraph::authority_score(connet)$vector,
       cent.deg = igraph::degree(connet),
       cent.betweenness = igraph::betweenness(connet),
       cent.closeness = igraph::closeness(connet),
-      cent.eigen = igraph::eigen_centrality(connet)$vector,
       cent.eccentricity = igraph::eccentricity(connet),
-      cent.hub = igraph::hub.score(connet)$vector,
       cent.pagerank = igraph::page_rank(connet)$vector,
-      cent.subgraph= igraph::subgraph_centrality(connet)
+      cent.eigen = igraph::eigen_centrality(connet)$vector,
+      cent.authority = igraph::authority_score(connet)$vector,
+      cent.hub = igraph::hub.score(connet)$vector,
+      cent.subgraph= igraph::subgraph_centrality(connet,diag = F)
   )
   toc()
 
@@ -138,10 +138,10 @@ d60 = function(x){ quantile(x,0.6) }
 d90 = function(x){ quantile(x,0.9) }
 
 # Get the values below/above a specified quantile
-get.d10 = function(x,with_ties=T){ as.logical( with_ties*(x==d10(x)) + (x < d10(x)) ) }
-get.q25 = function(x,with_ties=T){ as.logical( with_ties*(x==q25(x)) + (x < q25(x)) ) }
-get.q75 = function(x,with_ties=T){ as.logical( with_ties*(x==q75(x)) + (x > q75(x)) ) }
-get.d90 = function(x,with_ties=T){ as.logical( with_ties*(x==d90(x)) + (x > d90(x)) ) }
+get.d10 = function(x,with_ties=T){ (with_ties & (x==d10(x)) + (x < d10(x)) ) }
+get.q25 = function(x,with_ties=T){ (with_ties & (x==q25(x)) + (x < q25(x)) ) }
+get.q75 = function(x,with_ties=T){ (with_ties & (x==q75(x)) + (x > q75(x)) ) }
+get.d90 = function(x,with_ties=T){ (with_ties & (x==d90(x)) + (x > d90(x)) ) }
 # xx= 0:100
 # xx[ get.d10(xx,with_ties = F) ]
 # xx[ get.q25(xx,with_ties = F) ]
