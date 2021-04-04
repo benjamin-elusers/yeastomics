@@ -1,7 +1,26 @@
 source("src/utils.r",local = T)
+source("src/function_annotation.r",local = T)
 source("src/function_sequence.r",local = T)
 source("src/function_phylogenetic.r",local = T)
 
+# Molecular Interaction controlled vocabulary
+get.MI.annotation= function(id="MI:0013",
+                            relation=c('descendants','children','ancestors','parents','siblings'),
+                            include=T){
+  library(rols)
+  ol = rols::Ontologies()
+  MI <- ol[['mi']]
+  ID = term(MI,id)
+  related = match.arg(relation, choices =c('descendants','children','ancestors','parents'), several.ok = F )
+  message("looking for ",relation," of ",id," [",termLabel(ID),"] ...")
+  if(related == 'children'   ){ MI.annot = children(ID)    }
+  if(related == 'descendants'){ MI.annot = descendants(ID) }
+  if(related == 'ancestors'  ){ MI.annot = ancestors(ID)   }
+  if(related == 'parents'    ){ MI.annot = parents(ID)     }
+  if(related == 'siblings'    ){ MI.annot = children(parents(ID)[[1]])     }
+  if(include){ return( rbind( as(ID,"data.frame"), as(MI.annot, "data.frame") ) ) }
+  return( as(MI.annot, "data.frame") )
+}
 read.url <- function(file_url) {
   con <- gzcon(url(file_url))
   txt <- readLines(con)
@@ -400,7 +419,8 @@ get.aascales=function(){
 
 
 # Protein-Protein interactions (intact dataset from Hugo) ------------------------------
-load.intact.yeast = function(only.direct=T,
+load.intact.yeast = function(with_direct=T,with_biophysical=T,with_reliable=T,
+                             min.intact.score=0.5,
                              rm.useless=T,
                              orga="cerevisiae",
                              intact.data=sprintf("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_%s.txt",orga),
@@ -409,20 +429,7 @@ load.intact.yeast = function(only.direct=T,
   #/media/elusers/users/hugo/07_3DComplex_scripts/scripts_PPIs_networks/stack_studies_PPIs_nored_PMID_28122020_INTACT.R
   # intact.url="ftp://ftp.ebi.ac.uk/pub/databases/intact/current/psimitab/intact.txt"
 
-  # search.keyword <- function(x, pos, keyword='cerevisiae|:4932|:559292|yeast') {
-  #   colA = grepl(keyword,x[['Taxid.interactor.A']])
-  #   colB = grepl(keyword,x[['Taxid.interactor.B']])
-  #   colH = grepl(keyword,x[['Host.organism.s.']])
-  #   x[colA & colB & colH,]
-  #
-  # }
-  # test =readr::read_delim_chunked(file=intact.url, delim="\t",
-  #                           callback = readr::DataFrameCallback$new(search.keyword),
-  #                           chunk_size = 1000)
-  #                             )
-  #sc.intact = vroom(pipe("curl ftp://ftp.ebi.ac.uk/pub/databases/intact/current/psimitab/intact.txt | grep -w cerevisiae"),)
   if(from.MACOS){ intact.data=gsub("/media","/Volumes",intact.data) }
-
   IntAct = read.csv(intact.data,sep = "\t", quote = "", stringsAsFactors = F)
   colnames(IntAct) = c("protA","protB","altA","altB","aliasA","aliasB",
                        "method","pub.author1","pub.id",
@@ -452,6 +459,52 @@ load.intact.yeast = function(only.direct=T,
   cat(sprintf("(0) TOTAL INTERACTIONS : %s \n",nrow(INTACT.0)))
   # Highligh PPIs obtained with one of the methods given in input
   #INTACT$reliable = INTACT$method %in% used.methods
+  INTACT.0$intact_miscore = as.numeric(gsub(".*intact-miscore:([0-9]+\\.[0-9]+).*","\\1",INTACT.0$conf))
+
+  #-###-###-###-###-###-#
+  #  BENCHMARK MI_SCORE #
+  #-###-###-###-###-###-#
+  # mi_score = cut(INTACT.0$intact_miscore,breaks = seq(0,1,by=0.05))
+  # mi_meth = gsub("psi-mi:\"MI:[0-9]{4}\"\\((.+)\\)","\\1",INTACT.0$method)
+  # mi_methid = gsub("psi-mi:\"(MI:[0-9]{4})\"\\((.+)\\)","\\1",INTACT.0$method)
+  # miscores_meth = table(mi_score,mi_meth)
+  # benchmark_meth = miscores_meth[,colSums(miscores_meth)>0]
+  #
+  # # MI:0045 experimental interaction detection
+  # EXP = get.MI.annotation(id = "MI:0045", relation = 'children', include=F)[c('id','label')] %>%
+  #       rename(id_type=id, type=label) %>%
+  #       rowwise() %>%
+  #       mutate( descendants = purrr::map(id_type,get.MI.annotation,relation="descendants",include=T) ) %>%
+  #       unnest(cols=c(descendants)) %>%
+  #       dplyr::select(id_type, type, id, label)
+  #
+  # EXPTYPE = tibble(meth=colnames(benchmark_meth)) %>%
+  #           left_join(EXP,c('meth'='label')) %>%
+  #           mutate(type = factor(replace_na(type,  "other")),
+  #                  is_dup = duplicated(meth) ) %>%
+  #           filter( !is_dup ) %>%
+  #           arrange(type,meth)
+  #
+  # ann_column = data.frame( exptype = factor(EXPTYPE$type), row.names = EXPTYPE$meth)
+  # ann_colors = list( exptype = c("biochemical"="#66C2A5",
+  #                                "biophysical"="#FC8D62",
+  #                                "genetic interference"="#8DA0CB",
+  #                                "imaging technique"= "#E78AC3",
+  #                                "protein complementation assay"="#A6D854",
+  #                                "other"="#FFFFFF") )
+
+  # weights = matrix(1e4*as.numeric(EXPTYPE$type),byrow=T,nrow=20,ncol=nrow(EXPTYPE))
+  #CEXP = cor(benchmark_meth[,EXPTYPE$meth],use = 'pairwise.complete', meth='spearman')
+  #pheatmap::pheatmap(CEXP,annotation_col = ann_column)
+  # pheatmap::pheatmap(log10(1+benchmark_meth[,EXPTYPE$meth]),
+  #                    scale='none',
+  #                    cluster_rows = F,
+  #                    cluster_cols = T,
+  #                    clustering_distance_cols = dist(t(benchmark_meth[,EXPTYPE$meth]+weights)),
+  #                    annotation_col = ann_column,
+  #                    annotation_colors = ann_colors,
+  #                    cellwidth = 10,
+  #                    cellheight = 10,border_color = NA)
 
 
   # 1. remove small molecules and non-protein
@@ -504,29 +557,44 @@ load.intact.yeast = function(only.direct=T,
   cat("-> Filter duplicated interactions within PMID...\n")
   cat(sprintf("(4) TOTAL INTERACTIONS : %s \n",nrow(INTACT.4)))
 
-  if(only.direct){
-    get.biophysical.methods = function(){
-      if(!require(rols)){ BiocManager::install("rols") }
-      library(rols)
-      MI <- Ontology("MI")
-      # MI:0013 Biophysical methods
-      biophysical.methods = descendants(term(MI,"MI:0013"))
-      return( as(biophysical.methods, "data.frame") )
-    }
-
-
-    # 5. filter for direct method
-    biophy_meth= as.character(get.biophysical.methods()['id'])
-    biophy_meth_regex= paste0(biophy_meth,'"',collapse="|")
-    biophy_meth =
-
-    #c("MI:0114","MI:0276","MI:0071","MI:0028","MI:0808","MI:0020","MI:0826","MI:0016","MI:0038","MI:0397")
-    cat("-> Filter direct physical method...\n")
-    INTACT.5 = INTACT.4[grep(biophy_meth_regex,x=INTACT.4$method), ]
-    cat(sprintf("(5) TOTAL INTERACTIONS : %s \n",nrow(INTACT.5)))
-  }else{
-    INTACT.5 = INTACT.4
+  cat("-> Filter quality interactions...\n")
+  # 5.1 filter for direct association
+  if(with_direct){
+    direct =c("MI:0407",get.MI.annotation('MI:0407','descendants')[,'id'])
+    direct_regex= paste0(direct,'"',collapse="|")
+    is_direct = grepl(direct_regex,x=INTACT.4$typeAB)
+    cat(" >>> as direct association :",sum(is_direct),"\n")
   }
+  # 5.2 filter for biophysical methods
+  if(with_biophysical){
+    biophysical =c("MI:0013",get.MI.annotation('MI:0013','descendants')[,'id'])
+    biophysical_regex= paste0(biophysical,'"',collapse="|")
+    is_biophysical = grepl(biophysical_regex,x=INTACT.4$method)
+    cat(" >>> with biophysical methods : ",sum(is_biophysical),"\n")
+  }
+
+  # 5.3 filter for reliable methods
+  if(with_reliable){ # from Hugo's flagged methods
+    hugo_stringent =c("0016","0020","0028","0038","0071","0114","0276","0397","0808","0826")
+    hugo_keep=c(hugo_stringent,
+                "0013","0017","0040","0042","0052","0067","0069","0091","0104","0232","0404",
+                "0410","0419","0426","0512","0807","0825","0841","0859","0872","0947","0953",
+                "0964","0982","1022","1104","1147","1246","2289","2338")
+
+     hugo_keep_extended= c(hugo_keep,"0018","0027","0029","0030","0054","0055","0090","0226","0231","0398",
+                         "0676","1112","1203","1311","1356","2215")
+     reliable_regex= paste0("MI:",hugo_keep,'"',collapse="|")
+     is_reliable = grepl(reliable_regex,x=INTACT.4$method)
+     cat(" >>> from reliable methods (derived by Hugo) :", sum(is_reliable),"\n")
+  }
+
+  above_miscore = (INTACT.4$intact_miscore >= min.intact.score)
+  to_keep = (above_miscore|is_direct|is_biophysical|is_reliable)
+  cat("  >>> high MI confidence (>",min.intact.score,") :",sum(above_miscore),"\n")
+  cat("-------------------------------------------------\n")
+
+  INTACT.5 = INTACT.4[to_keep, ]
+  cat(sprintf("(5) TOTAL INTERACTIONS : %s \n",nrow(INTACT.5)))
   return(INTACT.5)
 }
 
