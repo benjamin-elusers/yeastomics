@@ -235,10 +235,8 @@ STRING = load.string(tax="4932",phy=T, ful=T, min.score = 700) %>%
                     ORF2 = str_extract(protein2,SGD.nomenclature())
              ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
 ## INTACT Molecular Interaction Database ---------------------------------------
-#test = load.intact.yeast(from.MACOS = T)
-#file.intact = "data/intact-yeast-ppi.rds"
-#INTACT = preload(file.intact, loading.call = load.intact.yeast(from.MACOS = T), doing = "loading PPIs from INTACT...")
-
+file.intact = "data/intact-yeast-ppi.rds"
+INTACT = preload(saved.file = file.intact, loading.call = load.intact.yeast(min.intact.score = 0.75), doing = "loading PPIs from INTACT...")
 
 # PROTEIN COMPLEXES  -----------------------------------------------------------
 nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca'),"mer")
@@ -468,9 +466,12 @@ INTERACTIONS=list()
 
 # PPI NETWORK 
 
-## STRING predicted interaction network
-df.STRING_centrality = network.centrality(STRING)
-
+## STRING protein association network
+cent.STRING = network.centrality(STRING)
+df.STRING_cent =  cent.STRING %>% rename_with(~Pxx(x=., px="STRING",s='_'), .cols=-ids)
+## INTACT protein-protein physical interaction network
+cent.INTACT = network.centrality(INTACT)
+df.INTACT_cent = cent.INTACT %>% rename_with(~Pxx(x=., px="INTACT",s='_'), .cols=-ids)
 
 
 # PROTEIN COMPLEXES
@@ -592,7 +593,10 @@ FEATURES = PROTEOME %>%
                left_join(df.cost,by=c('ORF'='name')) %>% 
                left_join(df.aaMW,by=c('UNIPROTKB'='UNIPROT', 'ORF', 'SGD')) %>% 
                left_join(df.tai,by=c('ORF'='prot')) %>% 
-               left_join(df.CU,by=c('ORF'='ID'))
+               left_join(df.CU,by=c('ORF'='ID')) %>%
+               left_join(df.STRING_centrality,by=c('ORF'='ids')) %>% 
+               left_join(df.INTACT_centrality,by=c('ORF'='ids'))
+
 TOTAL_FEATURES= length(setdiff(colnames(FEATURES),colnames(PROTEOME)))
 ```
 
