@@ -18,7 +18,7 @@ open.url <- function(file_url) {
 preload = function(saved.file,loading.call,doing='create data...'){
   library(tictoc)
   if( !file.exists(saved.file) ){
-    cat(doing)
+    cat(doing,"\n")
     tic(doing)
     res = eval(substitute(loading.call))
     saveRDS(res,saved.file)
