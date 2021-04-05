@@ -102,14 +102,14 @@ network.centrality = function(fromTo){
   tic(" - Find largest connected component...")
   connet = decompose(fullnet,max.comps=1)[[1]]
   nnodes= length(V(connet))
-  message("Maximum number of nodes :",nnodes)
+  message("Maximum number of nodes: ",nnodes)
   toc()
 
   # Compute centrality measures for nodes of largest connected component
   tic(" - Compute centrality measures in connected component...")
   centrality = tibble( ids = as_ids(V(connet)) ) %>%
     mutate(
-      cent.alpha = igraph::alpha_centrality(connet),
+      #cent.alpha = igraph::alpha_centrality(connet,loops = T),
       cent.deg = igraph::degree(connet),
       cent.betweenness = igraph::betweenness(connet),
       cent.closeness = igraph::closeness(connet),
