@@ -205,11 +205,11 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   r4s.col = c('POS','SEQ','SCORE','QQ_INTERVAL','STD','MSA')
 
   # Make sure QQ-INTERVAL does not have any space in between brackets
-  # LOOKBEHIND AND LOOKAHEAD librarys perl regex engine
-  gsub(x = "   34     I 0.005863   [0.0001698, 0.004] 0.00562 1011/1011",  pattern = "(?<=\\[)([^\\]]*)( +)","\\1",perl = T)
-  gsub(x = "  131     L    2.02   [0.4701,  2.02]       0 1011/1011",  pattern = "(?<=\\[)([^\\]]*)(\\s\\s?)([^\\s\\]]*)(?=\\])","\\1\\3",perl = T)
-  test="  131     L    2.02   [0.4701,  2.02]       0 1011/1011"
-  test="   34     I 0.005863   [0.0001698, 0.004] 0.00562 1011/1011"
+  # LOOKBEHIND AND LOOKAHEAD library perl regex engine
+  # gsub(x = "   34     I 0.005863   [0.0001698, 0.004] 0.00562 1011/1011",  pattern = "(?<=\\[)([^\\]]*)( +)","\\1",perl = T)
+  # gsub(x = "  131     L    2.02   [0.4701,  2.02]       0 1011/1011",  pattern = "(?<=\\[)([^\\]]*)(\\s\\s?)([^\\s\\]]*)(?=\\])","\\1\\3",perl = T)
+  # test="  131     L    2.02   [0.4701,  2.02]       0 1011/1011"
+  # test="   34     I 0.005863   [0.0001698, 0.004] 0.00562 1011/1011"
 
   clean_r4s =readLines(r4s) %>% str_replace_all(string = ., pattern = "\\s+(?=[^\\[\\]]*\\])", replacement="")
   #gsub(x = .,  pattern = "(?<=\\[)([^\\]]*)( +)([^\\]]*)(?=\\])","\\1\\3",perl = T)
