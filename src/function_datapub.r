@@ -1,7 +1,8 @@
-source("src/utils.r",local = T)
-source("src/function_sequence.r",local = T)
-source('src/function_alignment.r',local = T)
-source('src/function_phylogenetic.r',local = T)
+#source("src/utils.r",local = T)
+#source("src/function_sequence.r",local = T)
+#source('src/function_alignment.r',local = T)
+#source('src/function_phylogenetic.r',local = T)
+
 library(openxlsx)
 open.url <- function(file_url) {
   con <- gzcon(url(file_url))
@@ -31,6 +32,36 @@ get.longest = function(S, s='\\.'){
 # geometric mean and standard deviation
 geomean = function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) }
 geosd = function(x) {  exp(sd(log(x[x != 0 & !is.na(x)]))) }
+
+# SGD ORF regular expression
+SGD.nomenclature = function(coding=T,rna=F){
+  nuclear = "[Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?"
+  mito = "Q[0-9]{4}"
+  plasmid = "R[0-9]{4}[WC]"
+  tRNA = "t[ATCG]\\([ATCG]{3}\\)[A-P][0-9]+"
+  snRNA = "snR[0-9]+[a-z]"
+  rRNA = "RDN[0-9]+\\-?[0-9]"
+
+  ORF = paste(collapse='|',sprintf("(%s)",c(nuclear,mito,plasmid)))
+  RNA = paste(collapse='|',sprintf("(%s)",c(tRNA,snRNA,rRNA)))
+  if( coding & rna ){ return(sprintf("%s|%s",ORF,RNA)) }
+  if( coding & !rna ){ return(ORF) }
+  if( !coding & rna ){ return(RNA) }
+  if( !coding & !rna ){ return(nuclear) }
+}
+
+# Uniprot Accession regular expression
+UNIPROT.nomenclature = function(){
+  ACCESSION = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
+  return(ACCESSION)
+}
+
+clean_header = function(header){
+  header %>%
+    tolower %>% # CONVERT TO LOWERCASE
+    gsub("[[:punct:]]","",x=.) %>% # REMOVE PUNCTUATIONS%>%
+    gsub("\\s+",".",x=.) # SPACES TO UNDERSCORE
+}
 
 # Remote published proteome data -----------------------------------------------
 
@@ -133,7 +164,7 @@ load.barton2010.data = function(by=c("aa","prot")){
   BY = match.arg(by,choices=c('aa','prot'),several.ok = F)
   # Trasncript levels are obtained from 3 dilutions and 4 sources of nutrients published in:
   # JI Castrillo et al. 2007 -> "Growth control of the eukaryote cell: a systems biology study in yeast" (Journal of Biology)
-
+  library(seqinr)
   todownload=tempfile()
   if(BY=="aa"){
     aa.df = data.frame( aa=seqinr::a(), aaa=tolower(seqinr::aaa()))
@@ -323,9 +354,10 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
   return(peptides)
 }
 
-load.peter2018.data =function(){
+load.peter2018.data =function(d){
   # Load 1011 yeast strains data
   # Sheet 1 = Strains details
+  # Sheet 3 = Variable ORFs
   library(tidyverse)
   library(hablar)
 
@@ -334,33 +366,38 @@ load.peter2018.data =function(){
   SM.url = "https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-018-0030-5/MediaObjects/41586_2018_30_MOESM3_ESM.xls"
   todownload="41586_2018_30_MOESM3_ESM.xls"
   downloaded=download.file(SM.url, destfile = todownload)
+
+  peter=data.frame(stringsAsFactors = F, name   = c("strains collection", "variable ORFS"), sheetnum    = c(1,3) )
+  if( missing(d) || !(d %in% seq_along(peter$name)) ){
+    d = menu(sprintf("%s (%s)",peter$sheetnum,peter$name), graphics = FALSE, title = "Which dataset do you want to use?")
+  }
+  choice = peter[d,]
+  with(choice,cat(sprintf("Your choice was:\n [%s] S%s - '%s'  \n-----> obtained from Supp. Tables of Peter et al., Nature (2018)\n",d,sheetnum,name)))
+
   if(!downloaded){
-    # collection = gdata::read.xls(xls = todownload, sheet = 1, method='tab',verbose = F,
-    #                         blank.lines.skip=T, skip = 2, quote='',
-    #                         stringsAsFactor=F) %>%
-    #              mutate(across(everything(), ~ str_remove_all(., '\\\"'))) %>%
-    #              mutate(across(everything(), ~ str_trim(.))) %>%
-    #              mutate(X.Total.number.of.SNPs.=readr::parse_number(X.Total.number.of.SNPs.),
-    #              X.Number.of.singletons.=readr::parse_number(X.Number.of.singletons.))
-    collection = readxl::read_excel(path = todownload, sheet = 1, progress = T,skip = 2,col_names = T,n_max = 1011,guess_max = 900)
-    #%>%
-    clean_header = colnames(collection) %>%
-      tolower %>% # CONVERT TO LOWERCASE
-      gsub("[[:punct:]]","",x=.) %>% # REMOVE PUNCTUATIONS%>%
-      gsub("\\s+",".",x=.) # SPACES TO UNDERSCORE
+    if(d==1){
+      collection = readxl::read_excel(path = todownload, sheet = 1, progress = T,skip = 2,col_names = T,n_max = 1011,guess_max = 900) %>%
+        janitor::clean_names()
 
-    #  str_replace_all('\\.+', rep= '\\.') %>% # REMOVE CONSECUTIVE DOTS
-    #  stringr::str_sub(start = 3, end = -2) %>% # REMOVE starting 'X.' and ending '.'
+      strains= tibble(type.convert(collection[1:1011,])) %>%   # 1011 first rows = strains details
+        hablar::convert(hablar::chr(isolate.name),
+                        hablar::chr(isolation),
+                        hablar::chr(geographical.origins),
+                        hablar::num(number.of.singletons),
+                        hablar::chr(collection.provider)
+        )
+      file.remove(todownload)
+      return(strains)
 
-
-    names(collection)=clean_header
-    strains= tibble(type.convert(collection[1:1011,])) %>%   # 1011 first rows = strains details
-      hablar::convert(hablar::chr(isolate.name),
-                      hablar::chr(isolation),
-                      hablar::chr(geographical.origins),
-                      hablar::num(number.of.singletons),
-                      hablar::chr(collection.provider)
-      )
+    }
+    if(d==2){
+      varorf = readxl::read_excel(path = todownload, sheet = 3, progress = T,skip = 2,col_names = T,n_max = 3000,guess_max = 2500) %>%
+        janitor::clean_names(parsing_option=3) %>%
+        dplyr::select(-c(hgt_event,structural_position_in_hgt,megablast_through_ncbi_blast_server_hit,query_coverage,identity_percentage)) %>%
+        mutate(orf.s288c = str_extract(annotation_name,pattern = SGD.nomenclature()))
+      file.remove(todownload)
+      return(varorf)
+    }
     #PARSING REFERENCES
     # refs = collection = readxl::read_excel(path = todownload, sheet = 1, progress = T,skip = 1013,col_names = F) %>%
     #   str_split(pattern="\\. ",n=2,simplify = T) %>%
@@ -378,8 +415,6 @@ load.peter2018.data =function(){
     #          volume = str_remove(str_extract(journal.vol,pattern='[0-9]+,'),",")
     #          #ref.2=NULL, ref.3=NULL, ref.4=NULL,journal.vol=NULL
     #   )
-    file.remove(todownload)
-    return(strains)
   }else{
     stop("Could not download the supplementary table!")
   }
