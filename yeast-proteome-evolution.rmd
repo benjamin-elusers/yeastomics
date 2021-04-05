@@ -166,7 +166,7 @@ have been produced and published in [*J. Peter et al.*, Nature 2018](https://doi
 ```{r y1k11}
 ## 1011 strains
 riboseq_strains = c('AMH','BAN','BED','BPL','BTI','CMP','CPI','CQC') # Strains with riboseq data (on 14/01/21)
-strains.info = load.peter2018.data() %>%  # strains info from supp mat of Science paper
+strains.info = load.peter2018.data(1) %>%  # strains info from supp mat of Science paper
                  mutate( has_riboseq = standardized.name %in% riboseq_strains)
 
 # saveRDS(load.1011.strains(),"data/proteome-1011-strains.rds") # Takes >5mn for 6575 ids
