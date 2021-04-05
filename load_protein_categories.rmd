@@ -191,6 +191,10 @@ DUB = load.dubreuil2019.data(4)
 # DUPLICATED GENES (OHNOLOGS)  -------------------------------------------------
 OHNO = get.sc.ohno(myseq=S288C)
 
+VARORF =load.peter2018.data(2) %>% 
+        dplyr::filter(!is.na(precence_in_s288c) & occurrences_confirmed_by_mapping>500)
+
+
 # CHROMOSOME GENES  ------------------------------------------------------------
 CHR = SGD %>%
       filter(type=="ORF") %>%
@@ -236,7 +240,8 @@ STRING = load.string(tax="4932",phy=T, ful=T, min.score = 700) %>%
              ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
 ## INTACT Molecular Interaction Database ---------------------------------------
 file.intact = "data/intact-yeast-ppi.rds"
-INTACT = preload(saved.file = file.intact, loading.call = load.intact.yeast(min.intact.score = 0.75), doing = "loading PPIs from INTACT...")
+valid_ids=unique(c(names(S288C),UNI$UNIPROTKB))
+INTACT = preload(saved.file = file.intact, loading.call = load.intact.yeast(min.intact.score = 0.75), doing = "loading PPIs from INTACT...") %>% dplyr::filter(protA %in% valid_ids & protB %in% valid_ids)
 
 # PROTEIN COMPLEXES  -----------------------------------------------------------
 nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca'),"mer")
@@ -322,17 +327,19 @@ GENOMICS=list()
 df.len = tibble(orf=names(S288C),len=width(S288C))
 # %GC content in genes ---------------------------------------------------------
 df.gc  = tibble(orf=names(CDS),pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
-
 ### Chromosome Number ---------------------------------------------------------
 chr.orf =  split(CHR$name,CHR$chr.f,drop=T) 
 names(chr.orf) = paste0("SGD.",names(chr.orf))
-
 GENOMICS = append(GENOMICS,chr.orf)
 ### Intron containing genes ---------------------------------------------------
 GENOMICS$SGD.has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
 ### Gene duplication ----------------------------------------------------------
 GENOMICS$BYRNE2005.WGD = OHNO$orf 
-GENOMICS$BYRNE2005.WGD_const.size = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
+GENOMICS$BYRNE2005.WGD_symlen = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
+GENOMICS$BYRNE2005.WGD_asymlen = OHNO %>% filter(between(RLEN,0.7,0.9)) %>% pull(orf)
+GENOMICS$BYRNE2005.WGD_varlen = OHNO %>% filter(RLEN<0.5) %>% pull(orf)
+### Cloud genome
+#GENOMICS$JACKSON2018.cloud = 
 ```
 
 ### Transcriptomics 
@@ -467,11 +474,11 @@ INTERACTIONS=list()
 # PPI NETWORK 
 
 ## STRING protein association network
-cent.STRING = network.centrality(STRING)
-df.STRING_cent =  cent.STRING %>% rename_with(~Pxx(x=., px="STRING",s='_'), .cols=-ids)
+cent.STRING = network.centrality(STRING[,c('ORF1','ORF2')])
+df.STRING_cent =  cent.STRING %>% rename_with(~Pxx(x=., px="STRING",s='.'), .cols=-ids)
 ## INTACT protein-protein physical interaction network
-cent.INTACT = network.centrality(INTACT)
-df.INTACT_cent = cent.INTACT %>% rename_with(~Pxx(x=., px="INTACT",s='_'), .cols=-ids)
+cent.INTACT = network.centrality(INTACT[,c('protA','protB')] %>% distinct() )
+df.INTACT_cent = cent.INTACT %>% rename_with(~Pxx(x=., px="INTACT",s='.'), .cols=-ids)
 
 
 # PROTEIN COMPLEXES
@@ -524,6 +531,8 @@ func_class = split(biofunc$ORF,biofunc$FUNCTION)
 FUNCTIONS = append(FUNCTIONS,func_class)
 
 # Biological pathways (KEGG)
+PATHWAY
+FUNCTIONS = append(FUNCTIONS,pathways)
 
 
 
