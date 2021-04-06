@@ -1,4 +1,6 @@
 source("src/utils.r",local = T)
+source("src/function_alignment.r",local = T)
+
 # Phylogenetic data ------------------------------------------------------------
 # load.phylogenetic = function() {
 #   load("/media/elusers/users/benjamin/A-PROJECTS/01_PhD/06-phd-final-report/data/EVO/SC-phylo-ali-prot_data.Rdata")
