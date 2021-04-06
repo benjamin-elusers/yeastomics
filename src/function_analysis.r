@@ -98,6 +98,10 @@ network.centrality = function(fromTo){
   cat("\n\n")
   toc()
 
+  node.centrality = tibble( ids = as_ids(V(fullnet)),
+          cent_deg = igraph::degree(fullnet)
+         )
+
   # Get the largest connected component
   tic(" - Find largest connected component...")
   connet = decompose(fullnet,max.comps=1)[[1]]
@@ -107,20 +111,21 @@ network.centrality = function(fromTo){
 
   # Compute centrality measures for nodes of largest connected component
   tic(" - Compute centrality measures in connected component...")
-  centrality = tibble( ids = as_ids(V(connet)) ) %>%
+  path.centrality = tibble( ids = as_ids(V(connet)) ) %>%
     mutate(
-      #cent.alpha = igraph::alpha_centrality(connet,loops = T),
-      cent.deg = igraph::degree(connet),
-      cent.betweenness = igraph::betweenness(connet),
-      cent.closeness = igraph::closeness(connet),
-      cent.eccentricity = igraph::eccentricity(connet),
-      cent.pagerank = igraph::page_rank(connet)$vector,
-      cent.eigen = igraph::eigen_centrality(connet)$vector,
-      cent.authority = igraph::authority_score(connet)$vector,
-      cent.hub = igraph::hub.score(connet)$vector,
-      cent.subgraph= igraph::subgraph_centrality(connet,diag = F)
+      #cent_alpha = igraph::alpha_centrality(connet,loops = T),
+      cent_betweenness = igraph::betweenness(connet,normalized=T),
+      cent_closeness = igraph::closeness(connet,normalized = T),
+      cent_eccentricity = igraph::eccentricity(connet),
+      cent_pagerank = igraph::page_rank(connet)$vector,
+      cent_eigen = igraph::eigen_centrality(connet,scale = T)$vector,
+      cent_authority = igraph::authority_score(connet,scale = T)$vector,
+      cent_hub = igraph::hub.score(connet,scale = T)$vector,
+      cent_subgraph= igraph::subgraph_centrality(connet,diag = F)
   )
   toc()
+
+  centrality = left_join(node.centrality,path.centrality)
 
   # Benchmark correlation for the centrality measures
   tic(" - Find correlation between centrality measures...")
