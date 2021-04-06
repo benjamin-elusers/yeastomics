@@ -110,7 +110,7 @@ load.belle2006.data = function(){
                          strip.white = T, blank.lines.skip = T
   )
   halflives$X=NULL # LAST COLUMN IS EMPTY
-  colnames(halflives)=c('ORF','GENE','half-life.mn','half-life.mn.corrected')
+  colnames(halflives)=c('ORF','GENE','halflife_mn','halflife_mn_corrected')
   return(halflives)
 }
 
@@ -121,10 +121,10 @@ load.pu.2008.data = function(){
 
   CYC2008.url = "http://wodaklab.org/cyc2008/resources/CYC2008_complex.tab"
   CYC2008 = read.delim(file = CYC2008.url, sep='\t', stringsAsFactors = F,header = T, na.strings = "") %>%
-              as_tibble() %>%
-              group_by(Complex) %>%
-              fill(PubMed_id:Jaccard_Index, .direction = "down") %>%
-              add_count(name="n_members")
+    as_tibble() %>%
+    group_by(Complex) %>%
+    fill(PubMed_id:Jaccard_Index, .direction = "down") %>%
+    add_count(name="n_members")
   return(CYC2008)
 }
 
@@ -178,10 +178,10 @@ load.barton2010.data = function(by=c("aa","prot")){
     # raw_cost %>% arrange(name,environment,cost_type) %>% print(n=100)
     # trna.var = raw_cost %>% group_by(name,dilution) %>% summarise(vtrna=var(transcript_level))
     biosynth_cost = raw_cost %>%
-                    pivot_wider(names_from=cost_type,
-                                names_glue = "{.value}.{cost_type}",
-                                values_from=cost) %>%
-                    rename_with(.cols=contains("-"),.fn=str_replace_all,pattern="-",replacement="_")
+      pivot_wider(names_from=cost_type,
+                  names_glue = "{.value}_{cost_type}",
+                  values_from=cost) %>%
+      rename_with(.cols=contains("-"),.fn=str_replace_all,pattern="-",replacement="_")
 
   }
   return(biosynth_cost)
@@ -200,7 +200,7 @@ load.geisberg2014.data = function(nodesc=T){
                                   sheet = 1, detectDates = F,
                                   skipEmptyRows = T, skipEmptyCols = T, startRow = 1)
 
-  colnames(mrna.half)=c('chr','ORF','GNAME','type','mrna.half-life.mn','DESC')
+  colnames(mrna.half)=c('chr','ORF','GNAME','type','mrna_halflife_mn','DESC')
   if(nodesc){ mrna.half$DESC = NULL }
   return(mrna.half)
 }
@@ -220,15 +220,15 @@ load.dana2014.data = function(){
   conditions = c("A14201","gb15",
                  "DNA replication","Recombination","anaphase","metaphase I","metaphase II","premeiotic entry",
                  "spore packing","spores")
-  studies = c("Ingolia",paste0("Brar-",conditions), )
+  studies = c("Ingolia",paste0("Brar-",conditions) )
   url.datasets = gsub(" ","%20", x=sprintf("%s/%s %s.txt",url.MTDR,org,studies))
   names(url.datasets) = conditions
-  exp.names = c('ingolia.exponential','brar.exponential_A14201','brar.exponential_gb15',
-                'brar.DNA_replication', 'brar.recombination', 'brar.anaphase', 'brar.metaphase_I', 'brar.metaphase_II', 'brar.premeiotic_entry',
-                'brar.spore_packing', 'brar.spores')
+  exp.names = c('ingolia2009.TE_exponential','brar2012.TE_exponential_A14201','brar2012.TE_exponential_gb15',
+                'brar2012.TE_DNA_replication','brar2012.TE_recombination','brar2012.TE_anaphase','brar2012.TE_metaphase_I','brar2012.TE_metaphase_II', 'brar.TE_premeiotic_entry',
+                'brar2012.TE_spore_packing', 'brar2012.TE_spores')
   MTDR = map(url.datasets,read.delim,header=F,col.names=c("orf","decoding_rate")) %>%
-                  purrr::reduce(.x=., .f = left_join, by = "orf") %>%
-                  rename_with(~exp.names,.cols=starts_with('decoding_rate'))
+    purrr::reduce(.x=., .f = left_join, by = "orf") %>%
+    rename_with(~exp.names,.cols=starts_with('decoding_rate'))
   return(MTDR)
 }
 
@@ -240,17 +240,20 @@ load.lee2014.data = function(){
   # Related to this first paper: The chemical genomic portrait of yeast: Uncovering a phenotype for all genes
   # E. Hillenmeyer, et al. Science 320,362–365 (2008).doi:10.1126/science.1150021
 
+  url.hiphop="http://chemogenomics.pharmacy.ubc.ca/hiphop/files/supplemental"
+  url.s1 = paste0(url.hiphop,"/","leesupptableS1.xlsx")
+  url.fitness =paste0(url.hiphop,"/","fitness_defect_matrix_hom.txt")
   library(openxlsx)
   # Compound library
-  compound.library =  openxlsx::read.xlsx(
-    xlsxFile = "http://chemogenomics.pharmacy.ubc.ca/hiphop/files/supplemental/leesupptableS1.xlsx",
-    sheet = 2, colNames = T, skipEmptyRows = T, skipEmptyCols = T, na.strings = c(""))
+  compound.library =  openxlsx::read.xlsx(  xlsxFile = url.s1, sheet = 2,
+                                            colNames = T, skipEmptyRows = T,
+                                            skipEmptyCols = T, na.strings = c(""))
 
   # Fitness Defect Score Matrix, homozygous strains (right-click to download, tab-delimited text, 280 Mb)
   # [Rows=Yeast Deletion Strain, Identified by Systematic ORF name; Columns=Fitness Screens, Identified by Screen ID (SGTC_N)]
   # Fitness defect on homozygous deletion strain for 3000 small molecules screen
-  chemofit = read.delim(file="http://chemogenomics.pharmacy.ubc.ca/hiphop/files/supplemental/fitness_defect_matrix_hom.txt",
-                        header=T, sep="\t", stringsAsFactors = F)
+  library(vroom)
+  chemofit = vroom(file=url.fitness,col_names=T, delim="\t", col_select = list(orf = 1, everything()))
   return(chemofit)
 }
 
@@ -286,11 +289,11 @@ load.vanleeuwen2016.data = function(){
   )
 
   vanleeuwen = read.xlsx( xlsxFile = S7, sheet = 2) %>%
-               separate_rows(Function,sep=",") %>%
-               mutate( FUNCTION = str_trim(Function),
-                       FN=factor(FUNCTION,levels=unique(FUNCTION),labels = invert(.class_function))
-               ) %>% dplyr::select(-Function) %>%
-               group_by(ORF) %>% mutate(FN_all=paste0(unique(FN),collapse = ""))
+    separate_rows(Function,sep=",") %>%
+    mutate( FUNCTION = str_trim(Function),
+            FN=factor(FUNCTION,levels=unique(FUNCTION),labels = invert(.class_function))
+    ) %>% dplyr::select(-Function) %>%
+    group_by(ORF) %>% mutate(FN_all=paste0(unique(FN),collapse = ""))
 
   return(vanleeuwen)
 }
@@ -309,7 +312,7 @@ load.villen2017.data = function(){
                                  skipEmptyRows = T, skipEmptyCols = T, startRow = 4)
 
   colnames(turnover) = c('ORF','UNIPROT','GNAME','PNAME',
-                         'half-life.avg','half-life.sd','half-life.cv',
+                         'halflife.avg','halflife.sd','halflife.cv',
                          'R1_hl.avg','R1_method','R1_reduced.x2','R1_adj.r2','R1_cv',
                          'R2_hl.avg','R2_method','R2_reduced.x2','R2_adj.r2','R2_cv')
   return(turnover)
@@ -329,6 +332,7 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
                                skipEmptyRows = T, skipEmptyCols = T)
 
   peptides = LIP_MS %>%
+    separate_rows(Protein_ID, sep=';') %>%
     add_count(Protein_ID,name='npep') %>%
     distinct() %>%
     mutate( nres = round(0.01*Protein.Coverage*Length))
@@ -360,6 +364,7 @@ load.peter2018.data =function(d){
   # Sheet 3 = Variable ORFs
   library(tidyverse)
   library(hablar)
+  library(janitor)
 
   message("REF: J. Peter et al., 2018, Science")
   message("Genome evolution across 1,011 Saccharomyces cerevisiae isolates")
@@ -369,7 +374,7 @@ load.peter2018.data =function(d){
 
   peter=data.frame(stringsAsFactors = F, name   = c("strains collection", "variable ORFS"), sheetnum    = c(1,3) )
   if( missing(d) || !(d %in% seq_along(peter$name)) ){
-    d = menu(sprintf("%s (%s)",peter$sheetnum,peter$name), graphics = FALSE, title = "Which dataset do you want to use?")
+    d = menu(sprintf("sheet %s (%s)",peter$sheetnum,peter$name), graphics = FALSE, title = "Which dataset do you want to use?")
   }
   choice = peter[d,]
   with(choice,cat(sprintf("Your choice was:\n [%s] S%s - '%s'  \n-----> obtained from Supp. Tables of Peter et al., Nature (2018)\n",d,sheetnum,name)))
@@ -377,24 +382,28 @@ load.peter2018.data =function(d){
   if(!downloaded){
     if(d==1){
       collection = readxl::read_excel(path = todownload, sheet = 1, progress = T,skip = 2,col_names = T,n_max = 1011,guess_max = 900) %>%
-        janitor::clean_names()
+        janitor::clean_names() # Clean the column names
 
       strains= tibble(type.convert(collection[1:1011,])) %>%   # 1011 first rows = strains details
-        hablar::convert(hablar::chr(isolate.name),
+        hablar::convert(hablar::chr(isolate_name),
                         hablar::chr(isolation),
-                        hablar::chr(geographical.origins),
-                        hablar::num(number.of.singletons),
-                        hablar::chr(collection.provider)
+                        hablar::chr(geographical_origins),
+                        hablar::num(number_of_singletons),
+                        hablar::chr(collection_provider)
         )
       file.remove(todownload)
       return(strains)
 
     }
     if(d==2){
-      varorf = readxl::read_excel(path = todownload, sheet = 3, progress = T,skip = 2,col_names = T,n_max = 3000,guess_max = 2500) %>%
-        janitor::clean_names(parsing_option=3) %>%
-        dplyr::select(-c(hgt_event,structural_position_in_hgt,megablast_through_ncbi_blast_server_hit,query_coverage,identity_percentage)) %>%
-        mutate(orf.s288c = str_extract(annotation_name,pattern = SGD.nomenclature()))
+
+      varorf = readxl::read_excel(path = todownload, sheet = 3, progress = T,skip = 2,col_names = T,n_max = 3000,guess_max = 2600) %>%
+        janitor::clean_names(parsing_option=3) %>% # Clean the column names
+        dplyr::select(where(~ mean(is.na(.x)) < 0.9)) %>%  #  Remove columns with 95% NA
+        mutate(orf.s288c = str_extract(annotation_name,pattern = SGD.nomenclature())) %>%
+        relocate(orf.s288c,origin_assignment,occurrences_confirmed_by_mapping) %>%
+        dplyr::filter(!is.na( orf.s288c) )
+
       file.remove(todownload)
       return(varorf)
     }
@@ -629,8 +638,8 @@ load.pfam = function(tax='559292'){
   header = read.url(url.pfam)[3]
   # parse the header (3rd commented rows)
   columns = header %>%
-            str_split(pattern = "> <") %>% unlist %>%
-            str_replace_all("[ \\-]","_") %>% str_remove_all("[#<>]")
+    str_split(pattern = "> <") %>% unlist %>%
+    str_replace_all("[ \\-]","_") %>% str_remove_all("[#<>]")
   pfam = readr::read_delim(file = url.pfam, skip=2,comment = "#",delim="\t", col_names = columns,escape_double = F,guess_max = 100)
   return(pfam)
 }
