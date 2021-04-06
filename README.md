@@ -46,7 +46,7 @@ read Rate4site (R4S) output
 |2010|Costanzo    |Science             |The Genetic Landscape of a cell                                                                                           |
 |2014|Lee         |Science             |Mapping the Cellular Response to Small Molecules Using Chemogenomic Fitness Signatures                                    |
 |2014|Geisberg    |Cell                |Global Analysis of mRNA Isoform Half-Lives Reveals Stabilizing and Destabilizing Elements in Yeast                        |
-|2016|Van Leeuwen |Science             |Exploring genetic suppression interactions on a global scale                                                               |
+|2016|Van Leeuwen |Science             |Exploring genetic suppression interactions on a global scale                                                              |
 |2017|Villen      |Cell Systems        |Determinants and Regulation of Protein Turnover in Yeast                                                                  |
 |2017|Leueunberger|Science             |Cell-wide analysis of protein thermal unfolding reveals determinants of thermostability                                   |
 |2018|Ho          |Cell Systems        |Unification of Protein Abundance Datasets Yields a Quantitative Saccharomyces cerevisiae Proteome                         |
@@ -67,6 +67,8 @@ read Rate4site (R4S) output
 -------------
 
 make equal bins (1st and last bin manual)
+compute network centrality
+discretize variables according to quantiles
 
 ## Utilities
 -------------
