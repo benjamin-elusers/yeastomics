@@ -372,7 +372,7 @@ load.trna.adaptation = function(inputseq,
   return(res)
 }
 
-load.codon.usage= function(cds){
+load.codon.usage= function(cds,with.counts=F){
   if( !require(coRdon) ){ BiocManager::install("coRdon") } # Install this package first
   library(coRdon)
   cT=codonTable(cds)
@@ -394,9 +394,9 @@ load.codon.usage= function(cds){
                   CU_e=E(cT,ribo=T)[,1],
                   CU_cai=CAI(cT,ribo=T)[,1],
                   CU_gcb=GCB(cT,ribo=T),
-                  CU_fop=Fop(cT,ribo=T)[,1],
-                  CU_count= cT@counts %>% as_tibble(),
-  )
+                  CU_fop=Fop(cT,ribo=T)[,1])
+
+  if(with.counts){ return( bind_cols(CU, cT@counts %>% as_tibble()) ) }
   return(CU)
 }
 
