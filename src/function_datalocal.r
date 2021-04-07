@@ -233,7 +233,7 @@ fetch.d2p2 = function(id,quiet=F){ # Get the d2p2 predictions for single id
   }
 }
 
-load.d2p2 = function(ids,saved){ # Get the d2p2 predictions for multiple ids
+load.d2p2 = function(ids,saved=""){ # Get the d2p2 predictions for multiple ids
   if( file.exists(saved) ){
     if( file_ext(saved) != 'rds' ){ warning("File type not recognized ! (should be RDS object)") }
     return( readRDS(saved) )
