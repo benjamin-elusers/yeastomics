@@ -125,6 +125,14 @@ pheatmap::pheatmap(PROP_jac,
                    cluster_cols = T, cluster_rows = T,
                    cellheight=5, cellwidth=5,fontsize=6,border_color = NA,
                    filename = "plots/properties-overlap.pdf", height=50, width=50)
+
+library(proxy)
+jac.go = dist(x = unigo.m[,-1], method = 'Jaccard',pairwise = TRUE)
+cor.go = cor(unigo.m[,-1], use = 'pairwise',method = 'spearman') # similarity between go term
+#cutree( hclust(as.dist(sim.go)), k=10 )
+pheatmap::pheatmap(1-jac.go,cellheight=3,cellwidth=3,fontsize=4, height=20, width=20,border_col=NA,file='plots/jaccard_dist_go.pdf')
+pheatmap::pheatmap(1-cor.go,cellheight=3,cellwidth=3,fontsize=4, height=20, width=20,border_col=NA,file='plots/correlation_dist_go.pdf')
+
 ```
 
 
