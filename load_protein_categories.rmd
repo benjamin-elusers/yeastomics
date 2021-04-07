@@ -215,11 +215,12 @@ AACLASS.FR = map(aa.prop, sum.aa.fr, BS=UNI.SC )
 
 # DISORDER (D2P2 + IUP)  -------------------------------------------------------
 file.d2p2="data/d2p2-yeast-uniprotKB.rds"
-D2P2 = get.d2p2.diso(load.d2p2(saved=file.d2p2),as.df = T) %>%
-       mutate(d2p2_seg = find.consecutive(d2p2_diso>=7, TRUE, min=3),
-              d2p2_gap = find.consecutive(d2p2_diso>=7, FALSE, min=1)) %>%
-       group_by(d2p2_seg) %>% mutate( d2p2_seglen = sum_(d2p2_seg!=0)) %>%
-       group_by(d2p2_gap) %>% mutate( d2p2_gaplen = sum_(d2p2_gap!=0))
+d2p2_pred = preload(file.d2p2, loading.call = load.d2p2(ids=UNI$UNIPROTKB), doing = "Fetching d2p2 for yeast proteome (uniprot)..." )
+D2P2 = get.d2p2.diso(d2p2_pred,as.df = T) %>%
+       mutate(d2p2.seg = find.consecutive(d2p2.diso>=7, TRUE, min=3),
+              d2p2.gap = find.consecutive(d2p2.diso>=7, FALSE, min=1)) %>%
+       group_by(d2p2.seg) %>% mutate( d2p2.seglen = sum_(d2p2.seg!=0)) %>%
+       group_by(d2p2.gap) %>% mutate( d2p2.gaplen = sum_(d2p2.gap!=0))
 
 # DOMAINS  ---------------------------------------------------------------------
 PFAM=load.pfam() 
@@ -356,7 +357,7 @@ GENOMICS = append(GENOMICS,chr.orf)
 ### Intron containing genes ---------------------------------------------------
 GENOMICS$SGD.has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
 ### Gene duplication ----------------------------------------------------------
-df.wgd  = OHNO %>% dplyr::select(orf,dup.orf,RLEN,PID1,pid,SCORE.B100,S,N,G)
+df.wgd  = OHNO %>% dplyr::select(orf,orf_dup=dup.orf,RLEN,PID1,pid,score_B100 = SCORE.B100,S,N,G) %>% dplyr::rename_with(.fn=Pxx, px="byrne2005")
 GENOMICS$byrne2005.wgd_all = OHNO$orf 
 GENOMICS$byrne2005.wgd_sym = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
 GENOMICS$byrne2005.wgd_asym = OHNO %>% filter(between(RLEN,0.7,0.9)) %>% pull(orf)
@@ -372,7 +373,7 @@ GENOMICS$peter2018.pangenome_core = df.pangenome %>% filter(peter2018.strains_pr
 df.genomics = PROTEOME %>% 
               left_join(df.len, by=c('ORF'='orf')) %>%
               left_join(df.gc, by=c('ORF'='orf')) %>%
-              left_join(df.wgd, by=c('ORF'='orf')) %>%
+              left_join(df.wgd, by=c('ORF'='byrne2005.orf')) %>%
               left_join(df.pangenome, by=c('ORF'='orf.s288c'))
 ```
 
@@ -419,10 +420,10 @@ df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,ste
 ### Amino-acid biosynthetic cost
 df.aaMW = DUB %>% 
        group_by(UNIPROT) %>% 
-       summarise( pepstats.AA_MW = MW/prot.size ) 
+       summarise( pepstats.mean_MW = MW/prot.size ) 
 
-TRANSCRIPTOMICS$pepstats.costly = df.aaMW %>% dplyr::filter(pepstats.AA_MW > 120 ) %>% pull(UNIPROT)
-TRANSCRIPTOMICS$pepstats.cheap = df.aaMW %>% dplyr::filter(pepstats.AA_MW < 105 ) %>% pull(UNIPROT)
+TRANSCRIPTOMICS$pepstats.costly = df.aaMW %>% dplyr::filter(pepstats.mean_MW > 120 ) %>% pull(UNIPROT)
+TRANSCRIPTOMICS$pepstats.cheap = df.aaMW %>% dplyr::filter(pepstats.mean_MW < 105 ) %>% pull(UNIPROT)
 
 df.cost = load.barton2010.data("prot") %>% 
           group_by(name) %>%
@@ -453,7 +454,6 @@ df.transcriptomics = PROTEOME %>%
                     left_join(df.cost,by=c('ORF'='name')) %>% 
                     left_join(df.HLmrna,by=c('ORF'='ORF')) %>%
                     left_join(df.riboeff,by=c('ORF'='orf'))
-
 ```
 
 ### Biophysics 
@@ -479,12 +479,12 @@ BIOPHYSICS=list()
 
 ### Single amino-acid frequencies ------------------------------------------------
 df.aa = AA.FR %>% mutate(uni=names(UNI.SC)) %>% relocate(uni) %>%
-        rename_with(.fn = Pxx, px="uniprot.f",s="_")
+        rename_with(.fn = Pxx, px="uniprot.f",s='',.cols=-uni)
 
 
 ### Grouped amino-acid frequencies -----------------------------------------------
 df.aa_class =  AACLASS.FR %>% purrr::reduce(full_join,by='id') %>% rename_with(~aa.class, starts_with('fr')) %>%
-          rename_with(.fn = Pxx, px="uniprot.f",s="_")
+          rename_with(.fn = Pxx, px="uniprot.f",s='',.cols=-id)
 
 # PFAM AA CLASSES
 # alcohol         o    S,T
@@ -502,14 +502,14 @@ df.aa_class =  AACLASS.FR %>% purrr::reduce(full_join,by='id') %>% rename_with(~
 
 
 ### Disorder content (segment, fraction, total) ----------------------------------
-df.d2p2 = D2P2 %>% dplyr::rename(d2p2.id = d2p2_id) %>%
+df.d2p2 = D2P2 %>%
           dplyr::filter(has.d2p2) %>%
           dplyr::select(-c(has.d2p2,d2p2.size)) %>%
           group_by(d2p2.id) %>% 
-          summarise(d2p2.L = sum_(d2p2_diso>=7), 
-                 d2p2.f = mean_(d2p2_diso>=7),
-                 d2p2.nseg = n_distinct(d2p2_seg),
-                 d2p2.Lsegmax = max(d2p2_seglen))
+          summarise(d2p2.L = sum_(d2p2.diso>=7), 
+                 d2p2.f = mean_(d2p2.diso>=7),
+                 d2p2.nseg = n_distinct(d2p2.seg),
+                 d2p2.Lsegmax = max(d2p2.seglen))
 
 df.pepstats = DUB %>% dplyr::select(UNIPROT,pepstats.netcharge=netcharge,pepstats.mw=MW,pepstats.pI=pI)
 
@@ -548,7 +548,8 @@ BIOPHYSICS$superfam.single = supfam %>% filter(superfamily.ndom==1) %>% pull(seq
 BIOPHYSICS$superfam.pair   = supfam %>% filter(superfamily.ndom==2) %>% pull(seqid)
 BIOPHYSICS$superfam.multi  = supfam %>% filter(superfamily.ndom>=3) %>% pull(seqid)
 superfamilies = split(SUPERFAM$seqid,SUPERFAM$superfamily_description) %>% map(unique) %>% keep(function(x){ n_distinct(x)>9 }) 
-names(superfamilies) = paste0("superfamilies.",janitor::make_clean_names(names(superfamilies)))
+names(superfamilies) = paste0("superfamilies.",make_clean_names(names(superfamilies),case='none'))
+BIOPHYSICS = append(BIOPHYSICS,superfamilies)
 
 pfam = PFAM %>% 
         group_by(clan) %>% mutate(pfam.clansize = n_distinct(seq_id)) %>%
@@ -562,17 +563,17 @@ BIOPHYSICS$pfam.single = pfam %>% filter(pfam.ndom==1) %>% pull(seq_id)
 BIOPHYSICS$pfam.pair   = pfam %>% filter(pfam.ndom==2) %>% pull(seq_id)
 BIOPHYSICS$pfam.multi  = pfam %>% filter(pfam.ndom>=3) %>% pull(seq_id)
 pfam_clans = split(pfam$seq_id,pfam$clan_name) %>% map(unique) %>% keep(function(x){ n_distinct(x)>9 }) 
-names(pfam_clans) = paste0("pfamclan.",janitor::make_clean_names(names(pfam_clans)) )
+names(pfam_clans) = paste0("pfamclan.",make_clean_names(names(pfam_clans),case='none'))
 BIOPHYSICS = append(BIOPHYSICS,pfam_clans)
 
 ### Protein stability  ------------------------------------------------------------
 df.dg= DELTAG %>% 
-       dplyr::select(Protein_ID,tmprot=Tm.Protein,protcov=Protein.Coverage,npep,nres) %>%
+       dplyr::select(protein_id,tm_protein,protein_coverage,npep,nres) %>%
   rename_with(.fn=Pxx, px='LIP2017')
       
-BIOPHYSICS$leueunberger2017.stable = DELTAG %>% dplyr::filter( Protinfo == "Stable") %>% pull(Protein_ID)
-BIOPHYSICS$leueunberger2017.medium = DELTAG %>% dplyr::filter( Protinfo == "Medium") %>% pull(Protein_ID)
-BIOPHYSICS$leueunberger2017.unstable = DELTAG %>% dplyr::filter( Protinfo == "Unstable") %>% pull(Protein_ID)
+BIOPHYSICS$leueunberger2017.stable = DELTAG %>% dplyr::filter( protinfo == "Stable") %>% pull(protein_id)
+BIOPHYSICS$leueunberger2017.medium = DELTAG %>% dplyr::filter( protinfo == "Medium") %>% pull(protein_id)
+BIOPHYSICS$leueunberger2017.unstable = DELTAG %>% dplyr::filter( protinfo == "Unstable") %>% pull(protein_id)
 
 
 df.HLprot = PROT.HL %>%
@@ -585,15 +586,14 @@ BIOPHYSICS$villen2017.shortlived_prot = df.HLprot %>% dplyr::filter(villen2017.H
 BIOPHYSICS$belle2006.shortlived_prot = df.HLprot %>% dplyr::filter(belle2006.HL_prot < 5) %>% pull(ORF)
 
 df.biophysics = PROTEOME %>% 
-                left_join(df.aa,by=c('UNIPROTKB'='uniprot.f_uni')) %>%
-                left_join(df.aa_class,by=c('UNIPROTKB'='uniprot.f_id')) %>%
+                left_join(df.aa,by=c('UNIPROTKB'='uni')) %>%
+                left_join(df.aa_class,by=c('UNIPROTKB'='id')) %>%
                 left_join(df.d2p2,by=c('UNIPROTKB'='d2p2.id')) %>%
                 left_join(df.pepstats,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.iup,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.aascales,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.HLprot,by=c('ORF'='ORF')) %>%
                 left_join(df.dg,by=c('UNIPROTKB'='LIP2017.protein_id'))
-
 ```
 
 ### Interactions 
@@ -628,7 +628,7 @@ INTERACTIONS$intact.minihub = cent.INTACT %>% dplyr::filter(between(cent_deg,10,
 # PROTEIN COMPLEXES -----------------------------------------------------------
 ## Catalogue of Yeast Complexes (CYC)
 CYC_complexes = split(CYC$ORF,CYC$Complex)
-names(CYC_complexes) = paste0("CYC.",janitor::make_clean_names(names(CYC_complexes)))
+names(CYC_complexes) = paste0("CYC.",janitor::make_clean_names(names(CYC_complexes),case='none'))
 CYC_oligomers = split(CYC$ORF,CYC$oligomers)
 CYC_machines = keep(CYC_complexes,function(X){ length(X) > 9  })
 INTERACTIONS=append(INTERACTIONS,CYC_machines)
@@ -636,7 +636,7 @@ INTERACTIONS=append(INTERACTIONS,CYC_oligomers)
 
 ## Complex Table
 EBI_complexes = split(CPX$members,CPX$CPLX_NAME)
-names(EBI_complexes) = paste0("EBI.",janitor::make_clean_names(names(EBI_complexes)))
+names(EBI_complexes) = paste0("EBI.",janitor::make_clean_names(names(EBI_complexes),case='none'))
 EBI_oligomers = split(CPX$members,CPX$oligomers)
 EBI_machines = keep(EBI_complexes,function(X){ length(X) > 9  })
 INTERACTIONS=append(INTERACTIONS,EBI_machines)
@@ -645,7 +645,6 @@ INTERACTIONS=append(INTERACTIONS,EBI_oligomers)
 df.interactions = PROTEOME %>%
                   left_join(df.STRING_cent, by=c("ORF"="ids")) %>%
                   left_join(df.INTACT_cent, by=c("ORF"="ids"))
-
 ```
 
 
@@ -666,29 +665,36 @@ unigo  = UNIGO %>% # get goterm from BP and MF not obsolete and with 30-1000 pro
 unigo.m  = unigo %>%  mutate(seen=1) %>%
            pivot_wider( id_cols = c('UNIPROT'), names_from = 'go', values_from = 'seen', 
                         values_fn=list(seen = sum),values_fill = list(seen=0))
-M = cor(unigo.m[,-1], use = 'pairwise',method = 'spearman') # similarity between go term
-ol =  crossprod(unigo.m[,-1] %>% as.matrix)
-ol_scaled = ( ol + abs(min(ol)) )  / max(ol + abs(min(ol)))
-pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, fontsize = 4)
+
+library(proxy)
+jac.go = dist(x = unigo.m[,-1], method = 'Jaccard',pairwise = TRUE)
+cor.go = cor(unigo.m[,-1], use = 'pairwise',method = 'spearman') # similarity between go term
+#cutree( hclust(as.dist(sim.go)), k=10 )
+pheatmap::pheatmap(1-jac.go,cellheight=3,cellwidth=3,fontsize=4, height=20, width=20,border_col=NA,file='plots/jaccard_dist_go.pdf')
+pheatmap::pheatmap(1-cor.go,cellheight=3,cellwidth=3,fontsize=4, height=20, width=20,border_col=NA,file='plots/correlation_dist_go.pdf')
+
+# ol =  crossprod(unigo.m[,-1] %>% as.matrix)
+# ol_scaled = ( ol + abs(min(ol)) )  / max(ol + abs(min(ol)))
+#pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, fontsize = 4)
                    #filename = "plots/GO_profile_spearman.pdf", height = 18, width=10)
-pheatmap::pheatmap(ol_scaled,show_colnames = F,show_rownames = T,cluster_cols =T,cluster_rows = T, fontsize = 4)
+#pheatmap::pheatmap(ol_scaled,show_colnames = F,show_rownames = T,cluster_cols =T,cluster_rows = T, fontsize = 4)
                    #filename = "plots/GO_profile_overlap.pdf", height = 18, width=10)
 go =  split(unigo$UNIPROT,unigo$go)
-names(go) = paste0("go.", make_clean_names(names(go)) )
+names(go) = paste0("go.", make_clean_names(names(go),case='none') )
 
 FUNCTIONS=append(FUNCTIONS,go)
 
 # Classification of Biological functions
-biofunc = load.vanleeuwen2016.data() %>% mutate( FUNCTION = janitor::make_clean_names(FUNCTION))
+biofunc = load.vanleeuwen2016.data()
 func_class = split(biofunc$ORF,biofunc$FUNCTION)
-names(func_class) = paste0("costanzo2010.", make_clean_names(names(func_class)) )
+names(func_class) = paste0("costanzo2010.", make_clean_names(names(func_class),case='none') )
 FUNCTIONS = append(FUNCTIONS,func_class)
 
 # Biological circuits (KEGG)
 kegg_path   = keep(split(PATHWAY$id,PATHWAY$desc),function(X){ length(X) > 9  })
-names(kegg_path) = paste0("keggpath.", make_clean_names(names(kegg_path)) )
+names(kegg_path) = paste0("keggpath.", make_clean_names(names(kegg_path), case='none') )
 kegg_module = keep(split(MODULE$id,MODULE$desc),function(X){ length(X) > 9  })
-names(kegg_path) = paste0("keggmod.",make_clean_names(names(kegg_module)) )
+names(kegg_module) = paste0("keggmod.",make_clean_names(names(kegg_module), case='none') )
 
 FUNCTIONS = append(FUNCTIONS,kegg_path)
 FUNCTIONS = append(FUNCTIONS,kegg_module)
@@ -723,14 +729,18 @@ PHENOTYPES$vanleeuwen2020.dispensable = dispensable
 #                    cellheight=5, cellwidth=5, height=80, width=500,
 #                    border_col=NA, fontsize=6 )
 signatures= keep(split(CHEMSIG$gene,CHEMSIG$response_signature), function(X){ length(X)>10 })
+names(signatures) = paste0("lee2014.",make_clean_names(names(signatures), case='none') )
+
 PHENOTYPES=append(PHENOTYPES,signatures)
 
 #### Subcellular localization 
-PHENOTYPES$has_foci = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
-PHENOTYPES$has_iso  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
+PHENOTYPES$uniloc.foci = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
+PHENOTYPES$uniloc.isoform  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
 loc = split(uniloc$id,uniloc$loc) 
 subloc = keep(loc,function(X){ length(X)>30 })
+names(subloc) = paste0("uniloc.", make_clean_names(names(subloc),case='none',))
 PHENOTYPES=append(PHENOTYPES,subloc)
+
 ```
 
 
@@ -772,17 +782,17 @@ PROPERTIES= unlist(CATEGORIES,rec=F)
 # Make a proteome table of all properties
 PROT = PROTEOME
 for( C in names(PROPERTIES)){
-  PROT[,C] = (PROT$UNIPROTKB %in% PROPERTIES[[C]]) | (PROT$ORF %in% PROPERTIES[[C]])
+  PROT[,C] = (PROT$UNIPROTKB %in% PROPERTIES[[C]]) | (PROT$ORF %in% PROPERTIES[[C]]) | (PROT$GNAME %in% PROPERTIES[[C]])
 }
 head(PROT)
-
-M = cor(PROT[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between properties
-pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, border_color = NA,
-                   filename = "plots/properties-overlap.pdf", height=50, width=50, cellheight=5, cellwidth=5,fontsize=6)
 
 when=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
 saveRDS(PROT,sprintf("data/proteome-properties-%s.rds",when))
 saveRDS(FEATURES,sprintf("data/proteome-features-%s.rds",when))
+
+M = cor(PROT[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between properties
+pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, border_color = NA,
+                   filename = "plots/properties-overlap.pdf", height=50, width=50, cellheight=5, cellwidth=5,fontsize=6)
 
 ```
 
@@ -831,7 +841,7 @@ MR = ggplot(fit.ER, aes(y = EVO.FULL, x = PPM)) +
      geom_abline(slope=0,intercept = mean(fit.ER$EVO.FULL),size=1)+
      geom_point(fill='lightgray',shape=19,alpha=0.3) +
      geom_segment(aes(xend = PPM, yend = .fitted), col='gray',linetype='12',size=0.5) +
-     geom_point(data=subset(fit.ER,essential),color='purple',fill=NA,shape=21,size=2)+
+     geom_point(data=subset(fit.ER,cat_phenotypes.vanleeuwen2020.essential),color='purple',fill=NA,shape=21,size=2)+
      geom_line(mapping=aes(y=.fitted),size=1) +
      xlab('Protein abundance (log10 ppm)') + ylab('Mean ER (full seq.)') +theme_clean() 
 MR
@@ -840,23 +850,24 @@ MR2= ggplot(data=fit.ER, aes(y=.resid,x=PPM)) +
   geom_point(col='lightgray',fill='black',size=2,shape=19) +
   geom_segment(aes(xend = PPM, yend = 0),col='gray',linetype='12',size=0.5) +
   geom_abline(slope=0,intercept = 0,size=1)+
-  geom_point(data=subset(fit.ER,essential),color='purple',fill=NA,shape=21,size=2)+
-  geom_segment(data=subset(fit.ER,essential),aes(xend = PPM, y=0, yend = .resid),col='purple') +
+  geom_point(data=subset(fit.ER,cat_phenotypes.vanleeuwen2020.essential),color='purple',fill=NA,shape=21,size=2)+
+  geom_segment(data=subset(fit.ER,cat_phenotypes.vanleeuwen2020.essential),aes(xend = PPM, y=0, yend = .resid),col='purple') +
   xlab('Protein abundance (log10 ppm)') + ylab('Residuals (ER)') +theme_clean() 
 MR2
 
 # Show most over/under estimated categories
 #colnames(fit.ER)[1:25]
 
-fit.ER %>% 
+ER.residuals = fit.ER %>% 
   pivot_longer( cols= starts_with('cat_'), 
                 names_to = c('categories','source','property'), 
                 names_pattern="cat_(.+)\\.(.+)\\.(.+)",
                 values_to = "has_prop") %>%
   filter(has_prop) %>%
   relocate(SGD,GNAME,PNAME,UNIPROT,ORF,categories,source,property,has_prop) %>%
+  arrange(categories,source,property,ORF) %>%
   mutate( total.resid = sum(abs(.resid)) ) %>%
-  group_by(property) %>% 
+  group_by(categories,source, property) %>% 
   summarise(  N=n(),
               sum.resid = sum(.resid), 
               rel.resid = sum(abs(.resid))/total.resid,
@@ -870,9 +881,9 @@ fit.ER %>%
 
 
 
-res.cat = fit.ER %>%
-  pivot_longer(cols = 22:ncol(fit.ER),names_to = 'filter') %>% 
-  filter(value==T) %>% 
+# res.cat = fit.ER %>%
+#   pivot_longer(cols = 22:ncol(fit.ER),names_to = 'filter') %>% 
+#   filter(value==T) %>% 
 
 library(ggplot2)
 library(ggfittext)
@@ -881,12 +892,21 @@ ggplot(beverages, aes(x = beverage, y = proportion, label = ingredient)) +
   geom_bar_text(position = "dodge", grow = TRUE, reflow = TRUE, place = "left", fullheight = F) +
   coord_flip()
 
-RES.CAT =res.cat %>% filter(abs(sum.resid)>10)
-fig.1 = ggplot(data=RES.CAT, aes(y=reorder(filter, -sum.resid),x=sum.resid, label=filter)) + 
-  geom_bar_text(position = "dodge",grow=T, reflow=T, place='left', fullheight=F) +
-  theme_minimal()
+RES.CAT =ER.residuals %>% filter(N > 20 & N < 1500 & abs(sum.resid) > 5)
+dim(RES.CAT)
 
+quantile(ER.residuals$sum.resid)
+quantile(ER.residuals$avg.resid)
 
-ggsave(fig.1,path = "plots/", scale=3,filename = "_PROPERTIES_1.evo_rate_properties.png")
+graphics.off()
+fig.1 = ggplot(data=RES.CAT, 
+               aes(y=reorder(property, -sum.resid),
+                   x=sign(sum.resid) * log(abs(sum.resid)),label=property, group=source, fill=categories)) + 
+  geom_bar(stat='identity',position='dodge') +
+  theme_minimal() +
+  facet_wrap(~categories,scales = 'free_y')
+
+plot(fig.1)
+ggsave(fig.1,path = "plots/", scale=3, filename = "Ressi_PROPERTIES_1.evo_rate_properties.png")
 
 ```
