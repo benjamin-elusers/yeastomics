@@ -383,8 +383,7 @@ load.peter2018.data =function(d){
   message("REF: J. Peter et al., 2018, Science")
   message("Genome evolution across 1,011 Saccharomyces cerevisiae isolates")
   SM.url = "https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-018-0030-5/MediaObjects/41586_2018_30_MOESM3_ESM.xls"
-  todownload="41586_2018_30_MOESM3_ESM.xls"
-  downloaded=download.file(SM.url, destfile = todownload)
+  #"http://1002genomes.u-strasbg.fr/isolates/page8/files/1002genomes.txt"
 
   peter=data.frame(stringsAsFactors = F, name   = c("strains collection", "variable ORFS"), sheetnum    = c(1,3) )
   if( missing(d) || !(d %in% seq_along(peter$name)) ){
@@ -393,34 +392,28 @@ load.peter2018.data =function(d){
   choice = peter[d,]
   with(choice,cat(sprintf("Your choice was:\n [%s] S%s - '%s'  \n-----> obtained from Supp. Tables of Peter et al., Nature (2018)\n",d,sheetnum,name)))
 
-  if(!downloaded){
-    if(d==1){
-      collection = readxl::read_excel(path = todownload, sheet = 1, progress = T,skip = 2,col_names = T,n_max = 1011,guess_max = 900) %>%
-        janitor::clean_names() # Clean the column names
+  if(d==1){
+    collection = rio::import(file = SM.url,which = 1,progress = T,skip = 2,col_names = T,n_max = 1011,guess_max = 900) %>%
+      janitor::clean_names() # Clean the column names
 
-      strains= tibble(type.convert(collection[1:1011,])) %>%   # 1011 first rows = strains details
-        hablar::convert(hablar::chr(isolate_name),
-                        hablar::chr(isolation),
-                        hablar::chr(geographical_origins),
-                        hablar::num(number_of_singletons),
-                        hablar::chr(collection_provider)
-        )
-      file.remove(todownload)
-      return(strains)
+    strains= tibble(type.convert(collection[1:1011,])) %>%   # 1011 first rows = strains details
+      hablar::convert(hablar::chr(isolate_name),
+                      hablar::chr(isolation),
+                      hablar::chr(geographical_origins),
+                      hablar::num(number_of_singletons),
+                      hablar::chr(collection_provider)
+      )
+    return(strains)
 
-    }
-    if(d==2){
-
-      varorf = readxl::read_excel(path = todownload, sheet = 3, progress = T,skip = 2,col_names = T,n_max = 3000,guess_max = 2600) %>%
+  }else if(d==2){
+      varorf = rio::import(file = SM.url,which = 3, progress = T,skip = 2,col_names = T,n_max = 3000,guess_max = 2600) %>%
         janitor::clean_names(parsing_option=3) %>% # Clean the column names
         dplyr::select(where(~ mean(is.na(.x)) < 0.9)) %>%  #  Remove columns with 95% NA
         mutate(orf.s288c = str_extract(annotation_name,pattern = SGD.nomenclature())) %>%
         relocate(orf.s288c,origin_assignment,occurrences_confirmed_by_mapping) %>%
         dplyr::filter(!is.na( orf.s288c) )
-
-      file.remove(todownload)
       return(varorf)
-    }
+  }
     #PARSING REFERENCES
     # refs = collection = readxl::read_excel(path = todownload, sheet = 1, progress = T,skip = 1013,col_names = F) %>%
     #   str_split(pattern="\\. ",n=2,simplify = T) %>%
@@ -438,9 +431,6 @@ load.peter2018.data =function(d){
     #          volume = str_remove(str_extract(journal.vol,pattern='[0-9]+,'),",")
     #          #ref.2=NULL, ref.3=NULL, ref.4=NULL,journal.vol=NULL
     #   )
-  }else{
-    stop("Could not download the supplementary table!")
-  }
 }
 
 load.ho2018.data = function(noauto = T, nogfp  = F, noms   = F, notap  = F) {
