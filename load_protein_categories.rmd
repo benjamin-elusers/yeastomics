@@ -223,16 +223,14 @@ D2P2 = get.d2p2.diso(load.d2p2(saved=file.d2p2),as.df = T) %>%
 
 # DOMAINS  ---------------------------------------------------------------------
 PFAM=load.pfam() 
-SUPERFAM=load.superfamily() %>% dplyr::rename(seqid = "Sequence ID") 
+SUPERFAM=load.superfamily() %>% dplyr::rename(seqid = "sequence_id") 
 
 # PROTEIN STABILITY ------------------------------------------------------------
 ## PROTEIN UNFOLDING ENERGY ----------------------------------------------------
 DELTAG = load.leuenberger2017.data() %>%
-   add_count(Protein_ID,name='npep') %>%
-   dplyr::select(Protein_ID,Tm.Protein,Protinfo,Protein.Coverage,Length,
-                 Measured.Domains, Theoretical.Number.of.Domain,Essential,npep ) %>%
+   add_count(protein_id,name='npep') %>%
    distinct() %>%
-   mutate( nres = round(0.01*Protein.Coverage*Length))
+   mutate( nres = round(0.01*protein_coverage*length))
 ## MRNA HALFLIFE  --------------------------------------------------------------
 MRNA.HL = load.geisberg2014.data() 
 ## PROTEIN HALFLIFE ------------------------------------------------------------
@@ -258,21 +256,21 @@ nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','
 ## CYC = Catalogue of Yeast Complexes ------------------------------------------
 CYC = load.pu.2008.data() %>% # BASED ON ORF
       mutate(oligomers = cut(n_members, breaks = c(1:10,20,81), 
-                             labels =  paste0("CYC_",c(nmers[2:10],'high_oligomer','molecular_machine'))) )
+                             labels =  paste0("CYC.",c(nmers[2:10],'high_oligomer','molecular_machine'))) )
 ## COMPLEXTAB = Complex Portal from EBI ----------------------------------------
 CPX = load.meldal.2019.data() %>%
   filter(is_uniprot) %>% # BASED ON UNIPROT
       mutate(oligomers = cut(n_members, breaks = c(1:10,20,81), 
-                             labels = paste0("CPX_",c(nmers[2:10],'high_oligomer','molecular_machine'))),
+                             labels = paste0("CPX.",c(nmers[2:10],'high_oligomer','molecular_machine'))),
              CPLX_ASSEMBLY = gsub("(.+)(\\.$)","\\1",CPLX_ASSEMBLY) )
 
 # FUNCTIONAL ANNOTATIONS -------------------------------------------------------
 ## GO Biological Process + Molecular Function ----------------------------------
 UNIGO = get.uniprot.go(UNIPROT$UNIPROTKB) %>%  # Uniprot-based GO annotation
-        mutate( go = paste0(ONTOLOGY,"_",goterm)) %>% 
+        mutate( go = paste0(ONTOLOGY,"_", goterm ) ) %>% 
         arrange(go) 
 ## KEGG Biological Pahtways/Modules --------------------------------------------
-PATHWAY=get.KEGG('sce','pathway',as.df=T)
+PATHWAY=get.KEGG('sce','pathway',as.df=T) 
 MODULE=get.KEGG('sce','module',as.df=T)
 
 # PHENOTYPES
@@ -286,11 +284,12 @@ THR.LOC.SIZE = 50 # MINIMUM NUMBER OF PROTEINS PER COMPARTMENT
 LOC.size = sort(colSums(UNILOC[,-c(1:3)]))
 LOC50 = sort( names( LOC.size[LOC.size>THR.LOC.SIZE] ) )
 
-## Drug Resistance
-file.chemofit= "data/lee2014_chemogenomic_fitness_defect.rds"
-CHEM =  preload(saved.file = file.chemofit,
-                loading.call = load.lee2014.data(),
+## CHEMOGENOMIC SIGNATURE
+file.chemofit= "data/lee2014-chemogenomic-fitness-defect-heterozygous.rds"
+CHEMFIT =  preload(saved.file = file.chemofit,
+                loading.call = load.lee2014.data(rawdata=T),
                 doing = "loading chemogenomic fitness signatures...")
+CHEMSIG=load.lee2014.data(rawdata=F)
 
 # EVOLUTIONARY RATE
 ER = load.dubreuil2021.data(1) %>% 
@@ -347,21 +346,21 @@ ER = load.dubreuil2021.data(1) %>%
 ```{r genomic}
 GENOMICS=list()
 ### Proteins length -----------------------------------------------------------
-df.len = tibble(orf=names(S288C),SGD.len=width(S288C))
+df.len = tibble(orf=names(S288C),sgd.len=width(S288C))
 # %GC content in genes ---------------------------------------------------------
-df.gc  = tibble(orf=names(CDS),SGD.pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
+df.gc  = tibble(orf=names(CDS),sgd.pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
 ### Chromosome Number ---------------------------------------------------------
 chr.orf =  split(CHR$name,CHR$chr.f,drop=T) 
-names(chr.orf) = paste0("SGD.",names(chr.orf))
+names(chr.orf) = paste0("sgd.",names(chr.orf))
 GENOMICS = append(GENOMICS,chr.orf)
 ### Intron containing genes ---------------------------------------------------
 GENOMICS$SGD.has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
 ### Gene duplication ----------------------------------------------------------
 df.wgd  = OHNO %>% dplyr::select(orf,dup.orf,RLEN,PID1,pid,SCORE.B100,S,N,G)
-GENOMICS$byrne2005.WGD_all = OHNO$orf 
-GENOMICS$byrne2005.WGD_sym = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
-GENOMICS$byrne2005.WGD_asym = OHNO %>% filter(between(RLEN,0.7,0.9)) %>% pull(orf)
-GENOMICS$byrne2005.WGD_trunc = OHNO %>% filter(RLEN<0.5) %>% pull(orf)
+GENOMICS$byrne2005.wgd_all = OHNO$orf 
+GENOMICS$byrne2005.wgd_sym = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
+GENOMICS$byrne2005.wgd_asym = OHNO %>% filter(between(RLEN,0.7,0.9)) %>% pull(orf)
+GENOMICS$byrne2005.wgd_trunc = OHNO %>% filter(RLEN<0.5) %>% pull(orf)
 ### Pan genome
 df.pangenome =  VARORF %>%
                 dplyr::select(orf.s288c,occurrences_confirmed_by_mapping) %>% 
@@ -415,7 +414,7 @@ TRANSCRIPTOMICS=list()
 ### Codon adaptation
 df.tai=load.trna.adaptation(inputseq=CDS) %>% dplyr::rename(codonr.tAI = tAI)
 df.CU=load.codon.usage(cds=CDS,with.counts=F) %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
-df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3)) %>% dplyr::rename_with(.fn=Pxx,px="SGD")
+df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
  
 ### Amino-acid biosynthetic cost
 df.aaMW = DUB %>% 
@@ -449,7 +448,7 @@ df.riboeff = load.dana2014.data()
 df.transcriptomics = PROTEOME %>% 
                     left_join(df.tai,by=c('ORF'='prot')) %>% 
                     left_join(df.CU,by=c('ORF'='ID')) %>%
-                    left_join(df.codons,by=c('ORF'='SGD.orf')) %>%
+                    left_join(df.codons,by=c('ORF'='sgd.orf')) %>%
                     left_join(df.aaMW,by=c('UNIPROTKB'='UNIPROT')) %>% 
                     left_join(df.cost,by=c('ORF'='name')) %>% 
                     left_join(df.HLmrna,by=c('ORF'='ORF')) %>%
@@ -480,12 +479,12 @@ BIOPHYSICS=list()
 
 ### Single amino-acid frequencies ------------------------------------------------
 df.aa = AA.FR %>% mutate(uni=names(UNI.SC)) %>% relocate(uni) %>%
-        rename_with(.fn = Pxx, px="UNI.f",s="_")
+        rename_with(.fn = Pxx, px="uniprot.f",s="_")
 
 
 ### Grouped amino-acid frequencies -----------------------------------------------
 df.aa_class =  AACLASS.FR %>% purrr::reduce(full_join,by='id') %>% rename_with(~aa.class, starts_with('fr')) %>%
-          rename_with(.fn = Pxx, px="UNI.f",s="_")
+          rename_with(.fn = Pxx, px="uniprot.f",s="_")
 
 # PFAM AA CLASSES
 # alcohol         o    S,T
@@ -503,10 +502,10 @@ df.aa_class =  AACLASS.FR %>% purrr::reduce(full_join,by='id') %>% rename_with(~
 
 
 ### Disorder content (segment, fraction, total) ----------------------------------
-df.d2p2 = D2P2 %>%
-          dplyr::filter(has_d2p2) %>%
-          dplyr::select(-c(has_d2p2,d2p2_size)) %>%
-          group_by(d2p2_id) %>% 
+df.d2p2 = D2P2 %>% dplyr::rename(d2p2.id = d2p2_id) %>%
+          dplyr::filter(has.d2p2) %>%
+          dplyr::select(-c(has.d2p2,d2p2.size)) %>%
+          group_by(d2p2.id) %>% 
           summarise(d2p2.L = sum_(d2p2_diso>=7), 
                  d2p2.f = mean_(d2p2_diso>=7),
                  d2p2.nseg = n_distinct(d2p2_seg),
@@ -521,11 +520,11 @@ df.iup = DUB %>% mutate(has_iup = !is.na(L.IUP20) | !is.na(L.IUP30) | !is.na(L.I
 BIOPHYSICS$iupred.standard = DUB %>% dplyr::filter(standard) %>% pull(UNIPROT)
 BIOPHYSICS$iupred.medium= DUB %>% dplyr::filter(medium) %>% pull(UNIPROT)
 BIOPHYSICS$iupred.high= DUB %>% dplyr::filter(high) %>% pull(UNIPROT)
-BIOPHYSICS$topcons.MB= DUB %>% dplyr::filter(isMB) %>% pull(UNIPROT)
+BIOPHYSICS$topcons.membrane= DUB %>% dplyr::filter(isMB) %>% pull(UNIPROT)
 
-BIOPHYSICS$UNI.small= DUB %>% dplyr::filter(small) %>% pull(UNIPROT)
-BIOPHYSICS$UNI.average= DUB %>% dplyr::filter(average) %>% pull(UNIPROT)
-BIOPHYSICS$UNI.large= DUB %>% dplyr::filter(large) %>% pull(UNIPROT)
+BIOPHYSICS$uniprot.small= DUB %>% dplyr::filter(small) %>% pull(UNIPROT)
+BIOPHYSICS$uniprot.average= DUB %>% dplyr::filter(average) %>% pull(UNIPROT)
+BIOPHYSICS$uniprot.large= DUB %>% dplyr::filter(large) %>% pull(UNIPROT)
 
 
 ### Amino-acid interactions propensities
@@ -538,14 +537,18 @@ df.aascales = DUB %>%
 
 
 ### Protein domains (nodom,single,multi)  ----------------------------------------
-supfam =  SUPERFAM %>% dplyr::count(seqid,name="superfamily.ndom")
+supfam =  SUPERFAM %>% 
+          janitor::clean_names() %>%
+          dplyr::count(seqid,name="superfamily.ndom")
 #           group_by(`Sequence ID`) %>% 
 #           count(`Model ID`,name='n_uniq') %>%
 
-BIOPHYSICS$SUPERFAMILY.none   = setdiff(PROTEOME$ORF,supfam$seqid)
-BIOPHYSICS$SUPERFAMILY.single = supfam %>% filter(superfamily.ndom==1) %>% pull(seqid)
-BIOPHYSICS$SUPERFAMILY.pair   = supfam %>% filter(superfamily.ndom==2) %>% pull(seqid)
-BIOPHYSICS$SUPERFAMILY.multi  = supfam %>% filter(superfamily.ndom>=3) %>% pull(seqid)
+BIOPHYSICS$superfam.none   = setdiff(PROTEOME$ORF,supfam$seqid)
+BIOPHYSICS$superfam.single = supfam %>% filter(superfamily.ndom==1) %>% pull(seqid)
+BIOPHYSICS$superfam.pair   = supfam %>% filter(superfamily.ndom==2) %>% pull(seqid)
+BIOPHYSICS$superfam.multi  = supfam %>% filter(superfamily.ndom>=3) %>% pull(seqid)
+superfamilies = split(SUPERFAM$seqid,SUPERFAM$superfamily_description) %>% map(unique) %>% keep(function(x){ n_distinct(x)>9 }) 
+names(superfamilies) = paste0("superfamilies.",janitor::make_clean_names(names(superfamilies)))
 
 pfam = PFAM %>% 
         group_by(clan) %>% mutate(pfam.clansize = n_distinct(seq_id)) %>%
@@ -554,12 +557,12 @@ pfam = PFAM %>%
         #count(hmm_acc,name='n_uniq') %>%
 table_(pfam$pfam.ndom)
 
-BIOPHYSICS$PFAM.none   = setdiff(PROTEOME$UNIPROTKB,pfam$seq_id)
-BIOPHYSICS$PFAM.single = pfam %>% filter(pfam.ndom==1) %>% pull(seq_id)
-BIOPHYSICS$PFAM.pair   = pfam %>% filter(pfam.ndom==2) %>% pull(seq_id)
-BIOPHYSICS$PFAM.multi  = pfam %>% filter(pfam.ndom>=3) %>% pull(seq_id)
-pfam_clans = split(pfam$seq_id,pfam$clan) %>% map(unique) %>% keep(function(x){ n_distinct(x)>9 }) 
-names(pfam_clans) = paste0("PFAM.",names(pfam_clans))
+BIOPHYSICS$pfam.none   = setdiff(PROTEOME$UNIPROTKB,pfam$seq_id)
+BIOPHYSICS$pfam.single = pfam %>% filter(pfam.ndom==1) %>% pull(seq_id)
+BIOPHYSICS$pfam.pair   = pfam %>% filter(pfam.ndom==2) %>% pull(seq_id)
+BIOPHYSICS$pfam.multi  = pfam %>% filter(pfam.ndom>=3) %>% pull(seq_id)
+pfam_clans = split(pfam$seq_id,pfam$clan_name) %>% map(unique) %>% keep(function(x){ n_distinct(x)>9 }) 
+names(pfam_clans) = paste0("pfamclan.",janitor::make_clean_names(names(pfam_clans)) )
 BIOPHYSICS = append(BIOPHYSICS,pfam_clans)
 
 ### Protein stability  ------------------------------------------------------------
@@ -582,14 +585,14 @@ BIOPHYSICS$villen2017.shortlived_prot = df.HLprot %>% dplyr::filter(villen2017.H
 BIOPHYSICS$belle2006.shortlived_prot = df.HLprot %>% dplyr::filter(belle2006.HL_prot < 5) %>% pull(ORF)
 
 df.biophysics = PROTEOME %>% 
-                left_join(df.aa,by=c('UNIPROTKB'='UNI.f_uni')) %>%
-                left_join(df.aa_class,by=c('UNIPROTKB'='UNI.f_id')) %>%
-                left_join(df.d2p2,by=c('UNIPROTKB'='d2p2_id')) %>%
+                left_join(df.aa,by=c('UNIPROTKB'='uniprot.f_uni')) %>%
+                left_join(df.aa_class,by=c('UNIPROTKB'='uniprot.f_id')) %>%
+                left_join(df.d2p2,by=c('UNIPROTKB'='d2p2.id')) %>%
                 left_join(df.pepstats,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.iup,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.aascales,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.HLprot,by=c('ORF'='ORF')) %>%
-                left_join(df.dg,by=c('UNIPROTKB'='LIP2017.Protein_ID'))
+                left_join(df.dg,by=c('UNIPROTKB'='LIP2017.protein_id'))
 
 ```
 
@@ -608,22 +611,24 @@ INTERACTIONS=list()
 ## STRING protein association network
 cent.STRING = network.centrality(STRING[,c('ORF1','ORF2')])
 df.STRING_cent =  cent.STRING %>% rename_with(~Pxx(x=., px="string",s='.'), .cols=-ids)
+quantile(cent.STRING$cent_deg)
 
-INTERACTIONS$string.megahub = cent.STRING %>% dplyr::filter(degree>100) %>% pull(ids)
-INTERACTIONS$string.superhub = cent.STRING %>% dplyr::filter(between(degree,20,100)) %>% pull(ids)
-INTERACTIONS$string.minihub = cent.STRING %>% dplyr::filter(between(degree,10,20)) %>% pull(ids)
+INTERACTIONS$string.megahub = cent.STRING %>% dplyr::filter(cent_deg>300) %>% pull(ids)
+INTERACTIONS$string.superhub = cent.STRING %>% dplyr::filter(between(cent_deg,100,300)) %>% pull(ids)
+#INTERACTIONS$string.minihub = cent.STRING %>% dplyr::filter(between(cent_deg,10,11)) %>% pull(ids)
 
 ## INTACT protein-protein physical interaction network
 cent.INTACT = network.centrality(INTACT[,c('protA','protB')] %>% distinct() )
 df.INTACT_cent = cent.INTACT %>% rename_with(~Pxx(x=., px="intact",s='.'), .cols=-ids)
-INTERACTIONS$intact.megahub = cent.INTACT %>% dplyr::filter(degree>100) %>% pull(ids)
-INTERACTIONS$intact.superhub = cent.INTACT %>% dplyr::filter(between(degree,20,100)) %>% pull(ids)
-INTERACTIONS$intact.minihub = cent.INTACT %>% dplyr::filter(between(degree,10,20)) %>% pull(ids)
-
+quantile(cent.INTACT$cent_deg)
+INTERACTIONS$intact.megahub = cent.INTACT %>% dplyr::filter(cent_deg>50) %>% pull(ids)
+INTERACTIONS$intact.superhub = cent.INTACT %>% dplyr::filter(between(cent_deg,20,50)) %>% pull(ids)
+INTERACTIONS$intact.minihub = cent.INTACT %>% dplyr::filter(between(cent_deg,10,20)) %>% pull(ids)
 
 # PROTEIN COMPLEXES -----------------------------------------------------------
 ## Catalogue of Yeast Complexes (CYC)
 CYC_complexes = split(CYC$ORF,CYC$Complex)
+names(CYC_complexes) = paste0("CYC.",janitor::make_clean_names(names(CYC_complexes)))
 CYC_oligomers = split(CYC$ORF,CYC$oligomers)
 CYC_machines = keep(CYC_complexes,function(X){ length(X) > 9  })
 INTERACTIONS=append(INTERACTIONS,CYC_machines)
@@ -631,6 +636,7 @@ INTERACTIONS=append(INTERACTIONS,CYC_oligomers)
 
 ## Complex Table
 EBI_complexes = split(CPX$members,CPX$CPLX_NAME)
+names(EBI_complexes) = paste0("EBI.",janitor::make_clean_names(names(EBI_complexes)))
 EBI_oligomers = split(CPX$members,CPX$oligomers)
 EBI_machines = keep(EBI_complexes,function(X){ length(X) > 9  })
 INTERACTIONS=append(INTERACTIONS,EBI_machines)
@@ -668,18 +674,24 @@ pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluste
 pheatmap::pheatmap(ol_scaled,show_colnames = F,show_rownames = T,cluster_cols =T,cluster_rows = T, fontsize = 4)
                    #filename = "plots/GO_profile_overlap.pdf", height = 18, width=10)
 go =  split(unigo$UNIPROT,unigo$go)
+names(go) = paste0("go.", make_clean_names(names(go)) )
+
 FUNCTIONS=append(FUNCTIONS,go)
 
 # Classification of Biological functions
-biofunc = load.vanleeuwen2016.data()
+biofunc = load.vanleeuwen2016.data() %>% mutate( FUNCTION = janitor::make_clean_names(FUNCTION))
 func_class = split(biofunc$ORF,biofunc$FUNCTION)
+names(func_class) = paste0("costanzo2010.", make_clean_names(names(func_class)) )
 FUNCTIONS = append(FUNCTIONS,func_class)
 
 # Biological circuits (KEGG)
 kegg_path   = keep(split(PATHWAY$id,PATHWAY$desc),function(X){ length(X) > 9  })
+names(kegg_path) = paste0("keggpath.", make_clean_names(names(kegg_path)) )
 kegg_module = keep(split(MODULE$id,MODULE$desc),function(X){ length(X) > 9  })
-FUNCTIONS = append(FUNCTIONS,pathways)
-FUNCTIONS = append(FUNCTIONS,modules)
+names(kegg_path) = paste0("keggmod.",make_clean_names(names(kegg_module)) )
+
+FUNCTIONS = append(FUNCTIONS,kegg_path)
+FUNCTIONS = append(FUNCTIONS,kegg_module)
 
 ```
 
@@ -702,25 +714,23 @@ PHENOTYPES=list()
 
 essential = ESSENTIAL %>% filter( lethal ) %>% pull(ORF)
 dispensable = ESSENTIAL %>% filter(disp =='Dispensable' ) %>% pull(ORF)
-PHENOTYPES$essential   = essential
-PHENOTYPES$dispensable = dispensable
-
+PHENOTYPES$vanleeuwen2020.essential   = essential
+PHENOTYPES$vanleeuwen2020.dispensable = dispensable
 #### chemogenomics profile
 # MDR -> multi-drug resistance (>20% fitness)
-pheatmap::pheatmap(CHEM[,-1])
-
+# pheatmap::pheatmap(CHEMFIT[,-1], cluster_cols = F,
+#                    file="plots/chemogenomic-fitness-signatures.pdf",
+#                    cellheight=5, cellwidth=5, height=80, width=500,
+#                    border_col=NA, fontsize=6 )
+signatures= keep(split(CHEMSIG$gene,CHEMSIG$response_signature), function(X){ length(X)>10 })
+PHENOTYPES=append(PHENOTYPES,signatures)
 
 #### Subcellular localization 
 PHENOTYPES$has_foci = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
 PHENOTYPES$has_iso  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
-
 loc = split(uniloc$id,uniloc$loc) 
 subloc = keep(loc,function(X){ length(X)>30 })
 PHENOTYPES=append(PHENOTYPES,subloc)
-
-
-
-
 ```
 
 
@@ -729,13 +739,14 @@ PHENOTYPES=append(PHENOTYPES,subloc)
 ## Features (Quantitative output)
 
 ```{r features}
+KEYS=c('UNIPROTKB','SGD','ORF','GNAME','PNAME')
 FEATURES = PROTEOME %>% 
-            left_join(df.genomics, by=c(UNIPROTKB,SGD,ORF,GNAME,PNAME)) %>%
-            left_join(df.transcriptomics, by=c(UNIPROTKB,SGD,ORF,GNAME,PNAME)) %>%
-            left_join(df.biophysics, by=c(UNIPROTKB,SGD,ORF,GNAME,PNAME)) %>%
-            left_join(df.interactions, by=c(UNIPROTKB,SGD,ORF,GNAME,PNAME)) %>%
-            #left_join(df.functions, by=c(UNIPROTKB,SGD,ORF,GNAME,PNAME)) %>%
-            #left_join(df.phenotypes, by=c(UNIPROTKB,SGD,ORF,GNAME,PNAME))
+            left_join(df.genomics, by=KEYS) %>%
+            left_join(df.transcriptomics, by=KEYS) %>%
+            left_join(df.biophysics, by=KEYS) %>%
+            left_join(df.interactions, by=KEYS) 
+            #left_join(df.functions, by=KEYS) %>%
+            #left_join(df.phenotypes, by=KEYS)
 
 TOTAL_FEATURES= length(setdiff(colnames(FEATURES),colnames(PROTEOME)))
 ```
@@ -766,7 +777,8 @@ for( C in names(PROPERTIES)){
 head(PROT)
 
 M = cor(PROT[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between properties
-pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, fontsize = 4)
+pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, border_color = NA,
+                   filename = "plots/properties-overlap.pdf", height=50, width=50, cellheight=5, cellwidth=5,fontsize=6)
 
 when=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
 saveRDS(PROT,sprintf("data/proteome-properties-%s.rds",when))
@@ -774,29 +786,29 @@ saveRDS(FEATURES,sprintf("data/proteome-features-%s.rds",when))
 
 ```
 
-## Bins (Semi-quantitative output)
-```{r bins}
-BINS=list()
-#### range of protein length ---------------------------------------------------
-PROTLEN = fivebins(x = FEATURES$len, applyto = FEATURES$ORF, 
-                   binnames = c("shortest","shorter","average","longer","longest"))
-BINS = append(BINS,PROTLEN)
-#### range of GC content -------------------------------------------------------
-GCPERC = fivebins(x = FEATURES$pGC, applyto = FEATURES$ORF)
-BINS = append(BINS,GCPERC)
-#### range of % disorder (IUP) -----------------------------------------------------
-IUPPERC = fivebins(x = FEATURES$f.IUP20, applyto = FEATURES$ORF)
-BINS = append(BINS,IUPPERC)
-#### range of % disorder (D2P2) -----------------------------------------------------
-D2P2PERC = fivebins(x = FEATURES$f.d2p2, applyto = FEATURES$ORF)
-BINS = append(BINS,D2P2PERC)
-```
+<!-- ## Bins (Semi-quantitative output) -->
+<!-- ```{r bins} -->
+<!-- BINS=list() -->
+<!-- #### range of protein length --------------------------------------------------- -->
+<!-- PROTLEN = fivebins(x = FEATURES$len, applyto = FEATURES$ORF,  -->
+<!--                    binnames = c("shortest","shorter","average","longer","longest")) -->
+<!-- BINS = append(BINS,PROTLEN) -->
+<!-- #### range of GC content ------------------------------------------------------- -->
+<!-- GCPERC = fivebins(x = FEATURES$pGC, applyto = FEATURES$ORF) -->
+<!-- BINS = append(BINS,GCPERC) -->
+<!-- #### range of % disorder (IUP) ----------------------------------------------------- -->
+<!-- IUPPERC = fivebins(x = FEATURES$f.IUP20, applyto = FEATURES$ORF) -->
+<!-- BINS = append(BINS,IUPPERC) -->
+<!-- #### range of % disorder (D2P2) ----------------------------------------------------- -->
+<!-- D2P2PERC = fivebins(x = FEATURES$f.d2p2, applyto = FEATURES$ORF) -->
+<!-- BINS = append(BINS,D2P2PERC) -->
+<!-- ``` -->
 
 So far, **`r TOTAL_PROPERTIES`** proteome properties were retrieved within the following categories:
 
 **`r kable(TOTAL_CATEGORIES)`** 
 
-We also obtain **`r TOTAL_FEATURES`** protein features.
+We also gathered **`r TOTAL_FEATURES`** protein features.
 
 
 ## Residual evolutionary rate
@@ -811,8 +823,6 @@ fit.ER = broom::augment_columns(x = nls.fit, data = ER) %>%
                   neg.resid = sum(.resid[.resid<0]),
                   pos.resid = sum(.resid[.resid>0])) %>%   
           left_join(PROT,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
-
-
 
 # Show the residuals of the eR~pA fit 
 library(ggplot2)
