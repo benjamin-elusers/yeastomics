@@ -365,17 +365,10 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
                     measured_domains, theoretical_number_of_domain,
                     essential,npep )
   }
-  # cols = c("Peptide.ID","Aggregation","Position","Tm.Peptide", "Tm.Protein",
-  #          "Length","Sequence","Protein_ID","Pepinfo","Protinfo",
-  #          "Secondary.Structure","Domain.logic","Domain.Name",
-  #          "Theoretical.Number.of.Domain", "Measured.Domains","is.disordered",
-  #          "Protein.Coverage","Protein.Abundance","Essential","T.90..Unfolded")
-  #
-  # "ID"           "ErrorMessage" "Position"     "Length"       "T0Abundance"  "lL"           "SSE"          "RMSE"         "R2"
-  # [10] "dSTm"         "h"            "mf"           "mu"           "sf"           "su"           "tm"           "sig"          "h_cil"
-  # [19] "h_ciu"        "mf_cil"       "mf_ciu"       "mu_cil"       "mu_ciu"       "sf_cil"       "sf_ciu"       "su_cil"       "su_ciu"
-  # [28] "tm_cil"       "tm_ciu"       "sig_cil"      "sig_ciu"      "ProteinID"
-  #
+  # cols = c("Peptide.ID","Aggregation","Position","Tm.Peptide",
+  #         "Sequence","Pepinfo", "Secondary.Structure","Domain.logic","Domain.Name",
+  #          "is.disordered", "T.90..Unfolded")
+
   return(peptides)
 }
 
