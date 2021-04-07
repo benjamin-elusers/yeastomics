@@ -429,7 +429,7 @@ TRANSCRIPTOMICS$pepstats.cheap = df.aaMW %>% dplyr::filter(pepstats.mean_MW < 10
 df.cost = load.barton2010.data("prot") %>% 
           group_by(name) %>%
           mutate(rna_exp = mean(transcript_level)) %>%
-          dplyr::select('name','trna','transcript_level','cai','rna_exp',
+          dplyr::select('name','trna','cai','rna_exp',
                         "cost_akashi", "cost_weight",
                         contains("craig"), contains("wagner"), 
                         contains("yeast"), -contains("absolute")) %>%
@@ -667,13 +667,6 @@ unigo.m  = unigo %>%  mutate(seen=1) %>%
            pivot_wider( id_cols = c('UNIPROT'), names_from = 'go', values_from = 'seen', 
                         values_fn=list(seen = sum),values_fill = list(seen=0))
 
-library(proxy)
-jac.go = dist(x = unigo.m[,-1], method = 'Jaccard',pairwise = TRUE)
-cor.go = cor(unigo.m[,-1], use = 'pairwise',method = 'spearman') # similarity between go term
-#cutree( hclust(as.dist(sim.go)), k=10 )
-pheatmap::pheatmap(1-jac.go,cellheight=3,cellwidth=3,fontsize=4, height=20, width=20,border_col=NA,file='plots/jaccard_dist_go.pdf')
-pheatmap::pheatmap(1-cor.go,cellheight=3,cellwidth=3,fontsize=4, height=20, width=20,border_col=NA,file='plots/correlation_dist_go.pdf')
-
 # ol =  crossprod(unigo.m[,-1] %>% as.matrix)
 # ol_scaled = ( ol + abs(min(ol)) )  / max(ol + abs(min(ol)))
 #pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, fontsize = 4)
@@ -699,7 +692,6 @@ names(kegg_module) = paste0("keggmod.",make_clean_names(names(kegg_module), case
 
 FUNCTIONS = append(FUNCTIONS,kegg_path)
 FUNCTIONS = append(FUNCTIONS,kegg_module)
-
 ```
 
 ### Phenotypes 
@@ -750,6 +742,7 @@ PHENOTYPES=append(PHENOTYPES,subloc)
 ## Features (Quantitative output)
 
 ```{r features}
+when=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
 KEYS=c('UNIPROTKB','SGD','ORF','GNAME','PNAME')
 FEATURES = PROTEOME %>% 
             left_join(df.genomics, by=KEYS) %>%
@@ -760,6 +753,8 @@ FEATURES = PROTEOME %>%
             #left_join(df.phenotypes, by=KEYS)
 
 TOTAL_FEATURES= length(setdiff(colnames(FEATURES),colnames(PROTEOME)))
+saveRDS(FEATURES,sprintf("data/proteome-features-%s.rds",when))
+
 ```
 
 ## Properties (Qualitative output)
@@ -777,20 +772,13 @@ TOTAL_PROPERTIES = length(flatten(CATEGORIES))
 #sort( sapply(flatten(CATEGORIES),n_distinct) )
 PROPERTIES= unlist(CATEGORIES,rec=F)
 
-###mini.properties = PROPERTIES[sapply(PROPERTIES,n_distinct) < 10]
-###mega.properties = PROPERTIES[sapply(PROPERTIES,n_distinct) > 1000]
-
 # Make a proteome table of all properties
 PROT = PROTEOME
 for( C in names(PROPERTIES)){
   PROT[,C] = (PROT$UNIPROTKB %in% PROPERTIES[[C]]) | (PROT$ORF %in% PROPERTIES[[C]]) | (PROT$GNAME %in% PROPERTIES[[C]])
 }
-head(PROT)
 
-when=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
 saveRDS(PROT,sprintf("data/proteome-properties-%s.rds",when))
-saveRDS(FEATURES,sprintf("data/proteome-features-%s.rds",when))
-
 ```
 
 <!-- ## Bins (Semi-quantitative output) -->
