@@ -379,6 +379,7 @@ load.peter2018.data =function(d){
   library(tidyverse)
   library(hablar)
   library(janitor)
+  library(rio)
 
   message("REF: J. Peter et al., 2018, Science")
   message("Genome evolution across 1,011 Saccharomyces cerevisiae isolates")
