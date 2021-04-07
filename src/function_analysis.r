@@ -89,6 +89,7 @@ network.centrality = function(fromTo){
   #library(netrankr)
   tic(" - Build graph...")
   fullnet = graph_from_data_frame(fromTo,directed = F)
+  message("Number of nodes: ",length(V(fullnet)))
   comp = components(fullnet)
   message("Number of components: ",comp$no)
   comp.sizes = table(comp$csize)
