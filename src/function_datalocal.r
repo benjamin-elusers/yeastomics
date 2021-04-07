@@ -269,11 +269,11 @@ get.d2p2.diso = function(d2p2,as.df=F){
     id.col = rep(names(diso.L),times=lengths(diso.L))
     len.col = rep(lengths(diso.L),times=lengths(diso.L))
     names(len.col)=NULL
-    diso.df = tibble( d2p2_id=id.col,
-                      d2p2_resi=unlist(resi.L,use.names = F),
-                      d2p2_diso=unlist(diso.L,use.names = F),
-                      d2p2_size=len.col,
-                      has_d2p2=T)
+    diso.df = tibble( d2p2.id=id.col,
+                      d2p2.resi=unlist(resi.L,use.names = F),
+                      d2p2.diso=unlist(diso.L,use.names = F),
+                      d2p2.size=len.col,
+                      has.d2p2=T)
     return(diso.df)
   }
   return(diso.L)
