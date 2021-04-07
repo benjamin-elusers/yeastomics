@@ -29,6 +29,14 @@ preload = function(saved.file,loading.call,doing='create data...'){
   return(res)
 }
 
+get.last.file = function(path,pattern){
+  library(tidyverse)
+  list.files(path, pattern, full.names=T) %>%
+    file.info %>%
+    dplyr::slice(which.max(mtime)) %>%
+    rownames
+}
+
 # Testing/Subsetting -----------------------------------------------------------
 is.whole  <- function(x){ all(floor(x) == x) }      # checks if a value has decimal part (not necessarily integer e.g. 1.0 is whole)
 is.string <- function(x){ is.character(x) && length(x) == 1 } # cheks if a value is a single string of letters

@@ -1,5 +1,5 @@
 ---
-title: "Protein Categories"
+title: "Analyze Protein Categories"
 subtitle: ""
 author: "[Benjamin Dubreuil](https://github.com/benjamin-elusers/)"
 home: "https://github.com/benjamin-elusers/yeastomics/"
@@ -184,6 +184,13 @@ UNIPROT = UNI %>%
 
 ## CROSS-REFERENCE PROTEOME ----------------------------------------------------
 PROTEOME = UNIPROT %>% dplyr::select(UNIPROTKB, SGD, ORF, GNAME, PNAME)
+
+# EVOLUTIONARY RATE
+ER = load.dubreuil2021.data(1) %>% 
+     as_tibble() %>%
+     dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT')) %>%
+     hablar::convert(dbl(EVO.FULL), dbl(PPM))
+
 ```
 
 ## Proteome-wide characteristics
@@ -291,12 +298,6 @@ CHEMFIT =  preload(saved.file = file.chemofit,
                 loading.call = load.lee2014.data(rawdata=T),
                 doing = "loading chemogenomic fitness signatures...")
 CHEMSIG=load.lee2014.data(rawdata=F)
-
-# EVOLUTIONARY RATE
-ER = load.dubreuil2021.data(1) %>% 
-     as_tibble() %>%
-     dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT')) %>%
-     hablar::convert(dbl(EVO.FULL), dbl(PPM))
 
 ```
 
@@ -790,6 +791,12 @@ when=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
 saveRDS(PROT,sprintf("data/proteome-properties-%s.rds",when))
 saveRDS(FEATURES,sprintf("data/proteome-features-%s.rds",when))
 
+
+
+when='07_04_2021'
+PROT=readRDS(sprintf("data/proteome-properties-%s.rds",when))
+FEATURES=readRDS(sprintf("data/proteome-features-%s.rds",when))
+
 M = cor(PROT[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between properties
 pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, border_color = NA,
                    filename = "plots/properties-overlap.pdf", height=50, width=50, cellheight=5, cellwidth=5,fontsize=6)
@@ -819,7 +826,6 @@ So far, **`r TOTAL_PROPERTIES`** proteome properties were retrieved within the f
 **`r kable(TOTAL_CATEGORIES)`** 
 
 We also gathered **`r TOTAL_FEATURES`** protein features.
-
 
 ## Residual evolutionary rate
 ```{r fit-ER, eval=FALSE, include=FALSE}
