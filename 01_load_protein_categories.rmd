@@ -19,7 +19,7 @@ output:
     fig_caption: yes
     keep_md: yes
 #    toc: yes
-    toc_depth: 3
+    toc_depth: 4
     toc_float:
       toc_collapsed: true
     number_sections: true
@@ -309,10 +309,12 @@ CHEMSIG=load.lee2014.data(rawdata=F)
       
       * Chromosomes
       
+      
           Genes are distributed along the genomic DNA which is itself organized
           between separate chromosomal structures.
       
       * Gene duplications
+      
       
           The genome must be duplicated at every generation to give rise to a new
           cell. Yet, copied genomes may incorporate unidentical version of their
@@ -322,11 +324,13 @@ CHEMSIG=load.lee2014.data(rawdata=F)
       
       * Pangenome
         
+        
           Genome may be decomposed in two sets: core and cloud genes. Core genes
           are present in all strains of a species, while the presence of cloud
           genes may vary across strains.
       
       * Protein-coding genes
+      
       
           Protein coding genes may be splitted in translated and untranslated
           segments (e.g. exons and introns). In yeast, very few genes contains
@@ -385,6 +389,7 @@ df.genomics = PROTEOME %>%
       
       * tRNA adapation
       
+      
         Some codons are faster to translate than others, even when both code for
         the same amino acid, i.e. synonymous codons. The copy number of tRNA
         genes determine how fast tRNA can load the amino acid corresponding to a
@@ -392,6 +397,7 @@ df.genomics = PROTEOME %>%
         codons for which tRNA genes have high copy number.
       
       * codon usage measures
+        
         
         Other measures of codon usage are commonly used but they often require
         to compare to a set of optimized genes. Generally, ribosomal genes are
@@ -402,10 +408,12 @@ df.genomics = PROTEOME %>%
   
       * Molecular weight per AA
         
+        
         The average amino acid molecular weight of a particular protein sequence
         informs on how cost-effective is its production.
       
       * Consumption of ATP per AA
+      
       
         Other measure of biosynthetic cost of amino acid are often used. For
         example, by measuring how many ATP molecules are required to synthetize
@@ -461,19 +469,35 @@ df.transcriptomics = PROTEOME %>%
 
   - Amino acid composition
   
+  
       * single AA frequencies
+  
   
       * Frequencies of AA class
   
+  
+  
   - Intrinsic Disorder in proteins 
+  
   
       * Number of segments
   
+  
       * Relative content
+  
   
       * Absolute content
   
+  
   - Protein domains & families
+
+  - Protein stability
+    
+    
+      * Turnover (half-life)
+    
+      
+      * Melting temperature (Tm)
 
 ```{r biophysical}
 BIOPHYSICS=list()
@@ -601,7 +625,7 @@ df.biophysics = PROTEOME %>%
 
   - Physical interactions
   
-  - Predicted interactions
+  - Functional interactions
   
   - Protein complexes
 
@@ -657,6 +681,8 @@ df.interactions = PROTEOME %>%
 
 - Functional classes
 
+- Pathways and modules
+
 ```{r function}
 FUNCTIONS=list()
 
@@ -696,6 +722,7 @@ FUNCTIONS = append(FUNCTIONS,kegg_module)
 
 ### Phenotypes 
 
+
 - Essentiality vs. Dispensability
 
     As their name suggest, essential genes are required for the cell to be viable.
@@ -706,7 +733,8 @@ FUNCTIONS = append(FUNCTIONS,kegg_module)
 
 - Subcellular localizations
 
-- Drug resistance
+
+- Response signature to chemicals
 
 ```{r phenotype}
 PHENOTYPES=list()
@@ -805,4 +833,3 @@ So far, **`r TOTAL_PROPERTIES`** proteome properties were retrieved within the f
 **`r knitr::kable(TOTAL_CATEGORIES)`** 
 
 We also gathered **`r TOTAL_FEATURES`** protein features.
-
