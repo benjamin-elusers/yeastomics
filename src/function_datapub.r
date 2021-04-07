@@ -232,7 +232,7 @@ load.dana2014.data = function(){
   return(MTDR)
 }
 
-load.lee2014.data = function(){
+load.lee2014.data = function(rawdata=F){
   # Load chemogenomic fitness signatures
   message("REF: A.Y. Lee,  R.P. St.Onge et al., 2014, Science")
   message("Mapping the Cellular Response to Small Molecules Using Chemogenomic Fitness Signatures")
@@ -240,9 +240,13 @@ load.lee2014.data = function(){
   # Related to this first paper: The chemical genomic portrait of yeast: Uncovering a phenotype for all genes
   # E. Hillenmeyer, et al. Science 320,362–365 (2008).doi:10.1126/science.1150021
 
+
   url.hiphop="http://chemogenomics.pharmacy.ubc.ca/hiphop/files/supplemental"
   url.s1 = paste0(url.hiphop,"/","leesupptableS1.xlsx")
-  url.fitness =paste0(url.hiphop,"/","fitness_defect_matrix_hom.txt")
+  url.s4 = paste0(url.hiphop,"/","leesupptableS4.xlsx")
+  url.fitness_hom =paste0(url.hiphop,"/","fitness_defect_matrix_hom.txt")
+  url.fitness_het =paste0(url.hiphop,"/","fitness_defect_matrix_het.txt")
+
   library(openxlsx)
   # Compound library
   compound.library =  openxlsx::read.xlsx(  xlsxFile = url.s1, sheet = 2,
@@ -253,8 +257,24 @@ load.lee2014.data = function(){
   # [Rows=Yeast Deletion Strain, Identified by Systematic ORF name; Columns=Fitness Screens, Identified by Screen ID (SGTC_N)]
   # Fitness defect on homozygous deletion strain for 3000 small molecules screen
   library(vroom)
-  chemofit = vroom(file=url.fitness,col_names=T, delim="\t", col_select = list(orf = 1, everything()))
-  return(chemofit)
+  if(rawdata){
+    chemofit = vroom(file=url.fitness_het, col_names=T, delim="\t",
+                     col_select = list(orf = 1, everything()),
+                     col_types = cols(.default = col_double()))
+    return(chemofit)
+  }else{
+    major.responses=  openxlsx::read.xlsx(  xlsxFile = url.s4, sheet = 2, na.strings = c("","NA")) %>%
+                      janitor::clean_names() %>%
+                      dplyr::select(response_signature,gene,median_fd)
+
+    minor.responses = openxlsx::read.xlsx(  xlsxFile = url.s4, sheet = 3, na.strings = c("",NA)) %>%
+                      janitor::clean_names() %>% hablar::convert(chr(response_signature))
+    responses = bind_rows(major.responses, minor.responses) %>%
+                relocate(gene) %>%
+                arrange(gene,response_signature) %>%
+                dplyr::rename(FD_med=median_fd)
+    return(responses)
+  }
 }
 
 load.vanleeuwen2016.data = function(){
@@ -329,20 +349,21 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
   #download.file(S3.url, destfile = "aai7825_Leuenberger_Table-S3.xlsx" )
   LIP_MS = openxlsx::read.xlsx(xlsxFile = S3.url,
                                sheet = species, detectDates = T,
-                               skipEmptyRows = T, skipEmptyCols = T)
+                               skipEmptyRows = T, skipEmptyCols = T) %>%
+    janitor::clean_names()
 
   peptides = LIP_MS %>%
-    separate_rows(Protein_ID, sep=';') %>%
-    add_count(Protein_ID,name='npep') %>%
+    separate_rows(protein_id, sep=';') %>%
+    add_count(protein_id,name='npep') %>%
     distinct() %>%
-    mutate( nres = round(0.01*Protein.Coverage*Length))
+    mutate( nres = round(0.01*protein_coverage*length))
 
   if(!rawdata){
     peptides = peptides %>%
-      dplyr::select(Protein_ID,Tm.Protein,
-                    Protinfo,Protein.Coverage,Length,
-                    Measured.Domains, Theoretical.Number.of.Domain,
-                    Essential,npep )
+      dplyr::select(protein_id,tm_protein,
+                    protinfo,protein_coverage,length,
+                    measured_domains, theoretical_number_of_domain,
+                    essential,npep )
   }
   # cols = c("Peptide.ID","Aggregation","Position","Tm.Peptide", "Tm.Protein",
   #          "Length","Sequence","Protein_ID","Pepinfo","Protinfo",
@@ -616,7 +637,7 @@ load.superfamily = function(tax='xs'){
   download.request =  httr::GET(sprintf("http://supfam.org/SUPERFAMILY/cgi-bin/save.cgi?var=%s;type=ass",tax))
   superfamily.txt = httr::content(download.request,as = 'text')
   superfamily.assignment = unlist(stringi::stri_split_lines(superfamily.txt,omit_empty = T))[-c(1:2)]
-  supfam = readr::read_delim(superfamily.assignment,comment = "#",delim="\t", escape_double = F)
+  supfam = readr::read_delim(superfamily.assignment,comment = "#",delim="\t", escape_double = F) %>% janitor::clean_names()
   return(supfam)
 }
 
@@ -631,6 +652,10 @@ load.pfam = function(tax='559292'){
   message("---------------")
 
   url.pfam = sprintf("http://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/%s.tsv.gz",tax)
+  url.clan = sprintf("http://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.clans.tsv.gz")
+  clans = readr::read_delim(url.clan,delim="\t",col_names=c("pfam_id",'clan_id','clan_name',"pfam_name","pfam_desc")) %>%
+          mutate( clan_id = tidyr::replace_na(clan_id,replace = 'No_clan') )
+
   .vers = read.url(url.pfam)[1]
   message(.vers)
   .nprot = read.url(url.pfam)[2]
@@ -640,7 +665,9 @@ load.pfam = function(tax='559292'){
   columns = header %>%
     str_split(pattern = "> <") %>% unlist %>%
     str_replace_all("[ \\-]","_") %>% str_remove_all("[#<>]")
-  pfam = readr::read_delim(file = url.pfam, skip=2,comment = "#",delim="\t", col_names = columns,escape_double = F,guess_max = 100)
+  pfam = readr::read_delim(file = url.pfam, skip=2,comment = "#",delim="\t", col_names = columns,escape_double = F,guess_max = 100) %>%
+         left_join(clans,by = c('clan'="clan_id",'hmm_acc'='pfam_id','hmm_name'='pfam_name') )
+
   return(pfam)
 }
 
