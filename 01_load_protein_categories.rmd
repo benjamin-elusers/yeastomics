@@ -779,6 +779,7 @@ for( C in names(PROPERTIES)){
 }
 
 saveRDS(PROT,sprintf("data/proteome-properties-%s.rds",when))
+save.image(sprintf("data/loaded-datasets-%s.rds",when))
 ```
 
 <!-- ## Bins (Semi-quantitative output) -->
@@ -801,7 +802,7 @@ saveRDS(PROT,sprintf("data/proteome-properties-%s.rds",when))
 
 So far, **`r TOTAL_PROPERTIES`** proteome properties were retrieved within the following categories:
 
-**`r kable(TOTAL_CATEGORIES)`** 
+**`r knitr::kable(TOTAL_CATEGORIES)`** 
 
 We also gathered **`r TOTAL_FEATURES`** protein features.
 
