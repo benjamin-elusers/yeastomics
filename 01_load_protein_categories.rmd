@@ -791,16 +791,6 @@ when=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
 saveRDS(PROT,sprintf("data/proteome-properties-%s.rds",when))
 saveRDS(FEATURES,sprintf("data/proteome-features-%s.rds",when))
 
-
-
-when='07_04_2021'
-PROT=readRDS(sprintf("data/proteome-properties-%s.rds",when))
-FEATURES=readRDS(sprintf("data/proteome-features-%s.rds",when))
-
-M = cor(PROT[,-c(1:5)], use = 'pairwise.complete',method = 'spearman') # similarity between properties
-pheatmap::pheatmap(M,show_colnames = F,show_rownames = T,cluster_cols = T,cluster_rows = T, border_color = NA,
-                   filename = "plots/properties-overlap.pdf", height=50, width=50, cellheight=5, cellwidth=5,fontsize=6)
-
 ```
 
 <!-- ## Bins (Semi-quantitative output) -->
@@ -827,92 +817,3 @@ So far, **`r TOTAL_PROPERTIES`** proteome properties were retrieved within the f
 
 We also gathered **`r TOTAL_FEATURES`** protein features.
 
-## Residual evolutionary rate
-```{r fit-ER, eval=FALSE, include=FALSE}
-# Fitting mean Evolutionary rate (eR) to Protein abundance (pA)
-init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
-nls.fit = nls(EVO.FULL ~ SSlogis(PPM,Asym,xmid,scal),start=init.params,data = ER )
-fit.ER = broom::augment_columns(x = nls.fit, data = ER) %>% 
-           ungroup() %>% 
-           mutate(SSE = sum(.resid^2), total.resid = sum(.resid),
-                  avg.resid = mean_(.resid), 
-                  neg.resid = sum(.resid[.resid<0]),
-                  pos.resid = sum(.resid[.resid>0])) %>%   
-          left_join(PROT,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
-
-# Show the residuals of the eR~pA fit 
-library(ggplot2)
-library(ggthemes)
-MR = ggplot(fit.ER, aes(y = EVO.FULL, x = PPM)) +
-     geom_abline(slope=0,intercept = mean(fit.ER$EVO.FULL),size=1)+
-     geom_point(fill='lightgray',shape=19,alpha=0.3) +
-     geom_segment(aes(xend = PPM, yend = .fitted), col='gray',linetype='12',size=0.5) +
-     geom_point(data=subset(fit.ER,cat_phenotypes.vanleeuwen2020.essential),color='purple',fill=NA,shape=21,size=2)+
-     geom_line(mapping=aes(y=.fitted),size=1) +
-     xlab('Protein abundance (log10 ppm)') + ylab('Mean ER (full seq.)') +theme_clean() 
-MR
-
-MR2= ggplot(data=fit.ER, aes(y=.resid,x=PPM)) +
-  geom_point(col='lightgray',fill='black',size=2,shape=19) +
-  geom_segment(aes(xend = PPM, yend = 0),col='gray',linetype='12',size=0.5) +
-  geom_abline(slope=0,intercept = 0,size=1)+
-  geom_point(data=subset(fit.ER,cat_phenotypes.vanleeuwen2020.essential),color='purple',fill=NA,shape=21,size=2)+
-  geom_segment(data=subset(fit.ER,cat_phenotypes.vanleeuwen2020.essential),aes(xend = PPM, y=0, yend = .resid),col='purple') +
-  xlab('Protein abundance (log10 ppm)') + ylab('Residuals (ER)') +theme_clean() 
-MR2
-
-# Show most over/under estimated categories
-#colnames(fit.ER)[1:25]
-
-ER.residuals = fit.ER %>% 
-  pivot_longer( cols= starts_with('cat_'), 
-                names_to = c('categories','source','property'), 
-                names_pattern="cat_(.+)\\.(.+)\\.(.+)",
-                values_to = "has_prop") %>%
-  filter(has_prop) %>%
-  relocate(SGD,GNAME,PNAME,UNIPROT,ORF,categories,source,property,has_prop) %>%
-  arrange(categories,source,property,ORF) %>%
-  mutate( total.resid = sum(abs(.resid)) ) %>%
-  group_by(categories,source, property) %>% 
-  summarise(  N=n(),
-              sum.resid = sum(.resid), 
-              rel.resid = sum(abs(.resid))/total.resid,
-              avg.resid = mean_(.resid), 
-              neg.resid = sum(.resid[.resid<0]), 
-              pos.resid = sum(.resid[.resid>0])) %>% 
-  distinct() %>% 
-  filter(N>10) %>%
-  arrange(desc(rel.resid))
-
-
-
-
-# res.cat = fit.ER %>%
-#   pivot_longer(cols = 22:ncol(fit.ER),names_to = 'filter') %>% 
-#   filter(value==T) %>% 
-
-library(ggplot2)
-library(ggfittext)
-ggplot(beverages, aes(x = beverage, y = proportion, label = ingredient)) +
-  #geom_col(position = "dodge") +
-  geom_bar_text(position = "dodge", grow = TRUE, reflow = TRUE, place = "left", fullheight = F) +
-  coord_flip()
-
-RES.CAT =ER.residuals %>% filter(N > 20 & N < 1500 & abs(sum.resid) > 5)
-dim(RES.CAT)
-
-quantile(ER.residuals$sum.resid)
-quantile(ER.residuals$avg.resid)
-
-graphics.off()
-fig.1 = ggplot(data=RES.CAT, 
-               aes(y=reorder(property, -sum.resid),
-                   x=sign(sum.resid) * log(abs(sum.resid)),label=property, group=source, fill=categories)) + 
-  geom_bar(stat='identity',position='dodge') +
-  theme_minimal() +
-  facet_wrap(~categories,scales = 'free_y')
-
-plot(fig.1)
-ggsave(fig.1,path = "plots/", scale=3, filename = "Ressi_PROPERTIES_1.evo_rate_properties.png")
-
-```
