@@ -108,19 +108,18 @@ FEAT_num = FEAT %>% ungroup() %>% dplyr::select( where(is.numeric) )
 TOT_PROP=ncol(PROP_lgl)
 TOT_FEAT=ncol(FEAT_num)
 
+str_split_fixed(names(PROP_lgl),n=3,pattern = '\\.')
+
+
 # ER FITTED PROPERTIES
 ER.PROP = fit.ER %>% left_join(PROP,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
-
-
-
+dim(ER.PROP)
+ER.FEAT = fit.ER %>% left_join(FEAT,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
+dim(ER.FEAT)
 ```
 
 
 There are a total of **`r TOT_PROP`** proteome properties and **`r TOT_FEAT`**
-They are organized into 
-
-**`r kable(TOTAL_CATEGORIES)`** 
-
 We also gathered **`r TOTAL_FEATURES`** protein features.
 ## Compute properties similarities
 
