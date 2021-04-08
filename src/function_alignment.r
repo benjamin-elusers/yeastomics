@@ -1,20 +1,10 @@
-source("src/utils.r",local = T)
+#source("src/utils.r",local = T)
+library(tidyverse)
 # Pairwise alignment -----------------------------------------------------------
 get.pair.prot = function(prot, pair){
   seq.1 = prot[pair[[1]]]
   seq.2 = prot[pair[[2]]]
   return(list(s1=seq.1,s2=seq.2))
-}
-
-align.pair.prot  = function(p1,p2,mat = "BLOSUM62",tomatrix=F, opening=10, extend=4 ){
-  if(length(p1) != length(p2))
-    stop("p1 and p2 should have the same length!")
-  ali = pairwiseAlignment(p1, p2, substitutionMatrix = mat, gapOpening=opening, gapExtension=extend)
-  if(tomatrix){
-    return( pairwise.alignment.to.df(ali) )
-  }else{
-    return(ali)
-  }
 }
 
 pairwise.alignment.to.df  = function(ali){
@@ -51,6 +41,16 @@ pairwise.alignment.to.df  = function(ali){
   return( bind_rows(ali.list) )
 }
 
+align.pair.prot  = function(p1,p2,mat = "BLOSUM62",tomatrix=F, opening=10, extend=4 ){
+  if(length(p1) != length(p2))
+    stop("p1 and p2 should have the same length!")
+  ali = pairwiseAlignment(p1, p2, substitutionMatrix = mat, gapOpening=opening, gapExtension=extend)
+  if(tomatrix){
+    return( pairwise.alignment.to.df(ali) )
+  }else{
+    return(ali)
+  }
+}
 aa2str = function(aacol,by){
   aa.list = split(as.character(aacol), f = by)
   prot = Biostrings::AAStringSet( sapply(aa.list,paste0,collapse='') )

@@ -1,5 +1,5 @@
-source("src/utils.r",local = T)
-source("src/function_alignment.r",local = T)
+#source("src/utils.r",local = T)
+#source("src/function_alignment.r",local = T)
 
 # Phylogenetic data ------------------------------------------------------------
 # load.phylogenetic = function() {
@@ -54,7 +54,10 @@ get.sc.ohno = function(myseq) {
     dplyr::select(WGD_anc, orf, gname, ref, dup.orf, dup.gname, pid, rlen)
   ohno = ygob %>% bind_rows(bogy)
 
-  if(missing(myseq)){ myseq = load.sgd.proteome() }
+  if(missing(myseq)){
+    warn("No input proteome sequences! Cannot compare ohnolog sequences...")
+    return(ohno)
+  }
   ohno.seq = get.pair.prot(prot=myseq, pair = get.ygob.pair(ohno))
   ohno.ali = align.pair.prot(p1=ohno.seq$s1, p2=ohno.seq$s2, mat='BLOSUM62')
   aafreq = alphabetFrequency(alignedSubject(ohno.ali))
@@ -105,6 +108,8 @@ get.ortho.pair = function(ortho = load.pombe.orthologs() ){
 }
 
 compare.to.ancestors = function(ancestor, current){
+  # ancestor is the data table containing ancestral sequences (AncientGenomes.org)
+  # current is a Biostrings object of proteome sequences of a particular species (S. cerevisiae for example)
   ancestral.genome = read.delim(file = ancestor, header = T,sep = '\t',stringsAsFactors = F)
   # Extract yeast ancestor genes
   ancestral.genome$proxy_yeast = gsub(".+(YEAST.+)","\\1",ancestral.genome$proxy_genes)

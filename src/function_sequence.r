@@ -1,5 +1,22 @@
-source("src/utils.r",local = T)
+#source("src/utils.r",local = T)
 library(stringr)
+# Sequences --------------------------------------------------------------------
+load.proteome = function(url,nostop=T) {
+  library(Biostrings)
+  p = Biostrings::readAAStringSet(filepath = url)
+  if(nostop){ # Remove the trailing star from amino acid sequence (stop codon)
+    star = Biostrings::subseq(p,start=-1) == '*'
+    p = Biostrings::subseq(p,start=1,  end=Biostrings::width(p)-star)
+  }
+  return(p)
+}
+
+load.genome = function(url) {
+  library(Biostrings)
+  g = Biostrings::readDNAStringSet(filepath = url)
+  return(g)
+}
+
 ### Playing with SGD (Saccharomyces Genome Database) ---------------------------
 SGD.nomenclature = function(coding=T,rna=F){
   nuclear = "[Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?"

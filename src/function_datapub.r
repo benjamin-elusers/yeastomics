@@ -3,6 +3,9 @@
 #source('src/function_alignment.r',local = T)
 #source('src/function_phylogenetic.r',local = T)
 
+# TO REMOVE DEPENDENCIES, THOSE FUNCTIONS WERE COPIED FROM OTHER SCRIPTS
+# Utils --------------------------------------------------------------------
+
 library(openxlsx)
 open.url <- function(file_url) {
   con <- gzcon(url(file_url))
@@ -62,6 +65,8 @@ clean_header = function(header){
     gsub("[[:punct:]]","",x=.) %>% # REMOVE PUNCTUATIONS%>%
     gsub("\\s+",".",x=.) # SPACES TO UNDERSCORE
 }
+
+### END OF DEPENDENCIES ###
 
 # Remote published proteome data -----------------------------------------------
 
@@ -603,9 +608,9 @@ load.dubreuil2021.data = function(d){
   data.url = sprintf('%s/%s',dubreuil$base_url[d], dubreuil$num[d])
 
   if( dubreuil$format[d] == 'TSV'){
-    res = read.delim(file = data.url, header=T, sep='\t', stringsAsFactors = F)
+    res = readr::read_delim(file = data.url, col_names=T, delim='\t')
   } else if( dubreuil$format[d] == 'TSV.GZ' ){
-    res = read.delim(file=open.url(data.url), header=T, sep='\t',stringsAsFactors = F)
+    res =  readr::read_delim(file=open.url(data.url), col_names = T, delim='\t')
   }
   return(res)
 }

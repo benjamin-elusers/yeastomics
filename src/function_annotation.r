@@ -365,8 +365,8 @@ get.KEGG = function(sp='sce',type=c('pathway','module'),as.df=F){
 #names(pathways.list) = unlist(  )
 
 ## _4_ functional categories --------------------------------------------------
-load.yeast.biofunctions = function(){
-  # load gene classification of biological functions (costanzo 2010, Van Leeuwen 2016)
-  A = load.costanzo2010.data()
-  B = load.vanleeuwen2016.data()
-}
+# load.yeast.biofunctions = function(){
+#   # load gene classification of biological functions (costanzo 2010, Van Leeuwen 2016)
+#   A = load.costanzo2010.data()
+#   B = load.vanleeuwen2016.data()
+# }

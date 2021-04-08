@@ -1,8 +1,37 @@
-source("src/utils.r",local = T)
-source("src/function_annotation.r",local = T)
-source("src/function_sequence.r",local = T)
-source("src/function_phylogenetic.r",local = T)
+#source("src/utils.r",local = T)
+#source("src/function_annotation.r",local = T)
+#source("src/function_sequence.r",local = T)
+#source("src/function_phylogenetic.r",local = T)
 
+# TO REMOVE DEPENDENCIES, THOSE FUNCTIONS WERE COPIED FROM OTHER SCRIPTS
+
+# Sequences --------------------------------------------------------------------
+load.proteome = function(url,nostop=T) {
+  library(Biostrings)
+  p = Biostrings::readAAStringSet(filepath = url)
+  if(nostop){ # Remove the trailing star from amino acid sequence (stop codon)
+    star = Biostrings::subseq(p,start=-1) == '*'
+    p = Biostrings::subseq(p,start=1,  end=Biostrings::width(p)-star)
+  }
+  return(p)
+}
+load.sgd.proteome = function(withORF=T,rm.stop=T) {
+  library(stringr)
+  sgd.url = "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_protein/orf_trans_all.fasta.gz"
+  SGD = load.proteome(sgd.url,nostop = rm.stop)
+  regexSGD = "(S[0-9]{9})"
+  if(withORF){
+    # ORF identifier
+    names(SGD) = str_extract(names(SGD), SGD.nomenclature() )
+  }else{
+    # SGD ID
+    names(SGD) = str_extract(names(SGD), regexSGD)
+  }
+  #names(SGD) = subname(names(SGD),sep=" ",lc=F)
+  return(SGD)
+}
+
+# Annotations --------------------------------------------------------------------
 # Molecular Interaction controlled vocabulary
 get.MI.annotation= function(id="MI:0013",
                             relation=c('descendants','children','ancestors','parents','siblings'),
@@ -21,6 +50,8 @@ get.MI.annotation= function(id="MI:0013",
   if(include){ return( rbind( as(ID,"data.frame"), as(MI.annot, "data.frame") ) ) }
   return( as(MI.annot, "data.frame") )
 }
+# Utils --------------------------------------------------------------------
+
 read.url <- function(file_url) {
   con <- gzcon(url(file_url))
   txt <- readLines(con)
@@ -37,6 +68,8 @@ subname=function(name,sep="\\.",lc=F){ # extracts substring until first separato
 strfind = function(strings, patterns){ # search multiple patterns in character vectors
   sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
 }
+### END OF DEPENDENCIES ###
+
 
 # Local proteome data ----------------------------------------------------------
 load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_general.R"){
@@ -90,7 +123,8 @@ load.wapinsky2007.data = function(path.data="./data/"){
 
 path.r4s = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/rate4site-3.2.0"
 load.rate4site_1011.data = function(path.res = paste0(path.r4s,"/src/rate4site/RUN-1011G"),
-                                    only_results=T){
+                                    only_results=T,
+                                    s288c.ref=load.sgd.proteome(withORF = T,rm.stop = F)){
   library(tictoc)
   library(purrr)
   library(progress)
@@ -109,7 +143,7 @@ load.rate4site_1011.data = function(path.res = paste0(path.r4s,"/src/rate4site/R
   #ws = sapply(widths(seqin),unique)
   #r4s = tibble( orf = orfs, len=ws, strains=lengths(seqin) )
 
-  S288C  = load.sgd.proteome(withORF = T,rm.stop = F)
+  S288C  = s288c.ref
   wr= setNames(widths(S288C),names(S288C))
   sgd = tibble( orf= names(S288C), len.s288c=wr )
 
@@ -633,7 +667,7 @@ load.3dcomplex.yeast = function(limit = F, n = 1000) {
 
   ## Run mySQL query if test on 1000 rows is successfully passed
   Qtest = dbGetQuery(V6, paste0(query, " LIMIT ", n))
-  if (limit) { treturn(Qtest) }
+  if (limit) { return(Qtest) }
 
   if (exists("Qtest") && nrow(Qtest) > 0) {
     tic(doing)
