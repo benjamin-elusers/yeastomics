@@ -160,7 +160,7 @@ multiple specialized databases (structure, interactions, evolution, expression
 ```{r reference}
 # REFERENCE PROTEIN DATABASE ---------------------------------------------------
 ## Saccharomyces genome database (SGD) -----------------------------------------
-chr.1let = paste0("chr_",c(NA,LETTERS[1:2],"2-mu",LETTERS[3:16],"mito"))
+chr.1let = paste0("chr_",c(NA,LETTERS[1:2],"2mu",LETTERS[3:16],"mito"))
 SGD  = load.sgd.features(by.chr=T) %>% 
        # Add chromosome as a letter or symbol
        mutate(chr.f = factor(chr, levels=unique(chr), labels = chr.1let))
