@@ -34,3 +34,4 @@ vignettes/*.pdf
 /*_files/
 yeast-proteome-evolution.html
 .Rproj.user
+.DS_Store
