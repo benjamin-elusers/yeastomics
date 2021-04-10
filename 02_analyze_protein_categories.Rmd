@@ -108,9 +108,6 @@ FEAT_num = FEAT %>% ungroup() %>% dplyr::select( where(is.numeric) )
 TOT_PROP=ncol(PROP_lgl)
 TOT_FEAT=ncol(FEAT_num)
 
-str_split_fixed(names(PROP_lgl),n=3,pattern = '\\.')
-
-
 # ER FITTED PROPERTIES
 ER.PROP = fit.ER %>% left_join(PROP,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
 dim(ER.PROP)
@@ -128,8 +125,30 @@ library(proxy)
 # spearman correlation between properties
 prop.cor="output/properties-spearman.rds"
 PROP_cor = preload(prop.cor,
-                   cor(PROP_lgl, use = 'pairwise.complete',method = 'spearman'), 
-                   doing="Computing spearman correlation between properties...")
+                   cor(PROP_lgl,use='pairwise.complete',method = 'pearson'), 
+                   doing="Computing correlation between properties...")
+
+tmp = coop::pcor(PROP_lgl %>% convert(num(everything())) )
+tmp[ between(tmp,-0.1,0.1) ] = NA
+diag(tmp)=NA
+
+res<-NbClust(PROP_cor, diss=NULL, distance = "binary", min.nc=2, max.nc=100, 
+            method = "ward.D2", index = "kl") 
+res$All.index
+res$Best.nc
+table(res$Best.partition)
+head(res$Best.partition)
+max_cor = apply(abs(tmp),2,max_)
+quantile_( max_cor )
+
+uncorrelated = tmp[ which(max_cor < 0.4), which(max_cor < 0.4) ]
+colnames( uncorrelated )
+pheatmap::pheatmap(tmp, border_color = NA, fontsize = 3,
+                   show_colnames = T, show_rownames = F,
+                   filename = "output/properties-correlation.pdf",
+                   width = 10, height=10
+                  )
+
 # jaccard similarity between properties
 prop.jac="output/properties-jaccard.rds"
 PROP_jac = preload(prop.jac, 
