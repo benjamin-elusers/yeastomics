@@ -779,7 +779,7 @@ FEATURES = PROTEOME %>%
 
 TOTAL_FEATURES= length(setdiff(colnames(FEATURES),colnames(PROTEOME)))
 FEATURE_BY_CATEGORIES = table(str_extract(pattern = "(^[^\\.]+)\\.", names(FEATURES)))
-saveRDS(FEATURES,sprintf("data/proteome-features-%s.rds",when))
+saveRDS(FEATURES,sprintf("output/proteome-features-%s.rds",when))
 
 ```
 
@@ -806,8 +806,8 @@ for( C in names(PROPERTIES)){
   PROT[,C] = (PROT$UNIPROTKB %in% PROPERTIES[[C]]) | (PROT$ORF %in% PROPERTIES[[C]]) | (PROT$GNAME %in% PROPERTIES[[C]])
 }
 
-saveRDS(PROT,sprintf("data/proteome-properties-%s.rds",when))
-save.image(sprintf("data/loaded-datasets-%s.rds",when))
+saveRDS(PROT,sprintf("output/proteome-properties-%s.rds",when))
+save.image(sprintf("output/loaded-datasets-%s.rds",when))
 ```
 
 <!-- ## Bins (Semi-quantitative output) -->
