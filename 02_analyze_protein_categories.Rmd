@@ -100,14 +100,19 @@ fit.ER = broom::augment_columns(x = nls.fit, data = ER) %>%
 ```{r protcat}
 # protein properties (qualitative)
 PROP=readRDS(get.last.file("data","proteome-properties"))
-PROP_lgl = PROP %>% ungroup() %>% dplyr::select( where(is.logical) )
+PROP_lgl = PROP %>% 
+            ungroup() %>% 
+            dplyr::select( where(is.logical) )  %>% 
+            convert(num(everything())) %>%
+            as.matrix
 # protein features (quantitative)
 FEAT=readRDS(get.last.file("data","proteome-features"))
-FEAT_num = FEAT %>% ungroup() %>% dplyr::select( where(is.numeric) )
+FEAT_num = FEAT %>%
+            ungroup() %>% 
+            dplyr::select( where(is.numeric) )
 
 TOT_PROP=ncol(PROP_lgl)
 TOT_FEAT=ncol(FEAT_num)
-
 # ER FITTED PROPERTIES
 ER.PROP = fit.ER %>% left_join(PROP,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
 dim(ER.PROP)
@@ -121,14 +126,13 @@ We also gathered **`r TOTAL_FEATURES`** protein features.
 ## Compute properties similarities
 
 ```{r properties-similarity}
-library(proxy)
 # spearman correlation between properties
-prop.cor="output/properties-spearman.rds"
+prop.cor="output/properties-correlation.rds"
 PROP_cor = preload(prop.cor,
-                   cor(PROP_lgl,use='pairwise.complete',method = 'pearson'), 
+                   coop::pcor(PROP_lgl), 
                    doing="Computing correlation between properties...")
-
-tmp = coop::pcor(PROP_lgl %>% convert(num(everything())) )
+library(proxy)
+tmp = 
 tmp[ between(tmp,-0.1,0.1) ] = NA
 diag(tmp)=NA
 
