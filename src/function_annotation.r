@@ -44,7 +44,7 @@ get.MI.annotation= function(id="MI:0013",
 
 # Biological annotations (mapped to Uniprot) -----------------------------------
 
-load.uniprot.features = function(tax=559292,refdb='UNIPROTKB'){ # Gene/Protein features from Uniprot
+load.uniprot.features = function(tax=559292,refdb='UNIPROTKB',with.sequence=F){ # Gene/Protein features from Uniprot
   library(UniProt.ws)
   # 559292 S. cerevisiae 288C (maintained by SGD)
 
@@ -60,6 +60,7 @@ load.uniprot.features = function(tax=559292,refdb='UNIPROTKB'){ # Gene/Protein f
   FEATURES = c("SGD","UNIPROTKB","REVIEWED","EXISTENCE","SCORE","LENGTH",
                "FAMILIES","FEATURES","PATHWAY","DOMAIN","DOMAINS","INTERACTOR","GO-ID","GO","GENES",
                "PROTEIN-NAMES","SUBCELLULAR-LOCATIONS","COMMENTS","KEYWORDS")
+  if(with.sequence){ FEATURES = c(FEATURES,"SEQUENCE") }
 
   up.feat = UniProt.ws::select(x=uniprot, keys=ids,  keytype = refkey,
                                columns = FEATURES) %>%
