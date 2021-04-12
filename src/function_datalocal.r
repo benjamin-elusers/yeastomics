@@ -267,7 +267,7 @@ fetch.d2p2 = function(id,quiet=F){ # Get the d2p2 predictions for single id
   }
 }
 
-load.d2p2 = function(ids,saved=""){ # Get the d2p2 predictions for multiple ids
+load.d2p2 = function(ids,saved,autosave=T){ # Get the d2p2 predictions for multiple ids
   if( file.exists(saved) ){
     if( file_ext(saved) != 'rds' ){ warning("File type not recognized ! (should be RDS object)") }
     return( readRDS(saved) )
@@ -289,8 +289,13 @@ load.d2p2 = function(ids,saved=""){ # Get the d2p2 predictions for multiple ids
     cat(prg)
   }
   toc()
-  message(sprintf("Saving D2P2 predictions to : %s\n",saved))
-  saveRDS(d2p2, saved)
+  if(autosave){
+    if(saved=="" | tools::file_ext(saved) != "rds"){
+      saved=tempfile(pattern = "d2p2-pred",tmpdir = getwd(), fileext = 'rds')
+    }
+    message("Saving d2p2 predictions to file:",saved)
+    saveRDS(d2p2, saved)
+  }
   return(d2p2)
 }
 
