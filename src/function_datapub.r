@@ -595,26 +595,23 @@ load.dubreuil2021.data = function(d){
   message("Abundance imparts evolutionary constraints of similar magnitude on the buried, surface, and disordered regions of proteins")
   dubreuil=data.frame(stringsAsFactors = F,
                       name   = c("1.1 yeast.prot", "1.2 yeast.res", "1.3 yeast.res") ,
-                      num    = c('26404466', '26404475', '26404478'),
+                      num    = c('27528953', '26404475', '26404478'),
                       base_url =  rep('https://ndownloader.figshare.com/files/',3),
                       format = c('TSV','TSV','TSV.GZ')
   )
-
   if( missing(d) || !(d %in% seq_along(dubreuil$name)) ){
     d = menu(sprintf("%s (%s)",dubreuil$name,dubreuil$format), graphics = FALSE, title = "Which dataset do you want to use?")
   }
   choice = dubreuil[d,]
   with(choice,cat(sprintf("Your choice was:\n [%s] %s\n-----> from %s%s (formatted as %s)\n",d,name,base_url,num,format)))
   data.url = sprintf('%s/%s',dubreuil$base_url[d], dubreuil$num[d])
-
   if( dubreuil$format[d] == 'TSV'){
-    res = readr::read_delim(file = data.url, col_names=T, delim='\t')
+    res = readr::read_delim(file = data.url, col_names=T, progress=T, delim='\t')
   } else if( dubreuil$format[d] == 'TSV.GZ' ){
-    res =  readr::read_delim(file=open.url(data.url), col_names = T, delim='\t')
+    res = read.delim(file=open.url(data.url), header=T, sep='\t',stringsAsFactors = F)
   }
   return(res)
 }
-
 
 # Resource databases with proteome data available ------------------------------
 
