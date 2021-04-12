@@ -291,7 +291,7 @@ load.d2p2 = function(ids,saved,autosave=T){ # Get the d2p2 predictions for multi
   toc()
   if(autosave){
     if(saved=="" | tools::file_ext(saved) != "rds"){
-      saved=tempfile(pattern = "d2p2-pred",tmpdir = getwd(), fileext = 'rds')
+      saved=tempfile(pattern = "d2p2-pred-",tmpdir = getwd(), fileext = '.rds')
     }
     message("Saving d2p2 predictions to file:",saved)
     saveRDS(d2p2, saved)
