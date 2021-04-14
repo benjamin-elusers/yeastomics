@@ -84,7 +84,6 @@ ER = load.dubreuil2021.data(1) %>%
      dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT')) %>%
      hablar::convert(dbl(EVO.FULL), dbl(PPM)) %>% 
      ungroup()
-
 # Fitting mean Evolutionary rate (R) to Protein abundance (E)
 init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
 nls.fit = nls(EVO.FULL ~ SSlogis(PPM,Asym,xmid,scal),start=init.params,data = ER )
@@ -99,14 +98,14 @@ fit.ER = broom::augment_columns(x = nls.fit, data = ER) %>%
 
 ```{r protcat}
 # protein properties (qualitative)
-PROP=readRDS(get.last.file("data","proteome-properties"))
+PROP=readRDS(get.last.file("output","proteome-properties"))
 PROP_lgl = PROP %>% 
             ungroup() %>% 
             dplyr::select( where(is.logical) )  %>% 
             convert(num(everything())) %>%
             as.matrix
 # protein features (quantitative)
-FEAT=readRDS(get.last.file("data","proteome-features"))
+FEAT=readRDS(get.last.file("output","proteome-features"))
 FEAT_num = FEAT %>%
             ungroup() %>% 
             dplyr::select( where(is.numeric) )
@@ -123,65 +122,94 @@ dim(ER.FEAT)
 
 There are a total of **`r TOT_PROP`** proteome properties and **`r TOT_FEAT`**
 We also gathered **`r TOTAL_FEATURES`** protein features.
+
 ## Compute properties similarities
 
-```{r properties-similarity}
-# spearman correlation between properties
-prop.cor="output/properties-correlation.rds"
-PROP_cor = preload(prop.cor,
-                   coop::pcor(PROP_lgl), 
-                   doing="Computing correlation between properties...")
-library(proxy)
-tmp = 
-tmp[ between(tmp,-0.1,0.1) ] = NA
-diag(tmp)=NA
+To compare properties, we will use the Jaccard distance on the binary matrix where rows are proteins and columns are the properties. The distance corresponds to the proportion of (TRUE, TRUE) pairs, but not considering (FALSE, FALSE) pairs.
 
-res<-NbClust(PROP_cor, diss=NULL, distance = "binary", min.nc=2, max.nc=100, 
-            method = "ward.D2", index = "kl") 
+So it compares the intersection with the union of protein sets between properties.
+
+
+```{r properties-similarity}
+# Pearson correlation between properties
+prop_cor = preload("output/properties-correlation.rds",
+                   coop::pcor(PROP_lgl), 
+                   doing="Computing Pearson correlation between properties...")
+library(proxy)
+# Example of Jaccard distance on binary data
+# x <- matrix(sample(c(FALSE, TRUE), 50, rep = TRUE), ncol = 10)
+# dist(x, x, method = "Jaccard") # cross distances
+
+# jaccard distance between properties
+prop_jacc = preload("output/properties-jaccard.rds", 
+                   proxy::dist(PROP_lgl, PROP_lgl, by_rows=F, method="Jaccard"),
+                   doing="Computing Jaccard distance between properties...") 
+dim(prop_jacc)
+hc = hclust(d=stats::as.dist(prop_jacc),method = 'ward.D2')
+grp = cutree(hc,k=100) 
+
+
+pheatmap::pheatmap(prop_jacc,
+                   show_colnames = F, show_rownames = T,
+                   cluster_cols = hc, cluster_rows = hc,
+                   clustering_distance_rows = prop_jacc,
+                   clustering_distance_cols = prop_jacc,
+                   cutree_rows = 100,cutree_cols = 100,
+                   fontsize=3, border_color = NA, silent=T, 
+                   cellheight=3, cellwidth=3,
+                   filename="output/properties-jaccard.pdf", height=50, width=50)
+
+which(prop_jacc < 0.5,arr.ind=T)
+
+# Number of clusters
+library(factoextra)
+library(NbClust)
+m.prop_jacc=base::as.matrix(stats::as.dist(prop_jacc))
+brk.minor=seq(5,245,by=5)
+brk.major=seq(50,250,by=25)
+
+# Elbow method
+fig.1a=fviz_nbclust(m.prop_jacc, method = "wss",
+                    FUNcluster = kmeans, k.max=250, nstart = 100, nboot=200) +
+  geom_vline(xintercept=brk.minor, linetype=3,size=0.5) +
+  geom_vline(xintercept=brk.major, linetype=2,size=0.5) +
+  labs(subtitle = "Elbow method") 
+
+# Silhouette method
+fig.1b=fviz_nbclust(m.prop_jacc, method = "silhouette",
+                   FUNcluster = kmeans, k.max=250, nstart = 100, nboot=200) +
+  labs(subtitle = "Silhouette method")
+
+# Gap statistic
+set.seed(42)
+fig.1c=fviz_nbclust(m.prop_jacc, method = "gap_stat", 
+                    FUNcluster=kmeans, k.max=250, nstart = 100, nboot = 200 ) + 
+  labs(subtitle = "Gap statistic method")
+
+nbclust_out <- NbClust(
+  data = m.prop_jacc, 
+  distance = "binary", 
+  min.nc = 2, # minimum number of clusters
+  max.nc = 250, # maximum number of clusters
+  method = "ward.D2"
+)
+
+# create a dataframe of the optimal number of clusters
+nbclust_plot <- data.frame(clusters = nbclust_out$Best.nc[1, ])
+# select only indices which select between 2 and 5 clusters
+nbclust_plot <- subset(nbclust_plot, clusters >= 2 & clusters <= 5)
+
+# create plot
+ggplot(nbclust_plot) +
+  aes(x = clusters) +
+  geom_histogram(bins = 30L, fill = "#0c4c8a") +
+  labs(x = "Number of clusters", y = "Frequency among all indices", title = "Optimal number of clusters") +
+  theme_minimal()
+res<-NbClust(prop_jacc, diss=NULL, distance = "binary", min.nc=2, max.nc=500,              method = "ward.D2", index = "kl") 
 res$All.index
 res$Best.nc
-table(res$Best.partition)
 head(res$Best.partition)
-max_cor = apply(abs(tmp),2,max_)
-quantile_( max_cor )
-
-uncorrelated = tmp[ which(max_cor < 0.4), which(max_cor < 0.4) ]
-colnames( uncorrelated )
-pheatmap::pheatmap(tmp, border_color = NA, fontsize = 3,
-                   show_colnames = T, show_rownames = F,
-                   filename = "output/properties-correlation.pdf",
-                   width = 10, height=10
-                  )
-
-# jaccard similarity between properties
-prop.jac="output/properties-jaccard.rds"
-PROP_jac = preload(prop.jac, 
-                   dist(PROP_lgl, pairwise = T, method="Jaccard"),
-                   doing="Computing Jaccard similarity between properties...") 
-
-# pheatmap::pheatmap(PROP_jac,
-#                    show_colnames = F, show_rownames = T,
-#                    cluster_cols = F, cluster_rows = F,
-#                    clustering_distance_rows = PROP_jac, 
-#                    clustering_distance_cols = PROP_jac,
-#                    fontsize=5, border_color = NA, silent=T, # cellheight=3, cellwidth=3,
-#                    filename="plots/properties-jaccard.pdf", height=30, width=30)
-# 
-# pheatmap::pheatmap(PROP_cor,
-#                    show_colnames = F, show_rownames = T,
-#                    cluster_cols = T, cluster_rows = T,
-#                    clustering_distance_rows = PROP_cor, 
-#                    clustering_distance_cols = PROP_cor,
-#                    fontsize=5,border_color = NA, silent=T, # cellheight=3, cellwidth=3,
-#                    filename="plots/properties-spearman.pdf", height=30, width=30)
-
-
-# library(proxy)
-# jac.go = dist(x = unigo.m[,-1], method = 'Jaccard',pairwise = TRUE)
-# cor.go = cor(unigo.m[,-1], use = 'pairwise',method = 'spearman') # similarity between go term
-# #cutree( hclust(as.dist(sim.go)), k=10 )
-# pheatmap::pheatmap(1-jac.go,cellheight=3,cellwidth=3,fontsize=4, height=20, width=20,border_col=NA,file='plots/jaccard_dist_go.pdf')
-# pheatmap::pheatmap(1-cor.go,cellheight=3,cellwidth=3,fontsize=4, height=20, width=20,border_col=NA,file='plots/correlation_dist_go.pdf')
+table(res$Best.partition)
 
 ```
 
