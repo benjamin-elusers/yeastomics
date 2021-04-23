@@ -198,7 +198,12 @@ ER = load.dubreuil2021.data(1) %>%
 DUB = load.dubreuil2019.data(4)
 # DUPLICATED GENES (OHNOLOGS)  -------------------------------------------------
 OHNO = get.sc.ohno(myseq=S288C)
-# VARIABLE ORF (PANGENOMICS)
+# CONSERVED GENES (ORTHOLOGS)  -------------------------------------------------
+ORTHO=get.eggnog.node('4891',to.matrix = T)
+df.ortho = get.eggnog.node('4891')
+PPM.ORTHO=get.ppm.ortho(node = '4891')
+
+# VARIABLE ORF (PANGENOMICS) -------------------------------------------------
 VARORF = load.peter2018.data(2)
 
 # CHROMOSOME GENES  ------------------------------------------------------------
@@ -453,11 +458,14 @@ TRANSCRIPTOMICS$geisberg2014.shortlived_mrna  = df.HLmrna %>% dplyr::filter(geis
 # RIBOSOME EFFICIENCY
 df.riboeff = load.dana2014.data() 
 
+df.orthoexp =  PPM.ORTHO %>%
+              filter(is1to1)
+
 df.transcriptomics = PROTEOME %>% 
                     left_join(df.tai,by=c('ORF'='prot')) %>% 
                     left_join(df.CU,by=c('ORF'='ID')) %>%
                     left_join(df.codons,by=c('ORF'='sgd.orf')) %>%
-                    left_join(df.aaMW,by=c('UNIPROTKB'='UNIPROT')) %>% 
+                    left_join(df.aaMW,by=c('UNIPROTKB'='UNIPROT')) %>%
                     left_join(df.cost,by=c('ORF'='name')) %>% 
                     left_join(df.HLmrna,by=c('ORF'='ORF')) %>%
                     left_join(df.riboeff,by=c('ORF'='orf'))
