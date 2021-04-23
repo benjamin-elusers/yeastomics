@@ -35,6 +35,8 @@ read Rate4site (R4S) output
 - SGD (genome sequences, features, gene ontology annotations)
 - D2P2 (Consensus disorder predictions)
 - STRING (protein-protein interactions)
+- eggNog (orthology prediction and functional annotation)
+- paxDB (proteome abundance)
 
 ## Published datasets _(remote access via URL)_
 -------------
