@@ -17,8 +17,11 @@ open.url <- function(file_url) {
 read.url <- function(file_url) {
   con <- gzcon(url(file_url))
   txt <- readLines(con)
+  closeAllConnections()
   return(txt)
 }
+
+
 strfind = function(strings, patterns){
   # Find several patterns in set of strings
   sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
@@ -414,7 +417,7 @@ load.peter2018.data =function(d){
   }else if(d==2){
       varorf = rio::import(file = SM.url,which = 3, progress = T,skip = 2,col_names = T,n_max = 3000,guess_max = 2600) %>%
         janitor::clean_names(parsing_option=3) %>% # Clean the column names
-        dplyr::select(where(~ mean(is.na(.x)) < 0.9)) %>%  #  Remove columns with 95% NA
+        dplyr::select(where(~ mean(is.na(.x)) < 0.9)) %>%  #  Remove columns with 90% NA
         mutate(orf.s288c = str_extract(annotation_name,pattern = SGD.nomenclature())) %>%
         relocate(orf.s288c,origin_assignment,occurrences_confirmed_by_mapping) %>%
         dplyr::filter(!is.na( orf.s288c) )
@@ -676,5 +679,168 @@ load.string = function(tax="4932",phy=T,ful=T,min.score=700){
   return(STRING_net)
 }
 
+load.pombe.orthologs = function() {
+  # Load orthologs pombe-cerevisiae
+  # Fused genes have parentheses to indicate which fused side they are
+  bracket.before = "(?<=\\()"
+  bracket.after = "(?=\\))"
+  regex_fusion = paste0( bracket.before, "(FUSION-)?(N|C)?", bracket.after)
 
+  url.orthologs = "ftp://ftp.pombase.org/pombe/orthologs/cerevisiae-orthologs.txt"
+  sp.sc = readr::read_delim(url.orthologs, delim="\t", col_names=c('PombaseID','ORFS'), comment="#", trim_ws=T) %>%
+    separate_rows(ORFS,sep = "\\|") %>%
+    mutate(orf= dplyr::na_if(str_extract(ORFS,"^[^\\(]+"),"NONE"),  # get the orf,
+           fused_side=str_sub(start=-1,str_extract(ORFS,regex_fusion)) )%>%  # get the parentheses content
+    filter(!is.na(orf)) %>%
+    group_by(PombaseID) %>% mutate(sp1 = n() ==1 ) %>%
+    group_by(orf) %>% mutate(sc1= n() == 1) %>%
+    rowwise %>% mutate( is_1to1 = sp1 & sc1,
+                        is_fusion = !is.na(fused_side)) %>%
+    dplyr::select(-ORFS) %>% ungroup() %>% arrange(orf)
+
+  return(sp.sc)
+}
+
+load.paxdb.orthologs = function(node,show.nodes=F) {
+  # get table of orthologs proteins from paxdb
+  paxdb_ortho="https://pax-db.org/downloads/latest/paxdb-orthologs.zip"
+  library(rio)
+  library(RCurl)
+  library(hablar)
+  # download the archive
+  temp<-tempfile()
+  download.file(paxdb_ortho,temp)
+  # Find the list of files in the archive (taxonomic nodes)
+  paxdb_nodes = unzip(temp,list = T)$Name %>%
+           str_subset("\\.txt") %>%
+           basename %>%
+           str_remove(".orthgroups.consistent.txt") %>%
+           gtools::mixedsort()
+
+  if(show.nodes){ return(paxdb_nodes) }
+  # Check the taxonomic node selected
+  node_exists= !purrr::is_empty(node)
+  is_paxdb_node=F
+
+  if(node_exists){
+    numnode=grep(node,paxdb_nodes)
+    if(length(numnode)==1 ){
+      is_paxdb_node=T
+      node_full=grep(node,paxdb_nodes,v=T)
+      message("taxonomic node (",node_full,") is valid!")
+    }else if(length(numnode)>1){
+      warning("(",node,") is not unique! Please select a valid unique node",immediate.=T)
+      is_paxdb_node=F
+    }
+  }
+
+  if(!is_paxdb_node){
+    warning("(",node,") is not a valid taxonomic node from paxDB orthologs!",immediate.=T)
+    numnode = menu(paxdb_nodes, title = "Pick a taxonomic node from the list below",graphics = T)
+  }
+
+  node = paxdb_nodes[numnode]
+  paxdb_node = sprintf("paxdb-orthologs-4.1/%s.orthgroups.consistent.txt",node)
+  # Read orthogroups at a specific taxonomic level
+  message("Retrieving orthologs for node [",node,"]...")
+  node_ortho <- readr::read_delim(unz(temp, paxdb_node),col_names = c("NOG", "orthologs"), delim="\t",progress=T) %>%
+    separate_rows(orthologs,sep=" ") %>%
+    extract(orthologs,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
+    group_by(NOG,taxid) %>% mutate(is_1to1=n()==1)
+
+  return(node_ortho)
+}
+
+load.paxdb = function(taxon=4932,average=T,integrated=T){
+
+  paxdb_dataset ="https://pax-db.org/downloads/latest/datasets/"
+  taxon_dir=file.path(paxdb.dataset,taxon,"/")
+  taxon_data <- RCurl::getURL(taxon_dir,dirlistonly = TRUE) %>%
+    stringr::str_extract_all('(?<=\\<a href\\=\\")(.+\\.txt)(?=\\">)') %>%
+    unlist
+
+  Ndata = length(taxon_data)
+  message(Ndata," paxDB datasets for taxon [",taxon,"]")
+
+  taxon_url = paste0(taxon_dir,taxon_data)
+  get.paxdb_header = function(urldata){
+    read.url(urldata) %>%
+      str_subset(pattern="^#") %>%
+      as_tibble %>%
+      extract(col=value,into=c('info',"value"), regex="^#([^\\:]+)\\:(.+)$") %>%
+      mutate(info=str_trim(info),value=str_trim(value)) %>%
+      filter( !is.na(info) ) %>%
+      pivot_wider(names_from='info',values_from=c(value))
+  }
+
+  if( Ndata == 1){
+    taxon_ppm = rio::import(taxon_url) %>%
+      rename_with(~c("paxid",'string','ppm','count')) %>%
+      mutate(dataset = basename(taxon_url)) %>%
+      extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)')
+    return(taxon_ppm)
+  }else{
+    infodata = map_dfr(taxon_url,get.paxdb_header) %>%
+      mutate(w=parse_number(weight)*0.01) %>%
+      dplyr::select(id,score,w,score,coverage,year=publication_year,organ,integrated,filename)
+
+    taxon_ppm = rio::import_list(taxon_url,rbind_label = "datafile",rbind = TRUE,rbind_fill = T) %>%
+      mutate(dataset=basename(datafile)) %>%
+      dplyr::select(-datafile) %>%
+      rename_with(~c("paxid",'string','ppm','count','dataset')) %>%
+      extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
+      left_join(infodata, by=c('dataset'='filename')) %>%
+      arrange(protid,ppm)
+  }
+  return(taxon_ppm)
+}
+
+get.ppm.ortho = function(node="4751.fungi"){
+  # Retrive orthologs from node
+  message("Selecting orthologs for [",node,"]")
+  ortho = load.paxdb.orthologs(node)
+  # Obtain unique taxons
+  taxons = sort(unique(ortho$taxid))
+  ntax = length(taxons)
+  message("node",node," has ",ntax," taxons : ",toString(taxons))
+  ppms = map_dfr(taxons, load.paxdb)
+
+  ortho_ppms = inner_join(ortho,ppms) %>%
+    arrange(NOG,taxid,protid,ppm,dataset)
+  return (ortho_ppms)
+}
+
+
+
+# if(average){
+#   message("Apply geometric mean...")
+#   message("Apply geometric standard deviation...")
+#   taxon_ppm = taxon_ppm %>%
+#     dplyr::filter(integrated=='false') %>%
+#     group_by(protid) %>%
+#     summarise(
+#               ppm_max=hablar::max_(ppm),
+#               ppm_min=hablar::min_(ppm),
+#               ppm_n=n(),
+#
+#               ppm_avg = sum(ppm*w)/sum(w),
+#               ppm_med = median(ppm*w),
+#               ppm_sd  = sd(ppm*w),
+#               ppm_mad = mad(ppm*w),
+#               ppm_cv  = ppm_sd/ppm_avg,
+#
+#     )
+# }
+#
+#     if(integrated){
+#       message("Extract WHOLE ORGANISM integrated abundance...")
+#       integrated = taxon_ppm %>%
+#         dplyr::filter(grepl("WHOLE_ORGANISM-integrated",dataset)) %>%
+#         dplyr::select(protid,ppm_int=ppm)
+#
+#       return(left_join(taxon_ppm,integrated,by="protid"))
+#     }
+#   }
+#   return(taxon_ppm)
+# }
 
