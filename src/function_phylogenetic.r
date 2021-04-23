@@ -133,26 +133,6 @@ get.sc.ohno = function(myseq) {
   return(pair)
 }
 
-load.pombe.orthologs = function() {
-  url.orthologs = "ftp://ftp.pombase.org/pombe/orthologs/cerevisiae-orthologs.txt"
-  sp.sc = read.delim(url.orthologs, comment.char = "#", stringsAsFactors = F,
-                     header = F, sep = '\t', row.names = NULL,
-                     col.names = c('PombaseID','ORFS'))
-  orthologs = sp.sc %>%
-    separate_rows(ORFS,sep = "\\|") %>%
-    mutate( PombaseID=str_trim(PombaseID),
-            ORF =  str_trim(str_remove(ORFS,"\\((FUSION-)?(N|C)\\)")),
-            splitted = str_extract(ORFS,"(?<=\\()(N|C)(?=\\))")) %>%
-    dplyr::select(-ORFS) %>%
-    # Remove pombe genes with no orthologs in cerevisiae (MEL genes don't exist in yeast)
-    filter(ORF != "NONE" & !grepl("MEL[1256]",ORF) ) %>%
-    group_by(PombaseID) %>% mutate(pombe.1 = n()==1 ) %>%
-    group_by(ORF) %>% mutate(cerevisiae.1 = n()==1 ) %>%
-    rowwise %>% mutate(ortho.1to1 = pombe.1 & cerevisiae.1)
-
-  return(orthologs)
-}
-
 get.ortho.pair = function(ortho = load.pombe.orthologs() ){
   return(ortho[,c('PombaseID','ORF')])
 }
@@ -193,8 +173,75 @@ compare.to.ancestors = function(ancestor, current){
   return(anc.stat)
 }
 
-get.enog.4891 = function(taxid_info='http://eggnog5.embl.de/download/eggnog_5.0/e5.taxid_info.tsv',
-                         node_info='./data/EVO/eggNOG-data/by_level_taxa/4891.proteomes'){
+load.eggnog.node = function(node=NULL,to.matrix=F,show.nodes=F){
+  eggnog = lst(baseurl="http://eggnog.embl.de/download/",
+                v4.5=paste0(baseurl,"eggnog_4.5/"),
+                latest=paste0(baseurl,"latest/"),
+                tax_level = paste0(v4.5,"eggnog4.taxonomic_levels.txt"),
+                tax_info =paste0(latest,"e5.taxid_info.tsv"),
+                level_info =  paste0(latest,"e5.level_info.tar.gz")
+               )
+
+  eggnog_nodes=readr::read_delim(eggnog$tax_level,delim="\t",col_types = cols(.default="c")) %>%
+    janitor::clean_names(replace = c("#"="")) %>%
+    mutate(node_full = sprintf(" %-s (%s)", paste(tax_id,tolower(level_name),sep="."), nog_prefix)) %>%
+    dplyr::select(-ends_with("_count")) %>% arrange(tax_id)
+
+  eggnog_taxons=readr::read_delim(eggnog$tax_info,delim="\t", col_types = "ccccc") %>%
+                janitor::clean_names(replace = c("#"=""))
+
+  # Testing
+  # node.test = list(null=NULL,empty=c(),none="",num=4751,name='Fungi', nog='fuNOG')
+  # node = node.test$nog
+  nodes=dplyr::select(eggnog_nodes,tax_id:level_name)
+  if(show.nodes){ return(eggnog_nodes) }
+  node_exists= !purrr::is_empty(node)
+  is_eggnog_node=F
+
+  if(node_exists){
+    node_pos  = which( node == nodes, arr.ind=T) # check if the node exists
+    if( nrow(node_pos) == 1 ){
+      inod=node_pos[,'row']
+      node_type = names(nodes)[ node_pos[,'col'] ] # find what column the node is found (tax_id, nog_prefix or level_name)
+      message("(",node,") is a valid eggnog node of type [",node_type,"]")
+      is_eggnog_node=T
+    }else if( nrow(node_pos)>1){
+      warning("(",node,") is not unique! Please select a valid unique node",immediate.=T)
+      is_eggnog_node=F
+    }
+  }
+  nodes_list = eggnog_nodes$node_full %>%  gtools::mixedsort()
+
+  if( !is_eggnog_node ){
+    warning(node," is not a valid eggnog taxonomic level!",immediate.=T)
+    inod = menu( choices=nodes_list )
+  }
+  node_info = eggnog_nodes[inod,] %>% dplyr::select(-node_full)
+  print(node_info)
+
+  node_members = sprintf("%s/per_tax_level/%s/%s_members.tsv.gz",eggnog$latest,node_info$tax_id,node_info$tax_id)
+  df.ortho = readr::read_delim(node_members,"\t",progress=T,
+                    col_names = c('node','OG','ns','np','ortho','taxons'),
+                    col_types=cols(.default="c")) %>%
+    mutate(has_yeast = str_detect(string = taxons,pattern = "4932")) %>%
+    separate_rows(ortho,sep=",") %>%
+    extract(ortho,into=c('taxid','protid'),regex='^(^[0-9]+)\\.(.+)') %>%
+    group_by(OG,taxid) %>% mutate(is_1to1=n()==1) %>%
+    left_join(node_info, by=c('node'='tax_id'))
+
+  if( to.matrix ){
+    ortho.m= df.ortho %>%
+              filter(is_1to1) %>%
+              pivot_wider(id_cols=c(OG,np),names_from=taxid, values_from=protid)
+    return(ortho.m)
+  }
+  return(df.ortho)
+}
+
+#NODES = get.eggnog.node(node = 4751,to.matrix = F)
+#colnames(NODES)
+
+get.enog.4891 = function(){
   sp.4891 = data.frame(
     taxid=c('4952','5476', # outgroup
             '4956','4950','28985','45285','33169','381046', # prewgd
