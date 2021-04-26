@@ -15,10 +15,13 @@ load.proteome = function(url,nostop=T) {
   }
   return(p)
 }
-load.sgd.proteome = function(withORF=T,rm.stop=T) {
+
+load.sgd.proteome = function(withORF=T,rm.stop=T, orf_protein="sequence/S288C_reference/orf_protein") {
   library(stringr)
-  sgd.url = "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_protein/orf_trans_all.fasta.gz"
-  SGD = load.proteome(sgd.url,nostop = rm.stop)
+  sgd.url = "http://sgd-archive.yeastgenome.org"
+  prot= file.path(sgd.url,orf_protein,"orf_trans_all.fasta.gz")
+  prot_archived = file.path(dirname(prot),"archive/orf_trans_all_R64-3-1_20210421.fasta.gz")
+  SGD = load.proteome(fallback(prot,prot_archived),nostop = rm.stop)
   regexSGD = "(S[0-9]{9})"
   if(withORF){
     # ORF identifier
