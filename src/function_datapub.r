@@ -754,7 +754,7 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
 load.paxdb = function(taxon=4932,average=T,integrated=T){
 
   paxdb_dataset ="https://pax-db.org/downloads/latest/datasets/"
-  taxon_dir=file.path(paxdb.dataset,taxon,"/")
+  taxon_dir=file.path(paxdb_dataset,taxon,"/")
   taxon_data <- RCurl::getURL(taxon_dir,dirlistonly = TRUE) %>%
     stringr::str_extract_all('(?<=\\<a href\\=\\")(.+\\.txt)(?=\\">)') %>%
     unlist
