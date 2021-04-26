@@ -39,10 +39,23 @@ UNIPROT.nomenclature = function(){
   return(ACCESSION)
 }
 
-load.sgd.CDS = function(withORF=T) {
+fallback = function(url,archived){
+  # if current download is dead/blocked use the latest archive
+  if( httr::http_error(url) ){
+    warning(sprintf("falling back to last release archived (%s)...",archived),immediate. = T)
+    url = archived
+  }else{
+    message("URL...OK")
+  }
+  return(url)
+}
+
+load.sgd.CDS = function(withORF=T,orf.dna="sequence/S288C_reference/orf_dna") {
   library(stringr)
-  sgd.url = "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_dna/orf_coding_all.fasta.gz"
-  SGD = load.genome(sgd.url)
+  sgd.url = "http://sgd-archive.yeastgenome.org"
+  cds= file.path(sgd.url,orf.dna,"orf_coding_all.fasta.gz")
+  cds_archived = file.path(dirname(cds),"archive/orf_coding_all_R64-3-1_20210421.fasta.gz")
+  SGD = load.genome(fallback(cds,cds_archived))
   regexSGD = "(S[0-9]{9})"
   if(withORF){
     # ORF identifier
@@ -55,10 +68,12 @@ load.sgd.CDS = function(withORF=T) {
   return(SGD)
 }
 
-load.sgd.proteome = function(withORF=T,rm.stop=T) {
+load.sgd.proteome = function(withORF=T,rm.stop=T, orf_protein="sequence/S288C_reference/orf_protein") {
   library(stringr)
-  sgd.url = "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_protein/orf_trans_all.fasta.gz"
-  SGD = load.proteome(sgd.url,nostop = rm.stop)
+  sgd.url = "http://sgd-archive.yeastgenome.org"
+  prot= file.path(sgd.url,orf_protein,"orf_trans_all.fasta.gz")
+  prot_archived = file.path(dirname(prot),"archive/orf_trans_all_R64-3-1_20210421.fasta.gz")
+  SGD = load.proteome(fallback(prot,prot_archived),nostop = rm.stop)
   regexSGD = "(S[0-9]{9})"
   if(withORF){
     # ORF identifier
