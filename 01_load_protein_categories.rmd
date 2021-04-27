@@ -198,13 +198,14 @@ ER = load.dubreuil2021.data(1) %>%
 DUB = load.dubreuil2019.data(4)
 # DUPLICATED GENES (OHNOLOGS)  -------------------------------------------------
 OHNO = get.sc.ohno(myseq=S288C)
+
 # CONSERVED GENES (ORTHOLOGS)  -------------------------------------------------
 ORTHO=load.eggnog.node('4751',to.matrix = T)
 df.ortho = load.eggnog.node('4751')
 PPM.ORTHO=get.ppm.ortho(node = '4751', raw=F, which.abundance = 'integrated')
 # PPM.ORTHO.ALL = get.ppm.ortho(node = '4751', raw=T) # All abundance values
 
-# Turn orthologs abundance as columns *use integrated ppm values*
+# Orthologs abundance as columns *uses integrated ppm values*
 PPM.ORTHO.4932 = PPM.ORTHO %>% ungroup() %>% filter(taxid==4932) %>% 
                   dplyr::select(NOG,orf=protid,ppm_4932=ppm_int) %>%
                   left_join(PPM.ORTHO %>% filter(taxid!=4932), by=c("NOG")) %>% 
@@ -212,6 +213,7 @@ PPM.ORTHO.4932 = PPM.ORTHO %>% ungroup() %>% filter(taxid==4932) %>%
                               names_from=taxid, names_glue="ppm_{taxid}",
                               values_from=ppm_int, values_fn=mean_) %>%
                   dplyr::select(-ppm_NA,-organ)
+
 
 # VARIABLE ORF (PANGENOMICS) -------------------------------------------------
 VARORF = load.peter2018.data(2)
@@ -223,7 +225,9 @@ CHR = SGD %>%
       dplyr::select(name)
 
 # AMINO ACID FREQUENCIES -------------------------------------------------------
-AA.FR = letterFrequency(UNI.SC,as.prob = T,letters = get.AA1()) %>% as_tibble
+AA.FR = letterFrequency(UNI.SC,as.prob = T,letters = get.AA1()) %>% bind_cols( id=names(UNI.SC)) 
+AA.COUNT = letterFrequency(UNI.SC,as.prob = F,letters = get.AA1())%>% bind_cols( id=names(UNI.SC)) 
+
 aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY
 sum.aa.fr = function(BS,alphabet){ 
   alphabet.freq = rowSums(letterFrequency(BS,as.prob = T,letters = alphabet))
@@ -366,7 +370,7 @@ CHEMSIG=load.lee2014.data(rawdata=F)
 GENOMICS=list()
 ### Proteins length -----------------------------------------------------------
 df.len = tibble(orf=names(S288C),sgd.len=width(S288C))
-# %GC content in genes ---------------------------------------------------------
+# %GC content in genes --------------------------------------------------------
 df.gc  = tibble(orf=names(CDS),sgd.pGC = rowSums(letterFrequency(CDS, letters="CG",as.prob = T)))
 ### Chromosome Number ---------------------------------------------------------
 chr.orf =  split(CHR$name,CHR$chr.f,drop=T) 
@@ -375,18 +379,24 @@ GENOMICS = append(GENOMICS,chr.orf)
 ### Intron containing genes ---------------------------------------------------
 GENOMICS$sgd.has_intron = SGD %>% filter(type=='intron') %>% pull(parent) %>% intersect(y=names(S288C))
 ### Gene duplication ----------------------------------------------------------
-df.wgd  = OHNO %>% dplyr::select(orf,orf_dup=dup.orf,RLEN,PID1,pid,score_B100 = SCORE.B100,S,N,G) %>% dplyr::rename_with(.fn=Pxx, px="byrne2005")
+df.wgd  = OHNO %>% dplyr::select(orf,RLEN,PID1,pid,score_B100 = SCORE.B100,S,N,G) %>% dplyr::rename_with(.fn=Pxx, px="byrne2005")
 GENOMICS$byrne2005.wgd_all = OHNO$orf 
-GENOMICS$byrne2005.wgd_sym = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
-GENOMICS$byrne2005.wgd_asym = OHNO %>% filter(between(RLEN,0.7,0.9)) %>% pull(orf)
-GENOMICS$byrne2005.wgd_trunc = OHNO %>% filter(RLEN<0.5) %>% pull(orf)
+GENOMICS$byrne2005.wgd_symlen = OHNO %>% filter(RLEN>0.99) %>% pull(orf)
+GENOMICS$byrne2005.wgd_nearlen = OHNO %>% filter(between(RLEN,0.9,0.99)) %>% pull(orf)
+GENOMICS$byrne2005.wgd_asymlen = OHNO %>% filter(between(RLEN,0.65,0.89)) %>% pull(orf)
+GENOMICS$byrne2005.wgd_trunclen = OHNO %>% filter(RLEN<0.65) %>% pull(orf)
 ### Pan genome
 df.pangenome =  VARORF %>%
                 dplyr::select(orf.s288c,occurrences_confirmed_by_mapping) %>% 
                 dplyr::rename(peter2018.strains_presence=occurrences_confirmed_by_mapping)
+
 GENOMICS$peter2018.pangenome_cloud = df.pangenome %>% filter(peter2018.strains_presence<750) %>% pull(orf.s288c)
 GENOMICS$peter2018.pangenome_variable = df.pangenome %>% filter(between(peter2018.strains_presence,750,1000)) %>% pull(orf.s288c)
 GENOMICS$peter2018.pangenome_core = df.pangenome %>% filter(peter2018.strains_presence>1000) %>% pull(orf.s288c)
+
+GENOMICS$uniprot.existence_transcript = UNIPROT %>% filter(EXISTENCE=="Evidence at transcript level") %>% pull(UNIPROTKB)
+GENOMICS$uniprot.existence_predicted  = UNIPROT %>% filter(EXISTENCE=="Predicted") %>% pull(UNIPROTKB)
+GENOMICS$uniprot.existence_homology   = UNIPROT %>% filter(EXISTENCE=="Inferred from homology") %>% pull(UNIPROTKB)
 
 df.genomics = PROTEOME %>% 
               left_join(df.len, by=c('ORF'='orf')) %>%
@@ -440,19 +450,15 @@ df.CU=load.codon.usage(cds=CDS,with.counts=F) %>% dplyr::rename_with(.fn=Pxx,px=
 df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
  
 ### Amino-acid biosynthetic cost
-df.uni_info = UNIPROT %>%  dplyr::select(c(UNIPROTKB,REVIEWED,EXISTENCE,SCORE,qual))
-df.aaMW = DUB %>% 
+df.protinfo = UNIPROT %>%  dplyr::select(c(UNIPROTKB,REVIEWED,EXISTENCE,SCORE,qual))
+df.aa_mw = DUB %>% 
        group_by(UNIPROT) %>% 
-       summarise( pepstats.mean_MW = MW/prot.size ) %>%
-       left_join(df.uni_info, by=c('UNIPROT' = 'UNIPROTKB'))
+       summarise( pepstats.mean_MW = MW/prot.size, L = prot.size ) %>%
+       left_join(df.protinfo, by=c('UNIPROT' = 'UNIPROTKB')) %>%
+       filter(qual != 'Dubious' & EXISTENCE != "Uncertain" & L>50  )
 
-head(df.aaMW)
-
-df.aaMW %>% dplyr::filter(pepstats.mean_MW > 120 ) 
-
-
-TRANSCRIPTOMICS$pepstats.AA_costly = df.aaMW %>% dplyr::filter(pepstats.mean_MW > 120 ) %>% pull(UNIPROT)
-TRANSCRIPTOMICS$pepstats.AA_cheap = df.aaMW %>% dplyr::filter(pepstats.mean_MW < 105 ) %>% pull(UNIPROT)
+TRANSCRIPTOMICS$pepstats.AA_costly = df.aa_mw %>% dplyr::filter(pepstats.mean_MW > 119 ) %>% pull(UNIPROT)
+TRANSCRIPTOMICS$pepstats.AA_cheap = df.aa_mw %>% dplyr::filter(pepstats.mean_MW <= 105 ) %>% pull(UNIPROT)
 
 df.cost = load.barton2010.data("prot") %>% 
           group_by(name) %>%
@@ -475,7 +481,6 @@ TRANSCRIPTOMICS$geisberg2014.shortlived_mrna  = df.HLmrna %>% dplyr::filter(geis
 # RIBOSOME EFFICIENCY
 df.riboeff = load.dana2014.data() 
 
-
 # ORTHOLOGS EXPRESSION (against yeast, integrated abundance, average of orthologs)
 df.orthoexp =  PPM.ORTHO.4932 %>% 
                  group_by(NOG,orf) %>%
@@ -487,12 +492,11 @@ df.orthoexp =  PPM.ORTHO.4932 %>%
                          ortho_ppm_n= sum.na(c_across(starts_with('ppm_')),notNA = T) ) %>%
                   filter(ortho_ppm_n > 1)
 
-
 df.transcriptomics = PROTEOME %>% 
                     left_join(df.tai,by=c('ORF'='prot')) %>% 
                     left_join(df.CU,by=c('ORF'='ID')) %>%
                     left_join(df.codons,by=c('ORF'='sgd.orf')) %>%
-                    left_join(df.aaMW,by=c('UNIPROTKB'='UNIPROT')) %>%
+                    left_join(df.aa_mw,by=c('UNIPROTKB'='UNIPROT')) %>%
                     left_join(df.cost,by=c('ORF'='name')) %>% 
                     left_join(df.HLmrna,by=c('ORF'='ORF')) %>%
                     left_join(df.riboeff,by=c('ORF'='orf')) %>%
@@ -537,8 +541,8 @@ df.transcriptomics = PROTEOME %>%
 BIOPHYSICS=list()
 
 ### Single amino-acid frequencies ------------------------------------------------
-df.aa = AA.FR %>% mutate(uni=names(UNI.SC)) %>% relocate(uni) %>%
-        rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-uni)
+df.aa = AA.FR %>%
+        rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-id)
 
 
 ### Grouped amino-acid frequencies -----------------------------------------------
@@ -584,15 +588,16 @@ BIOPHYSICS$dubreuil2019.uniprot_short= DUB %>% dplyr::filter(small) %>% pull(UNI
 BIOPHYSICS$dubreuil2019.uniprot_average= DUB %>% dplyr::filter(average) %>% pull(UNIPROT)
 BIOPHYSICS$dubreuil2019.uniprot_long= DUB %>% dplyr::filter(large) %>% pull(UNIPROT)
 
-
 ### Amino-acid interactions propensities
+fullsti = tibble( uni=AA.COUNT$id, uniprot.sti_full = AACOUNT2SCORE(COUNT=AA.COUNT[,1:20],SCORE=get.stickiness()) )
 df.aascales = DUB %>%
               mutate(has_iup = !is.na(L.IUP20) | !is.na(L.IUP30) | !is.na(L.IUP40),
                      has_dom = !is.na(L.domain) ) %>%
               dplyr::filter(has_iup | has_dom) %>%
               dplyr::select(UNIPROT,ends_with(c('.dom','.iup20'),ignore.case = F)) %>%
-              rename_with(.fn=str_replace, pattern="(.+)\\.(.+)",replacement = 'dubreuil2019.\\1_\\2')
-
+              rename_with(.fn=str_replace, pattern="(.+)\\.(.+)",replacement = 'dubreuil2019.\\1_\\2') %>%
+              left_join(fullsti,by=c('UNIPROT'='uni'))
+  
 
 ### Protein domains (nodom,single,multi)  ----------------------------------------
 supfam =  SUPERFAM %>% 
@@ -644,7 +649,7 @@ BIOPHYSICS$villen2017.shortlived_prot = df.HLprot %>% dplyr::filter(villen2017.H
 BIOPHYSICS$belle2006.shortlived_prot = df.HLprot %>% dplyr::filter(belle2006.HL_prot < 5) %>% pull(ORF)
 
 df.biophysics = PROTEOME %>% 
-                left_join(df.aa,by=c('UNIPROTKB'='uni')) %>%
+                left_join(df.aa,by=c('UNIPROTKB'='id')) %>%
                 left_join(df.aa_class,by=c('UNIPROTKB'='id')) %>%
                 left_join(df.d2p2,by=c('UNIPROTKB'='d2p2.id')) %>%
                 left_join(df.pepstats,by=c('UNIPROTKB'='UNIPROT')) %>%
