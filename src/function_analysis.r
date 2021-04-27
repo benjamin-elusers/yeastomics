@@ -202,4 +202,28 @@ fivebins = function(x, applyto=NULL,
 # APPLY AMINO ACID SCORES COUNT AMINO ACIDS BY PROTEIN
 #data(AAindex,package = 'protr')
 
+AACOUNT2SCORE = function(COUNT,SCORE, opposite=F){
+  if( is.null(dim(COUNT)) ){ stop("COUNT must be a 2D object") }
+  if( is.null(names(SCORE)) ){ stop("SCORE must be a 1D vector with names corresponding to row or col names of COUNT") }
+  #nms1 = setdiff(names(SCORE),colnames(COUNT))
+  #nms2 = setdiff(names(SCORE),rownames(COUNT))
+  if(opposite){
+    SCORE = SCORE * (-1)
+    print("TAKING OPPOSITE VALUES ")
+  }
+  if( length(SCORE) == nrow(COUNT) ){ # AA SCORE BY ROW, PROT BY COL
+    #print("AMINO ACID BY ROW, PROTEIN BY COLUMN")
+    score.m = matrix(as.numeric(SCORE),nrow=nrow(COUNT),ncol=ncol(COUNT),byrow=F)
+    rownames(score.m) = rownames(COUNT)
+    S = colSums(COUNT*score.m,na.rm = T)/colSums(COUNT,na.rm = T)
+  }else if( length(SCORE) == ncol(COUNT) ){ # AA SCORE BY COL, PROT BY ROW
+    #print("PROTEIN BY ROW, AMINO ACID BY COLUMN")
+    score.m = matrix(data = as.numeric(SCORE),nrow=nrow(COUNT),ncol=ncol(COUNT),byrow=T)
+    colnames(score.m) = colnames(COUNT)
+    S = rowSums(COUNT*score.m,na.rm = T)/rowSums(COUNT,na.rm = T)
+  }else if( !(length(SCORE) %in% dim(COUNT) ) ){
+    stop("SCORE must be a vector of length equal to number of col OR number of rows of COUNT")
+  }
+  return(S)
+}
 
