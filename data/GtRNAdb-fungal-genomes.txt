@@ -1,0 +1,433 @@
+org_name	org_abbr	tax_ID
+Absidia idahoensis var. thermophila	Absi_idah_var_thermophila	572092: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Cunninghamellaceae; Absidia. 
+Agaricus bisporus var. bisporus H97	Agar_bisp_var_bisporus_H97	936046: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Agaricaceae; 
+Agaricus bisporus var. burnettii JB137-S8 JB137-s8	Agar_bisp_var_burnettii_JB137_S8_JB137_s8	597362: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Agaricaceae; 
+Allomyces macrogynus ATCC 38327	Allo_macr_ATCC_38327	578462: Eukaryota; Fungi; Blastocladiomycota; Blastocladiomycetes; Blastocladiales; Blastocladiaceae; Allomyces. 
+Amanita jacksonii TRTC168611	Aman_jack_TRTC168611	1417757: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Amanitaceae; Amanita. 
+Anncaliia algerae PRA109	Annc_alge_PRA109	1240240: Eukaryota; Fungi; Microsporidia; Tubulinosematidae; Anncaliia. 
+Anncaliia algerae PRA339	Annc_alge_PRA339	1288291: Eukaryota; Fungi; Microsporidia; Tubulinosematidae; Anncaliia. 
+Arthroderma benhamiae CBS 112371	Arth_benh_CBS_112371	663331: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Arthroderma otae CBS 113480	Arth_otae_CBS_113480	554155: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Ascosphaera apis ARSEF 7405 USDA-ARSEF 7405	Asco_apis_ARSEF_7405_USDA_ARSEF_7405	392613: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ascosphaeraceae; 
+Ascocoryne sarcoides NRRL 50072	Asco_sarc_NRRL_50072	1016881: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Helotiales; Helotiaceae; Ascocoryne. 
+Eremothecium gossypii ATCC 10895	Ashb_goss_ATCC_10895	284811: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Aspergillus clavatus NRRL 1	Aspe_clav_NRRL_1	344612: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus flavus NRRL3357	Aspe_flav_NRRL3357	332952: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus fumigatus A1163	Aspe_fumi_A1163	451804: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus fumigatus Af293	Aspe_fumi_Af293	330879: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus kawachii IFO 4308 IFO4308	Aspe_kawa_IFO_4308_IFO4308	1033177: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus nidulans FGSC A4	Aspe_nidu_FGSC_A4	227321: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus niger CBS 513.88	Aspe_nige_CBS_513_88	425011: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus niger SH-2	Aspe_nige_SH_2	1316740: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus oryzae RIB40	Aspe_oryz_RIB40	510516: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus ruber CBS 135680	Aspe_rube_CBS_135680	1388766: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus sojae NBRC 4239	Aspe_soja_NBRC_4239	927772: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Aspergillus terreus NIH2624	Aspe_terr_NIH2624	341663: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Batrachochytrium dendrobatidis JAM81	Batr_dend_JAM81	684364: Eukaryota; Fungi; Chytridiomycota; Chytridiomycetes; Rhizophydiales; Rhizophydiales incertae sedis; Batrachochytrium. 
+Batrachochytrium dendrobatidis JEL423	Batr_dend_JEL423	403673: Eukaryota; Fungi; Chytridiomycota; Chytridiomycetes; Rhizophydiales; Rhizophydiales incertae sedis; Batrachochytrium. 
+Baudoinia compniacensis UAMH 10762	Baud_comp_UAMH_10762	717646: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Capnodiales; 
+Beauveria bassiana ARSEF 2860	Beau_bass_ARSEF_2860	655819: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Cordycipitaceae; 
+Bipolaris maydis ATCC 48331	Bipo_mayd_ATCC_48331	665024: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Pleosporomycetidae; Pleosporales; Pleosporineae; 
+Bipolaris maydis C5	Bipo_mayd_C5	701091: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Pleosporomycetidae; Pleosporales; Pleosporineae; 
+Bipolaris sorokiniana ND90Pr	Bipo_soro_ND90Pr	665912: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Pleosporomycetidae; Pleosporales; Pleosporineae; 
+Blastomyces dermatitidis ATCC 18187	Blas_derm_ATCC_18187	946394: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ajellomycetaceae; 
+Blastomyces dermatitidis ATCC 18188	Blas_derm_ATCC_18188	653446: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ajellomycetaceae; 
+Blastomyces dermatitidis ATCC 26199	Blas_derm_ATCC_26199	447095: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ajellomycetaceae; 
+Blastomyces dermatitidis ER-3	Blas_derm_ER_3	559297: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ajellomycetaceae; 
+Blastomyces dermatitidis SLH14081	Blas_derm_SLH14081	559298: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ajellomycetaceae; 
+Blumeria graminis f. sp. hordei DH14	Blum_gram_f_hordei_DH14	546991: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Erysiphales; Erysiphaceae; Blumeria. 
+Blumeria graminis f. sp. tritici 94202	Blum_gram_f_tritici_94202	1306135: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Erysiphales; Erysiphaceae; Blumeria. 
+Blumeria graminis f. sp. tritici 96224	Blum_gram_f_tritici_96224	1268274: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Erysiphales; Erysiphaceae; Blumeria. 
+Blumeria graminis f. sp. tritici JIW2	Blum_gram_f_tritici_JIW2	1306134: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Erysiphales; Erysiphaceae; Blumeria. 
+Botryobasidium botryosum FD-172 SS1	Botr_botr_FD_172_SS1	930990: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Cantharellales; Botryobasidiaceae; Botryobasidium. 
+Botrytis cinerea B05.10	Botr_cine_B05_10	332648: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Helotiales; Sclerotiniaceae; Botrytis. 
+Botrytis cinerea BcDW1	Botr_cine_BcDW1	1290391: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Helotiales; Sclerotiniaceae; Botrytis. 
+Botrytis cinerea T4	Botr_cine_T4	999810: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Helotiales; Sclerotiniaceae; Botrytis. 
+Candida albicans 3153A	Cand_albi_3153A	1182531: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans A123	Cand_albi_A123	1182537: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans A155	Cand_albi_A155	1182538: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans A20	Cand_albi_A20	1182533: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans A203	Cand_albi_A203	1182540: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans A48	Cand_albi_A48	1182534: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans A67	Cand_albi_A67	1182535: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans A84	Cand_albi_A84	1182539: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans A92	Cand_albi_A92	1182536: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans CHN1	Cand_albi_CHN1	1182532: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans Ca529L	Cand_albi_Ca529L	1325634: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida albicans WO-1	Cand_albi_WO_1	294748: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida dubliniensis CD36	Cand_dubl_CD36	573826: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida glabrata CBS 138	Cand_glab_CBS_138	5478: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Candida orthopsilosis Co 90-125	Cand_orth_Co_90_125	273371: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida tropicalis 121	Cand_trop_121	5482: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Candida tropicalis MYA-3404	Cand_trop_MYA_3404	294747: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Capronia semiimmersa CBS 27337	Capr_semi_CBS_27337	5601: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Cerataphis brasiliensis yeast-like symbiont	Cera_bras_yeast_like_symbiont	1202554: Eukaryota; Fungi; Dikarya; Ascomycota. 
+Chaetomium globosum CBS 148.51	Chae_glob_CBS_148_51	306901: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Chaetomiaceae; 
+Chaetomium thermophilum var. thermophilum DSM 1495	Chae_ther_var_thermophilum_DSM_1495	759272: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Chaetomiaceae; 
+Cladophialophora bantiana CBS 173.52	Clad_bant_CBS_173_52	1442370: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Cladophialophora carrionii CBS 160.54	Clad_carr_CBS_160_54	1279043: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Cladophialophora immunda CBS 83496	Clad_immu_CBS_83496	569365: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Cladonia macilenta KoLRI003786	Clad_maci_KoLRI003786	1353983: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Lecanoromycetes; OSLEUM clade; Lecanoromycetidae; Lecanorales; 
+Cladonia metacorallifera KoLRI002260	Clad_meta_KoLRI002260	1400770: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Lecanoromycetes; OSLEUM clade; Lecanoromycetidae; Lecanorales; 
+Cladosporium sphaerospermum UM 843	Clad_spha_UM_843	1151026: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Capnodiales; Cladosporiaceae; 
+Clavispora lusitaniae ATCC 42720	Clav_lusi_ATCC_42720	306902: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Metschnikowiaceae; Clavispora. 
+Coccidioides immitis H538.4	Cocc_immi_H538_4	396776: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides immitis RMSCC 2394	Cocc_immi_RMSCC_2394	404692: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides immitis RMSCC 3703	Cocc_immi_RMSCC_3703	454286: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides immitis RS	Cocc_immi_RS	246410: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii C735 delta SOWgp	Cocc_posa_C735_delta_SOWgp	222929: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii CPA 0001	Cocc_posa_CPA_0001	469472: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii CPA 0020	Cocc_posa_CPA_0020	490068: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii CPA 0066	Cocc_posa_CPA_0066	490069: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii RMSCC 1037	Cocc_posa_RMSCC_1037	490065: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii RMSCC 1038	Cocc_posa_RMSCC_1038	490066: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii RMSCC 2133	Cocc_posa_RMSCC_2133	469470: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii RMSCC 3488	Cocc_posa_RMSCC_3488	454284: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii RMSCC 3700	Cocc_posa_RMSCC_3700	469471: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Coccidioides posadasii str. Silveira	Cocc_posa_Silveira	443226: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Colletotrichum graminicola M1.001	Coll_gram_M1_001	645133: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Glomerellales; Glomerellaceae; 
+Colletotrichum orbiculare MAFF 240422	Coll_orbi_MAFF_240422	1213857: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Glomerellales; Glomerellaceae; 
+Coniophora puteana RWD-64-598 SS2	Coni_pute_RWD_64_598_SS2	741705: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Boletales; Coniophorineae; 
+Cordyceps militaris CM01	Cord_mili_CM01	983644: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Cordycipitaceae; 
+Cronartium comandrae C4	Cron_coma_C4	1301515: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Cronartiaceae; Cronartium. 
+Cronartium quercuum f. sp. banksianae CqE3WM	Cron_quer_f_banksianae_CqE3WM	1301520: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Cronartiaceae; Cronartium. 
+Cronartium ribicola 11-2	Cron_ribi_11_2	1301521: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Cronartiaceae; Cronartium. 
+Cryptococcus bestiolae CBS 10118	Cryp_best_CBS_10118	1296100: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellales incertae sedis; 
+Cryptococcus dejecticola CBS 10117	Cryp_deje_CBS_10117	1296121: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellales incertae sedis; 
+Cryptococcus gattii 2001/935-1	Cryp_gatt_2001_935_1	1334442: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii 99/473	Cryp_gatt_99_473	1296104: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii CA1014	Cryp_gatt_CA1014	1296107: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii CA1280	Cryp_gatt_CA1280	1296109: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii CA1873	Cryp_gatt_CA1873	1296111: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii CBS 10090	Cryp_gatt_CBS_10090	1296101: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii CBS 7750	Cryp_gatt_CBS_7750	1385412: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii E566	Cryp_gatt_E566	1296102: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii EJB2	Cryp_gatt_EJB2	1296103: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii IND107	Cryp_gatt_IND107	1296105: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii LA55	Cryp_gatt_LA55	1296106: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii MMRL2647	Cryp_gatt_MMRL2647	1296117: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii NT-10	Cryp_gatt_NT_10	1296108: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii R265	Cryp_gatt_R265	552467: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii Ram5	Cryp_gatt_Ram5	1296110: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii Ru294	Cryp_gatt_Ru294	1296112: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus gattii WM276	Cryp_gatt_WM276	367775: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus neoformans var. grubii H99	Cryp_neof_var_grubii_H99	235443: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus neoformans var. neoformans B-3501A	Cryp_neof_var_neoformans_B_3501A	283643: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus neoformans var. neoformans JEC21	Cryp_neof_var_neoformans_JEC21	214684: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Filobasidiella; 
+Cryptococcus pinus CBS 10737	Cryp_pinu_CBS_10737	1296096: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellales incertae sedis; 
+Curvularia lunata CX-3	Curv_luna_CX_3	1263492: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Pleosporomycetidae; Pleosporales; Pleosporineae; 
+Cyberlindnera jadinii NBRC 0988 NBRC0988	Cybe_jadi_NBRC_0988_NBRC0988	1128122: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Phaffomycetaceae; 
+Cylindrobasidium torrendii FP15055 ss-10	Cyli_torr_FP15055_ss_10	1314674: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Corticiales; Corticiaceae; Cylindrobasidium. 
+Cyphellophora europaea CBS 101466	Cyph_euro_CBS_101466	1220924: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Dactylellina haptotyla CBS 200.50	Dact_hapt_CBS_200_50	1284197: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Orbiliomycetes; Orbiliales; Orbiliaceae; mitosporic Orbiliaceae; 
+Debaryomyces hansenii CBS767	Deba_hans_CBS767	284592: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Drechslerella stenobrocha 248	Drec_sten_248	1043628: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Orbiliomycetes; Orbiliales; Orbiliaceae; mitosporic Orbiliaceae; 
+Encephalitozoon cuniculi GB-M1	Ence_cuni_GB_M1	284813: Eukaryota; Fungi; Microsporidia; Unikaryonidae; Encephalitozoon. 
+Encephalitozoon hellem ATCC 50504	Ence_hell_ATCC_50504	907965: Eukaryota; Fungi; Microsporidia; Unikaryonidae; Encephalitozoon. 
+Encephalitozoon intestinalis ATCC 50506	Ence_inte_ATCC_50506	876142: Eukaryota; Fungi; Microsporidia; Unikaryonidae; Encephalitozoon. 
+Encephalitozoon romaleae SJ-2008	Ence_roma_SJ_2008	1178016: Eukaryota; Fungi; Microsporidia; Unikaryonidae; Encephalitozoon. 
+Endocronartium harknessii PhW48OC	Endo_hark_PhW48OC	1300066: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Cronartiaceae; Endocronartium. 
+Endocarpon pusillum KoLRI No. LF000583	Endo_pusi_KoLRI_No_LF000583	364733: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Verrucariales; 
+Endocarpon pusillum Z07020	Endo_pusi_Z07020	1263415: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Verrucariales; 
+Enterocytozoon bieneusi H348	Ente_bien_H348	481877: Eukaryota; Fungi; Microsporidia; Enterocytozoonidae; Enterocytozoon. 
+Epichloe festucae E2368	Epic_fest_E2368	696363: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Clavicipitaceae; 
+Epichloe festucae Fl1	Epic_fest_Fl1	877507: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Clavicipitaceae; 
+Eremothecium cymbalariae DBVPG#7215	Erem_cymb_DBVPG#7215	931890: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Eutypa lata UCREL1	Euty_lata_UCREL1	1287681: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Xylariomycetidae; Xylariales; Diatrypaceae; 
+Exophiala dermatitidis NIH/UT8656	Exop_derm_NIH_UT8656	858893: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Exophiala mesophila CBS 40295	Exop_meso_CBS_40295	212818: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Exophiala oligosperma CBS 72588	Exop_olig_CBS_72588	215243: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Exophiala sideris CBS 121828	Exop_side_CBS_121828	1016849: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Exophiala spinifera CBS 89968	Exop_spin_CBS_89968	91928: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Exophiala xenobiotica CBS 118157	Exop_xeno_CBS_118157	348802: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Fibroporia radiculosa TFFH 294	Fibr_radi_TFFH_294	599839: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Polyporales; Polyporaceae; Fibroporia. 
+Fistulina hepatica ATCC 64428	Fist_hepa_ATCC_64428	1128425: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Fistulinaceae; 
+Flammulina velutipes KACC42780	Flam_velu_KACC42780	1300067: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Physalacriaceae; 
+Fomitiporia mediterranea MF3/22	Fomi_medi_MF3_22	694068: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Hymenochaetales; Hymenochaetaceae; Fomitiporia. 
+Fomitopsis pinicola FP-58527 SS1	Fomi_pini_FP_58527_SS1	743788: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Polyporales; Fomitopsis. 
+Fonsecaea multimorphosa CBS 102226	Fons_mult_CBS_102226	1442371: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Fonsecaea pedrosoi CBS 271.37	Fons_pedr_CBS_271_37	1442368: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Fusarium fujikuroi B14	Fusa_fuji_B14	1215603: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium graminearum CS3005	Fusa_gram_CS3005	5518: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium graminearum PH-1 NRRL 31084	Fusa_gram_PH_1_NRRL_31084	229533: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum FOSC 3-a	Fusa_oxys_FOSC_3_a	909455: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum Fo47	Fusa_oxys_Fo47	660027: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. conglutinans race 2 54008	Fusa_oxys_f_conglutinans_race_2_54008	1089457: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. cubense race 1	Fusa_oxys_f_cubense_race_1	1229664: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. cubense race 4	Fusa_oxys_f_cubense_race_4	1229665: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. cubense tropical race 4 54006	Fusa_oxys_f_cubense_tropical_race_4_54006	1089451: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. lycopersici MN25	Fusa_oxys_f_lycopersici_MN25	1080343: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. melonis 26406	Fusa_oxys_f_melonis_26406	1089452: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. pisi HDV247	Fusa_oxys_f_pisi_HDV247	1080344: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. radicis-lycopersici 26381	Fusa_oxys_f_radicis_lycopersici_26381	1089448: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. raphani 54005	Fusa_oxys_f_raphani_54005	1089458: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium oxysporum f. sp. vasinfectum 25433	Fusa_oxys_f_vasinfectum_25433	1089449: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium pseudograminearum CS3096	Fusa_pseu_CS3096	1028729: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium pseudograminearum CS3270	Fusa_pseu_CS3270	101028: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Fusarium verticillioides 7600	Fusa_vert_7600	334819: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Gaeumannomyces graminis var. tritici R3-111a-1	Gaeu_gram_var_tritici_R3_111a_1	644352: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Magnaporthales; 
+Galerina marginata CBS 339.88	Gale_marg_CBS_339_88	685588: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Strophariaceae; 
+Ganoderma lucidum G.260125-1	Gano_luci_G_260125_1	1077286: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Polyporales; Ganodermataceae; Ganoderma. 
+Ganoderma lucidum Xiangnong No.1	Gano_luci_Xiangnong_No_1	1127707: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Polyporales; Ganodermataceae; Ganoderma. 
+Glarea lozoyensis 74030	Glar_lozo_74030	1104152: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Helotiales; Helotiaceae; Glarea. 
+Glarea lozoyensis ATCC 20868	Glar_lozo_ATCC_20868	1116229: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Helotiales; Helotiaceae; Glarea. 
+Gloeophyllum trabeum ATCC 11539	Gloe_trab_ATCC_11539	670483: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Gloeophyllales; Gloeophyllaceae; Gloeophyllum. 
+Grosmannia clavigera kw1407	Gros_clav_kw1407	655863: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Ophiostomatales; 
+Gyalolechia flavorubescens KoLRI002931	Gyal_flav_KoLRI002931	1353255: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Lecanoromycetes; OSLEUM clade; Lecanoromycetidae; Teloschistales; 
+Gymnopus luxurians FD-317 M1	Gymn_luxu_FD_317_M1	944289: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Tricholomataceae; 
+Hirsutella minnesotensis 3608	Hirs_minn_3608	1043627: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; 
+Histoplasma capsulatum G186AR	Hist_caps_G186AR	447093: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ajellomycetaceae; 
+Histoplasma capsulatum H143	Hist_caps_H143	544712: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ajellomycetaceae; 
+Histoplasma capsulatum H88	Hist_caps_H88	544711: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ajellomycetaceae; 
+Histoplasma capsulatum NAm1	Hist_caps_NAm1	339724: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Ajellomycetaceae; 
+Homoloaphlyctis polyrhiza JEL 142 JEL142	Homo_poly_JEL_142_JEL142	166479: Eukaryota; Fungi; Chytridiomycota; Chytridiomycetes; Rhizophydiales; Rhizophydiales incertae sedis. 
+Hortaea werneckii EXF-2000	Hort_wern_EXF_2000	1157616: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Dothideales; mitosporic 
+Hydnomerulius pinastri MD-312	Hydn_pina_MD_312	994086: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Boletales; Paxilineae; 
+Jaapia argillacea MUCL 33604	Jaap_argi_MUCL_33604	933084: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Jaapiales; Jaapiaceae; Jaapia. 
+Kazachstania africana CBS 2517	Kaza_afri_CBS_2517	1071382: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Kazachstania naganishii CBS 8797	Kaza_naga_CBS_8797	1071383: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Kluyveromyces lactis NRRL Y-1140	Kluy_lact_NRRL_Y_1140	28985: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Kluyveromyces marxianus var. marxianus KCTC 17555	Kluy_marx_var_marxianus_KCTC_17555	1162310: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Komagataella pastoris CBS 7435	Koma_past_CBS_7435	981350: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Phaffomycetaceae; Komagataella. 
+Komagataella pastoris GS115	Koma_past_GS115	644223: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Phaffomycetaceae; Komagataella. 
+Kuraishia capsulata CBS 1993	Kura_caps_CBS_1993	1382522: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetales incertae 
+Kwoniella heveanensis BCC8398	Kwon_heve_BCC8398	1296120: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellales incertae sedis; 
+Kwoniella heveanensis CBS 569	Kwon_heve_CBS_569	1296119: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellales incertae sedis; 
+Kwoniella mangroviensis CBS 10435	Kwon_mang_CBS_10435	1331196: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellales incertae sedis; 
+Kwoniella mangroviensis CBS 8507	Kwon_mang_CBS_8507	1296122: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellales incertae sedis; 
+Kwoniella mangroviensis CBS 8886	Kwon_mang_CBS_8886	1296123: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellales incertae sedis; 
+Laccaria bicolor S238N-H82	Lacc_bico_S238N_H82	486041: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Tricholomataceae; 
+Lachancea kluyveri NRRL Y-12651	Lach_kluy_NRRL_Y_12651	226302: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; Lachancea. 
+Lachancea lanzarotensis CBS 12615	Lach_lanz_CBS_12615	1245769: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; Lachancea. 
+Lachancea thermotolerans CBS 6340	Lach_ther_CBS_6340	559295: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; Lachancea. 
+Lecanosticta acicola CBS 871.95	Leca_acic_CBS_871_95	1367079: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Capnodiales; 
+Leptosphaeria maculans JN3	Lept_macu_JN3	985895: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Pleosporomycetidae; Pleosporales; Pleosporineae; 
+Lignosus rhinocerotis TM02	Lign_rhin_TM02	1379160: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Polyporales; Polyporaceae; Lignosus. 
+Lodderomyces elongisporus NRRL YB-4239	Lodd_elon_NRRL_YB_4239	379508: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Magnaporthe oryzae 70-15	Magn_oryz_70_15	242507: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Magnaporthales; 
+Magnaporthe oryzae 98-06	Magn_oryz_98_06	318829: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Magnaporthales; 
+Magnaporthe oryzae KJ201	Magn_oryz_KJ201	1271791: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Magnaporthales; 
+Magnaporthe oryzae P131	Magn_oryz_P131	1143193: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Magnaporthales; 
+Magnaporthe oryzae Y34	Magn_oryz_Y34	1143189: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Magnaporthales; 
+Magnaporthiopsis poae ATCC 64411	Magn_poae_ATCC_64411	644358: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Magnaporthales; 
+Malassezia sympodialis ATCC 42132	Mala_symp_ATCC_42132	1230383: Eukaryota; Fungi; Dikarya; Basidiomycota; Ustilaginomycotina; Malasseziomycetes; Malasseziales; Malasseziaceae; Malassezia. 
+Marssonina brunnea f. sp. multigermtubi MB_m1	Mars_brun_f_multigermtubi_MB_m1	1072389: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Helotiales; Dermateaceae; Marssonina. 
+Melampsora larici-populina 98AG31	Mela_lari_98AG31	747676: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Melampsoraceae; Melampsora. 
+Melampsora pinitorqua Mpini7	Mela_pini_Mpini7	1298852: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Melampsoraceae; Melampsora. 
+Metarhizium acridum CQMa 102	Meta_acri_CQMa_102	655827: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Clavicipitaceae; 
+Metarhizium anisopliae BRIP 53284	Meta_anis_BRIP_53284	1291519: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Clavicipitaceae; 
+Metarhizium anisopliae BRIP 53293	Meta_anis_BRIP_53293	1291518: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Clavicipitaceae; 
+Metacordyceps chlamydosporia 123	Meta_chla_123	1052797: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Clavicipitaceae; 
+Metarhizium robertsii ARSEF 23	Meta_robe_ARSEF_23	655844: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Clavicipitaceae; 
+Meyerozyma guilliermondii ATCC 6260	Meye_guil_ATCC_6260	294746: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; Meyerozyma. 
+Microsporum gypseum CBS 118893	Micr_gyps_CBS_118893	535722: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Microbotryum violaceum p1A1 Lamole	Micr_viol_p1A1_Lamole	683840: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Microbotryomycetes; Microbotryales; Microbotryaceae; Microbotryum. 
+Millerozyma farinosa CBS 7064	Mill_fari_CBS_7064	559304: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; Millerozyma. 
+Mortierella verticillata NRRL 6337	Mort_vert_NRRL_6337	1069443: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mortierellomycotina; Mortierellales; Mortierellaceae; 
+Mrakia frigida Nwmf-AP1	Mrak_frig_Nwmf_AP1	29902: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Cystofilobasidiales; Cystofilobasidiaceae; Mrakia. 
+Mucor ambiguus NBRC 6742	Muco_ambi_NBRC_6742	91626: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Mucoraceae; Mucor. 
+Mucor circinelloides f. circinelloides 1006PhL	Muco_circ_f_circinelloides_1006PhL	1220926: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Mucoraceae; Mucor. 
+Mucor irregularis B50	Muco_irre_B50	1290454: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Mucoraceae; Mucor. 
+Myceliophthora thermophila ATCC 42464	Myce_ther_ATCC_42464	573729: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Chaetomiaceae; 
+Mycosphaerella sp. Ston1	Myco_Ston1	333113: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Capnodiales; 
+Mycosphaerella laricina CBS 326.52	Myco_lari_CBS_326_52	1367536: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Capnodiales; 
+Naumovozyma castellii CBS 4309	Naum_cast_CBS_4309	1064592: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Naumovozyma dairenensis CBS 421	Naum_dair_CBS_421	1071378: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Nectria haematococca mpVI 77-13-4	Nect_haem_mpVI_77_13_4	660122: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Nectriaceae; 
+Nematocida sp. 1 ERTm2	Nema_1_ERTm2	944018: Eukaryota; Fungi; Microsporidia; Nematocida. 
+Nematocida parisii ERTm1	Nema_pari_ERTm1	881290: Eukaryota; Fungi; Microsporidia; Nematocida. 
+Nematocida parisii ERTm3	Nema_pari_ERTm3	935791: Eukaryota; Fungi; Microsporidia; Nematocida. 
+Neofusicoccum parvum UCRNP2	Neof_parv_UCRNP2	1287680: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetes incertae sedis; Botryosphaeriales; 
+Neosartorya fischeri NRRL 181	Neos_fisc_NRRL_181	331117: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Neurospora africana FGSC 1740	Neur_afri_FGSC_1740	1266766: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Sordariaceae; 
+Neurospora crassa 73	Neur_cras_73	5141: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Sordariaceae; 
+Neurospora crassa OR74A	Neur_cras_OR74A	367110: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Sordariaceae; 
+Neurospora pannonica FGSC 7221	Neur_pann_FGSC_7221	1266714: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Sordariaceae; 
+Neurospora sublineolata FGSC 5508	Neur_subl_FGSC_5508	1266767: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Sordariaceae; 
+Neurospora terricola FGSC 1889	Neur_terr_FGSC_1889	1266715: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Sordariaceae; 
+Neurospora tetrasperma FGSC 2508	Neur_tetr_FGSC_2508	510951: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Sordariaceae; 
+Neurospora tetrasperma FGSC 2509	Neur_tetr_FGSC_2509	510952: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Sordariaceae; 
+Nilaparvata lugens yeast-like symbiont Hangzhou	Nila_luge_yeast_like_symbiont_Hangzhou	36927: Eukaryota; Fungi; Dikarya; Ascomycota. 
+Nosema apis BRL 01	Nose_apis_BRL_01	1037528: Eukaryota; Fungi; Microsporidia; Nosematidae; Nosema. 
+Nosema bombycis CQ1	Nose_bomb_CQ1	578461: Eukaryota; Fungi; Microsporidia; Nosematidae; Nosema. 
+Ogataea parapolymorpha DL-1	Ogat_para_DL_1	871575: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Pichiaceae; Ogataea. 
+Omphalotus olearius VT 653.13	Omph_olea_VT_653_13	1128401: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Omphalotaceae; 
+Ophiostoma novo-ulmi subsp. novo-ulmi H327	Ophi_novo_novo_ulmi_H327	1224258: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Ophiostomatales; 
+Ophiostoma piceae UAMH 11346	Ophi_pice_UAMH_11346	1262450: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Ophiostomatales; 
+Ophiocordyceps sinensis CO18	Ophi_sine_CO18	911162: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; 
+Paracoccidioides brasiliensis Pb03	Para_bras_Pb03	482561: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Paracoccidioides brasiliensis Pb18	Para_bras_Pb18	502780: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Paracoccidioides sp. lutzii Pb01	Para_lutzii_Pb01	502779: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; mitosporic 
+Parasitella parasitica CBS 412.66 substr. NGI-315 ade-	Para_para_CBS_412_66_NGI_315_ade	35722: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Mucoraceae; 
+Passalora fulva CBS 131901	Pass_fulv_CBS_131901	1156157: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Capnodiales; 
+Penicillium camemberti FM 013	Peni_came_FM_013	1429867: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium chrysogenum KF-25	Peni_chry_KF_25	1218708: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium chrysogenum NCPC10086	Peni_chry_NCPC10086	1297591: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium chrysogenum P2niaD18	Peni_chry_P2niaD18	5076: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium digitatum PHI26	Peni_digi_PHI26	1170229: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium digitatum Pd1	Peni_digi_Pd1	1170230: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium oxalicum 114-2	Peni_oxal_114_2	933388: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium oxalicum JU-A10-T	Peni_oxal_JU_A10_T	933390: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium paxilli ATCC 26601	Peni_paxi_ATCC_26601	1292256: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium roqueforti FM164	Peni_roqu_FM164	1365484: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Penicillium rubens Wisconsin 54-1255	Peni_rube_Wisconsin_54_1255	500485: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Aspergillaceae; 
+Pestalotiopsis fici W106-1	Pest_fici_W106_1	1229662: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Xylariomycetidae; Xylariales; Amphisphaeriaceae; 
+Phlebiopsis gigantea 11061_1 CR5-6	Phle_giga_11061_1_CR5_6	745531: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Polyporales; Phanerochaetaceae; Phlebiopsis. 
+Phlebopus portentosus PP33	Phle_port_PP33	80661: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Boletales; Sclerodermatineae; 
+Pleurotus ostreatus PC15	Pleu_ostr_PC15	1137138: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Pleurotaceae; 
+Plicaturopsis crispa FD-325 SS-3	Plic_cris_FD_325_SS_3	944288: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Agaricales incertae 
+Podospora anserina S mat+	Podo_anse_S_mat+	515849: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Lasiosphaeriaceae; 
+Pseudozyma antarctica JCM 10317	Pseu_anta_JCM_10317	84753: Eukaryota; Fungi; Dikarya; Basidiomycota; Ustilaginomycotina; Ustilaginomycetes; Ustilaginales; Ustilaginaceae; mitosporic 
+Pseudozyma antarctica T-34	Pseu_anta_T_34	1151754: Eukaryota; Fungi; Dikarya; Basidiomycota; Ustilaginomycotina; Ustilaginomycetes; Ustilaginales; Ustilaginaceae; mitosporic 
+Pseudozyma brasiliensis GHG001	Pseu_bras_GHG001	1392244: Eukaryota; Fungi; Dikarya; Basidiomycota; Ustilaginomycotina; Ustilaginomycetes; Ustilaginales; Ustilaginaceae; mitosporic 
+Pseudogymnoascus destructans 20631-21	Pseu_dest_20631_21	658429: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Leotiomycetes incertae sedis; Pseudeurotiaceae; 
+Pseudocercospora fijiensis CIRAD86	Pseu_fiji_CIRAD86	383855: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Capnodiales; 
+Pseudozyma flocculosa PF-1	Pseu_floc_PF_1	1277687: Eukaryota; Fungi; Dikarya; Basidiomycota; Ustilaginomycotina; Ustilaginomycetes; Ustilaginales; Ustilaginaceae; mitosporic 
+Pseudozyma hubeiensis SY62	Pseu_hube_SY62	1305764: Eukaryota; Fungi; Dikarya; Basidiomycota; Ustilaginomycotina; Ustilaginomycetes; Ustilaginales; Ustilaginaceae; mitosporic 
+Pseudocercospora pini-densiflorae CBS 125139	Pseu_pini_CBS_125139	1367541: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Capnodiales; 
+Puccinia graminis f. sp. tritici CRL 75-36-700-3	Pucc_gram_f_tritici_CRL_75_36_700_3	418459: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Pucciniaceae; Puccinia. 
+Puccinia striiformis f. sp. tritici CY32	Pucc_stri_f_tritici_CY32	1240226: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Pucciniaceae; Puccinia. 
+Puccinia triticina 1-1 BBBD Race 1	Pucc_trit_1_1_BBBD_Race_1	630390: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Pucciniaceae; Puccinia. 
+Pyrenochaeta lycopersici CRA-PAV_ER 1211	Pyre_lyco_CRA_PAV_ER_1211	1331946: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Pleosporomycetidae; Pleosporales; Pleosporineae; 
+Pyrenophora seminiperda CCB06	Pyre_semi_CCB06	1302712: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Pleosporomycetidae; Pleosporales; Pleosporineae; 
+Pyrenophora teres f. teres 0-1	Pyre_tere_f_teres_0_1	861557: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Pleosporomycetidae; Pleosporales; Pleosporineae; 
+Pyrenophora tritici-repentis Pt-1C-BFP	Pyre_trit_Pt_1C_BFP	426418: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Pleosporomycetidae; Pleosporales; Pleosporineae; 
+Rhinocladiella mackenziei CBS 650.93	Rhin_mack_CBS_650_93	1442369: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Chaetothyriomycetidae; Chaetothyriales; 
+Rhizopus delemar RA 99-880	Rhiz_dele_RA_99_880	246409: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Rhizopodaceae; 
+Rhizopus delemar Type II NRRL 21446	Rhiz_dele_Type_II_NRRL_21446	1279484: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Rhizopodaceae; 
+Rhizopus delemar Type II NRRL 21447	Rhiz_dele_Type_II_NRRL_21447	1279483: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Rhizopodaceae; 
+Rhizopus delemar Type II NRRL 21477	Rhiz_dele_Type_II_NRRL_21477	1279481: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Rhizopodaceae; 
+Rhizophagus irregularis DAOM 181602 DAOM 197198	Rhiz_irre_DAOM_181602_DAOM_197198	747089: Eukaryota; Fungi; Glomeromycota; Glomeromycetes; Glomerales; Glomeraceae; Rhizophagus. 
+Rhizomucor miehei CAU432	Rhiz_mieh_CAU432	1031333: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Lichtheimiaceae; Rhizomucor. 
+Rhizopus oryzae 99-892	Rhiz_oryz_99_892	1279482: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Rhizopodaceae; 
+Rhizopus oryzae HUMC 02	Rhiz_oryz_HUMC_02	1279480: Eukaryota; Fungi; Fungi incertae sedis; Early diverging fungal lineages; Mucoromycotina; Mucorales; Mucorineae; Rhizopodaceae; 
+Rhizoctonia solani AG-1 IA AG-1IA	Rhiz_sola_AG_1_IA_AG_1IA	983506: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Cantharellales; Ceratobasidiaceae; mitosporic 
+Rhizoctonia solani AG-8 WAC10335	Rhiz_sola_AG_8_WAC10335	1287689: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Cantharellales; Ceratobasidiaceae; mitosporic 
+Rhodosporidium toruloides MTCC 457	Rhod_toru_MTCC_457	1165933: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Microbotryomycetes; Sporidiobolales; Rhodosporidium. 
+Rhodosporidium toruloides NP11	Rhod_toru_NP11	1130832: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Microbotryomycetes; Sporidiobolales; Rhodosporidium. 
+Rozella allomycis CSF55	Roze_allo_CSF55	988480: Eukaryota; Fungi; Cryptomycota; Rozella. 
+Saccharomycetaceae sp. Ashbya aceri	Sacc_Ashbya_aceri	566037: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces arboricola H-6	Sacc_arbo_H_6	1160507: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces sp. boulardii 17	Sacc_boulardii_17	252598: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces sp. boulardii ATCC MYA-796	Sacc_boulardii_ATCC_MYA_796	252598: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae AWRI796	Sacc_cere_AWRI796	764097: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae CBS 7960	Sacc_cere_CBS_7960	929587: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae CEN.PK113-7D	Sacc_cere_CEN_PK113_7D	889517: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae CLIB215	Sacc_cere_CLIB215	464025: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae CLIB324	Sacc_cere_CLIB324	929629: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae CLIB382	Sacc_cere_CLIB382	947035: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae EC1118	Sacc_cere_EC1118	643680: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae EC9-8	Sacc_cere_EC9_8	1095001: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae FL100	Sacc_cere_FL100	947036: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae FostersB	Sacc_cere_FostersB	764102: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae Kyokai no. 7	Sacc_cere_Kyokai_no_7	721032: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae Lalvin QA23	Sacc_cere_Lalvin_QA23	764098: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae P283	Sacc_cere_P283	1177187: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae P301	Sacc_cere_P301	1182968: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae PW5	Sacc_cere_PW5	947039: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae R008	Sacc_cere_R008	1182966: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae R103	Sacc_cere_R103	1182967: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae RM11-1a	Sacc_cere_RM11_1a	285006: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae Sigma1278b	Sacc_cere_Sigma1278b	658763: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae T7	Sacc_cere_T7	929585: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae T73	Sacc_cere_T73	471859: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae UC5	Sacc_cere_UC5	947040: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae UFMG A-905	Sacc_cere_UFMG_A_905	1434269: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae VL3	Sacc_cere_VL3	764100: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae Vin13	Sacc_cere_Vin13	764099: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae W303	Sacc_cere_W303	580240: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae Y10	Sacc_cere_Y10	462210: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae YJM269	Sacc_cere_YJM269	929586: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae YJSH1	Sacc_cere_YJSH1	1087981: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1056	Sacc_kudr_FM1056	1163633: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1062	Sacc_kudr_FM1062	1163641: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1069	Sacc_kudr_FM1069	1163632: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1071	Sacc_kudr_FM1071	1165457: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1072	Sacc_kudr_FM1072	1163638: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1073	Sacc_kudr_FM1073	1163639: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1074	Sacc_kudr_FM1074	1163640: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1076	Sacc_kudr_FM1076	1163643: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1077	Sacc_kudr_FM1077	1163644: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1078	Sacc_kudr_FM1078	1163636: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii FM1079	Sacc_kudr_FM1079	1163637: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii IFO10990	Sacc_kudr_IFO10990	1163646: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii IFO10991	Sacc_kudr_IFO10991	1163647: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii IFO1803	Sacc_kudr_IFO1803	1163648: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii IFO 1802	Sacc_kudr_IFO_1802	226230: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces kudriavzevii ZP591	Sacc_kudr_ZP591	1165456: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Saccharomyces cerevisiae (S288c Apr 2011)	Scere3	559292: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae.
+Scheffersomyces stipitis CBS 6054	Sche_stip_CBS_6054	322104: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; 
+Schizophyllum commune H4-8	Schi_comm_H4_8	578458: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Schizophyllaceae; 
+Schizosaccharomyces cryophilus OY26	Schi_cryo_OY26	653667: Eukaryota; Fungi; Dikarya; Ascomycota; Taphrinomycotina; Schizosaccharomycetes; Schizosaccharomycetales; 
+Schizosaccharomyces japonicus yFS275	Schi_japo_yFS275	402676: Eukaryota; Fungi; Dikarya; Ascomycota; Taphrinomycotina; Schizosaccharomycetes; Schizosaccharomycetales; 
+Schizosaccharomyces octosporus yFS286	Schi_octo_yFS286	483514: Eukaryota; Fungi; Dikarya; Ascomycota; Taphrinomycotina; Schizosaccharomycetes; Schizosaccharomycetales; 
+Schizosaccharomyces pombe 972h-	Schi_pomb_972h	4896: Eukaryota; Fungi; Dikarya; Ascomycota; Taphrinomycotina; Schizosaccharomycetes; Schizosaccharomycetales; 
+Sclerotinia borealis F-4157	Scle_bore_F_4157	1432307: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Helotiales; Sclerotiniaceae; Sclerotinia. 
+Sclerotinia sclerotiorum 1980 UF-70	Scle_scle_1980_UF_70	665079: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Leotiomycetes; Helotiales; Sclerotiniaceae; Sclerotinia. 
+Serpula lacrymans var. lacrymans S7.3	Serp_lacr_var_lacrymans_S7_3	936435: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Boletales; Coniophorineae; 
+Serpula lacrymans var. lacrymans S7.9	Serp_lacr_var_lacrymans_S7_9	578457: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Boletales; Coniophorineae; 
+Spathaspora arborariae UFMG-19.1A	Spat_arbo_UFMG_19_1A	1343157: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Debaryomycetaceae; Spathaspora. 
+Sphaerulina populicola P02.02b p02.02b	Spha_popu_P02_02b_p02_02b	1136490: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetidae; Capnodiales; 
+Sphaerobolus stellatus SS14	Spha_stel_SS14	990650: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Phallomycetidae; Geastrales; Sphaerobolaceae; 
+Sporisorium reilianum SRZ2	Spor_reil_SRZ2	999809: Eukaryota; Fungi; Dikarya; Basidiomycota; Ustilaginomycotina; Ustilaginomycetes; Ustilaginales; Ustilaginaceae; Sporisorium. 
+Sporothrix schenckii ATCC 58251	Spor_sche_ATCC_58251	1391915: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Ophiostomatales; 
+Sporisorium scitamineum 2014001	Spor_scit_2014001	49012: Eukaryota; Fungi; Dikarya; Basidiomycota; Ustilaginomycotina; Ustilaginomycetes; Ustilaginales; Ustilaginaceae; Sporisorium. 
+Stachybotrys chartarum IBT 40288	Stac_char_IBT_40288	1283842: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; mitosporic 
+Stachybotrys chartarum IBT 40293	Stac_char_IBT_40293	1280524: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; mitosporic 
+Stachybotrys chartarum IBT 7711	Stac_char_IBT_7711	1280523: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; mitosporic 
+Stachybotrys chlorohalonata IBT 40285	Stac_chlo_IBT_40285	1283841: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; mitosporic 
+Stereum hirsutum FP-91666 SS1	Ster_hirs_FP_91666_SS1	721885: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Russulales; Stereaceae; Stereum. 
+Suillus luteus UH-Slu-Lm8-n1	Suil_lute_UH_Slu_Lm8_n1	930992: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Boletales; Suillineae; 
+Talaromyces cellulolyticus Y-94	Tala_cell_Y_94	1472165: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Trichocomaceae; 
+Talaromyces marneffei ATCC 18224	Tala_marn_ATCC_18224	441960: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Trichocomaceae; 
+Talaromyces stipitatus ATCC 10500	Tala_stip_ATCC_10500	441959: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Eurotiales; Trichocomaceae; 
+Taphrina deformans PYCC 5710	Taph_defo_PYCC_5710	1097556: Eukaryota; Fungi; Dikarya; Ascomycota; Taphrinomycotina; Taphrinomycetes; Taphrinales; Taphrinaceae; Taphrina. 
+Tetrapisispora blattae CBS 6284	Tetr_blat_CBS_6284	1071380: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Tetrapisispora phaffii CBS 4417	Tetr_phaf_CBS_4417	1071381: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Thielavia terrestris NRRL 8126	Thie_terr_NRRL_8126	578455: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Sordariales; Chaetomiaceae; 
+Togninia minima UCRPA7	Togn_mini_UCRPA7	1286976: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Calosphaeriales; 
+Torulaspora delbrueckii CBS 1146	Toru_delb_CBS_1146	4950: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Trachipleistophora hominis	Trac_homi	72359: Eukaryota; Fungi; Microsporidia; Pleistophoridae; Trachipleistophora. 
+Tremella mesenterica DSM 1558 Fries	Trem_mese_DSM_1558_Fries	578456: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellaceae; Tremella. 
+Trichosporon asahii var. asahii CBS 8904	Tric_asah_var_asahii_CBS_8904	1220162: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Tremellomycetes; Tremellales; Tremellales incertae sedis; 
+Trichophyton equinum CBS 127.97	Tric_equi_CBS_127_97	559882: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichoderma hamatum GD12	Tric_hama_GD12	1247866: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Hypocreaceae; 
+Trichophyton interdigitale H6	Tric_inte_H6	1215336: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichoderma longibrachiatum SMF2	Tric_long_SMF2	1234776: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Hypocreaceae; 
+Trichoderma reesei QM6a	Tric_rees_QM6a	431241: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Hypocreaceae; 
+Trichoderma reesei RUT C-30	Tric_rees_RUT_C_30	1344414: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; Hypocreaceae; 
+Trichophyton rubrum CBS 100081	Tric_rubr_CBS_100081	1215328: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton rubrum CBS 118892	Tric_rubr_CBS_118892	559305: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton rubrum CBS 202.88	Tric_rubr_CBS_202_88	1215334: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton rubrum CBS 288.86	Tric_rubr_CBS_288_86	1215330: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton rubrum CBS 289.86	Tric_rubr_CBS_289_86	1215329: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton rubrum CBS 735.88	Tric_rubr_CBS_735_88	1215332: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton rubrum MR1448	Tric_rubr_MR1448	1215339: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton rubrum MR1459	Tric_rubr_MR1459	1215341: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton rubrum MR850	Tric_rubr_MR850	1215337: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton soudanense CBS 452.61	Tric_soud_CBS_452_61	1215331: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton tonsurans CBS 112818	Tric_tons_CBS_112818	647933: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Trichophyton verrucosum HKI 0517	Tric_verr_HKI_0517	663202: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Arthrodermataceae; 
+Tuber melanosporum Mel28	Tube_mela_Mel28	39416: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Pezizomycetes; Pezizales; Tuberaceae; Tuber. 
+Umbilicaria muehlenbergii KoLRI No. LF000956	Umbi_mueh_KoLRI_No_LF000956	87280: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Lecanoromycetes; OSLEUM clade; Umbilicariomycetidae; 
+Uncinocarpus reesii 1704	Unci_rees_1704	336963: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Eurotiomycetes; Eurotiomycetidae; Onygenales; Onygenaceae; 
+Uromyces viciae-fabae I2	Urom_vici_I2	55588: Eukaryota; Fungi; Dikarya; Basidiomycota; Pucciniomycotina; Pucciniomycetes; Pucciniales; Pucciniaceae; Uromyces. 
+Ustilago maydis 521	Usti_mayd_521	237631: Eukaryota; Fungi; Dikarya; Basidiomycota; Ustilaginomycotina; Ustilaginomycetes; Ustilaginales; Ustilaginaceae; Ustilago. 
+Ustilaginoidea virens IPU010	Usti_vire_IPU010	1159556: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Hypocreales; mitosporic 
+Valsa mali 03-8	Vals_mali_03_8	105487: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Diaporthales; Valsaceae; Valsa. 
+Valsa mali var. pyri SXYL134	Vals_mali_var_pyri_SXYL134	694573: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Sordariomycetidae; Diaporthales; Valsaceae; Valsa. 
+Vanderwaltozyma polyspora DSM 70294	Vand_poly_DSM_70294	436907: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Vavraia culicis subsp. floridensis	Vavr_culi_floridensis	948595: Eukaryota; Fungi; Microsporidia; Pleistophoridae; Vavraia. 
+Verruconis gallopava CBS 43764	Verr_gall_CBS_43764	253628: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Dothideomycetes; Dothideomycetes incertae sedis; Venturiales; 
+Verticillium alfalfae VaMs.102	Vert_alfa_VaMs_102	526221: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Glomerellales; 
+Verticillium dahliae JR2	Vert_dahl_JR2	1202531: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Glomerellales; 
+Verticillium dahliae VdLs.17	Vert_dahl_VdLs_17_1	498257: Eukaryota; Fungi; Dikarya; Ascomycota; Pezizomycotina; Sordariomycetes; Hypocreomycetidae; Glomerellales; 
+Vittaforma corneae ATCC 50505	Vitt_corn_ATCC_50505	993615: Eukaryota; Fungi; Microsporidia; Nosematidae; Vittaforma. 
+Volvariella volvacea V23	Volv_volv_V23	706473: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Agaricomycetidae; Agaricales; Pluteaceae; 
+Wickerhamomyces anomalus NRRL Y-366	Wick_anom_NRRL_Y_366	885923: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Phaffomycetaceae; 
+Wolfiporia cocos MD-104 SS10	Wolf_coco_MD_104_SS10	742152: Eukaryota; Fungi; Dikarya; Basidiomycota; Agaricomycotina; Agaricomycetes; Polyporales; Wolfiporia. 
+Yarrowia lipolytica CLIB122	Yarr_lipo_CLIB122	284591: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Dipodascaceae; Yarrowia. 
+Yarrowia lipolytica PO1f	Yarr_lipo_PO1f	1445506: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Dipodascaceae; Yarrowia. 
+Yarrowia lipolytica WSH-Z06	Yarr_lipo_WSH_Z06	1437815: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Dipodascaceae; Yarrowia. 
+Zygosaccharomyces bailii CLIB 213	Zygo_bail_CLIB_213	1333698: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
+Zygosaccharomyces rouxii CBS 732	Zygo_roux_CBS_732	4956: Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina; Saccharomycetes; Saccharomycetales; Saccharomycetaceae; 
