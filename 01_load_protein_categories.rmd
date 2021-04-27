@@ -199,9 +199,19 @@ DUB = load.dubreuil2019.data(4)
 # DUPLICATED GENES (OHNOLOGS)  -------------------------------------------------
 OHNO = get.sc.ohno(myseq=S288C)
 # CONSERVED GENES (ORTHOLOGS)  -------------------------------------------------
-ORTHO=get.eggnog.node('4891',to.matrix = T)
-df.ortho = get.eggnog.node('4891')
-PPM.ORTHO=get.ppm.ortho(node = '4891')
+ORTHO=load.eggnog.node('4751',to.matrix = T)
+df.ortho = load.eggnog.node('4751')
+PPM.ORTHO=get.ppm.ortho(node = '4751', raw=F, which.abundance = 'integrated')
+# PPM.ORTHO.ALL = get.ppm.ortho(node = '4751', raw=T) # All abundance values
+
+# Turn orthologs abundance as columns *use integrated ppm values*
+PPM.ORTHO.4932 = PPM.ORTHO %>% ungroup() %>% filter(taxid==4932) %>% 
+                  dplyr::select(NOG,orf=protid,ppm_4932=ppm_int) %>%
+                  left_join(PPM.ORTHO %>% filter(taxid!=4932), by=c("NOG")) %>% 
+                  pivot_wider(id_cols=c(NOG,orf,ppm_4932,organ), 
+                              names_from=taxid, names_glue="ppm_{taxid}",
+                              values_from=ppm_int, values_fn=mean_) %>%
+                  dplyr::select(-ppm_NA,-organ)
 
 # VARIABLE ORF (PANGENOMICS) -------------------------------------------------
 VARORF = load.peter2018.data(2)
@@ -430,9 +440,16 @@ df.CU=load.codon.usage(cds=CDS,with.counts=F) %>% dplyr::rename_with(.fn=Pxx,px=
 df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
  
 ### Amino-acid biosynthetic cost
+df.uni_info = UNIPROT %>%  dplyr::select(c(UNIPROTKB,REVIEWED,EXISTENCE,SCORE,qual))
 df.aaMW = DUB %>% 
        group_by(UNIPROT) %>% 
-       summarise( pepstats.mean_MW = MW/prot.size ) 
+       summarise( pepstats.mean_MW = MW/prot.size ) %>%
+       left_join(df.uni_info, by=c('UNIPROT' = 'UNIPROTKB'))
+
+head(df.aaMW)
+
+df.aaMW %>% dplyr::filter(pepstats.mean_MW > 120 ) 
+
 
 TRANSCRIPTOMICS$pepstats.AA_costly = df.aaMW %>% dplyr::filter(pepstats.mean_MW > 120 ) %>% pull(UNIPROT)
 TRANSCRIPTOMICS$pepstats.AA_cheap = df.aaMW %>% dplyr::filter(pepstats.mean_MW < 105 ) %>% pull(UNIPROT)
@@ -458,8 +475,18 @@ TRANSCRIPTOMICS$geisberg2014.shortlived_mrna  = df.HLmrna %>% dplyr::filter(geis
 # RIBOSOME EFFICIENCY
 df.riboeff = load.dana2014.data() 
 
-df.orthoexp =  PPM.ORTHO %>%
-              filter(is1to1)
+
+# ORTHOLOGS EXPRESSION (against yeast, integrated abundance, average of orthologs)
+df.orthoexp =  PPM.ORTHO.4932 %>% 
+                 group_by(NOG,orf) %>%
+                 mutate( ortho_ppm_avg = mean_(c_across(starts_with('ppm_'))),
+                         ortho_ppm_sd  = sd_(c_across(starts_with('ppm_'))),
+                         ortho_ppm_cv  = ortho_ppm_sd/ortho_ppm_avg,
+                         ortho_ppm_max  = max_(c_across(starts_with('ppm_'))),
+                         ortho_ppm_min  = min_(c_across(starts_with('ppm_'))),
+                         ortho_ppm_n= sum.na(c_across(starts_with('ppm_')),notNA = T) ) %>%
+                  filter(ortho_ppm_n > 1)
+
 
 df.transcriptomics = PROTEOME %>% 
                     left_join(df.tai,by=c('ORF'='prot')) %>% 
@@ -468,7 +495,8 @@ df.transcriptomics = PROTEOME %>%
                     left_join(df.aaMW,by=c('UNIPROTKB'='UNIPROT')) %>%
                     left_join(df.cost,by=c('ORF'='name')) %>% 
                     left_join(df.HLmrna,by=c('ORF'='ORF')) %>%
-                    left_join(df.riboeff,by=c('ORF'='orf'))
+                    left_join(df.riboeff,by=c('ORF'='orf')) %>%
+                    left_join(df.orthoexp,by=c('ORF'='orf'))
 ```
 
 ### Biophysics 
