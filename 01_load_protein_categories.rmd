@@ -589,7 +589,8 @@ BIOPHYSICS$dubreuil2019.uniprot_average= DUB %>% dplyr::filter(average) %>% pull
 BIOPHYSICS$dubreuil2019.uniprot_long= DUB %>% dplyr::filter(large) %>% pull(UNIPROT)
 
 ### Amino-acid interactions propensities
-fullsti = tibble( uni=AA.COUNT$id, uniprot.sti_full = AACOUNT2SCORE(COUNT=AA.COUNT[,1:20],SCORE=get.stickiness()) )
+fullsti = tibble( uni=AA.COUNT$id, 
+                  uniprot.sti_full = AACOUNT2SCORE(COUNT=AA.COUNT[,1:20],SCORE=get.stickiness()) )
 df.aascales = DUB %>%
               mutate(has_iup = !is.na(L.IUP20) | !is.na(L.IUP30) | !is.na(L.IUP40),
                      has_dom = !is.na(L.domain) ) %>%
