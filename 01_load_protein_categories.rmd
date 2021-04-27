@@ -72,7 +72,7 @@ suppressPackageStartupMessages({
 })
 
 # turn off annoying messages from dplyr::summarise
-options(dplyr.summarise.inform = FALSE)
+options(dplyr.summarise.inform = FALSE,dplyr.width=Inf)
 ```
 
 # Introduction to "yeast-omics"

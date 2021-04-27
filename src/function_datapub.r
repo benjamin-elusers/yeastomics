@@ -10,14 +10,14 @@ library(openxlsx)
 open.url <- function(file_url) {
   con <- gzcon(url(file_url))
   txt <- readLines(con,skipNul=T)
-  closeAllConnections()
+  #closeAllConnections()
   return(textConnection(txt))
 }
 
 read.url <- function(file_url) {
   con <- gzcon(url(file_url))
   txt <- readLines(con,skipNul=T)
-  closeAllConnections()
+  #closeAllConnections()
   return(txt)
 }
 
