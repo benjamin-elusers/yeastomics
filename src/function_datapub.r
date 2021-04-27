@@ -9,14 +9,14 @@
 library(openxlsx)
 open.url <- function(file_url) {
   con <- gzcon(url(file_url))
-  txt <- readLines(con)
+  txt <- readLines(con,skipNul=T)
   closeAllConnections()
   return(textConnection(txt))
 }
 
 read.url <- function(file_url) {
   con <- gzcon(url(file_url))
-  txt <- readLines(con)
+  txt <- readLines(con,skipNul=T)
   closeAllConnections()
   return(txt)
 }
@@ -746,12 +746,12 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
   node_ortho <- readr::read_delim(unz(temp, paxdb_node),col_names = c("NOG", "orthologs"), delim="\t",progress=T) %>%
     separate_rows(orthologs,sep=" ") %>%
     extract(orthologs,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
-    group_by(NOG,taxid) %>% mutate(is_1to1=n()==1)
+    group_by(NOG,taxid) %>% mutate(is_1to1=n()==1) %>%
 
   return(node_ortho)
 }
 
-load.paxdb = function(taxon=4932,average=T,integrated=T){
+load.paxdb = function(taxon=4932){
 
   paxdb_dataset ="https://pax-db.org/downloads/latest/datasets/"
   taxon_dir=file.path(paxdb_dataset,taxon,"/")
@@ -770,77 +770,124 @@ load.paxdb = function(taxon=4932,average=T,integrated=T){
       extract(col=value,into=c('info',"value"), regex="^#([^\\:]+)\\:(.+)$") %>%
       mutate(info=str_trim(info),value=str_trim(value)) %>%
       filter( !is.na(info) ) %>%
-      pivot_wider(names_from='info',values_from=c(value))
+      pivot_wider(names_from='info',values_from=c(value)) %>%
+      mutate(taxid=as.character(taxon))
   }
 
-  if( Ndata == 1){
-    taxon_ppm = rio::import(taxon_url) %>%
-      rename_with(~c("paxid",'string','ppm','count')) %>%
-      mutate(dataset = basename(taxon_url)) %>%
-      extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)')
-    return(taxon_ppm)
-  }else{
-    infodata = map_dfr(taxon_url,get.paxdb_header) %>%
-      mutate(w=parse_number(weight)*0.01) %>%
-      dplyr::select(id,score,w,score,coverage,year=publication_year,organ,integrated,filename)
+  infodata = map_dfr(taxon_url,get.paxdb_header) %>%
+    mutate( w=parse_number(weight)*0.01,
+            ndata = n_distinct(id,filename),
+            is_integrated = integrated=='true' | ndata==1) %>%
+    dplyr::select(taxid,organ,ndata,id,filename,is_integrated,score,w,cov=coverage,yr=publication_year)
 
-    taxon_ppm = rio::import_list(taxon_url,rbind_label = "datafile",rbind = TRUE,rbind_fill = T) %>%
-      mutate(dataset=basename(datafile)) %>%
-      dplyr::select(-datafile) %>%
+  # if( Ndata == 1){
+  # ppm = rio::import(taxon_url) %>%
+  #   rename_with(~c("paxid",'string','ppm','count')) %>%
+  #    mutate(dataset = basename(taxon_url)) %>%
+  #     extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
+  #      mutate()
+  # }else{
+  # If only one file, read twice the url and keep the distinct rows
+    ppm = rio::import_list(file=c(taxon_url[1],taxon_url),
+                           setclass="tibble",
+                           rbind = TRUE,rbind_label = "dataset",rbind_fill = T) %>%
       rename_with(~c("paxid",'string','ppm','count','dataset')) %>%
+      mutate(dataset = basename(dataset)) %>%
       extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
-      left_join(infodata, by=c('dataset'='filename')) %>%
-      arrange(protid,ppm)
-  }
+      distinct()
+  #}#
+
+  taxon_ppm = left_join(ppm,infodata, by=c('dataset'='filename','taxid')) %>%
+    arrange(protid,ppm)
   return(taxon_ppm)
 }
 
-get.ppm.ortho = function(node="4751.fungi"){
+get.paxdb = function(tax=4932, abundance=c('integrated','median','mean','weighted')){
+  paxdb = load.paxdb(tax)
+  # if nothing selected return the integrated values
+  # (if there is a single dataset, it is considered as integrated)
+  targets=match.arg(abundance,c('integrated','median','mean','weighted'), T)
+  message(sprintf("---> Returning (%s) abundance values...",toString(targets)))
+  RES = list()
+
+  if( "integrated" == targets ){
+    RES$INT = paxdb %>%
+      group_by(taxid,organ,protid) %>%
+      mutate(ppm_n = ndata-sum(is_integrated)) %>%
+      filter(is_integrated) %>%
+      dplyr::select(taxid,organ,protid, ppm_int = ppm,ppm_n)
+  }
+
+  if( "median" == targets ){
+    RES$MED = paxdb %>%
+      filter(!is_integrated) %>%
+      group_by(taxid,organ,protid) %>%
+      summarise(
+        # range
+        ppm_max = hablar::max_(ppm),
+        ppm_min = hablar::min_(ppm),
+        ppm_med = hablar::median_(ppm),
+        ppm_mad = mad(ppm,na.rm=T)
+      )
+  }
+
+  if( "mean" == targets ){
+    RES$AVG = paxdb %>%
+      filter(!is_integrated) %>%
+      group_by(taxid,organ,protid) %>%
+      summarise(
+        # regular average
+        ppm_avg = mean_(ppm),
+        ppm_sd = sd_(ppm),
+        ppm_cv  = ppm_sd/ppm_avg,
+      )
+  }
+
+  if( "weigthed" == targets ){
+    RES$WT = paxdb %>%
+      filter(!is_integrated) %>%
+      group_by(taxid,organ,protid) %>%
+      summarise(
+        # weighted average/median
+        wppm_sum = sum_(ppm*w),
+        wppm_Wtot=sum(w),
+        wppm_avg = wppm_sum/wppm_Wtot,
+        wppm_sd  = sd_(ppm*w),
+        wppm_med = median_(ppm*w),
+        wppm_mad = mad(ppm*w,na.rm=T),
+        wppm_cv  = wppm_sd/wppm_avg,
+      )
+  }
+  return(RES %>%  purrr::reduce(left_join, by = c("taxid","organ","protid")) )
+}
+
+
+#test = get.paxdb(4932,abundance = 'integrated')
+# test.num = test %>% ungroup() %>% dplyr::select(-c(taxid,organ,protid)) %>% as.matrix
+# C=cor(test.num,use='pairwise.complete',met='spearman')
+# corrplot::corrplot(C,
+#                    method = 'ellipse',
+#                    diag = F, type = 'upper',
+#                    addCoef.col = "gold1",
+#                    number.cex = 0.7,number.digits=2,number.font=1)
+
+get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated"){
   # Retrive orthologs from node
   message("Selecting orthologs for [",node,"]")
   ortho = load.paxdb.orthologs(node)
   # Obtain unique taxons
   taxons = sort(unique(ortho$taxid))
   ntax = length(taxons)
-  message("node",node," has ",ntax," taxons : ",toString(taxons))
-  ppms = map_dfr(taxons, load.paxdb)
+  message("node ",node," has ",ntax," taxons : ",toString(taxons))
+  if(raw){
+    message("---> Returning raw abundance values from individual datasets...")
+    ppms = map_dfr(taxons, load.paxdb)
+  }else{
+    ppms = map_dfr(taxons, get.paxdb,which.abundance)
+  }
 
-  ortho_ppms = inner_join(ortho,ppms) %>%
-    arrange(NOG,taxid,protid,ppm,dataset)
+  ortho_ppms = inner_join(ortho,ppms, by=c('taxid','protid')) %>%
+      arrange(NOG,taxid,protid)
+
   return (ortho_ppms)
 }
-
-
-
-# if(average){
-#   message("Apply geometric mean...")
-#   message("Apply geometric standard deviation...")
-#   taxon_ppm = taxon_ppm %>%
-#     dplyr::filter(integrated=='false') %>%
-#     group_by(protid) %>%
-#     summarise(
-#               ppm_max=hablar::max_(ppm),
-#               ppm_min=hablar::min_(ppm),
-#               ppm_n=n(),
-#
-#               ppm_avg = sum(ppm*w)/sum(w),
-#               ppm_med = median(ppm*w),
-#               ppm_sd  = sd(ppm*w),
-#               ppm_mad = mad(ppm*w),
-#               ppm_cv  = ppm_sd/ppm_avg,
-#
-#     )
-# }
-#
-#     if(integrated){
-#       message("Extract WHOLE ORGANISM integrated abundance...")
-#       integrated = taxon_ppm %>%
-#         dplyr::filter(grepl("WHOLE_ORGANISM-integrated",dataset)) %>%
-#         dplyr::select(protid,ppm_int=ppm)
-#
-#       return(left_join(taxon_ppm,integrated,by="protid"))
-#     }
-#   }
-#   return(taxon_ppm)
-# }
-
