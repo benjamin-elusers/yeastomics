@@ -192,3 +192,11 @@ fivebins = function(x, applyto=NULL,
 # fivebins(x = xx) %>% lapply(FUN = function(B){ xx[B] } )
 # df = data.frame(id=paste0('id',0:100), num=0:100, stringsAsFactors = F)
 # fivebins(x = df$num,applyto=df$id)
+
+# COUNT AMINO ACIDS BY PROTEIN
+#dubres = load.dubreuil2019.data(3)
+#fullAA=dubres$resname
+# APPLY AMINO ACID SCORES COUNT AMINO ACIDS BY PROTEIN
+#data(AAindex,package = 'protr')
+
+
