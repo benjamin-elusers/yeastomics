@@ -264,10 +264,11 @@ PROT.HL = load.belle2006.data() %>%
 
 # PROTEIN-PROTEIN INTERACTIONS  ------------------------------------------------
 ## STRING functional protein association networks ------------------------------
-STRING = load.string(tax="4932",phy=T, ful=T, min.score = 700) %>% 
+STRING = load.string(tax="4932",phy=F, ful=T, min.score = 900) %>% 
              mutate(ORF1 = str_extract(protein1,SGD.nomenclature()),
                     ORF2 = str_extract(protein2,SGD.nomenclature())
              ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
+
 ## INTACT Molecular Interaction Database ---------------------------------------
 file.intact = "data/intact-yeast-ppi.rds"
 valid_ids=unique(c(names(S288C),UNI$UNIPROTKB))
@@ -672,21 +673,18 @@ INTERACTIONS=list()
 
 # PPI NETWORK -----------------------------------------------------------------
 ## STRING protein association network
-cent.STRING = network.centrality(STRING[,c('ORF1','ORF2')])
+cent.STRING = network.centrality(STRING[,c('ORF1','ORF2')] %>% distinct(), namenet='STRING')
 df.STRING_cent =  cent.STRING %>% rename_with(~Pxx(x=., px="string",s='.'), .cols=-ids)
-quantile(cent.STRING$cent_deg)
-
 INTERACTIONS$string.megahub_func = cent.STRING %>% dplyr::filter(cent_deg>300) %>% pull(ids)
 INTERACTIONS$string.superhub_func = cent.STRING %>% dplyr::filter(between(cent_deg,100,300)) %>% pull(ids)
 #INTERACTIONS$string.minihub = cent.STRING %>% dplyr::filter(between(cent_deg,10,11)) %>% pull(ids)
 
 ## INTACT protein-protein physical interaction network
-cent.INTACT = network.centrality(INTACT[,c('protA','protB')] %>% distinct() )
+cent.INTACT = network.centrality(INTACT[,c('protA','protB')] %>% distinct(), 'INTACT')
 df.INTACT_cent = cent.INTACT %>% rename_with(~Pxx(x=., px="intact",s='.'), .cols=-ids)
-quantile(cent.INTACT$cent_deg)
-INTERACTIONS$intact.megahub_ppi = cent.INTACT %>% dplyr::filter(cent_deg>50) %>% pull(ids)
-INTERACTIONS$intact.superhub_ppi = cent.INTACT %>% dplyr::filter(between(cent_deg,20,50)) %>% pull(ids)
-INTERACTIONS$intact.minihub_ppi = cent.INTACT %>% dplyr::filter(between(cent_deg,10,20)) %>% pull(ids)
+INTERACTIONS$intact.megahub_ppi = cent.INTACT %>% dplyr::filter(cent_deg>20) %>% pull(ids)
+INTERACTIONS$intact.superhub_ppi = cent.INTACT %>% dplyr::filter(between(cent_deg,11,20)) %>% pull(ids)
+INTERACTIONS$intact.minihub_ppi = cent.INTACT %>% dplyr::filter(between(cent_deg,5,10)) %>% pull(ids)
 
 # PROTEIN COMPLEXES -----------------------------------------------------------
 ## Catalogue of Yeast Complexes (CYC)
