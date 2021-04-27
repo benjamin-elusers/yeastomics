@@ -214,7 +214,6 @@ PPM.ORTHO.4932 = PPM.ORTHO %>% ungroup() %>% filter(taxid==4932) %>%
                               values_from=ppm_int, values_fn=mean_) %>%
                   dplyr::select(-ppm_NA,-organ)
 
-
 # VARIABLE ORF (PANGENOMICS) -------------------------------------------------
 VARORF = load.peter2018.data(2)
 
