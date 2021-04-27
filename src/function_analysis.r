@@ -81,7 +81,7 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
 
 
 # Measure centrality of a network
-network.centrality = function(fromTo){
+network.centrality = function(fromTo,namenet=''){
   if(missing(fromTo)){ stop("A from-to matrix is required to build the network!") }
   library(igraph)
   library(tictoc)
@@ -130,7 +130,10 @@ network.centrality = function(fromTo){
 
   # Benchmark correlation for the centrality measures
   tic(" - Find correlation between centrality measures...")
-  corrplot::corrplot(cor(centrality[,-1],use = 'complete',method ='spearman'))
+  corrplot::corrplot(cor(centrality[,-1],use = 'complete',method ='spearman'),
+                     method='circle', addCoef.col = 'violet',
+                     number.cex = 0.7, number.font = 1, number.digits = 2,
+                     title=paste0("\n",namenet," network"))
   toc()
   return(centrality)
 }
