@@ -671,7 +671,7 @@ load.string = function(tax="4932",phy=T,ful=T,min.score=700){
   STRING_url = sprintf("%s/%s/%s.%s.%s",STRING_baseurl,STRING_dataset,tax,STRING_dataset,"txt.gz")
 
   message("STRING VERSION: ", .version)
-  message("STRING DATASET:",STRING_dataset)
+  message("STRING DATASET: ",STRING_dataset)
   message(sprintf("FILTERED BY:\n physical links = %s \nAND\n full evidence =  %s \nAND\n min. score >= %s", phy, ful, min.score))
   # each numeric column is an evidence score out of 1000 to asssess the existence of the link between protein
   # _transferred means information was inferred from a different organism (homology or orthologous group)
