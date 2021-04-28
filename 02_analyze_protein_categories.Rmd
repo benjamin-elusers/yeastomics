@@ -72,7 +72,7 @@ suppressPackageStartupMessages({
 })
 
 # turn off annoying messages from dplyr::summarise
-options(dplyr.summarise.inform = FALSE)
+options(dplyr.summarise.inform = FALSE, dplyr.width=Inf)
 ```
 
 # Evolutionary dataset
@@ -151,40 +151,72 @@ FEAT_scor = preload("output/features-spearman.rds",
                    cor(FEAT.m,use='pairwise.complete.obs',method = 'spearman'), 
                    doing="Computing Spearman correlation between features...")
 
-prop = ER.PROP %>% dplyr::select(starts_with("cat_"))
-under10 = colSums(prop)<10
-sum(under10); length(prop)-sum(under10)
+prop = PROP %>% 
+        pivot_longer(cols = starts_with('cat_'),
+                     names_to = c('categories','source','property'), 
+                     names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+                     values_to = "has_prop") %>%
+        mutate(has_ortho = ORF %in% ER$ORF)
 
-prop.size= 
-  tibble( 
-        prop.name  = names(prop[under10]),
-        size.ortho = colSums(prop[,under10]),
-        size.prot  = colSums(PROP[,prop.name]),
-        size.ratio = size.ortho/size.prot
-      ) %>% 
-        arrange(size.prot) %>%
-        separate(prop.name, 
-                into = c('categories','source','property'), 
-                sep="\\.")
+prop.size = prop %>% 
+  group_by(ORF,categories,source,property) %>% 
+  summarise( in_prot=sum(has_prop), 
+             in_ortho=sum(has_prop*has_ortho),
+             r_prot_ortho = in_ortho/in_prot)
+  
+under10 = colSums(prop[,-1])<10
+sum(under10); length(prop)-sum(under10)
+# 
+# prop.size= 
+#   tibble( 
+#         prop.name  = names(prop[under10]),
+#         size.ortho = colSums(prop[,under10]),
+#         size.prot  = colSums(PROP[,prop.name]),
+#         size.ratio = size.ortho/size.prot
+#       ) %>% 
+#         arrange(size.prot) %>%
+#         separate(prop.name, 
+#                 into = c('categories','source','property'), 
+#                 sep="\\.")
 
 # 1. Properties under-represented in yeast orthologs
 ggplot(prop.size) + 
-  geom_bar(aes(y=size.prot, x=reorder(property,size.prot),fill=source),stat='identity') +
-  geom_bar(aes(y=size.ortho, x=reorder(property,size.prot)),stat='identity') + 
+  geom_bar(aes(y=in_prot, x=reorder(property,in_prot),fill=source),stat='identity') +
+  geom_bar(aes(y=in_ortho, x=reorder(property,in_prot)),stat='identity') + 
   geom_hline(yintercept=10,color='white',linetype='dashed') +
   facet_wrap(~categories,scales = 'free_y') +
   coord_flip() + theme( axis.text = element_text(size=5))
 
 
-prop.1 = prop[!under10]
-length(colSums(prop.1))
+prop.1 = prop[,c(1,which(!under10)+1)]
+
+prop.2 = proxy::dist(prop.1[,-1], prop.1[,-1], by_rows=F, method="Jaccard")
+
+prop.1.1 = prop.1 %>% pivot_longer(cols = -GNAME,
+                                   names_to = c('categories','source','property'), 
+                                   names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+                                   values_to = "has_prop")
+
+#heatmap(x=as.matrix(1*prop.1), Rowv = F, Colv = F, symm = F)
+ggplot(prop.1.1) + 
+  geom_raster(aes(x=GNAME,y=property),show.legend = F,interpolate=T,color=NA) +
+  scale_fill_manual(values=c('black','white')) +
+  theme(legend.title = element_blank(), axis.text = element_blank())
+
+pheatmap::pheatmap(prop.1[,-1]*1, 
+                   show_rownames = T,show_colnames = F,
+                   cluster_rows = T, cluster_cols = F, 
+                   cellwidth = 25, cellheight = 5,
+                   border_color = NA, color = c('black','white'), 
+                   filename='output/heatmap-protein-binary-properties.pdf'
+                   )
 
 #library(proxy)
 # Example of Jaccard distance on binary data
 # x <- matrix(sample(c(FALSE, TRUE), 50, rep = TRUE), ncol = 10)
 # dist(x, x, method = "Jaccard") # cross distances
 
-dim(prop_jacc)
+
 hc = hclust(d=stats::as.dist(prop_jacc),method = 'ward.D2')
 grp = cutree(hc,k=100) 
 
