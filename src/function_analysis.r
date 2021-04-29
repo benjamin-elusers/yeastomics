@@ -105,7 +105,7 @@ network.centrality = function(fromTo,namenet=''){
 
   # Get the largest connected component
   tic(" - Find largest connected component...")
-  connet = decompose(fullnet,max.comps=1)[[1]]
+  connet = decompose(fullnet)[[which.max(comp$csize)]]
   nnodes= length(V(connet))
   message("Maximum number of nodes: ",nnodes)
   toc()
