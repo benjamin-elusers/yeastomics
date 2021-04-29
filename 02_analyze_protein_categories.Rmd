@@ -100,14 +100,14 @@ fit.ER = broom::augment_columns(x = nls.fit, data = ER) %>%
 # protein properties (qualitative)
 PROP=readRDS(get.last.file("output","proteome-properties"))
 # protein features (quantitative)
-FEAT = readRDS(get.last.file("output","proteome-features")) 
+FEAT = readRDS(get.last.file("output","proteome-features"))
 
 # ER fit with properties and features
 ER.PROP = fit.ER %>% left_join(PROP,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
 dim(ER.PROP)
 ER.FEAT = fit.ER %>% left_join(FEAT,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
 dim(ER.FEAT)
-
+colnames(FEAT)
 # Matrix format of properties and features
 PROP.m = PROP %>% 
       ungroup() %>% 
@@ -156,60 +156,71 @@ prop = PROP %>%
                      names_to = c('categories','source','property'), 
                      names_pattern="cat_(.+)\\.(.+)\\.(.+)",
                      values_to = "has_prop") %>%
-        mutate(has_ortho = ORF %in% ER$ORF)
+        mutate(has_ortho = ORF %in% ER$ORF,
+               col_prop = paste0(categories,'.',source,'.',property))
 
 prop.size = prop %>% 
-  group_by(ORF,categories,source,property) %>% 
+  group_by(categories,source,property) %>% 
   summarise( in_prot=sum(has_prop), 
              in_ortho=sum(has_prop*has_ortho),
              r_prot_ortho = in_ortho/in_prot)
-  
-under10 = colSums(prop[,-1])<10
-sum(under10); length(prop)-sum(under10)
-# 
-# prop.size= 
-#   tibble( 
-#         prop.name  = names(prop[under10]),
-#         size.ortho = colSums(prop[,under10]),
-#         size.prot  = colSums(PROP[,prop.name]),
-#         size.ratio = size.ortho/size.prot
-#       ) %>% 
-#         arrange(size.prot) %>%
-#         separate(prop.name, 
-#                 into = c('categories','source','property'), 
-#                 sep="\\.")
+```
 
+```{r F0 non-conserved properties}
+library(cowplot)
+theme_set(theme_cowplot())
+
+data.to.f0 = prop.size %>% filter(in_ortho<10)
 # 1. Properties under-represented in yeast orthologs
-ggplot(prop.size) + 
+f0 = ggplot(data.to.f0 ) + 
   geom_bar(aes(y=in_prot, x=reorder(property,in_prot),fill=source),stat='identity') +
   geom_bar(aes(y=in_ortho, x=reorder(property,in_prot)),stat='identity') + 
-  geom_hline(yintercept=10,color='white',linetype='dashed') +
-  facet_wrap(~categories,scales = 'free_y') +
-  coord_flip() + theme( axis.text = element_text(size=5))
+  geom_hline(yintercept=10,color='black',linetype='dashed') +
+  facet_wrap(~categories,scales = 'free_y',ncol=1) +
+  coord_flip() + theme( axis.text = element_text(size=6))
+save_plot(path="output/", filename = 'F0.properties-absent-ortho.pdf', plot = f0, device = 'pdf', scale = 3 )
+save_plot(path="output/", filename = 'F0.properties-absent-ortho.png', plot = f0, device = 'png', scale = 2 )
 
+categories=unique(data.to.f0$categories)
+for( icat in seq_along(categories) ){
+  CAT = categories[icat]
+  f0.1 = ggplot(data.to.f0 %>% filter(categories == CAT )) + 
+    geom_bar(aes(y=in_prot, x=reorder(property,in_prot),fill=source),stat='identity') +
+    geom_bar(aes(y=in_ortho, x=reorder(property,in_prot)),stat='identity') + 
+    geom_hline(yintercept=10,color='black',linetype='dashed') +
+    facet_wrap(~categories,scales = 'free_y',ncol=2) +
+    coord_flip() + theme( axis.text = element_text(size=8)) +
+    scale_x_discrete(position = "top", name='') + ylim(0,100)
+  save_plot(path="output/", filename = sprintf('F0.%s.properties-absent-ortho-%s.png',icat,CAT), plot = f0.1,device = 'png', scale = 2 )
+  save_plot(path="output/", filename = sprintf('F0.%s.properties-absent-ortho-%s.pdf',icat,CAT), plot = f0.1,device = 'pdf', scale = 2 )
+}
+```
 
-prop.1 = prop[,c(1,which(!under10)+1)]
+```{r F1 yeast QR properties }
+n_distinct(prop$GNAME)/n_distinct(prop$property)
+prop %>% filter(has_ortho) %>% ungroup() %>% summarise(np=n_distinct(property), ng=n_distinct(GNAME), r=ng/np)
+prop %>% ungroup() %>% summarise(np=n_distinct(property), ng=n_distinct(GNAME), r=ng/np)
 
-prop.2 = proxy::dist(prop.1[,-1], prop.1[,-1], by_rows=F, method="Jaccard")
-
-prop.1.1 = prop.1 %>% pivot_longer(cols = -GNAME,
-                                   names_to = c('categories','source','property'), 
-                                   names_pattern="cat_(.+)\\.(.+)\\.(.+)",
-                                   values_to = "has_prop")
-
-#heatmap(x=as.matrix(1*prop.1), Rowv = F, Colv = F, symm = F)
-ggplot(prop.1.1) + 
-  geom_raster(aes(x=GNAME,y=property),show.legend = F,interpolate=T,color=NA) +
-  scale_fill_manual(values=c('black','white')) +
+data.to.f1  = prop %>% mutate(propinfo = factor(has_prop+2*has_ortho, levels = c(0,1,2,3), labels('none','nocons_prop','cons_prot','cons_prop')))
+f1.1 = ggplot(data.to.f1) +
+  geom_raster(aes(x=GNAME,y=property,fill=propinfo),show.legend = F) +
+  scale_fill_manual(values=c('white','black')) +
+  scale_fill_manual(values=c('none'='white','nocons_prop'='red','cons_prot'='gray','cons_prop'='black'),na.value='white') +
   theme(legend.title = element_blank(), axis.text = element_blank())
-
-pheatmap::pheatmap(prop.1[,-1]*1, 
-                   show_rownames = T,show_colnames = F,
-                   cluster_rows = T, cluster_cols = F, 
-                   cellwidth = 25, cellheight = 5,
-                   border_color = NA, color = c('black','white'), 
-                   filename='output/heatmap-protein-binary-properties.pdf'
-                   )
+f1.2 = ggplot(data.to.f1 %>% filter(has_ortho)) +
+  geom_raster(aes(x=GNAME,y=property,fill=has_prop),show.legend = F,interpolate=T) +
+  scale_fill_manual(values=c('white','black')) +
+  theme(legend.title = element_blank(), axis.text = element_blank())
+f1 = plot_grid(f1.1,f1.2)
+save_plot(path="output/", filename = 'F1.properties-proteome.png', plot = f1,device = 'png', base_height = 13,base_width=26)
+save_plot(path="output/", filename = 'F1.properties-proteome.pdf', plot = f1,device = 'pdf', base_height = 13,base_width=26)
+# pheatmap::pheatmap(prop[,-1]*1, 
+#                    show_rownames = T,show_colnames = F,
+#                    cluster_rows = T, cluster_cols = F, 
+#                    cellwidth = 25, cellheight = 5,
+#                    border_color = NA, color = c('black','white'), 
+#                    filename='output/heatmap-protein-binary-properties.pdf'
+#                    )
 
 #library(proxy)
 # Example of Jaccard distance on binary data
@@ -217,75 +228,75 @@ pheatmap::pheatmap(prop.1[,-1]*1,
 # dist(x, x, method = "Jaccard") # cross distances
 
 
-hc = hclust(d=stats::as.dist(prop_jacc),method = 'ward.D2')
-grp = cutree(hc,k=100) 
+# hc = hclust(d=stats::as.dist(prop_jacc),method = 'ward.D2')
+# grp = cutree(hc,k=100) 
 
-pheatmap::pheatmap(prop_jacc,
-                   show_colnames = F, show_rownames = T,
-                   cluster_cols = hc, cluster_rows = hc,
-                   clustering_distance_rows = prop_jacc,
-                   clustering_distance_cols = prop_jacc,
-                   cutree_rows = 100,cutree_cols = 100,
-                   fontsize=3, border_color = NA, silent=T, 
-                   cellheight=3, cellwidth=3,
-                   filename="output/properties-jaccard.pdf", height=50, width=50)
-which(prop_jacc < 0.5,arr.ind=T)
-# Number of clusters
-library(factoextra)
-library(NbClust)
-m.prop_jacc=base::as.matrix(stats::as.dist(prop_jacc))
-
-caret::findCorrelation
-
-brk.minor=seq(5,45,by=5)
-brk.major=seq(50,50,by=25)
-
-# Elbow method
-fig.1a=fviz_nbclust(m.prop_jacc, method = "wss",
-                    FUNcluster = kmeans, k.max=50, nstart = 50, nboot=100) +
-  geom_vline(xintercept=brk.minor, linetype=3,size=0.5) +
-  geom_vline(xintercept=brk.major, linetype=2,size=0.5) +
-  labs(subtitle = "Elbow method") 
-
-# Silhouette method
-fig.1b=fviz_nbclust(m.prop_jacc, method = "silhouette",
-                   FUNcluster = kmeans, k.max=50, nstart = 50, nboot=100) +
-  labs(subtitle = "Silhouette method")
-
-# Gap statistic
-set.seed(42)
-fig.1c=fviz_nbclust(m.prop_jacc, method = "gap_stat", 
-                    FUNcluster=kmeans, k.max=50, nstart = 50, nboot = 100 ) + 
-  labs(subtitle = "Gap statistic method")
-
-nbclust_out <- NbClust(
-  data = PROP_lgl,
-  diss = NULL,
-  distance = 'binary', 
-  min.nc = 2, # minimum number of clusters
-  max.nc = 50, # maximum number of clusters
-  method = "complete"
-)
+# pheatmap::pheatmap(prop_jacc,
+#                    show_colnames = F, show_rownames = T,
+#                    cluster_cols = hc, cluster_rows = hc,
+#                    clustering_distance_rows = prop_jacc,
+#                    clustering_distance_cols = prop_jacc,
+#                    cutree_rows = 100,cutree_cols = 100,
+#                    fontsize=3, border_color = NA, silent=T, 
+#                    cellheight=3, cellwidth=3,
+#                    filename="output/properties-jaccard.pdf", height=50, width=50)
+# which(prop_jacc < 0.5,arr.ind=T)
+# # Number of clusters
+# library(factoextra)
+# library(NbClust)
+# m.prop_jacc=base::as.matrix(stats::as.dist(prop_jacc))
+# 
+# caret::findCorrelation
+# 
+# brk.minor=seq(5,45,by=5)
+# brk.major=seq(50,50,by=25)
+# 
+# # Elbow method
+# fig.1a=fviz_nbclust(m.prop_jacc, method = "wss",
+#                     FUNcluster = kmeans, k.max=50, nstart = 50, nboot=100) +
+#   geom_vline(xintercept=brk.minor, linetype=3,size=0.5) +
+#   geom_vline(xintercept=brk.major, linetype=2,size=0.5) +
+#   labs(subtitle = "Elbow method") 
+# 
+# # Silhouette method
+# fig.1b=fviz_nbclust(m.prop_jacc, method = "silhouette",
+#                    FUNcluster = kmeans, k.max=50, nstart = 50, nboot=100) +
+#   labs(subtitle = "Silhouette method")
+# 
+# # Gap statistic
+# set.seed(42)
+# fig.1c=fviz_nbclust(m.prop_jacc, method = "gap_stat", 
+#                     FUNcluster=kmeans, k.max=50, nstart = 50, nboot = 100 ) + 
+#   labs(subtitle = "Gap statistic method")
+# 
+# nbclust_out <- NbClust(
+#   data = PROP_lgl,
+#   diss = NULL,
+#   distance = 'binary', 
+#   min.nc = 2, # minimum number of clusters
+#   max.nc = 50, # maximum number of clusters
+#   method = "complete"
+# )
 
 # ensure the results are repeatable
-set.seed(7)
-# load the library
-library(mlbench)
-library(caret)
-print(prop_cor)
-hicor <- findCorrelation(prop_cor, cutoff=0.5)
-
-
-control <- rfeControl(functions=rfFuncs, method="cv", number=10)
-# run the RFE algorithm
-results <- rfe(ER.PROP[,19:935], ER.PROP$EVO.FULL , sizes=c(1:917), rfeControl=control)
-# summarize the results
-print(results)
-# list the chosen features
-predictors(results)
-# plot the results
-plot(results, type=c("g", "o"))
-
+# set.seed(7)
+# # load the library
+# library(mlbench)
+# library(caret)
+# print(prop_cor)
+# hicor <- findCorrelation(prop_cor, cutoff=0.5)
+# 
+# 
+# control <- rfeControl(functions=rfFuncs, method="cv", number=10)
+# # run the RFE algorithm
+# results <- rfe(ER.PROP[,19:935], ER.PROP$EVO.FULL , sizes=c(1:917), rfeControl=control)
+# # summarize the results
+# print(results)
+# # list the chosen features
+# predictors(results)
+# # plot the results
+# plot(results, type=c("g", "o"))
+# 
 
 # library(Boruta)
 # train.data = ER.PROP %>% dplyr::select(EVO.FULL, starts_with('cat_'))
@@ -299,7 +310,7 @@ plot(results, type=c("g", "o"))
 # imps2 = imps[imps$decision != 'Rejected', c('meanImp', 'decision')]
 # plot(boruta_output, cex.axis=.7, las=2, xlab="", main="Variable Importance")  
 
-head(imps2[order(-imps2$meanImp), ])  # descending sort
+#head(imps2[order(-imps2$meanImp), ])  # descending sort
 ```
 
 
@@ -308,9 +319,10 @@ head(imps2[order(-imps2$meanImp), ])  # descending sort
 
 library(ggplot2)
 library(ggthemes)
+library(cowplot)
 # Show the fit and the residuals of expression-evolutionary rate
-prop_name = grep("essential",colnames(PROP),v=T)
-prop_sub = fit.ER %>% filter(!!sym(prop_name))
+prop_name = grep("essential_core",colnames(PROP),v=T)
+prop_sub = ER.PROP %>% filter(!!sym(prop_name))
 MR = ggplot(fit.ER, aes(y = EVO.FULL, x = PPM)) +
      geom_abline(slope=0,intercept = mean(fit.ER$EVO.FULL),size=1)+
      geom_point(fill='lightgray',shape=19,alpha=0.3) +
@@ -318,7 +330,7 @@ MR = ggplot(fit.ER, aes(y = EVO.FULL, x = PPM)) +
      # Overlay the protein sharing a particular properties
      geom_point(data=prop_sub,color='purple',fill=NA,shape=21,size=2)+
      geom_line(mapping=aes(y=.fitted),size=1) +
-     xlab('Protein abundance (log10 ppm)') + ylab('Mean ER (full seq.)') +theme_clean() 
+     xlab('Protein abundance (log10 ppm)') + ylab('Mean ER (full seq.)')
 MR
 
 # Show residuals of a particular categories 
@@ -328,12 +340,14 @@ MR2= ggplot(data=fit.ER, aes(y=.resid,x=PPM)) +
   geom_abline(slope=0,intercept = 0,size=1)+
   geom_point(data=prop_sub,color='purple',fill=NA,shape=21,size=2)+
   geom_segment(data=prop_sub,aes(xend = PPM, y=0, yend = .resid),col='purple') +
-  xlab('Protein abundance (log10 ppm)') + ylab('Residuals (ER)') +theme_clean() 
+  xlab('Protein abundance (log10 ppm)') + ylab('Residuals (ER)') 
+  
 MR2
+```
 
-
+```{r rank-properties}
 # Show most over/under estimated categories
-ER.residuals = fit.ER %>% 
+ER.residuals = ER.PROP %>% 
   pivot_longer( cols= starts_with('cat_'), 
                 names_to = c('categories','source','property'), 
                 names_pattern="cat_(.+)\\.(.+)\\.(.+)",
@@ -355,30 +369,51 @@ ER.residuals = fit.ER %>%
               SR.avg = mean_(.resid), 
            ) %>% 
     distinct() %>% 
-  arrange(desc(SR.avg)) 
+  arrange(desc(SR.avg)) %>%
+  group_by(categories) %>% mutate(rSR = dense_rank(SR) , ncat=n())
 library(ggplot2)
 library(ggfittext)
 fig.0 = ggplot(ER.residuals, 
                aes(y = reorder(str_trunc(property,w=50), -SR.log),
                    x = SR.log, fill=source)) +
       geom_bar(stat='identity',position='dodge') + 
-      theme_clean() +
-      theme( axis.text = element_text(size=3), 
-             line = element_line(size=0.1),
-             rect = element_rect(size=0.1))
+      theme( axis.text = element_text(size=3))
+fig.0
 ggsave(fig.0, path='output/', 
        file='barplot-protein-properties-ALL.pdf',
        scale=5,limitsize = F)
 
-fig.1 = fig.0 + 
+fig.1 = ggplot(ER.residuals %>% filter(rSR < 10 | rSR > ncat-10), 
+               aes(y = reorder(str_trunc(property,w=50), -SR.log),
+                   x = SR.log, fill=source)) +
+      geom_bar(stat='identity',position='dodge')  + 
         facet_wrap(~categories,scales = 'free_y') +
-        theme( axis.text = element_text(size=4), 
-             line = element_line(size=0.2),
-             rect = element_rect(size=0.2))
-
+        theme( axis.text = element_text(size=8))
+fig.1
 ggsave(fig.1, 
-       path='output/', file='barplot-protein-properties-CATEGORIES.pdf',
-       scale=4,limitsize = F)
+       path='output/', file='barplot-protein-properties-CATEGORIES-top10.pdf',
+       scale=2,limitsize = F)
+```
 
+```{r rank-features}
+ER.residuals.cor=ER.FEAT %>% 
+  pivot_longer(cols = starts_with('cat_'),
+               names_to = c('categories','source','feature'), 
+               names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+              values_to = "value") %>%
+  group_by(feature) %>% mutate( nval = sum(!is.na(value)), 
+                                R2=ifelse(nval>0,scor(.resid,value)$estimate^2*nval,NA)) %>%
+  group_by(categories) %>% mutate( ncat=n(), rR2=dense_rank(R2)) %>% 
+  summarise(categories,source,feature,nval,R2,rR2,ncat)
+fig.2 = ggplot(ER.residuals.cor , 
+               aes(y = reorder(str_trunc(feature,w=50), -R2),
+                   x = log(R2), fill=source)) +
+      geom_bar(stat='identity',position='dodge')  + 
+        facet_wrap(~categories,scales = 'free_y') +
+        theme( axis.text = element_text(size=8))
+fig.2
+ggsave(fig.2, 
+       path='output/', file='barplot-protein-features_vs_ERresiduals-CATEGORIES.pdf',
+       scale=2.5,limitsize = F)
 
 ```
