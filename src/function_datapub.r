@@ -746,7 +746,7 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
   node_ortho <- readr::read_delim(unz(temp, paxdb_node),col_names = c("NOG", "orthologs"), delim="\t",progress=T) %>%
     separate_rows(orthologs,sep=" ") %>%
     extract(orthologs,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
-    group_by(NOG,taxid) %>% mutate(is_1to1=n()==1) %>%
+    group_by(NOG,taxid) %>% mutate(is_1to1=n()==1)
 
   return(node_ortho)
 }
