@@ -232,7 +232,7 @@ load.dana2014.data = function(){
   url.datasets = gsub(" ","%20", x=sprintf("%s/%s %s.txt",url.MTDR,org,studies))
   names(url.datasets) = conditions
   exp.names = c('ingolia2009.TE_exponential','brar2012.TE_exponential_A14201','brar2012.TE_exponential_gb15',
-                'brar2012.TE_DNA_replication','brar2012.TE_recombination','brar2012.TE_anaphase','brar2012.TE_metaphase_I','brar2012.TE_metaphase_II', 'brar.TE_premeiotic_entry',
+                'brar2012.TE_DNA_replication','brar2012.TE_recombination','brar2012.TE_anaphase','brar2012.TE_metaphase_I','brar2012.TE_metaphase_II', 'brar2012.TE_premeiotic_entry',
                 'brar2012.TE_spore_packing', 'brar2012.TE_spores')
   MTDR = map(url.datasets,read.delim,header=F,col.names=c("orf","decoding_rate")) %>%
     purrr::reduce(.x=., .f = left_join, by = "orf") %>%
