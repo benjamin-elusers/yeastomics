@@ -176,11 +176,19 @@ prop.size = prop %>%
              in_ortho=sum(has_prop*has_ortho),
              r_prot_ortho = in_ortho/in_prot)
 ```
+<<<<<<< HEAD
 
 ```{r F0 non-conserved properties}
 library(cowplot)
 theme_set(theme_cowplot())
 
+=======
+
+```{r F0 non-conserved properties}
+library(cowplot)
+theme_set(theme_cowplot())
+
+>>>>>>> a08cec7eb6a21181fb3779265fc25ea862a25336
 data.to.f0 = prop.size %>% filter(in_ortho<10)
 # 1. Properties under-represented in yeast orthologs
 f0 = ggplot(data.to.f0 ) + 
