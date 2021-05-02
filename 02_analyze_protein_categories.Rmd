@@ -177,17 +177,23 @@ prop.size = prop %>%
              r_prot_ortho = in_ortho/in_prot)
 ```
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a08cec7eb6a21181fb3779265fc25ea862a25336
 
 ```{r F0 non-conserved properties}
 library(cowplot)
 theme_set(theme_cowplot())
 
+<<<<<<< HEAD
 =======
 
 ```{r F0 non-conserved properties}
 library(cowplot)
 theme_set(theme_cowplot())
 
+>>>>>>> a08cec7eb6a21181fb3779265fc25ea862a25336
+=======
 >>>>>>> a08cec7eb6a21181fb3779265fc25ea862a25336
 data.to.f0 = prop.size %>% filter(in_ortho<10)
 # 1. Properties under-represented in yeast orthologs

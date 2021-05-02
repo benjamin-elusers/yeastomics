@@ -1,2 +1,8 @@
 BACKUP_*.rds
 loaded-datasets-*.rds
+features-spearman.rds
+heatmap-protein-binary-properties.pdf
+properties-correlation.rds
+properties-jaccard.rds
+proteome-features-29_04_2021.rds
+proteome-properties-29_04_2021.rds
