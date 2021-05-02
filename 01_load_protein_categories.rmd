@@ -472,11 +472,11 @@ df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,ste
 df.protinfo = UNIPROT %>%  dplyr::select(c(UNIPROTKB,REVIEWED,EXISTENCE,SCORE,qual))
 df.aa_mw = DUB %>% 
        group_by(UNIPROT) %>% 
-       summarise( pepstats.mean_MW = MW/prot.size, L = prot.size ) %>%
+       summarise( pepstats.mean_MW = MW/prot.size, sgd.prot_size = prot.size ) %>%
        left_join(df.protinfo, by=c('UNIPROT' = 'UNIPROTKB')) %>%
-       filter(qual != 'Dubious' & EXISTENCE != "Uncertain" & L>50  )
+       filter(qual != 'Dubious' & EXISTENCE != "Uncertain" & sgd.prot_size>50  )
 
-TRANSCRIPTOMICS$pepstats.AA_costly = df.aa_mw %>% dplyr::filter(pepstats.mean_MW > 119 ) %>% pull(UNIPROT)
+TRANSCRIPTOMICS$pepstats.AA_costly = df.aa_mw %>% dplyr::filter(pepstats.mean_MW > 118 ) %>% pull(UNIPROT)
 TRANSCRIPTOMICS$pepstats.AA_cheap = df.aa_mw %>% dplyr::filter(pepstats.mean_MW <= 105 ) %>% pull(UNIPROT)
 
 df.cost = load.barton2010.data("prot") %>% 
