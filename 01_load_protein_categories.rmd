@@ -210,9 +210,9 @@ PPM.ORTHO.4932 = PPM.ORTHO %>% ungroup() %>% filter(taxid==4932) %>%
                   dplyr::select(NOG,orf=protid,ppm_4932=ppm_int) %>%
                   left_join(PPM.ORTHO %>% filter(taxid!=4932), by=c("NOG")) %>% 
                   pivot_wider(id_cols=c(NOG,orf,ppm_4932,organ), 
-                              names_from=taxid, names_glue="ppm_{taxid}",
+                              names_from=taxid, names_glue="paxdb.ppm_{taxid}",
                               values_from=ppm_int, values_fn=mean_) %>%
-                  dplyr::select(-ppm_NA,-organ)
+                  dplyr::select(-paxdb.ppm_NA,-organ)
 
 # VARIABLE ORF (PANGENOMICS) -------------------------------------------------
 VARORF = load.peter2018.data(2)
@@ -227,13 +227,32 @@ CHR = SGD %>%
 AA.FR = letterFrequency(UNI.SC,as.prob = T,letters = get.AA1()) %>% bind_cols( id=names(UNI.SC)) 
 AA.COUNT = letterFrequency(UNI.SC,as.prob = F,letters = get.AA1())%>% bind_cols( id=names(UNI.SC)) 
 
-aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY
+# PFAM AA CLASSES
+# alcohol         o    S,T
+# hydrophobic     h    A,C,F,G,H,I,K,L,M,R,T,V,W,Y
+# turnlike        t    A,C,D,E,G,H,K,N,Q,R,S,T
+aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>% 
+          append( list('Alcohol'=c('S','T'), 
+                            'Turnlike'=c('A','C','D','E','G','H','K','N','Q','R','S','T'))
+          )
+
+# Already in seqinr
+# polar           p    C,D,E,H,K,N,Q,R,S,T
+# small           s    A,C,D,G,N,P,S,T,V
+# tiny            u    A,G,S
+# positive        +    H,K,R
+# negative        -    D,E
+# charged         c    D,E,H,K,R
+# aliphatic       l    I,L,V
+# any             .    A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y
+# aromatic        a    F,H,W,Y
+
 sum.aa.fr = function(BS,alphabet){ 
   alphabet.freq = rowSums(letterFrequency(BS,as.prob = T,letters = alphabet))
   prot.enrich = tibble(id=names(BS),fr=alphabet.freq)
 }
 aa.set = map_chr(aa.prop,str_c,collapse='')
-aa.class = paste0(tolower(names(aa.set)),"_",aa.set)
+aa.class = paste0(tolower(sub(x=names(aa.set),"\\.","")),"_",aa.set)
 AACLASS.FR = map(aa.prop, sum.aa.fr, BS=UNI.SC )
 
 # DISORDER (D2P2 + IUP)  -------------------------------------------------------
@@ -482,15 +501,15 @@ TRANSCRIPTOMICS$geisberg2014.shortlived_mrna  = df.HLmrna %>% dplyr::filter(geis
 df.riboeff = load.dana2014.data() 
 
 # ORTHOLOGS EXPRESSION (against yeast, integrated abundance, average of orthologs)
-df.orthoexp =  PPM.ORTHO.4932 %>% 
+df.orthoexp =  PPM.ORTHO.4932 %>%
                  group_by(NOG,orf) %>%
-                 mutate( ortho_ppm_avg = mean_(c_across(starts_with('ppm_'))),
-                         ortho_ppm_sd  = sd_(c_across(starts_with('ppm_'))),
-                         ortho_ppm_cv  = ortho_ppm_sd/ortho_ppm_avg,
-                         ortho_ppm_max  = max_(c_across(starts_with('ppm_'))),
-                         ortho_ppm_min  = min_(c_across(starts_with('ppm_'))),
-                         ortho_ppm_n= sum.na(c_across(starts_with('ppm_')),notNA = T) ) %>%
-                  filter(ortho_ppm_n > 1)
+                 mutate( paxdb.ortho_ppm_avg = mean_(c_across(starts_with('paxdb.ppm_'))),
+                         paxdb.ortho_ppm_sd  = sd_(c_across(starts_with('paxdb.ppm_'))),
+                         paxdb.ortho_ppm_cv  = paxdb.ortho_ppm_sd/paxdb.ortho_ppm_avg,
+                         paxdb.ortho_ppm_max  = max_(c_across(starts_with('paxdb.ppm_'))),
+                         paxdb.ortho_ppm_min  = min_(c_across(starts_with('paxdb.ppm_'))),
+                         paxdb.ortho_ppm_n= sum.na(c_across(starts_with('paxdb.ppm_')),notNA = T) ) %>%
+                  filter(paxdb.ortho_ppm_n > 1) %>%  dplyr::rename(paxdb.ppm_4932=ppm_4932)
 
 df.transcriptomics = PROTEOME %>% 
                     left_join(df.tai,by=c('ORF'='prot')) %>% 
@@ -548,20 +567,7 @@ df.aa = AA.FR %>%
 ### Grouped amino-acid frequencies -----------------------------------------------
 df.aa_class =  AACLASS.FR %>% purrr::reduce(full_join,by='id') %>% rename_with(~aa.class, starts_with('fr')) %>%
           rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-id)
-
-# PFAM AA CLASSES
-# alcohol         o    S,T
-# aliphatic       l    I,L,V
-# any             .    A,C,D,E,F,G,H,I,K,L,M,N,P,Q,R,S,T,V,W,Y
-# aromatic        a    F,H,W,Y
-# charged         c    D,E,H,K,R
-# hydrophobic     h    A,C,F,G,H,I,K,L,M,R,T,V,W,Y
-# negative        -    D,E
-# polar           p    C,D,E,H,K,N,Q,R,S,T
-# positive        +    H,K,R
-# small           s    A,C,D,G,N,P,S,T,V
-# tiny            u    A,G,S
-# turnlike        t    A,C,D,E,G,H,K,N,Q,R,S,T
+names(df.aa_class)
 
 
 ### Disorder content (segment, fraction, total) ----------------------------------
@@ -673,18 +679,21 @@ INTERACTIONS=list()
 
 # PPI NETWORK -----------------------------------------------------------------
 ## STRING protein association network
-cent.STRING = network.centrality(STRING[,c('ORF1','ORF2')] %>% distinct(), namenet='STRING')
+cent.STRING = network.centrality(fromTo=STRING[,c('ORF1','ORF2')] %>% distinct(), namenet='STRING')
 df.STRING_cent =  cent.STRING %>% rename_with(~Pxx(x=., px="string",s='.'), .cols=-ids)
+quantile(df.STRING_cent$string.cent_deg)
+sum(cent.STRING$cent_deg>300)
+sum(between(cent.STRING$cent_deg,100,300))
 INTERACTIONS$string.megahub_func = cent.STRING %>% dplyr::filter(cent_deg>300) %>% pull(ids)
 INTERACTIONS$string.superhub_func = cent.STRING %>% dplyr::filter(between(cent_deg,100,300)) %>% pull(ids)
 #INTERACTIONS$string.minihub = cent.STRING %>% dplyr::filter(between(cent_deg,10,11)) %>% pull(ids)
 
 ## INTACT protein-protein physical interaction network
 cent.INTACT = network.centrality(INTACT[,c('protA','protB')] %>% distinct(), 'INTACT')
-df.INTACT_cent = cent.INTACT %>% rename_with(~Pxx(x=., px="intact",s='.'), .cols=-ids)
-INTERACTIONS$intact.megahub_ppi = cent.INTACT %>% dplyr::filter(cent_deg>20) %>% pull(ids)
-INTERACTIONS$intact.superhub_ppi = cent.INTACT %>% dplyr::filter(between(cent_deg,11,20)) %>% pull(ids)
-INTERACTIONS$intact.minihub_ppi = cent.INTACT %>% dplyr::filter(between(cent_deg,5,10)) %>% pull(ids)
+df.INTACT_cent = cent.INTACT %>% rename_with(~Pxx(x=., px="intact",s='.'), .cols=-ids) %>% 
+  rowwise %>% mutate(uni = ifelse(grepl(ids,SGD.nomenclature()), UNIPROT$UNIPROTKB[UNIPROT$ORF %in% ids], ids ) )
+INTERACTIONS$intact.megahub_ppi = cent.INTACT %>% dplyr::filter(cent_deg>15) %>% pull(ids)
+INTERACTIONS$intact.superhub_ppi = cent.INTACT %>% dplyr::filter(between(cent_deg,5,15)) %>% pull(ids)
 
 # PROTEIN COMPLEXES -----------------------------------------------------------
 ## Catalogue of Yeast Complexes (CYC)
@@ -705,7 +714,8 @@ INTERACTIONS=append(INTERACTIONS,EBI_oligomers)
 
 df.interactions = PROTEOME %>%
                   left_join(df.STRING_cent, by=c("ORF"="ids")) %>%
-                  left_join(df.INTACT_cent, by=c("ORF"="ids"))
+                  left_join(df.INTACT_cent, by=c("UNIPROTKB"="uni"))
+
 ```
 
 
@@ -812,9 +822,10 @@ FEATURES = PROTEOME %>%
             left_join(df.genomics %>% rename_with(.fn=Pxx, px='cat_genomics',.cols=-all_of(KEYS)), by=KEYS) %>%
             left_join(df.transcriptomics %>% rename_with(.fn=Pxx, px='cat_transcriptomics',.cols=-all_of(KEYS)), by=KEYS) %>%
             left_join(df.biophysics %>% rename_with(.fn=Pxx, px='cat_biophysics',.cols=-all_of(KEYS)), by=KEYS) %>%
-            left_join(df.interactions %>% rename_with(.fn=Pxx, px='cat_interactions',.cols=-all_of(KEYS)), by=KEYS) 
+            left_join(df.interactions %>% rename_with(.fn=Pxx, px='cat_interactions',.cols=-all_of(KEYS)), by=KEYS) %>%
             #left_join(df.functions, by=KEYS) %>%
             #left_join(df.phenotypes, by=KEYS)
+            dplyr::select(c(all_of(KEYS),where(~ is.numeric(.x) && !all(is.na(.x)) ) ))
 
 TOTAL_FEATURES= length(setdiff(colnames(FEATURES),colnames(PROTEOME)))
 FEATURE_BY_CATEGORIES = table(str_extract(pattern = "(^[^\\.]+)\\.", names(FEATURES)))
