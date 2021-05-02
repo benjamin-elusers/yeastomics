@@ -416,9 +416,11 @@ load.trna.adaptation = function(inputseq,
 
 load.codon.usage= function(cds,with.counts=F){
   if( !require(coRdon) ){ BiocManager::install("coRdon") } # Install this package first
+  if( !require(KEGGREST) ){ BiocManager::install("KEGGREST") } # Install this package first
   library(coRdon)
+  library(KEGGREST)
   cT=codonTable(cds)
-  orf2ko = sub("ko:","",keggLink("ko",'sce'))
+  orf2ko = sub("ko:","",KEGGREST::keggLink("ko",'sce'))
   names(orf2ko) =  sub("^.+:","",names(orf2ko))
 
   # Add KO identifiers to select ribosome
@@ -441,7 +443,6 @@ load.codon.usage= function(cds,with.counts=F){
   if(with.counts){ return( bind_cols(CU, cT@counts %>% as_tibble()) ) }
   return(CU)
 }
-
 
 # Amino Acid features ----------------------------------------------------------
 get.aascales=function(){
