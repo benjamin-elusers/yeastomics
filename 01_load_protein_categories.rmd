@@ -71,6 +71,11 @@ suppressPackageStartupMessages({
   source("src/function_datapub.r")
 })
 
+check_chunk =function(df,LIST){
+  dim(df)
+  colnames(df)
+  sapply(LIST,length)
+}
 # turn off annoying messages from dplyr::summarise
 options(dplyr.summarise.inform = FALSE,dplyr.width=Inf)
 ```
@@ -236,7 +241,7 @@ aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>%
                             'Turnlike'=c('A','C','D','E','G','H','K','N','Q','R','S','T'))
           )
 
-# Already in seqinr
+# FROM SEQINR AMINO ACID CLASSES
 # polar           p    C,D,E,H,K,N,Q,R,S,T
 # small           s    A,C,D,G,N,P,S,T,V
 # tiny            u    A,G,S
@@ -422,6 +427,7 @@ df.genomics = PROTEOME %>%
               left_join(df.gc, by=c('ORF'='orf')) %>%
               left_join(df.wgd, by=c('ORF'='byrne2005.orf')) %>%
               left_join(df.pangenome, by=c('ORF'='orf.s288c'))
+
 ```
 
 ### Transcriptomics 
@@ -520,6 +526,8 @@ df.transcriptomics = PROTEOME %>%
                     left_join(df.HLmrna,by=c('ORF'='ORF')) %>%
                     left_join(df.riboeff,by=c('ORF'='orf')) %>%
                     left_join(df.orthoexp,by=c('ORF'='orf'))
+
+
 ```
 
 ### Biophysics 
@@ -664,6 +672,8 @@ df.biophysics = PROTEOME %>%
                 left_join(df.aascales,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.HLprot,by=c('ORF'='ORF')) %>%
                 left_join(df.dg,by=c('UNIPROTKB'='protein_id'))
+
+
 ```
 
 ### Interactions 
@@ -716,6 +726,7 @@ df.interactions = PROTEOME %>%
                   left_join(df.STRING_cent, by=c("ORF"="ids")) %>%
                   left_join(df.INTACT_cent, by=c("UNIPROTKB"="uni"))
 
+
 ```
 
 
@@ -764,6 +775,8 @@ names(kegg_module) = paste0("keggmod.KO_",make_clean_names(names(kegg_module), c
 
 FUNCTIONS = append(FUNCTIONS,kegg_path)
 FUNCTIONS = append(FUNCTIONS,kegg_module)
+
+
 ```
 
 ### Phenotypes 
@@ -808,6 +821,7 @@ subloc = keep(loc,function(X){ length(X)>30 })
 names(subloc) = paste0("uniprot.loc_", make_clean_names(names(subloc),case='none',))
 PHENOTYPES=append(PHENOTYPES,subloc)
 
+
 ```
 
 
@@ -818,6 +832,16 @@ PHENOTYPES=append(PHENOTYPES,subloc)
 ```{r features}
 when=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
 KEYS=c('UNIPROTKB','SGD','ORF','GNAME','PNAME')
+
+
+check_chunk(df.genomics,GENOMICS)
+check_chunk(df.transcriptomics,TRANSCRIPTOMICS)
+check_chunk(df.biophysics,BIOPHYSICS)
+check_chunk(df.interactions,INTERACTIONS)
+check_chunk(df=NULL,FUNCTIONS)
+check_chunk(df=NULL,PHENOTYPES)
+
+
 FEATURES = PROTEOME %>% 
             left_join(df.genomics %>% rename_with(.fn=Pxx, px='cat_genomics',.cols=-all_of(KEYS)), by=KEYS) %>%
             left_join(df.transcriptomics %>% rename_with(.fn=Pxx, px='cat_transcriptomics',.cols=-all_of(KEYS)), by=KEYS) %>%
