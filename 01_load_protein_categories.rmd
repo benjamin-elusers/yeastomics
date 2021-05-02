@@ -71,10 +71,33 @@ suppressPackageStartupMessages({
   source("src/function_datapub.r")
 })
 
-check_chunk =function(df,LIST){
-  dim(df)
-  colnames(df)
-  sapply(LIST,length)
+
+check_chunk =function(df,LIST,extra.verbose=F){
+  cat0 = function(...){ cat(sep='',...)}
+  if( !is.null(df) ){
+    feat.stats =sprintf("%s features concerning %s proteins\n",ncol(df),nrow(df))
+    cat0("\nFEATURES:\n##########\n",feat.stats,"##########\n")
+    if(extra.verbose){
+      cat0("Names of features\n==========\n")
+      cat0(sprintf("[%03s] (%s) '%s'\n",
+                seq_along(df),sapply(df,class),colnames(df)))
+    }
+  }else{
+    message("!! NO FEATURES !!")
+  }
+
+  
+  if( !is.null(LIST) ){
+    prop.stats = sprintf("%s for %s proteins in total", length(LIST), n_distinct(unlist(LIST)))
+    cat0("\nPROPERTIES:\n##########\n",prop.stats,"##########\n")
+    if(extra.verbose){
+      cat0("Names of properties\n==========\n")
+      cat0(sprintf("[%03s] %4s proteins share property '%s'\n",
+                seq_along(LIST),sapply(LIST,length),names(LIST)))
+    }
+  }else{
+    message("!! NO PROPERTIES !!")
+  }
 }
 # turn off annoying messages from dplyr::summarise
 options(dplyr.summarise.inform = FALSE,dplyr.width=Inf)
@@ -840,7 +863,6 @@ check_chunk(df.biophysics,BIOPHYSICS)
 check_chunk(df.interactions,INTERACTIONS)
 check_chunk(df=NULL,FUNCTIONS)
 check_chunk(df=NULL,PHENOTYPES)
-
 
 FEATURES = PROTEOME %>% 
             left_join(df.genomics %>% rename_with(.fn=Pxx, px='cat_genomics',.cols=-all_of(KEYS)), by=KEYS) %>%
