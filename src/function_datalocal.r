@@ -305,7 +305,7 @@ load.d2p2 = function(ids,saved,autosave=T){ # Get the d2p2 predictions for multi
 get.d2p2.pred = function(d2p2){ return(d2p2$diso$consensus) }
 get.d2p2.id = function(d2p2){ return(d2p2$id) }
 get.d2p2.diso = function(d2p2,as.df=F){
-  diso.L = lapply(d2p2, function(X){ setNames( object=list(get.d2p2.pred(X)) , nm=get.d2p2.id(X) ) })
+  diso.L = sapply(d2p2, function(X){ setNames( object=list(get.d2p2.pred(X)) , nm=get.d2p2.id(X) ) })
   if( as.df ){
     resi.L = lapply(diso.L,function(X){ seq_along(X) })
     id.col = rep(names(diso.L),times=lengths(diso.L))
