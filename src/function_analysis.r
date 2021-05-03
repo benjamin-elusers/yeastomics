@@ -54,16 +54,19 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
 
 # Calculate the spearman correlation of two variables by group
 cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
-  BYCOL=DATA[[BY]]
-  if( !is.factor(BYCOL) ){ BINS = na.exclude(unique(BYCOL)) }
-  BINS = levels(BYCOL)
-  nby = length(BINS)
-  message(sprintf("Number of groups: %s\n",nby))
-  bins = sprintf("[%s] %s",seq_along(BINS),as.character(levels(BINS)))
-  cat(str_wrap(toString(bins), width = 90))
-  cat("\n")
+  if( length(BY) == 1){
+    BYCOL=DATA[[BY]]
+    if( !is.factor(BYCOL) ){ BINS = na.exclude(unique(BYCOL)) }
+    BINS = levels(BYCOL)
+    nby = length(BINS)
+    message(sprintf("Number of groups: %s\n",nby))
+    bins = sprintf("[%s] %s",seq_along(BINS),as.character(levels(BINS)))
+    cat(str_wrap(toString(bins), width = 90))
+    cat("\n")
+  }
+
   CC = DATA %>% dplyr::select(XX,YY,BY,ID) %>%
-    group_by(!!sym(BY),.drop = T) %>%
+    group_by(across(all_of(BY)),.drop = T) %>%
     mutate( R = scor(!!sym(XX),!!sym(YY))$estimate, P=scor(!!sym(XX),!!sym(YY))$'p.value', n=n()) %>%
     summarise( r=unique(R) , p=unique(P),
                N=n(),
@@ -73,7 +76,7 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
     )
   if(na.rm){
     message('removing NAs...')
-    return( CC %>% dplyr::filter( !is.na(!!sym(BY)) ) )
+    #return( CC %>% dplyr::filter(  !is.na(across(all_of(BY))) )
   }
   return(CC)
 }
