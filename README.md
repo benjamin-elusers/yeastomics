@@ -1,6 +1,8 @@
 # Yeastomics
 -------------
 
+![yeastomics data](https://github.com/benjamin-elusers/yeastomics/docs/imgs/yeastomics_content.png "Yeastomics data")
+
 Yeastomics gather a set of tools and functions I use to analyze yeast proteome data.
 
 **SGD** is the reference for data related to _genome sequences_.
