@@ -2,6 +2,7 @@
 -------------
 
 ![yeastomics data](https://github.com/benjamin-elusers/yeastomics/blob/main/docs/imgs/yeastomics_content.png "Yeastomics data")
+(Image/Logos credits to BioRender/Freepik@Flaticon)
 
 Yeastomics gather a set of tools and functions I use to analyze yeast proteome data.
 
