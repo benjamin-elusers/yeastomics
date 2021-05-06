@@ -62,34 +62,21 @@ suppressPackageStartupMessages({
   main.pkg = c("tictoc","tidyverse","Biostrings","hablar")
   xfun::pkg_attach2(main.pkg)
   # Load custom local functions (available via Github repo) --------------------
-  source("src/utils.r")
-  source("src/function_annotation.r")
-  source("src/function_sequence.r")
-  source("src/function_phylogenetic.r")
-  source("src/function_analysis.r")
-  source("src/function_datalocal.r")
-  source("src/function_datapub.r")
-  source("src/function_YK11.r")
-  source("src/theme_black.r")
 
+  library(here)
+  source(here("src","utils.r"))
+  source(here("src","function_annotation.r"))
+  source(here("src","function_sequence.r"))
+  source(here("src","function_phylogenetic.r"))
+  source(here("src","function_analysis.r"))
+  source(here("src","function_datalocal.r"))
+  source(here("src","function_datapub.r"))
+  source(here("src","function_datapub.r"))
+  source(here("src","function_YK11.r"))
+  source(here("src","theme_black.r"))
 })
 # turn off annoying messages from dplyr::summarise
 options(dplyr.summarise.inform = FALSE)
-
-preload = function(saved.file,loading.call,doing='create data...'){
-  library(tictoc)
-  if( !file.exists(saved.file) ){
-    cat(doing)
-    tic(doing)
-    res = eval(substitute(loading.call))
-    saveRDS(res,saved.file)
-    toc()
-  }else{
-    res = readRDS(saved.file)
-  }
-  return(res)
-}
-
 #theme_set(theme_black())
 theme_set(theme_bw(base_size=16,base_line_size = 0.5) +theme(plot.background = element_blank()))
 
@@ -145,7 +132,7 @@ gather proteins for which expression or proof of physical existence has been sho
 ## UNIPROT
 # saveRDS(load.uniprot.features(),"data/uniprot-features.rds") # Takes >250sec for ~6700 ids
 UNI.SC = load.uniprot.proteome('yeast') # Reference UniprotKB sequences (Uniref)
-UNI = readRDS("data/uniprot-features.rds") %>% # main UNIPROT gene/protein features
+UNI = readRDS(here("data","uniprot-features.rds")) %>% # main UNIPROT gene/protein features
         group_by(UNIPROTKB) %>%
         mutate( is_uniref = UNIPROTKB %in% names(UNI.SC), one2one = (n()==1) ) 
 ```
@@ -170,7 +157,7 @@ strains.info = load.peter2018.data(1) %>%  # strains info from supp mat of Scien
                  mutate( has_riboseq = standardized.name %in% riboseq_strains)
 
 # saveRDS(load.1011.strains(),"data/proteome-1011-strains.rds") # Takes >5mn for 6575 ids
-YK11 = readRDS("data/proteome-1011-strains.rds")  # 1011 strains proteomes sequences
+YK11 = readRDS(here("data","proteome-1011-strains.rds"))  # 1011 strains proteomes sequences
 ```
 
 All strains read were aligned on the reference yeast genome (ATCC 204508 / S288c). 
@@ -288,7 +275,7 @@ most recent common ancestor (MRCA).
 ```{r load-evorate}
 WAP.r4s = load.wapinsky2007.data()   # Evolutionary rate for fungi lineage (~20s to load)
 #saveRDS(load.rate4site_1011.data(), "data/rate4site-1011-strains.rds") (~3mn to load)
-K11.r4s = readRDS("data/rate4site-1011-strains.rds") # Evolutionary rate for 1011 strains 
+K11.r4s = readRDS(here("data","rate4site-1011-strains.rds")) # Evolutionary rate for 1011 strains 
 EVO = load.aligned.data(data.path="data/" ) # Protein dataset with aligned evolutionary rate
 
 FUNGI = WAP.r4s %>%
@@ -380,9 +367,9 @@ Indels are not incorporated in the strains sequences.
 
 ```{r snp-proc, warning=F}
 SNP_FREQ=round(1/1011,4)
-wt.file = 'data/YK11_WT.rds'
-var.file = 'data/YK11_VAR.rds'
-snppos.file = 'data/YK11_SNP_pos.rds'
+wt.file = here("data","YK11_WT.rds")
+var.file = here("data","YK11_VAR.rds")
+snppos.file = here("data","YK11_SNP_pos.rds")
 
 P = tibble( orf=names(YK11), 
             n_strains=lengths(YK11),
@@ -668,7 +655,7 @@ sessionInfo()
 ```
 
 ```{r all-plot, echo=F, include=F}
-PATH.PLOT="plots/"
+PATH.PLOT=here("plots/")
 SAVED.PLOTS = list.files(PATH.PLOT)
 SCALE_PLOT=1.2
 EXT_GGPLOT2=c("eps", "ps", "tex" , "pdf", "jpeg", "tiff", "png", "bmp", "svg")
