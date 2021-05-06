@@ -28,6 +28,8 @@ output:
     chunk_output_type: console
   bibliography: bibliography.bib
   csl: biomed-central.csl
+runtime: shiny
+
 ---
 <!-- Github Logo -->
 <a href="https://github.com/benjamin-elusers/yeastomics/" class="github-corner" aria-label="View source on Github">
@@ -50,18 +52,21 @@ knitr::opts_chunk$set(echo = TRUE,
                       cache.lazy = FALSE,
                       autodep = TRUE,
                       warning = FALSE)
-#if('utils' %in% search()){ detach('utils') }
-#utils = attach(NULL,name = 'utils')
-#if('funcs' %in% search()){ detach('funcs') }
-#funcs = attach(NULL,name = 'funcs')
 
 suppressPackageStartupMessages({
   library(tictoc)
   library(tidyverse)
   library(stringr)
+  library(broom)
   library(hablar)
-  
-  
+  library(ggplot2)
+  library(ggnewscale)
+  library(ggpubr)
+  library(ggthemes)
+  library(ggsci)
+  library(cowplot)
+  theme_set(theme_cowplot())
+
   source("src/utils.r")
   source("src/function_annotation.r")
   source("src/function_sequence.r")
@@ -75,57 +80,23 @@ suppressPackageStartupMessages({
 options(dplyr.summarise.inform = FALSE, dplyr.width=Inf)
 ```
 
-# Evolutionary dataset
 
-```{r evodata}
-# EVOLUTIONARY RATE
-FUNGI = load.dubreuil2021.data(1) %>% 
-     as_tibble() %>%
-     dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT')) %>%
-     hablar::convert(dbl(EVO.FULL), dbl(PPM)) %>% 
-     ungroup()
-STRAINS = readRDS("data/rate4site-1011-strains.rds") %>% 
-       dplyr::filter( !is.na(ID) ) %>% 
-       group_by(orf,len.s288c) %>%
-       summarise(r4s.strains = mean_(SCORE),
-                 max_r4s.strains = max_(SCORE)
-       ) %>% left_join(PROTEOME, "ORF")
-
-R4S = left_join(STRAINS,FUNGI, by=c('orf'='ORF')) %>%
-      mutate( log10.r4s.fungi = log10(EVO.FULL),
-              log10.r4s.strains=log10(r4s.strains))
-
-# Fitting mean Evolutionary rate (R) to Protein abundance (E)
-init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
-nls.fit = nls(EVO.FULL ~ SSlogis(PPM,Asym,xmid,scal),start=init.params,data = ER )
-fit.ER = broom::augment_columns(x = nls.fit, data = ER) %>% 
-         mutate(SSR = sum(.resid^2), SR = sum(.resid) )
-
-```
-
-# Protein categories
-
-## Loading precomputed data
+##  Properties & feature
 
 ```{r protcat}
 # protein properties (qualitative)
-PROP=readRDS(get.last.file("output","proteome-properties"))
+PROP=readRDS(get.last.file("output","proteome-properties")) %>% 
+          dplyr::select(-contains("chemsig_X"))
+
 # protein features (quantitative)
 FEAT = readRDS(get.last.file("output","proteome-features"))
 
-# ER fit with properties and features
-ER.PROP = fit.ER %>% left_join(PROP,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
-dim(ER.PROP)
-ER.FEAT = fit.ER %>% left_join(FEAT,by=c('UNIPROT'='UNIPROTKB','ORF'='ORF'))
-dim(ER.FEAT)
-colnames(FEAT)
 # Matrix format of properties and features
 PROP.m = PROP %>% 
       ungroup() %>% 
       dplyr::select( where(is.logical) )  %>% 
-      convert(num(everything())) %>%
+     hablar::convert(num(everything())) %>%
       as.matrix
-
 
 FEAT.m = FEAT %>%
         ungroup() %>% 
@@ -135,111 +106,449 @@ FEAT.m = FEAT %>%
 TOT_PROP=ncol(PROP.m)
 TOT_FEAT=ncol(FEAT.m)
 
-```
-
-
-There are a total of **`r TOT_PROP`** proteome properties and **`r TOT_FEAT`**
-We also gathered **`r TOTAL_FEATURES`** protein features.
-
-## Compute properties similarities
-
-To compare properties, we will use the Jaccard distance on the binary matrix where rows are proteins and columns are the properties. The distance corresponds to the proportion of (TRUE, TRUE) pairs, but not considering (FALSE, FALSE) pairs.
-
-So it compares the intersection with the union of protein sets between properties.
-
-
-```{r properties-similarity}
-# Pearson correlation between properties
-PROP_cor = preload("output/properties-correlation.rds",
-                   coop::pcor(PROP.m), 
-                   doing="Computing Pearson correlation between properties...")
-# Jaccard distance between properties
-PROP_jacc = preload("output/properties-jaccard.rds", 
-                   proxy::dist(PROP.m, PROP.m, by_rows=F, method="Jaccard"),
-                   doing="Computing Jaccard distance between properties...") 
-
-FEAT_scor = preload("output/features-spearman.rds",
-                   cor(FEAT.m,use='pairwise.complete.obs',method = 'spearman'), 
-                   doing="Computing Spearman correlation between features...")
-
 prop = PROP %>% 
         pivot_longer(cols = starts_with('cat_'),
                      names_to = c('categories','source','property'), 
                      names_pattern="cat_(.+)\\.(.+)\\.(.+)",
                      values_to = "has_prop") %>%
-        mutate(has_ortho = ORF %in% ER$ORF,
-               col_prop = paste0(categories,'.',source,'.',property))
+        mutate(col_prop = paste0(categories,'.',source,'.',property))
 
+feat = FEAT %>% 
+        pivot_longer(cols = starts_with('cat_'),
+                     names_to = c('categories','source','feature'), 
+                     names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+                     values_to = "value") %>%
+        mutate(col_feat = paste0(categories,'.',source,'.',feature))
+
+```
+
+
+# Expression data
+
+```{r expdata}
+
+ABUNDANCE = load.ho2018.data() %>% 
+            dplyr::select(orf, MPC = mean.mpc, gfp=GFP.avg,ms=MS.avg) %>% # select the average expression
+            group_by(orf) %>% dplyr::summarise(across(where(is.numeric),log10)) %>% # apply log10 to expression
+            rowwise()  %>% mutate( noval = mean(is.na(c_across(2:4))) ) %>% # check how many expression values
+            dplyr::filter(noval<1) %>% dplyr::select(-noval) # remove no values
+
+EXPRESSION = FEAT %>% 
+             dplyr::select(ORF,contains(c("tAI","CU_cai","CU_fop","paxdb","TE_exponential"))) %>%
+             dplyr::select(-paste0("cat_transcriptomics.paxdb.ortho_ppm_", c("sd","cv","max","min","n")))%>%
+             dplyr::rename_with(.cols=everything(), str_replace, pattern="cat_.+\\..+\\.(.+)$",replacement="\\1")
+
+colab = c('PPM','MPC','gfp','ms')
+colexp = c("tAI","CU_cai","CU_fop","TE_exponential","TE_exponential_A14201","TE_exponential_gb15")
+colortho = c('ppm_4932','ppm_214684','ppm_4896','ppm_5061','ortho_ppm_avg')
+exp.type = rep(c('PROTEIN','GENE','ORTHOLOG'), times=c(length(colab),length(colexp),length(colortho)))
+
+```
+
+```{r evodata}
+# EVOLUTIONARY RATE ON FUNGI
+FUNGI = load.dubreuil2021.data(1) %>% 
+     as_tibble() %>%
+     dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT')) %>%
+     hablar::convert(dbl(EVO.FULL), dbl(PPM)) %>% 
+     ungroup() %>% 
+     left_join(ABUNDANCE,by=c('ORF'='orf'))
+
+# EVOLUTIONARY RATE ON BOTH FUNGI AND STRAINS
+STRAINS = readRDS("data/PROTEIN-EVO-FUNGI-SNP.rds") %>%
+       dplyr::select(c(starts_with(c('EVO.','SNP.')),'PPM','ORF','UNIPROT','IS_FUNGI','IS_STRAINS')) %>% 
+       group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log)) %>% # apply log10 to SNP rate4site
+       left_join(ABUNDANCE,by=c('ORF'='orf')) %>% 
+       left_join(EXPRESSION,by=c('ORF'))
+
+
+EVO = STRAINS %>% 
+      dplyr::filter(IS_FUNGI & IS_STRAINS) %>% 
+      pivot_longer( cols=starts_with(c("EVO.","SNP.")), names_pattern="(.+)\\.(.+)", names_to=c('TIMESCALE','REGION'), values_to='R4S' ) %>% 
+      pivot_longer( cols=all_of(c(colab,colexp,colortho)), names_to='EXPRESSION',values_to='ABUNDANCE') %>%
+      mutate(FROM = factor(EXPRESSION,levels = c(colab,colexp,colortho), labels = exp.type) )
+#
+COR = cor.sub.by(EVO,XX = 'ABUNDANCE',YY = 'R4S', BY = c('TIMESCALE','EXPRESSION','FROM','REGION') ) %>% 
+    mutate(toshow=sprintf("\n r %.3f \n p %.1e \n N %s \n",r,p,n), 
+           y.touse=ifelse(TIMESCALE=='EVO',-Inf,Inf))
+```
+
+### F1 : EVO vs EXP correlation
+
+```{r F1-evo-exp}
+# FIGURE 1 : EVOLUTION BY TIMESCALE AND BY PROTEIN EXPRESSION MEASURES
+COR_fullprot = COR %>% dplyr::filter(REGION=='FULL' & FROM=="PROTEIN")
+EVO_fullprot = EVO %>% dplyr::filter(REGION=='FULL' & FROM=="PROTEIN")
+P1 = ggplot(EVO_fullprot,aes(x=ABUNDANCE,y=R4S,col=EXPRESSION)) + 
+  geom_rect(data=COR_fullprot, aes(fill=EXPRESSION),xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=Inf,alpha=0.3,inherit.aes=F) + scale_fill_aaas() + 
+  geom_point(size=0.1,alpha=0.2,color='black') + geom_smooth(method='gam',size=0.5) + scale_color_d3() + 
+  new_scale_fill()  +
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", colour=NA,size=0.25,alpha=0.1) + scale_fill_distiller(palette = 'Blues',direction = -1)+
+  geom_text(COR_fullprot, mapping=aes(label=toshow),
+             #label.padding=unit(0.05,'lines'),label.r=unit(0.05,'lines'),label.size=0,
+             color="gray30",alpha=1,size=2.9,
+             x=Inf, y=Inf, hjust='inward',vjust='inward') +
+  facet_grid(TIMESCALE~EXPRESSION,scales = 'free') + theme_pubclean() +
+  theme(legend.position = 'none') 
+cowplot::save_plot(P1,filename='output/F1.evorate-abundance_by_timescale-prot.exp.png',base_height = 5, base_width = 10)
+plot(P1)
+
+# FIGURE S1 : EVOLUTION BY TIMESCALE AND BY GENE EXPRESSION MEASURES
+COR_fullgene = COR %>% dplyr::filter(REGION=='FULL' & FROM=="GENE")
+EVO_fullgene = EVO %>% dplyr::filter(REGION=='FULL' & FROM=="GENE")
+S1 = ggplot(EVO_fullgene,aes(x=ABUNDANCE,y=R4S,col=EXPRESSION)) + 
+  geom_rect(data=COR_fullgene, aes(fill=EXPRESSION),xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=Inf,alpha=0.3,inherit.aes=F) + scale_fill_aaas() + 
+  geom_point(size=0.1,alpha=0.2,color='black') + geom_smooth(method='gam',size=0.5) + scale_color_d3() + 
+  new_scale_fill()  +
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", colour=NA,size=0.25,alpha=0.1) + scale_fill_distiller(palette = 'Blues',direction = -1)+
+  geom_text(COR_fullgene, mapping=aes(label=toshow),
+             #label.padding=unit(0.05,'lines'),label.r=unit(0.05,'lines'),label.size=0,
+             color='gray30',alpha=1,size=2.9,
+             x=Inf,y=Inf, hjust='inward',vjust='inward') +
+  facet_grid(TIMESCALE~EXPRESSION,scales = 'free') + theme_pubclean() +
+  theme(legend.position = 'none') 
+cowplot::save_plot(S1,filename='output/S1.evorate-abundance_by_timescale-gene.exp.png',base_height = 5, base_width = 10)
+plot(S1)
+```
+
+
+# Protein categories
+
+There are a total of **`r TOT_PROP`** proteome properties.
+We also gathered **`r TOT_FEAT`** protein features.
+
+### F2 : Non-conserved properties
+
+```{r F2-non_cons-prop }
 prop.size = prop %>% 
+  mutate(has_ortho = ORF %in% STRAINS$ORF[STRAINS$IS_FUNGI],
+         has_snp = ORF %in% STRAINS$ORF[STRAINS$IS_STRAINS]) %>%
   group_by(categories,source,property) %>% 
   summarise( in_prot=sum(has_prop), 
              in_ortho=sum(has_prop*has_ortho),
-             r_prot_ortho = in_ortho/in_prot)
-```
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> a08cec7eb6a21181fb3779265fc25ea862a25336
+             in_snp=sum(has_prop*has_snp),
+             r_prot_ortho = in_ortho/in_prot,
+             r_prot_snp = in_snp/in_prot)
 
-```{r F0 non-conserved properties}
-library(cowplot)
-theme_set(theme_cowplot())
-
-<<<<<<< HEAD
-=======
-
-```{r F0 non-conserved properties}
-library(cowplot)
-theme_set(theme_cowplot())
-
->>>>>>> a08cec7eb6a21181fb3779265fc25ea862a25336
-=======
->>>>>>> a08cec7eb6a21181fb3779265fc25ea862a25336
-data.to.f0 = prop.size %>% filter(in_ortho<10)
+prop_nocons = prop.size %>% filter(in_ortho<10 & in_prot > 12)
 # 1. Properties under-represented in yeast orthologs
-f0 = ggplot(data.to.f0 ) + 
+P2 = ggplot(prop_nocons ) + 
   geom_bar(aes(y=in_prot, x=reorder(property,in_prot),fill=source),stat='identity') +
   geom_bar(aes(y=in_ortho, x=reorder(property,in_prot)),stat='identity') + 
   geom_hline(yintercept=10,color='black',linetype='dashed') +
-  facet_wrap(~categories,scales = 'free_y',ncol=1) +
-  coord_flip() + theme( axis.text = element_text(size=6))
-save_plot(path="output/", filename = 'F0.properties-absent-ortho.pdf', plot = f0, device = 'pdf', scale = 3 )
-save_plot(path="output/", filename = 'F0.properties-absent-ortho.png', plot = f0, device = 'png', scale = 2 )
+  facet_wrap(~categories,scales = 'free_y') + ylab('# Proteins') +
+  coord_flip() + theme( axis.text = element_text(size=12), legend.position = 'top') 
+#save_plot(path="output/", filename = 'F2.properties-absent-ortho.pdf', plot = P2, device = 'pdf', scale = 3 )
+save_plot(path="output/", filename = 'F2.properties-absent-ortho.png', plot = P2, device = 'png',base_height = 10, base_width = 20)
+plot(P2)
 
-categories=unique(data.to.f0$categories)
+categories=unique(prop_nocons$categories)
 for( icat in seq_along(categories) ){
   CAT = categories[icat]
-  f0.1 = ggplot(data.to.f0 %>% filter(categories == CAT )) + 
+  S2 = ggplot(prop_nocons %>% filter(categories == CAT )) + 
     geom_bar(aes(y=in_prot, x=reorder(property,in_prot),fill=source),stat='identity') +
     geom_bar(aes(y=in_ortho, x=reorder(property,in_prot)),stat='identity') + 
     geom_hline(yintercept=10,color='black',linetype='dashed') +
-    facet_wrap(~categories,scales = 'free_y',ncol=2) +
-    coord_flip() + theme( axis.text = element_text(size=8)) +
-    scale_x_discrete(position = "top", name='') + ylim(0,100)
-  save_plot(path="output/", filename = sprintf('F0.%s.properties-absent-ortho-%s.png',icat,CAT), plot = f0.1,device = 'png', scale = 2 )
-  save_plot(path="output/", filename = sprintf('F0.%s.properties-absent-ortho-%s.pdf',icat,CAT), plot = f0.1,device = 'pdf', scale = 2 )
+    facet_wrap(~categories,scales = 'free_y',ncol=2) + ylab('# Proteins') +
+    coord_flip() + theme( axis.text = element_text(size=10)) +
+    scale_x_discrete(position = "top", name='') + ylim(0,100) + scale_fill_npg()
+  save_plot(path="output/", filename = sprintf('S2_%s.properties-absent-ortho-%s.png',icat,CAT), plot = S2,device = 'png', scale = 2 )
+ # save_plot(path="output/", filename = sprintf('S2.%s.properties-absent-ortho-%s.pdf',icat,CAT), plot = S2,device = 'pdf', scale = 2 )
+  plot(S2)
 }
 ```
 
-```{r F1 yeast QR properties }
-n_distinct(prop$GNAME)/n_distinct(prop$property)
-prop %>% filter(has_ortho) %>% ungroup() %>% summarise(np=n_distinct(property), ng=n_distinct(GNAME), r=ng/np)
-prop %>% ungroup() %>% summarise(np=n_distinct(property), ng=n_distinct(GNAME), r=ng/np)
+# Control for expression 
 
-data.to.f1  = prop %>% mutate(propinfo = factor(has_prop+2*has_ortho, levels = c(0,1,2,3), labels('none','nocons_prop','cons_prot','cons_prop')))
-f1.1 = ggplot(data.to.f1) +
-  geom_raster(aes(x=GNAME,y=property,fill=propinfo),show.legend = F) +
-  scale_fill_manual(values=c('white','black')) +
-  scale_fill_manual(values=c('none'='white','nocons_prop'='red','cons_prot'='gray','cons_prop'='black'),na.value='white') +
-  theme(legend.title = element_blank(), axis.text = element_blank())
-f1.2 = ggplot(data.to.f1 %>% filter(has_ortho)) +
-  geom_raster(aes(x=GNAME,y=property,fill=has_prop),show.legend = F,interpolate=T) +
-  scale_fill_manual(values=c('white','black')) +
-  theme(legend.title = element_blank(), axis.text = element_blank())
-f1 = plot_grid(f1.1,f1.2)
-save_plot(path="output/", filename = 'F1.properties-proteome.png', plot = f1,device = 'png', base_height = 13,base_width=26)
-save_plot(path="output/", filename = 'F1.properties-proteome.pdf', plot = f1,device = 'pdf', base_height = 13,base_width=26)
-# pheatmap::pheatmap(prop[,-1]*1, 
+```{r fit-evo-exp}
+# Fitting mean Evolutionary rate (R) to Protein abundance (E)
+init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
+evo_mpc.fit = STRAINS %>%
+               broom::augment_columns(x=nls(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),start=init.params,data=.)) %>% 
+               mutate(SSR = sum(.resid^2), SR = sum(.resid)) %>%
+               dplyr::rename_with(.fn=xxS, sx='evo',.cols=c(".fitted", ".resid", "SSR", "SR") )
+
+snp_mpc.fit = STRAINS %>%
+               broom::augment_columns(x=lm(SNP.FULL ~ MPC,data=.)) %>% 
+               mutate(SSR = sum(.resid^2), SR = sum(.resid)) %>% 
+               dplyr::rename_with(.fn=xxS, sx='snp', .cols=c(".fitted", ".resid", "SSR", "SR") )
+
+
+propfit = inner_join(evo_mpc.fit,snp_mpc.fit, suffix=c('.evo','.snp')) %>% 
+              left_join(prop) %>% dplyr::filter(has_prop)
+
+.res_prop = propfit %>% 
+              group_by(col_prop) %>% 
+              mutate(  N=n(),
+                .res_evo.neg = sum(.resid.evo<0), 
+                .res_evo.pos = sum(.resid.evo>0),
+                .res_evo.dN  = .res_evo.neg-.res_evo.pos,
+                .res_evo.rN  = .res_evo.pos/.res_evo.neg,
+                .res_evo.SR  = sum(.resid.evo),
+                .res_evo.SR.log = sign(.res_evo.SR) * log(abs(.res_evo.SR)),
+                .res_evo.SR.neg = sum(.resid.evo[.resid.evo<0]), 
+                .res_evo.SR.pos = sum(.resid.evo[.resid.evo>0]),
+                .res_evo.SR.avg = mean_(.resid.evo), 
+                
+                .res_snp.neg = sum(.resid.snp<0), 
+                .res_snp.pos = sum(.resid.snp>0),
+                .res_snp.dN  = .res_snp.neg-.res_snp.pos,
+                .res_snp.rN  = .res_snp.pos/.res_snp.neg,
+                .res_snp.SR  = sum(.resid.snp),
+                .res_snp.SR.log = sign(.res_snp.SR) * log(abs(.res_snp.SR)),
+                .res_snp.SR.neg = sum(.resid.snp[.resid.snp<0]), 
+                .res_snp.SR.pos = sum(.resid.snp[.resid.snp>0]),
+                .res_snp.SR.avg = mean_(.resid.snp), 
+           ) %>%
+  arrange(desc(.res_evo.SR.avg)) %>%
+  dplyr::select(categories,source,property, col_prop, N, starts_with('.res_')) %>%
+  distinct() %>% 
+  group_by(categories) %>% mutate(rSR = dense_rank(.res_evo.SR.avg) , ncat=n())
+
+S3 = ggplot(.res_prop, 
+               aes(y = reorder(str_trunc(property,w=50), -.res_evo.SR.avg),
+                   x = .res_evo.SR.avg, fill=source)) +
+      geom_bar(stat='identity',position='dodge') + 
+      theme( axis.text = element_text(size=5))
+plot(S3)
+save_plot(plot = S3, 'output/S3.evorate-residuals-properties.pdf', base_height=50, base_width=20,limitsize = FALSE)
+
+categories=unique(prop_nocons$categories)
+for( icat in seq_along(categories) ){
+  CAT = categories[icat]
+  S3 = ggplot(.res_prop %>% filter(categories == CAT & N>9 ), 
+              aes(y = reorder(str_trunc(property,w=50), -.res_evo.SR.avg), x = .res_evo.SR.avg, fill=source)) +
+      geom_bar(stat='identity',position='dodge') + 
+      theme( axis.text = element_text(size=5))
+  plot(S3)
+  save_plot(path="output/", filename = sprintf('S3_%s.properties-residuals-%s.png',icat,CAT), plot = S3,device = 'png', scale = 2 )
+
+}
+
+
+F3 = ggplot(.res_prop %>% dplyr::filter(N>9) %>% slice_min_max( order_by=.res_evo.SR.avg, n=10 ), 
+               aes(y = reorder(str_trunc(property,w=50), -.res_evo.SR.avg),
+                   x = .res_evo.SR.avg, fill=source)) +
+      geom_bar(stat='identity',position='dodge')  + 
+      geom_text(aes(label=N),hjust='inward',size=5,col='black') +
+        facet_wrap(~categories,scales = 'free_y') +
+        theme( axis.text = element_text(size=12)) + xlab('Mean residual evolutionary rate') + ylab('Properties')
+plot(F3)
+save_plot(plot = F3, 'output/F3.evorate-residuals-properties-top10.png', base_height=12, base_width=20)
+
+.res_prop %>% 
+  dplyr::select( categories, source, property,N ,.res_evo.SR,.res_evo.SR.avg,ncat,rSR) %>%
+  dplyr::filter( categories == 'biophysics' & N > 9) %>% arrange(rSR) %>% print(n=250)
+
+
+feat.rk = left_join(STRAINS,feat) %>%
+             dplyr::filter(!is.na(value) & !is.na(SNP.FULL) & !is.na(EVO.FULL) & !is.na(MPC)) %>%
+             group_by(col_feat) %>% 
+             mutate(feat_n = n(), rk.value = dense_rank(value), rk.mpc = dense_rank(MPC))
+
+semifit.res = inner_join(evo_mpc.fit,snp_mpc.fit, suffix=c('.evo','.snp')) %>% 
+              left_join(feat.rk)
+
+test = semifit.res %>% 
+  group_by(col_feat) %>% 
+  mutate( R2_evo=scor(.resid.evo,value)$estimate,  
+          R2_snp=scor(.resid.snp,value)$estimate) %>%
+  group_by(categories) %>% mutate( ncat=n(), 
+                                   r.R2_evo=dense_rank(R2_evo),
+                                   r.R2_snp=dense_rank(R2_snp)) %>% 
+  summarise(categories,source,feature,feat_n,R2_evo,R2_snp, r.R2_evo,r.R2_snp,ncat) %>% distinct()
+
+F4 = ggplot(test %>% dplyr::filter(feat_n>100),# %>% slice_min_max( order_by=.res_evo.SR.avg, n=10 ), 
+               aes(y = reorder(str_trunc(feature,w=50), -R2_evo),
+                   x = R2_evo, fill=categories)) +
+      geom_bar(stat='identity',position='dodge')  + 
+        #geom_text(aes(label=feat_n),hjust='inward',size=3,col='black') +
+        facet_wrap(~source,scales = 'free_y',ncol=5) +
+        theme( axis.text = element_text(size=12),legend.position = 'top') + scale_fill_tableau() +
+      xlab('Correlation with Residual Evo.Rate') + ylab('Features') +
+      guides(y = guide_axis(check.overlap=F, n.dodge=1.5))
+plot(F4)
+save_plot(plot = F4, 'output/F4.evorate-residuals-features.png', base_height=20, base_width=25)
+
+
+categories=unique(test$categories)
+for( icat in seq_along(categories) ){
+  CAT = categories[icat]
+  S4 = ggplot(test %>% dplyr::filter(categories == CAT & feat_n>100),# %>% slice_min_max( order_by=.res_evo.SR.avg, n=10 ), 
+               aes(y = reorder(str_trunc(feature,w=50), -R2_evo),
+                   x = R2_evo, fill=source)) +
+      geom_bar(stat='identity',position='dodge')  + 
+        geom_text(aes(label=feat_n),hjust='inward',size=3,col='black') + 
+        facet_wrap(~categories,scales = 'free_y')
+  plot(S4)
+  save_plot(path="output/", filename = sprintf('S4_%s.features-residuals-%s.png',icat,CAT), plot = S4,device = 'png', scale = 2 )
+}
+
+
+feat.fit <-   feat.rk %>% 
+             nest(data = -c(col_feat, feat_n)) %>% 
+               mutate(
+                 fit = map(data, ~ lm(rk.value  ~ rk.mpc,data=.x)),
+                 augmented = map(fit, augment) ) %>%
+               unnest(cols=augmented ) 
+#fit.ER = inner_join(fit.ppm.ER,fit.mpc.ER, by=nonfit.col, suffix=c('.ppm','.mpc'))
+
+```
+
+## Residual evolutionary rate
+```{r shiny, echo = FALSE}
+library(shiny)
+library(plotly)
+shinyApp(
+  ui = fluidPage(
+    selectInput("properties", "Property:",choices = unique(prop$property),selected = c('essential_core','essential_dispensable'),selectize = T, multiple = T),
+    fluidRow( 
+      column(4,plotOutput("propfit")),
+      column(4,plotOutput("propres")),
+      column(4,plotOutput("sumres"))
+    )
+  ),
+
+  server = function(input, output) {
+
+    fitdata = reactive({  propfit  })
+    
+    propsub = reactive({
+      fitdata() %>% dplyr::filter( property  %in% input$properties )
+    })
+
+    output$propfit = renderPlot({
+        print("show property fit")
+          ggplot(evo_mpc.fit, aes(y = EVO.FULL, x = MPC)) +
+          geom_ribbon(aes(ymin=.fitted.evo+0.01, ymax=Inf), fill='#BB0033',alpha=0.3)+
+          geom_ribbon(aes(ymin=-Inf,ymax=.fitted.evo-0.01), fill='#00BB33',alpha=0.3)+
+          geom_abline(slope=0,intercept = mean(evo_mpc.fit$EVO.FULL),size=1,col='gray',linetype=2)+
+          geom_point(fill='lightgray',shape=19,alpha=0.3) +
+          geom_segment(aes(xend = MPC, yend = .fitted.evo), col='gray',linetype='12',size=0.3,alpha=0.5) +
+          # Overlay the protein sharing a particular properties
+          geom_line(mapping=aes(y=.fitted.evo),size=2) +
+          geom_segment(data=propsub(), aes(xend = MPC, yend = .fitted.evo,color=property),linetype=2,size=0.5,alpha=0.8) +
+          geom_point(data=propsub(), aes(color=property), shape=19,size=1.4) + scale_color_simpsons() +
+          annotate("text",y = 3, x=0.8, label='Over-estimated',col='#BB0033',vjust='inward',hjust='inward',size=8)+
+          annotate("text",y = 0, x=0.8, label='Under-estimated',col='#00BB33',vjust='inward',hjust='inward',size=8)+
+          xlab('Protein abundance (log10 mpc)') + ylab('Mean ER (full seq.)') + theme(legend.position = 'top',legend.direction = 'vertical')
+
+    })
+    
+    output$propres = renderPlot({
+      print("show property residuals")
+    ggplot(data=evo_mpc.fit, aes(y=.resid.evo,x=MPC)) + 
+        geom_ribbon(aes(ymin=0.01, ymax=Inf), fill='#BB0033',alpha=0.3)+
+        geom_ribbon(aes(ymin=-Inf,ymax=-0.01), fill='#00BB33',alpha=0.3)+
+        geom_abline(slope=0,intercept = 0,size=1)+
+        geom_point(col='gray30',shape=19,alpha=0.3) +
+        geom_segment(aes(xend = MPC, yend = 0),col='gray',linetype='12',size=0.3,alpha=0.5) +
+        geom_segment(data=propsub(),aes(xend = MPC, y=0, yend = .resid.evo,color=property),linetype=2,size=0.5,alpha=0.8) +
+        geom_point(data=propsub(), aes(color=property), shape=19,size=1.4) + scale_color_simpsons()+
+        annotate("text",y = 2, x=0.8, label='Over-estimated',col='#BB0033',vjust='inward',hjust='inward',size=8,alpha=0.5)+
+        annotate("text",y = -1.2, x=0.8, label='Under-estimated',col='#00BB33',vjust='inward',hjust='inward',size=8)+
+        xlab('Protein abundance (log10 mpc)') + ylab('Residuals (ER)') + theme(legend.position="none")
+
+    })
+     
+    output$sumres = renderPlot({
+      print("show sum of residuals")
+      propsubres = .res_prop %>% dplyr::filter(property %in% input$properties )
+      YMIN = min(-0.2,propsubres$.res_evo.SR.avg)%>% round(digits = 1)
+      YMAX = max(0.2,propsubres$.res_evo.SR.avg) %>% round(digits = 1)
+       ggplot(propsubres,
+             aes(x = reorder(str_trunc(property,w=50), -.res_evo.SR.avg),
+                 y = .res_evo.SR.avg, fill=property), group=source) +
+            geom_hline(yintercept = 0,size=1,col='gray',linetype=2) +
+            geom_rect(aes(xmin=-Inf,xmax=Inf,ymin=0,ymax=Inf), fill='#BB0033',alpha=0.2)+
+            geom_rect(aes(xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=0), fill='#00BB33',alpha=0.2)+
+            annotate("text",y = Inf, x=Inf, label='Over-estimated',col='#BB0033',vjust='inward',hjust='inward',size=5)+
+            annotate("text",y = -Inf, x=Inf, label='Under-estimated',col='#00BB33',vjust='inward',hjust='inward',size=5)+
+            geom_bar(stat='identity',position='dodge') +
+            geom_text(aes(label=N),vjust='inward',size=8) + 
+            theme( axis.text = element_text(size=14)) + 
+            ylim(YMIN,YMAX) + scale_fill_simpsons() +  coord_flip()+  theme(legend.position="none",axis.text.y = element_text(angle=45))+
+            ylab("Average residual evolutionary rate") + 
+            xlab('Property')
+    })
+  },
+ )
+
+
+```
+
+```{r transform-}
+propsub = propfit %>% dplyr::filter( property  %in% c('essential_core') )
+
+p1= ggplot(evo_mpc.fit, aes(y = EVO.FULL, x = MPC)) +
+          geom_ribbon(aes(ymin=.fitted.evo+0.01, ymax=Inf), fill='#BB0033',alpha=0.3)+
+          geom_ribbon(aes(ymin=-Inf,ymax=.fitted.evo-0.01), fill='#00BB33',alpha=0.3)+
+          geom_abline(slope=0,intercept = mean(evo_mpc.fit$EVO.FULL),size=1,col='gray',linetype=2)+
+          geom_point(fill='lightgray',shape=19,alpha=0.3) +
+          geom_segment(aes(xend = MPC, yend = .fitted.evo), col='gray',linetype='12',size=0.3,alpha=0.5) +
+          # Overlay the protein sharing a particular properties
+          geom_line(mapping=aes(y=.fitted.evo),size=2) +
+          geom_segment(data=propsub, aes(xend = MPC, yend = .fitted.evo,color=property),linetype=2,size=0.5,alpha=0.8) +
+          geom_point(data=propsub, aes(color=property), shape=19,size=1.4) + scale_color_simpsons() +
+          annotate("text",y = 3, x=0.8, label='Over-estimated',col='#BB0033',vjust='inward',hjust='inward',size=8)+
+          annotate("text",y = 0, x=0.8, label='Under-estimated',col='#00BB33',vjust='inward',hjust='inward',size=8)+
+          xlab('Protein abundance (log10 mpc)') + ylab('Mean ER (full seq.)') + theme(legend.position = 'top',legend.direction = 'vertical')
+
+plot(p1)
+
+p2=     ggplot(data=evo_mpc.fit, aes(y=.resid.evo,x=MPC)) + 
+        geom_ribbon(aes(ymin=0.01, ymax=Inf), fill='#BB0033',alpha=0.3)+
+        geom_ribbon(aes(ymin=-Inf,ymax=-0.01), fill='#00BB33',alpha=0.3)+
+        geom_abline(slope=0,intercept = 0,size=1)+
+        geom_point(col='gray30',shape=19,alpha=0.3) +
+        geom_segment(aes(xend = MPC, yend = 0),col='gray',linetype='12',size=0.3,alpha=0.5) +
+        geom_segment(data=propsub,aes(xend = MPC, y=0, yend = .resid.evo,color=property),linetype=2,size=0.5,alpha=0.8) +
+        geom_point(data=propsub, aes(color=property), shape=19,size=1.4) + scale_color_simpsons()+
+        annotate("text",y = 2, x=0.8, label='Over-estimated',col='#BB0033',vjust='inward',hjust='inward',size=8)+
+        annotate("text",y = -1.2, x=0.8, label='Under-estimated',col='#00BB33',vjust='inward',hjust='inward',size=8)+
+        xlab('Protein abundance (log10 mpc)') + ylab('Residuals (ER)') + theme(legend.position="none")
+plot(p2) 
+
+propsubres = .res_prop %>% dplyr::filter( property  %in% c('essential_core') )
+YMIN = min(-0.2,propsubres$.res_evo.SR.avg)%>% round(digits = 1)
+YMAX = max(0.2,propsubres$.res_evo.SR.avg) %>% round(digits = 1)
+p3 =  ggplot(propsubres,
+             aes(x = reorder(str_trunc(property,w=50), -.res_evo.SR.avg),
+                 y = .res_evo.SR.avg, fill=property), group=source) +
+            geom_hline(yintercept = 0,size=1,col='gray',linetype=2) +
+            geom_rect(aes(xmin=-Inf,xmax=Inf,ymin=0,ymax=Inf), fill='#BB0033',alpha=0.3)+
+            geom_rect(aes(xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=0), fill='#00BB33',alpha=0.3)+
+            annotate("text",y = Inf, x=Inf, label='Over-estimated',col='#BB0033',vjust='inward',hjust='inward',size=5)+
+            annotate("text",y = -Inf, x=Inf, label='Under-estimated',col='#00BB33',vjust='inward',hjust='inward',size=5)+
+            geom_bar(stat='identity',position='dodge') +
+            geom_text(aes(label=N),vjust='inward',size=8) + 
+            theme( axis.text = element_text(size=14)) + 
+            ylim(YMIN,YMAX) + scale_fill_simpsons() +  coord_flip()+  theme(legend.position="none",axis.text.y = element_text(angle=45))+
+            ylab("Average residual evolutionary rate") + 
+            xlab('Property')
+plot(p3)
+save_plot(plot =  plot_grid(p1,p2,p3,ncol = 3), filename = 'output/transformation-to-residuals.png',base_width=15,base_height = 5)
+```
+
+```{r F3-yeast-QR-code }
+# n_distinct(prop$GNAME)/n_distinct(prop$property)
+# prop %>% filter(has_ortho) %>% ungroup() %>% summarise(np=n_distinct(property), ng=n_distinct(GNAME), r=ng/np)
+# prop %>% ungroup() %>% summarise(np=n_distinct(property), ng=n_distinct(GNAME), r=ng/np)
+# 
+# data.to.f1  = prop %>% mutate(propinfo = factor(has_prop+2*has_ortho, levels = c(0,1,2,3), labels('none','nocons_prop','cons_prot','cons_prop')))
+# f1.1 = ggplot(data.to.f1) +
+#   geom_raster(aes(x=GNAME,y=property,fill=propinfo),show.legend = F) +
+#   scale_fill_manual(values=c('white','black')) +
+#   scale_fill_manual(values=c('none'='white','nocons_prop'='red','cons_prot'='gray','cons_prop'='black'),na.value='white') +
+#   theme(legend.title = element_blank(), axis.text = element_blank())
+# f1.2 = ggplot(data.to.f1 %>% filter(has_ortho)) +
+#   geom_raster(aes(x=GNAME,y=property,fill=has_prop),show.legend = F,interpolate=T) +
+#   scale_fill_manual(values=c('white','black')) +
+#   theme(legend.title = element_blank(), axis.text = element_blank())
+# f1 = plot_grid(f1.1,f1.2)
+# save_plot(path="output/", filename = 'F1.properties-proteome.png', plot = f1,device = 'png', base_height = 13,base_width=26)
+# save_plot(path="output/", filename = 'F1.properties-proteome.pdf', plot = f1,device = 'pdf', base_height = 13,base_width=26)
+# # pheatmap::pheatmap(prop[,-1]*1, 
 #                    show_rownames = T,show_colnames = F,
 #                    cluster_rows = T, cluster_cols = F, 
 #                    cellwidth = 25, cellheight = 5,
@@ -275,170 +584,30 @@ save_plot(path="output/", filename = 'F1.properties-proteome.pdf', plot = f1,dev
 # 
 # brk.minor=seq(5,45,by=5)
 # brk.major=seq(50,50,by=25)
-# 
-# # Elbow method
-# fig.1a=fviz_nbclust(m.prop_jacc, method = "wss",
-#                     FUNcluster = kmeans, k.max=50, nstart = 50, nboot=100) +
-#   geom_vline(xintercept=brk.minor, linetype=3,size=0.5) +
-#   geom_vline(xintercept=brk.major, linetype=2,size=0.5) +
-#   labs(subtitle = "Elbow method") 
-# 
-# # Silhouette method
-# fig.1b=fviz_nbclust(m.prop_jacc, method = "silhouette",
-#                    FUNcluster = kmeans, k.max=50, nstart = 50, nboot=100) +
-#   labs(subtitle = "Silhouette method")
-# 
-# # Gap statistic
-# set.seed(42)
-# fig.1c=fviz_nbclust(m.prop_jacc, method = "gap_stat", 
-#                     FUNcluster=kmeans, k.max=50, nstart = 50, nboot = 100 ) + 
-#   labs(subtitle = "Gap statistic method")
-# 
-# nbclust_out <- NbClust(
-#   data = PROP_lgl,
-#   diss = NULL,
-#   distance = 'binary', 
-#   min.nc = 2, # minimum number of clusters
-#   max.nc = 50, # maximum number of clusters
-#   method = "complete"
-# )
-
-# ensure the results are repeatable
-# set.seed(7)
-# # load the library
-# library(mlbench)
-# library(caret)
-# print(prop_cor)
-# hicor <- findCorrelation(prop_cor, cutoff=0.5)
-# 
-# 
-# control <- rfeControl(functions=rfFuncs, method="cv", number=10)
-# # run the RFE algorithm
-# results <- rfe(ER.PROP[,19:935], ER.PROP$EVO.FULL , sizes=c(1:917), rfeControl=control)
-# # summarize the results
-# print(results)
-# # list the chosen features
-# predictors(results)
-# # plot the results
-# plot(results, type=c("g", "o"))
-# 
-
-# library(Boruta)
-# train.data = ER.PROP %>% dplyr::select(EVO.FULL, starts_with('cat_'))
-# boruta_output <- Boruta(EVO.FULL ~ ., data=na.omit(train.data), doTrace=0)  
-# boruta_signif <- getSelectedAttributes(boruta_output, withTentative = TRUE)
-# print(boruta_signif)  
-# roughFixMod <- TentativeRoughFix(boruta_output)
-# boruta_signif <- getSelectedAttributes(roughFixMod)
-# print(boruta_signif)
-# imps <- attStats(roughFixMod)
-# imps2 = imps[imps$decision != 'Rejected', c('meanImp', 'decision')]
-# plot(boruta_output, cex.axis=.7, las=2, xlab="", main="Variable Importance")  
-
-#head(imps2[order(-imps2$meanImp), ])  # descending sort
 ```
 
 
-## Residual evolutionary rate
-```{r ER}
 
-library(ggplot2)
-library(ggthemes)
-library(cowplot)
-# Show the fit and the residuals of expression-evolutionary rate
-prop_name = grep("essential_core",colnames(PROP),v=T)
-prop_sub = ER.PROP %>% filter(!!sym(prop_name))
-MR = ggplot(fit.ER, aes(y = EVO.FULL, x = PPM)) +
-     geom_abline(slope=0,intercept = mean(fit.ER$EVO.FULL),size=1)+
-     geom_point(fill='lightgray',shape=19,alpha=0.3) +
-     geom_segment(aes(xend = PPM, yend = .fitted), col='gray',linetype='12',size=0.5) +
-     # Overlay the protein sharing a particular properties
-     geom_point(data=prop_sub,color='purple',fill=NA,shape=21,size=2)+
-     geom_line(mapping=aes(y=.fitted),size=1) +
-     xlab('Protein abundance (log10 ppm)') + ylab('Mean ER (full seq.)')
-MR
+## Compute properties similarities
 
-# Show residuals of a particular categories 
-MR2= ggplot(data=fit.ER, aes(y=.resid,x=PPM)) +
-  geom_point(col='lightgray',fill='black',size=2,shape=19) +
-  geom_segment(aes(xend = PPM, yend = 0),col='gray',linetype='12',size=0.5) +
-  geom_abline(slope=0,intercept = 0,size=1)+
-  geom_point(data=prop_sub,color='purple',fill=NA,shape=21,size=2)+
-  geom_segment(data=prop_sub,aes(xend = PPM, y=0, yend = .resid),col='purple') +
-  xlab('Protein abundance (log10 ppm)') + ylab('Residuals (ER)') 
-  
-MR2
-```
+To compare properties, we will use the Jaccard distance on the binary matrix where rows are proteins and columns are the properties. The distance corresponds to the proportion of (TRUE, TRUE) pairs, but not considering (FALSE, FALSE) pairs.
 
-```{r rank-properties}
-# Show most over/under estimated categories
-ER.residuals = ER.PROP %>% 
-  pivot_longer( cols= starts_with('cat_'), 
-                names_to = c('categories','source','property'), 
-                names_pattern="cat_(.+)\\.(.+)\\.(.+)",
-                values_to = "has_prop") %>%
-  filter(has_prop) %>%
-  relocate(SGD,GNAME,PNAME,UNIPROT,ORF,categories,source,property,has_prop) %>%
-  arrange(categories,source,property,ORF) %>%
-  mutate( total.resid = sum(abs(.resid)) ) %>%
-  group_by(categories,source, property) %>% 
-  summarise(  N=n(),
-              N.neg  = sum(.resid<0), 
-              N.pos  = sum(.resid>0),
-              dN     = N.pos-N.neg,
-              rN = N.pos/N.neg,
-              SR = sum(.resid),
-              SR.log = sign(SR) * log(abs(SR)),
-              SR.neg = sum(.resid[.resid<0]), 
-              SR.pos = sum(.resid[.resid>0]),
-              SR.avg = mean_(.resid), 
-           ) %>% 
-    distinct() %>% 
-  arrange(desc(SR.avg)) %>%
-  group_by(categories) %>% mutate(rSR = dense_rank(SR) , ncat=n())
-library(ggplot2)
-library(ggfittext)
-fig.0 = ggplot(ER.residuals, 
-               aes(y = reorder(str_trunc(property,w=50), -SR.log),
-                   x = SR.log, fill=source)) +
-      geom_bar(stat='identity',position='dodge') + 
-      theme( axis.text = element_text(size=3))
-fig.0
-ggsave(fig.0, path='output/', 
-       file='barplot-protein-properties-ALL.pdf',
-       scale=5,limitsize = F)
+So it compares the intersection with the union of protein sets between properties.
 
-fig.1 = ggplot(ER.residuals %>% filter(rSR < 10 | rSR > ncat-10), 
-               aes(y = reorder(str_trunc(property,w=50), -SR.log),
-                   x = SR.log, fill=source)) +
-      geom_bar(stat='identity',position='dodge')  + 
-        facet_wrap(~categories,scales = 'free_y') +
-        theme( axis.text = element_text(size=8))
-fig.1
-ggsave(fig.1, 
-       path='output/', file='barplot-protein-properties-CATEGORIES-top10.pdf',
-       scale=2,limitsize = F)
-```
 
-```{r rank-features}
-ER.residuals.cor=ER.FEAT %>% 
-  pivot_longer(cols = starts_with('cat_'),
-               names_to = c('categories','source','feature'), 
-               names_pattern="cat_(.+)\\.(.+)\\.(.+)",
-              values_to = "value") %>%
-  group_by(feature) %>% mutate( nval = sum(!is.na(value)), 
-                                R2=ifelse(nval>0,scor(.resid,value)$estimate^2*nval,NA)) %>%
-  group_by(categories) %>% mutate( ncat=n(), rR2=dense_rank(R2)) %>% 
-  summarise(categories,source,feature,nval,R2,rR2,ncat)
-fig.2 = ggplot(ER.residuals.cor , 
-               aes(y = reorder(str_trunc(feature,w=50), -R2),
-                   x = log(R2), fill=source)) +
-      geom_bar(stat='identity',position='dodge')  + 
-        facet_wrap(~categories,scales = 'free_y') +
-        theme( axis.text = element_text(size=8))
-fig.2
-ggsave(fig.2, 
-       path='output/', file='barplot-protein-features_vs_ERresiduals-CATEGORIES.pdf',
-       scale=2.5,limitsize = F)
+```{r properties-similarity}
+# Pearson correlation between properties
+PROP_cor = preload("output/properties-correlation.rds",
+                   coop::pcor(PROP.m), 
+                   doing="Computing Pearson correlation between properties...")
+# Jaccard distance between properties
+PROP_jacc = preload("output/properties-jaccard.rds", 
+                   proxy::dist(PROP.m, PROP.m, by_rows=F, method="Jaccard"),
+                   doing="Computing Jaccard distance between properties...") 
+
+FEAT_scor = preload("output/features-spearman.rds",
+                   cor(FEAT.m,use='pairwise.complete.obs',method = 'spearman'), 
+                   doing="Computing Spearman correlation between features...")
 
 ```
+
