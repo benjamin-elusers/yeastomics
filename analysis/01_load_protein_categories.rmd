@@ -60,15 +60,16 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(stringr)
   library(hablar)
+  library(here)
   
-  
-  source("src/utils.r")
-  source("src/function_annotation.r")
-  source("src/function_sequence.r")
-  source("src/function_phylogenetic.r")
-  source("src/function_analysis.r")
-  source("src/function_datalocal.r")
-  source("src/function_datapub.r")
+  source(here("src","utils.r"))
+  source(here("src","function_annotation.r"))
+  source(here("src","function_sequence.r"))
+  source(here("src","function_phylogenetic.r"))
+  source(here("src","function_analysis.r"))
+  source(here("src","function_datalocal.r"))
+  source(here("src","function_datapub.r"))
+
 })
 
 
@@ -195,7 +196,7 @@ SGD  = load.sgd.features(by.chr=T) %>%
        mutate(chr.f = factor(chr, levels=unique(chr), labels = chr.1let))
 
 ## Universal protein resource (UNIPROT) ----------------------------------------
-file.uniprot.feature="data/uniprot-features.rds"
+file.uniprot.feature=here("data","uniprot-features.rds")
 UNI = preload(file.uniprot.feature,loading.call = load.uniprot.features(),"Load uniprot features")
 
 ## REFERENCE PROTEOME SEQUENCES ------------------------------------------------
@@ -245,7 +246,8 @@ PPM.ORTHO.4932 = PPM.ORTHO %>% ungroup() %>% filter(taxid==4932) %>%
 
 # VARIABLE ORF (PANGENOMICS) -------------------------------------------------
 VARORF = load.peter2018.data(2)
-SNP_STRAIN = readRDS("data/PROTEIN-EVO-FUNGI-SNP.rds") %>% 
+file.r4s.fungi_snp=here("data","PROTEIN-EVO-FUNGI-SNP.rds")
+SNP_STRAIN = readRDS(file.r4s.fungi_snp) %>% 
               dplyr::select(starts_with('SNP.'),'ORF','UNIPROT','IS_FUNGI','IS_STRAINS') %>% 
               group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log)) # apply log10 to SNP rate4site %>% 
 
@@ -265,9 +267,8 @@ AA.COUNT = letterFrequency(UNI.SC,as.prob = F,letters = get.AA1())%>% bind_cols(
 # turnlike        t    A,C,D,E,G,H,K,N,Q,R,S,T
 aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>% 
           append( list('Alcohol'=c('S','T'), 
-                            'Turnlike'=c('A','C','D','E','G','H','K','N','Q','R','S','T'))
+                       'Turnlike'=c('A','C','D','E','G','H','K','N','Q','R','S','T'))
           )
-
 # FROM SEQINR AMINO ACID CLASSES
 # polar           p    C,D,E,H,K,N,Q,R,S,T
 # small           s    A,C,D,G,N,P,S,T,V
@@ -288,7 +289,7 @@ aa.class = paste0(tolower(sub(x=names(aa.set),"\\.","")),"_",aa.set)
 AACLASS.FR = map(aa.prop, sum.aa.fr, BS=UNI.SC )
 
 # DISORDER (D2P2 + IUP)  -------------------------------------------------------
-file.d2p2="data/d2p2-yeast-uniprotKB.rds"
+file.d2p2=here("data","d2p2-yeast-uniprotKB.rds")
 d2p2_pred = preload(file.d2p2, loading.call = load.d2p2(ids=UNI$UNIPROTKB), doing = "Fetching d2p2 for yeast proteome (uniprot)..." )
 D2P2 = get.d2p2.diso(d2p2_pred,as.df = T) %>%
        mutate(d2p2.seg = find.consecutive(d2p2.diso>=7, TRUE, min=3),
@@ -320,7 +321,7 @@ STRING = load.string(tax="4932",phy=F, ful=T, min.score = 900) %>%
              ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
 
 ## INTACT Molecular Interaction Database ---------------------------------------
-file.intact = "data/intact-yeast-ppi.rds"
+file.intact = here("data","intact-yeast-ppi.rds")
 valid_ids=unique(c(names(S288C),UNI$UNIPROTKB))
 INTACT = preload(saved.file = file.intact,
                  loading.call = load.intact.yeast(min.intact.score = 0.75),
@@ -361,7 +362,7 @@ LOC.size = sort(colSums(UNILOC[,-c(1:3)]))
 LOC50 = sort( names( LOC.size[LOC.size>THR.LOC.SIZE] ) )
 
 ## CHEMOGENOMIC SIGNATURE
-file.chemofit= "data/lee2014-chemogenomic-fitness-defect-heterozygous.rds"
+file.chemofit= here("data","lee2014-chemogenomic-fitness-defect-heterozygous.rds")
 CHEMFIT =  preload(saved.file = file.chemofit,
                 loading.call = load.lee2014.data(rawdata=T),
                 doing = "loading chemogenomic fitness signatures...")

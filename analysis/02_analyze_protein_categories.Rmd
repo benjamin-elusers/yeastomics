@@ -29,7 +29,6 @@ output:
   bibliography: bibliography.bib
   csl: biomed-central.csl
 #runtime: shiny
-
 ---
 <!-- Github Logo -->
 <a href="https://github.com/benjamin-elusers/yeastomics/" class="github-corner" aria-label="View source on Github">
@@ -65,15 +64,16 @@ suppressPackageStartupMessages({
   library(ggthemes)
   library(ggsci)
   library(cowplot)
+  library(here)
   theme_set(theme_cowplot())
 
-  source("src/utils.r")
-  source("src/function_annotation.r")
-  source("src/function_sequence.r")
-  source("src/function_phylogenetic.r")
-  source("src/function_analysis.r")
-  source("src/function_datalocal.r")
-  source("src/function_datapub.r")
+  source(here("src","utils.r"))
+  source(here("src","function_annotation.r"))
+  source(here("src","function_sequence.r"))
+  source(here("src","function_phylogenetic.r"))
+  source(here("src","function_analysis.r"))
+  source(here("src","function_datalocal.r"))
+  source(here("src","function_datapub.r"))
 })
 
 # turn off annoying messages from dplyr::summarise
