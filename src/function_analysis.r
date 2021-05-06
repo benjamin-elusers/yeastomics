@@ -194,6 +194,24 @@ fivebins = function(x, applyto=NULL,
   return(BINS)
 }
 
+
+slice_min_max <- function(df, order_by = value, n = 1) {
+
+  order_by = enquo(order_by)
+
+  min <- slice_min(df, !!order_by, n = n) %>%
+    mutate(type = "min")
+
+  max <- slice_max(df, !!order_by, n = n) %>%
+    mutate(type = "max")
+
+  df <- bind_rows(min, max) %>%
+    as_tibble()
+
+  return(df)
+
+}
+
 # TESTING
 # fivebins(x = xx) %>% lapply(FUN = function(B){ xx[B] } )
 # df = data.frame(id=paste0('id',0:100), num=0:100, stringsAsFactors = F)
