@@ -245,6 +245,9 @@ PPM.ORTHO.4932 = PPM.ORTHO %>% ungroup() %>% filter(taxid==4932) %>%
 
 # VARIABLE ORF (PANGENOMICS) -------------------------------------------------
 VARORF = load.peter2018.data(2)
+SNP_STRAIN = readRDS("data/PROTEIN-EVO-FUNGI-SNP.rds") %>% 
+              dplyr::select(starts_with('SNP.'),'ORF','UNIPROT','IS_FUNGI','IS_STRAINS') %>% 
+              group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log)) # apply log10 to SNP rate4site %>% 
 
 # CHROMOSOME GENES  ------------------------------------------------------------
 CHR = SGD %>%
@@ -442,6 +445,12 @@ GENOMICS$peter2018.pangenome_cloud = df.pangenome %>% filter(peter2018.strains_p
 GENOMICS$peter2018.pangenome_variable = df.pangenome %>% filter(between(peter2018.strains_presence,750,1000)) %>% pull(orf.s288c)
 GENOMICS$peter2018.pangenome_core = df.pangenome %>% filter(peter2018.strains_presence>1000) %>% pull(orf.s288c)
 
+# SNP 
+df.snp = SNP_STRAIN %>% janitor::clean_names() %>%
+          dplyr::select(orf, starts_with("snp_")) %>%
+          dplyr::rename_with(.cols=starts_with("snp_"), .fn=Pxx, px='peter2018' )
+
+# Uniprot existence
 GENOMICS$uniprot.existence_transcript = UNIPROT %>% filter(EXISTENCE=="Evidence at transcript level") %>% pull(UNIPROTKB)
 GENOMICS$uniprot.existence_predicted  = UNIPROT %>% filter(EXISTENCE=="Predicted") %>% pull(UNIPROTKB)
 GENOMICS$uniprot.existence_homology   = UNIPROT %>% filter(EXISTENCE=="Inferred from homology") %>% pull(UNIPROTKB)
@@ -450,7 +459,8 @@ df.genomics = PROTEOME %>%
               left_join(df.len, by=c('ORF'='orf')) %>%
               left_join(df.gc, by=c('ORF'='orf')) %>%
               left_join(df.wgd, by=c('ORF'='byrne2005.orf')) %>%
-              left_join(df.pangenome, by=c('ORF'='orf.s288c'))
+              left_join(df.pangenome, by=c('ORF'='orf.s288c')) %>% 
+              left_join(df.snp, by=c('ORF'='orf'))
 
 
 check_chunk(df.genomics,GENOMICS)
@@ -902,13 +912,83 @@ TOTAL_PROPERTIES = length(flatten(CATEGORIES))
 PROPERTIES= unlist(CATEGORIES,rec=F)
 
 # Make a proteome table of all properties
-PROT = PROTEOME
+PROP = PROTEOME
 for( C in names(PROPERTIES)){
-  PROT[,C] = (PROT$UNIPROTKB %in% PROPERTIES[[C]]) | (PROT$ORF %in% PROPERTIES[[C]]) | (PROT$GNAME %in% PROPERTIES[[C]])
+  PROP[,C] = (PROP$UNIPROTKB %in% PROPERTIES[[C]]) | (PROP$ORF %in% PROPERTIES[[C]]) | (PROP$GNAME %in% PROPERTIES[[C]])
 }
 
-saveRDS(PROT,sprintf("output/proteome-properties-%s.rds",when))
+saveRDS(PROP,sprintf("output/proteome-properties-%s.rds",when))
 save.image(sprintf("output/loaded-datasets-%s.rds",when))
+
+#load("output/loaded-datasets-04_05_2021.rds")
+```
+
+```{r count-prop-feat}
+
+prop = PROP %>% 
+        pivot_longer(cols = starts_with('cat_'),
+                     names_to = c('categories','source','property'), 
+                     names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+                     values_to = "has_prop") %>%
+        mutate(col_prop = paste0(categories,'.',source,'.',property)) %>% ungroup
+feat = FEATURES %>% 
+        pivot_longer(cols = starts_with('cat_'),
+                     names_to = c('categories','source','feature'), 
+                     names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+                     values_to = "value") %>%
+        mutate(col_feat = paste0(categories,'.',source,'.',feature))%>% ungroup
+
+cat.f = unique(prop$categories)
+
+nprop = prop %>% 
+        group_by(categories,source,property) %>%
+        summarise( n = sum(has_prop)) %>%
+        group_by(categories,source) %>% mutate( NS = n()) %>% 
+        group_by(categories) %>%  mutate( N = n(), type='property', categories.f = factor(categories,levels=cat.f, labels=cat.f))
+nfeat = feat %>%
+        group_by(categories,source,feature) %>%
+        summarise( n = sum(!is.na(value))) %>%
+        group_by(categories,source) %>% mutate( NS = n()) %>% 
+        group_by(categories) %>%  mutate( N = n() , type='feature', categories.f = factor(categories,levels=cat.f, labels=cat.f))
+
+count.cat = bind_rows(nprop,nfeat) %>% dplyr::select(categories.f,type,N) %>% distinct()
+
+library(ggplot2)
+library(cowplot)
+library(ggthemes)
+library(ggsci)
+library(ggnewscale)
+library(ggpubr)
+library(ggfittext)
+theme_set(cowplot::theme_minimal_grid())
+source("src/theme_black.r")
+
+
+bp0 = ggplot(nprop %>% dplyr::select(categories.f,N) %>% distinct(), aes(x=categories.f, y=N, fill=categories.f)) + 
+  geom_col() +
+  geom_bar_text(col='white',size=16) +
+  scale_fill_tableau() + theme_black(base_size = 20) + theme(legend.pos='none') + coord_flip() + ylab('Properties')+ xlab("")
+
+bp1 = ggplot(nfeat %>% dplyr::select(categories.f,N) %>% distinct(), aes(x=categories.f, y=N, fill=categories.f)) + 
+  geom_col() +
+  geom_bar_text(col='white',size=16) +
+  scale_fill_tableau() + theme_black(base_size = 20) + theme(legend.pos='none') + coord_flip() + ylab('Features') + xlab("")
+
+BP = ggplot(count.cat, aes(x=categories.f, y=N, label=N, fill=categories.f)) + 
+  geom_col() +
+  geom_text(col='white',size=8,hjust='inward') + facet_wrap(~type) + 
+  scale_fill_tableau() + theme_black(base_size = 20) + theme(legend.pos='none') + coord_flip() + ylab('') + xlab("Categories")
+
+bp = plot_grid(plotlist = list(bp0,bp1),nrow = 1)
+save_plot(plot = BP, filename = "output/S0.prop-feat-count.png", base_height = 8, base_width = 8)
+
+save_plot(plot = bp0, filename = "output/S0_1.prop-count.png", base_height = 8, base_width = 8)
+save_plot(plot = bp1, filename = "output/S0_2.feat-count.png", base_height = 8, base_width = 8)
+
+plot(bp0)
+plot(bp1)
+plot(BP)
+
 ```
 
 <!-- ## Bins (Semi-quantitative output) -->
