@@ -11,6 +11,7 @@ open.url <- function(file_url) {
   con <- gzcon(url(file_url))
   txt <- readLines(con,skipNul=T)
   #closeAllConnections()
+  close.connection(con)
   return(textConnection(txt))
 }
 
