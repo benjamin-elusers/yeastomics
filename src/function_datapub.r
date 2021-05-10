@@ -765,7 +765,7 @@ load.paxdb = function(taxon=4932){
   taxon_url = paste0(taxon_dir,taxon_data)
   get.paxdb_header = function(urldata){
     CON = read.url(urldata)
-    CON %>%
+    HEADER = CON %>%
       str_subset(pattern="^#") %>%
       as_tibble %>%
       extract(col=value,into=c('info',"value"), regex="^#([^\\:]+)\\:(.+)$") %>%
@@ -774,6 +774,7 @@ load.paxdb = function(taxon=4932){
       pivot_wider(names_from='info',values_from=c(value)) %>%
       mutate(taxid=as.character(taxon))
     close.connection(CON)
+    return(HEADER)
   }
 
   infodata = map_dfr(taxon_url,get.paxdb_header) %>%
