@@ -371,3 +371,43 @@ get.KEGG = function(sp='sce',type=c('pathway','module'),as.df=F){
 #   A = load.costanzo2010.data()
 #   B = load.vanleeuwen2016.data()
 # }
+
+
+
+# Ensembl -----------------------------------------------------------------------------------
+
+#DBFile <- makeEnsemblSQLiteFromTables()
+## and finally we can generate the package
+#makeEnsembldbPackage(ensdb = DBFile, version = "0.99.12",
+#                     maintainer = "Johannes Rainer <johannes.rainer@eurac.edu>",
+#                     author = "J Rainer")
+
+
+get.hs.ens2uni = function(transcript=T,ids.ens){
+  # WARNING! BUG WITH R version <4.0 (dplyr and AnnotationDbi conflict)
+  if(missing(ids.ens)){ stop("requires an input vector Ensembl Protein ids... (e.g. ENSP00000194214)") }
+  library(AnnotationHub)
+  ah <- AnnotationHub()
+  ensdb <- query(ah, pattern = c("Homo sapiens", "EnsDb",103))[[1]]
+  #library(ensembldb)
+  #library(EnsDb.Hsapiens.v86)
+  #library(org.Hs.eg.db)
+  query = c("GENENAME","GENEBIOTYPE","UNIPROTID","SYMBOL")
+  if(transcript){ query = append(query, values=c("EXONID","EXONIDX","TXID","TXBIOTYPE"), after=0) }
+  ens2uni = AnnotationDbi::select(ensdb, keys=ids.ens, keytype = 'PROTEINID', columns = query )
+  return(ens2uni)
+}
+
+# hs.ppm = get.paxdb(tax = 9606, abundance='integrated')
+# hs.pax2uni = get.hs.ens2uni(transcript = F, ids.ens = unique(hs.ppm$protid)) %>%
+#               mutate(uniprot = str_extract(UNIPROTID,UNIPROT.nomenclature())) %>% # keep only the UNIPROT Accession without the version number
+#               dplyr::select(-UNIPROTID) %>% distinct() # keep unique Uniprot identifiers
+# uni.feat = load.uniprot.features(tax=9606)
+#
+# write_rds(hs.ppm,"data/paxdb-human-integrated.rds")
+# write_rds(hs.pax2uni,"data/ensembl-human-uniprot.rds")
+# write_rds(uni.feat,"data/uniprot-human-features.rds")
+#
+# hs.ppm.uni = left_join(hs.ppm, hs.pax2uni, by=c('protid'='PROTEINID'))
+
+
