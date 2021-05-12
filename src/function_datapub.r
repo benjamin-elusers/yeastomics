@@ -11,6 +11,7 @@ open.url <- function(file_url) {
   con <- gzcon(url(file_url))
   txt <- readLines(con,skipNul=T)
   #closeAllConnections()
+  close.connection(con)
   return(textConnection(txt))
 }
 
@@ -18,6 +19,7 @@ read.url <- function(file_url) {
   con <- gzcon(url(file_url))
   txt <- readLines(con,skipNul=T)
   #closeAllConnections()
+  close.connection(con)
   return(txt)
 }
 
@@ -790,9 +792,9 @@ load.paxdb = function(taxon=4932){
   # If only one file, read twice the url and keep the distinct rows
     ppm = rio::import_list(file=c(taxon_url[1],taxon_url),
                            setclass="tibble",
-                           rbind = TRUE,rbind_label = "dataset",rbind_fill = T) %>%
-      rename_with(~c("paxid",'string','ppm','count','dataset')) %>%
-      mutate(dataset = basename(dataset)) %>%
+                           rbind = TRUE,rbind_label = "dataurl",rbind_fill = T) %>%
+      dplyr::rename(paxid="#internal_id", string="string_external_id", ppm="abundance") %>%
+      mutate(dataset = basename(path = dataurl)) %>% dplyr::select(-dataurl) %>%
       extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
       distinct()
   #}#
@@ -802,7 +804,7 @@ load.paxdb = function(taxon=4932){
   return(taxon_ppm)
 }
 
-get.paxdb = function(tax=4932, abundance=c('integrated','median','mean','weighted')){
+get.paxdb = function(tax=4932, abundance='integrated'){
   paxdb = load.paxdb(tax)
   # if nothing selected return the integrated values
   # (if there is a single dataset, it is considered as integrated)
@@ -810,7 +812,7 @@ get.paxdb = function(tax=4932, abundance=c('integrated','median','mean','weighte
   message(sprintf("---> Returning (%s) abundance values...",toString(targets)))
   RES = list()
 
-  if( "integrated" == targets ){
+  if( "integrated" %in% targets ){
     RES$INT = paxdb %>%
       group_by(taxid,organ,protid) %>%
       mutate(ppm_n = ndata-sum(is_integrated)) %>%
@@ -818,7 +820,7 @@ get.paxdb = function(tax=4932, abundance=c('integrated','median','mean','weighte
       dplyr::select(taxid,organ,protid, ppm_int = ppm,ppm_n)
   }
 
-  if( "median" == targets ){
+  if( "median" %in% targets ){
     RES$MED = paxdb %>%
       filter(!is_integrated) %>%
       group_by(taxid,organ,protid) %>%
@@ -831,7 +833,7 @@ get.paxdb = function(tax=4932, abundance=c('integrated','median','mean','weighte
       )
   }
 
-  if( "mean" == targets ){
+  if( "mean" %in% targets ){
     RES$AVG = paxdb %>%
       filter(!is_integrated) %>%
       group_by(taxid,organ,protid) %>%
@@ -843,7 +845,7 @@ get.paxdb = function(tax=4932, abundance=c('integrated','median','mean','weighte
       )
   }
 
-  if( "weigthed" == targets ){
+  if( "weigthed" %in% targets ){
     RES$WT = paxdb %>%
       filter(!is_integrated) %>%
       group_by(taxid,organ,protid) %>%
