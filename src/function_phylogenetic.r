@@ -28,6 +28,9 @@ pairwise.alignment.to.df  = function(ali){
     A = ali[i]
     P=alignedPattern(A)
     S=alignedSubject(A)
+    p=unaligned(P)
+    s=unaligned(S)
+
     S1=unlist(strsplit(x = toString(P),''))
     S2=unlist(strsplit(x = toString(S),''))
     resi = seq_along(S2)
@@ -35,7 +38,7 @@ pairwise.alignment.to.df  = function(ali){
                     s1 = names(P), s2 = names(S),
                     aa.s1 = S1, gap.s1 = (aa.s1=='-'),
                     aa.s2= S2, gap.s2 = (aa.s2=='-'),
-                    l.s1 = width(P), l.s2 = width(S),
+                    l.s1 = width(p), l.s2 = width(s),
                     ol.12 = l.s1/l.s2, ol.21 = l.s2/l.s1,
                     pid.aligned = pid(A,type = "PID2" ),
                     pid.short = pid(A,type = "PID3" ),

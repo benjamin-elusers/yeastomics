@@ -242,7 +242,10 @@ PPM.ORTHO.4932 = PPM.ORTHO %>% ungroup() %>% filter(taxid==4932) %>%
                   pivot_wider(id_cols=c(NOG,orf,ppm_4932,organ), 
                               names_from=taxid, names_glue="paxdb.ppm_{taxid}",
                               values_from=ppm_int, values_fn=mean_) %>%
-                  dplyr::select(-paxdb.ppm_NA,-organ)
+                  dplyr::select(-paxdb.ppm_NA,-organ) 
+
+test=  PPM.ORTHO.4932 %>% add_count(NOG) %>% dplyr::filter(n>1) %>% group_by(NOG) %>% summarise(ppm.avg=median(ppm_4932),paxdb.ppm_4896) %>% distinct()
+scor(test$ppm.avg, test$paxdb.ppm_4896)
 
 # VARIABLE ORF (PANGENOMICS) -------------------------------------------------
 VARORF = load.peter2018.data(2)
