@@ -38,7 +38,7 @@ pairwise.alignment.to.df  = function(ali){
                     s1 = names(P), s2 = names(S),
                     aa.s1 = S1, gap.s1 = (aa.s1=='-'),
                     aa.s2= S2, gap.s2 = (aa.s2=='-'),
-                    l.s1 = width(p), l.s2 = width(s),
+                    l.s1 = width(p), l.s2 = width(s), l=width(P),
                     ol.12 = l.s1/l.s2, ol.21 = l.s2/l.s1,
                     pid.aligned = pid(A,type = "PID2" ),
                     pid.short = pid(A,type = "PID3" ),
