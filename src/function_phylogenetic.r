@@ -28,8 +28,8 @@ pairwise.alignment.to.df  = function(ali){
     A = ali[i]
     P=alignedPattern(A)
     S=alignedSubject(A)
-    p=unaligned(P)
-    s=unaligned(S)
+    p=unaligned(pattern(A))
+    s=unaligned(subject(A))
 
     S1=unlist(strsplit(x = toString(P),''))
     S2=unlist(strsplit(x = toString(S),''))
