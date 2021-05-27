@@ -690,6 +690,7 @@ load.pombe.orthologs = function() {
 
   url.orthologs = "ftp://ftp.pombase.org/pombe/orthologs/cerevisiae-orthologs.txt"
   sp.sc = readr::read_delim(url.orthologs, delim="\t", col_names=c('PombaseID','ORFS'), comment="#", trim_ws=T) %>%
+    mutate(grp = sprintf("OG_%04d",row_number())) %>%
     separate_rows(ORFS,sep = "\\|") %>%
     mutate(orf= dplyr::na_if(str_extract(ORFS,"^[^\\(]+"),"NONE"),  # get the orf,
            fused_side=str_sub(start=-1,str_extract(ORFS,regex_fusion)) )%>%  # get the parentheses content
