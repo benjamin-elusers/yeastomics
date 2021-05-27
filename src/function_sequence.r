@@ -86,19 +86,26 @@ load.sgd.proteome = function(withORF=T,rm.stop=T, orf_protein="sequence/S288C_re
   return(SGD)
 }
 
-load.pombase.proteome = function(withORF=T) {
+load.pombase.proteome = function(withORF=T,rm.version=T) {
   library(stringr)
   pombase.url = "ftp://ftp.pombase.org/pombe/genome_sequence_and_features/feature_sequences/peptide.fa.gz"
   Pombase = load.proteome(pombase.url)
   regexPombaseID = "(SP[^ ]+)(?=:pep)"
   regexPombase = "(?<=:pep )(.+)(?=\\|)"
+
+  orf = str_extract(names(Pombase), regexPombaseID) # ORF identifier
+  if(rm.version){ orf = str_remove(orf, "(\\.[0-9]+$)") }
+
+  gname = str_extract(names(Pombase), regexPombase) # Pombase standard name
+  has_noname = is.na(gname)
+  gname[has_noname] = orf[has_noname]
+
   if(withORF){
-    # ORF identifier
-    names(Pombase) = str_extract(names(Pombase), regexPombaseID )
+    names(Pombase) = orf
   }else{
-    # Pombase standard name
-    names(Pombase) = str_extract(names(Pombase), regexPombase)
+    names(Pombase) = gname
   }
+
   return(Pombase)
 }
 
