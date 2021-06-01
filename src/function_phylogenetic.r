@@ -17,6 +17,7 @@ get.pair.prot = function(prot, pair){
 
 pairwise.alignment.to.df  = function(ali){
   library(dplyr)
+  library(tictoc)
   N=length(ali)
   ali.list=list()
   doing="Global alignnment of pairwise sequences..."
