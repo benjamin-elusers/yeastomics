@@ -166,6 +166,7 @@ load.costanzo2010.data = function(){
 }
 
 load.barton2010.data = function(by=c("aa","prot")){
+  # load amino acid biosynthetic cost in yeast
   message("REF: Michael D. Barton et al., PLOS One, 2010")
   message("Evolutionary Systems Biology of Amino Acid Biosynthetic Cost in Yeast")
   #https://doi.org/10.1371/journal.pone.0011935
@@ -197,6 +198,54 @@ load.barton2010.data = function(by=c("aa","prot")){
   return(biosynth_cost)
 }
 
+load.marguerat2012.data = function(raw=F){
+  # load protein abundance for fission yeast (pombe)
+  # !! WARNING !! paxDB has values which do not correspond to original data
+  library(openxlsx)
+  library(rio)
+  library(hablar)
+  # Load mRNA half-lives
+  message("REF: S. Marguerat et al., 2012, Cell")
+  message("Quantitative Analysis of Fission Yeast Transcriptomes and Proteomes in Proliferating and Quiescent Cells")
+  #https://doi.org/10.1016/j.cell.2012.09.019
+  SM.url = "https://ars.els-cdn.com./content/image/1-s2.0-S0092867412011269-mmc1.xlsx"
+
+  # S4 = Copies per cell data for all RNAs and proteins, including mRNA and protein features and annotation
+  S4=import(SM.url,which = 5,skip=6) %>% janitor::clean_names() %>%
+    # remove columns names containing footnotes from a to e
+    dplyr::rename(chromosome="chromosomea",
+                  sequencability="sequencabilityb",
+                  ribosome_occupancy="ribosome_occupancyc",
+                  mrna_halflife="m_rna_half_lifed",
+                  annotation="annotatione") %>%
+    rowwise() %>%
+    mutate( cpc_pro=as.numeric(mm_protein_cpc),cpc_qui=as.numeric(mn_protein_cpc)) %>% ungroup
+  # S8 = Global absolute abundance estimations for all proteins identified from proliferating cells
+  S8=import(SM.url,which = 9) %>% janitor::clean_names() %>% dplyr::rename_with(xxS, sx='pro', s='_')
+  # S9 = Global absolute abundance estimations for all proteins identified from quiescence cells
+  S9=import(SM.url,which = 10) %>% janitor::clean_names() %>% dplyr::rename_with(xxS, sx='qui', s='_')
+
+  colexp = c("cpc_pro","cpc_qui","protein_copies_cell_pro","protein_copies_cell_qui")
+  rawdata = full_join(S4 , S8 ,by=c('systematic_name'='accession_pro')) %>%
+    full_join(S9, by=c('systematic_name'='accession_qui')) %>% rowwise %>%
+    mutate(nval = sum.na(c_across(colexp),notNA=T) ) %>% dplyr::filter(nval>0)
+
+  if(raw){ return(rawdata) }
+
+  expdata = rawdata %>%
+    dplyr::select(pombase="systematic_name", gname="common_name",colexp,'nval') %>%
+    rowwise %>%
+    mutate(cpc_avg = mean_(c_across(cpc_pro:protein_copies_cell_qui)),
+           cpc_min = min_(c_across(cpc_pro:protein_copies_cell_qui)),
+           cpc_max = max_(c_across(cpc_pro:protein_copies_cell_qui)),
+    ) %>% ungroup() %>%
+    mutate( perc_max = 100 * cpc_max / sum_(cpc_max), ppm_max = 10000 * perc_max,
+            perc_min = 100 * cpc_min / sum_(cpc_max), ppm_min = 10000 * perc_min,
+            perc_avg = 100 * cpc_avg / sum_(cpc_avg), ppm_avg = 10000 * perc_avg,
+            perc_pro = 100 * cpc_pro / sum_(cpc_pro), ppm_pro = 10000 * perc_pro,
+            perc_qui = 100 * cpc_qui / sum_(cpc_qui), ppm_qui = 10000 * perc_qui)
+return(expdata)
+}
 
 load.geisberg2014.data = function(nodesc=T){
   library(openxlsx)
@@ -816,7 +865,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
 
   if( "integrated" %in% targets ){
     RES$INT = paxdb %>%
-      group_by(taxid,organ,protid) %>%
+      dplyr::group_by(taxid,organ,protid) %>%
       mutate(ppm_n = ndata-sum(is_integrated)) %>%
       filter(is_integrated) %>%
       dplyr::select(taxid,organ,protid, ppm_int = ppm,ppm_n)
@@ -824,7 +873,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
 
   if( "median" %in% targets ){
     RES$MED = paxdb %>%
-      filter(!is_integrated) %>%
+      dplyr::filter(!is_integrated) %>%
       group_by(taxid,organ,protid) %>%
       summarise(
         # range
@@ -837,7 +886,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
 
   if( "mean" %in% targets ){
     RES$AVG = paxdb %>%
-      filter(!is_integrated) %>%
+      dplyr::filter(!is_integrated) %>%
       group_by(taxid,organ,protid) %>%
       summarise(
         # regular average
@@ -849,7 +898,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
 
   if( "weigthed" %in% targets ){
     RES$WT = paxdb %>%
-      filter(!is_integrated) %>%
+      dplyr::filter(!is_integrated) %>%
       group_by(taxid,organ,protid) %>%
       summarise(
         # weighted average/median
@@ -862,7 +911,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
         wppm_cv  = wppm_sd/wppm_avg,
       )
   }
-  return(RES %>%  purrr::reduce(left_join, by = c("taxid","organ","protid")) )
+  return(purrr::reduce(.x=RES,.f=left_join, by = c("taxid","organ","protid")) )
 }
 
 
