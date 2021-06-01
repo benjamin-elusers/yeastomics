@@ -33,5 +33,6 @@ sc_pax2orf = left_join(sc_pax,uni2sgd, by=c('protid'='ORF')) %>%
 sc_pdb = get.mapping.3dcomplex.yeast() # REQUIRES ACCESS TO FILESERVER 'mata.weizmann.ac.il'
 dbConnect(MySQL(), user = "elevy", password = "Mysql1!", dbname = "3dcomplexV6",
           host = "mata.weizmann.ac.il")
+
 ##### 5. RANKED PROTEIN ABUNDANCE MAPPED TO PDB #####
 final = left_join(sc_pax2orf,sc_pdb, by=c('UNIPROTKB'='seqid'))
