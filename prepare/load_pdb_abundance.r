@@ -9,13 +9,13 @@ source(file.path(yeastomics,"src/function_datapub.r"))
 library(tidyverse)
 library(hablar)
 
-##### 1. UNIPROT-TO-ORF MAPPING
+##### 1. UNIPROT-TO-ORF MAPPING #####
 sc_uni = readRDS("data/uniprot-features.rds") %>%
   dplyr::select("UNIPROTKB","SGD","EXISTENCE","SCORE","FAMILIES","PNAME")
 sc_sgd = load.sgd.features() %>% dplyr::select("sgdid","type","qual",ORF="name","gname","chr","strand")
 uni2sgd = left_join(sc_uni,sc_sgd,by=c('SGD'='sgdid'))
 
-##### 2. PAXDB ABUNDANCE RANKED
+##### 2. PAXDB ABUNDANCE RANKED #####
 sc_pax = get.paxdb(4932,'integrated') %>%
   group_by(taxid) %>%
   mutate(rk = dense_rank(desc(ppm_int)),
@@ -23,14 +23,15 @@ sc_pax = get.paxdb(4932,'integrated') %>%
          pc= 100 * ppm_int / sum_(ppm_int)) %>%
   arrange(rk.pc)
 
-##### 3. PAXDB MAPPED TO UNIPROT-TO-ORF MAPPING
+##### 3. PAXDB MAPPED TO UNIPROT-TO-ORF MAPPING #####
 sc_pax2orf = left_join(sc_pax,uni2sgd, by=c('protid'='ORF')) %>%
   relocate(UNIPROTKB,EXISTENCE,SCORE,FAMILIES,
-           ORF,gname,SGD,type,qual,chr,strand)
+           ORF=protid,gname,SGD,type,qual,chr,strand)
 
-##### 4. PDB TO ORF MAPPING VIA UNIPROT
-sc_complex = load.3dcomplex.yeast()
-sc_pdb = get.mapping.3dcomplex.yeast()
-
-##### 5. RANKED PROTEIN ABUNDANCE MAPPED TO PDB
+##### 4. PDB TO ORF MAPPING VIA UNIPROT #####
+#sc_complex = load.3dcomplex.yeast() # residue level data
+sc_pdb = get.mapping.3dcomplex.yeast() # REQUIRES ACCESS TO FILESERVER 'mata.weizmann.ac.il'
+dbConnect(MySQL(), user = "elevy", password = "Mysql1!", dbname = "3dcomplexV6",
+          host = "mata.weizmann.ac.il")
+##### 5. RANKED PROTEIN ABUNDANCE MAPPED TO PDB #####
 final = left_join(sc_pax2orf,sc_pdb, by=c('UNIPROTKB'='seqid'))
