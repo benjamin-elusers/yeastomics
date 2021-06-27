@@ -32,10 +32,10 @@ sc_pax2orf = left_join(sc_pax,uni2sgd, by=c('protid'='ORF')) %>%
 #sc_complex = load.3dcomplex.yeast() # residue level data
 sc_pdb = get.mapping.3dcomplex.yeast()
 sc_pdb_nr = sc_pdb %>%
-            arrange(seqid,code,chain_name,desc(ident),desc(overlap),resol,desc(length_atom)) %>%
-            group_by(seqid) %>%
-            mutate( pdb_rk=row_number() ) %>% #, length_atom, length_full) ) %>%
-            dplyr::filter(pdb_rk==1)# REQUIRES ACCESS TO FILESERVER 'mata.weizmann.ac.il'
+  arrange(seqid,code,chain_name,desc(ident),desc(overlap),resol,desc(length_atom)) %>%
+  group_by(seqid) %>%
+  mutate( pdb_rk=row_number() ) %>% #, length_atom, length_full) ) %>%
+  dplyr::filter(pdb_rk==1)# REQUIRES ACCESS TO FILESERVER 'mata.weizmann.ac.il'
 
 ##### 5. RANKED PROTEIN ABUNDANCE MAPPED TO PDB #####
 options(dplyr.width=Inf)
@@ -54,26 +54,42 @@ homology = tribble(
   ~name,        ~pdb,   ~chain,       ~oligomer,    ~pid,  ~is_homology,
   'FBA1',   '6lnk.1',     'A',    'homo-2-mer',   73.43,          TRUE,
   'ENO2',   '2one.1',     'A',    'homo-2-mer',   95.41,          TRUE,
- 'CDC19',     '1a3x',  'ABCD',    'homo-4-mer',   100.0,         FALSE,
+  'CDC19',  '1a3x.1',  'ABCD',    'homo-4-mer',   100.0,         FALSE,
   'SSA2',   '4fl9.1',     'A',       'monomer',   80.18,          TRUE,
   'PMA1',   '6lly.1',     'A',       'monomer',   25.50,          TRUE,
   'ILV5',   '6vo2.1',     'A',    'homo-2-mer',   34.38,          TRUE,
   'ALD6',   '5fhz.1',     'A',    'homo-4-mer',   48.53,          TRUE,
   'SSA1',   '4fl9.1',     'A',       'monomer',   80.36,          TRUE,
-'RPL21B',   '5h4p.1',     'U',       'monomer',   98.75,          TRUE,
- 'RPP2B',  '4v5z.23',     'A',       'monomer',   35.09,         FALSE,
+  'RPL21B', '5h4p.1',     'U',       'monomer',   98.75,          TRUE,
+  'RPP2B', '4v5z.23',     'A',       'monomer',   35.09,         FALSE,
   'MET6',   '3ppc.1',     'A',       'monomer',   75.52,          TRUE,
- 'RPL7A',     '6c0f',     'I', 'hetero-40-mer',   100.0,         FALSE
+  'RPL7A',  '6c0f.1',     'I', 'hetero-40-mer',   100.0,         FALSE
 )
 
 top20 = top50 %>% left_join(homology, by=c('gname'='name')) %>%
   mutate( pdb_code = ifelse(is.na(code), no=code, yes=pdb),
           pdb_chain = ifelse(is.na(chain_name), no=chain_name, yes=chain),
           ident     = ifelse(is.na(ident), no=ident, pid)
-        )  %>%
-  dplyr::select(-c(code, chain_name, ident)) %>% dplyr::filter(rk<21)
+  )  %>%
+  dplyr::select(-c(pdb, chain, code, chain_name, ident)) %>% dplyr::filter(rk<23)
 
-sprintf("fetch %s",paste(str_sub(top20$pdb_code,1,4),collapse=" "))
+#sprintf("fetch %s",paste(str_sub(top20$pdb_code,1,4),collapse=" "))
 
+pdbs = list.files('/data2/elevy/50_3DCOMPLEX_V6/data/BU_all_renum/',full.names = T)
+codes= tolower(subname(basename(pdbs)))
+top20_codes = sub(x=top20$pdb_code,"\\.","_")
+is_top20 = top20_codes %in% codes
 
+file.copy(from = pdbs[selected_codes],
+          to   = sprintf("~/Desktop/tmp/%02.0f-%s.pdb",selected_rk, top20_codes[selected_codes]) )
 
+mpc = load.ho2018.data()
+library(tidyverse)
+mpc %>%
+  mutate(rk.mpc=rank(desc(mean.mpc)),
+         rk.mdpc=rank(desc(median.mpc)),
+         pc.mpc= 100 * mean.mpc / sum_(mean.mpc),
+         pc.mdpc= 100 * median.mpc / sum_(median.mpc)
+  ) %>%
+  arrange(rk.mdpc) %>%
+  dplyr::select(orf,gname,mean.mpc,rk.mpc,pc.mpc,rk.mdpc,median.mpc,pc.mdpc)
