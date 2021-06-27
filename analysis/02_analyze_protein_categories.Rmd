@@ -229,16 +229,17 @@ for( icat in seq_along(categories) ){
 
 ```{r fit-evo-exp}
 # Fitting mean Evolutionary rate (R) to Protein abundance (E)
-init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
+#init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
+init.params = getInitial(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),data=STRAINS)
 evo_mpc.fit = STRAINS %>%
                broom::augment_columns(x=nls(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),start=init.params,data=.)) %>% 
-               mutate(SSR = sum(.resid^2), SR = sum(.resid)) %>%
-               dplyr::rename_with(.fn=xxS, sx='evo',.cols=c(".fitted", ".resid", "SSR", "SR") )
+               mutate(RSS = sum(.resid^2), RS = sum(.resid), TSS = sum_(EVO.FULL-mean_(EVO.FULL)^2)) %>%
+               dplyr::rename_with(.fn=xxS, sx='evo',.cols=c(".fitted", ".resid", "RSS", "RS",'TSS') )
 
 snp_mpc.fit = STRAINS %>%
                broom::augment_columns(x=lm(SNP.FULL ~ MPC,data=.)) %>% 
-               mutate(SSR = sum(.resid^2), SR = sum(.resid)) %>% 
-               dplyr::rename_with(.fn=xxS, sx='snp', .cols=c(".fitted", ".resid", "SSR", "SR") )
+               mutate(RSS = sum(.resid^2), RS = sum(.resid),TSS = sum_(SNP.FULL-mean_(SNP.FULL)^2)) %>% 
+               dplyr::rename_with(.fn=xxS, sx='snp', .cols=c(".fitted", ".resid", "RSS", "RS","TSS") )
 
 
 propfit = inner_join(evo_mpc.fit,snp_mpc.fit, suffix=c('.evo','.snp')) %>% 
@@ -247,27 +248,32 @@ propfit = inner_join(evo_mpc.fit,snp_mpc.fit, suffix=c('.evo','.snp')) %>%
 .res_prop = propfit %>% 
               group_by(col_prop) %>% 
               mutate(  N=n(),
+                .res_evo.RS.pc  = sum(.resid.evo)/TSS,
+
                 .res_evo.neg = sum(.resid.evo<0), 
                 .res_evo.pos = sum(.resid.evo>0),
                 .res_evo.dN  = .res_evo.neg-.res_evo.pos,
                 .res_evo.rN  = .res_evo.pos/.res_evo.neg,
-                .res_evo.SR  = sum(.resid.evo),
-                .res_evo.SR.log = sign(.res_evo.SR) * log(abs(.res_evo.SR)),
-                .res_evo.SR.neg = sum(.resid.evo[.resid.evo<0]), 
-                .res_evo.SR.pos = sum(.resid.evo[.resid.evo>0]),
-                .res_evo.SR.avg = mean_(.resid.evo), 
+                .res_evo.RS  = sum(.resid.evo),
+
+                .res_evo.RS.log = sign(.res_evo.RS) * log(abs(.res_evo.RS)),
+                .res_evo.RS.neg = sum(.resid.evo[.resid.evo<0]), 
+                .res_evo.RS.pos = sum(.resid.evo[.resid.evo>0]),
+                .res_evo.RS.avg = mean_(.resid.evo), 
                 
                 .res_snp.neg = sum(.resid.snp<0), 
                 .res_snp.pos = sum(.resid.snp>0),
                 .res_snp.dN  = .res_snp.neg-.res_snp.pos,
                 .res_snp.rN  = .res_snp.pos/.res_snp.neg,
-                .res_snp.SR  = sum(.resid.snp),
-                .res_snp.SR.log = sign(.res_snp.SR) * log(abs(.res_snp.SR)),
-                .res_snp.SR.neg = sum(.resid.snp[.resid.snp<0]), 
-                .res_snp.SR.pos = sum(.resid.snp[.resid.snp>0]),
-                .res_snp.SR.avg = mean_(.resid.snp), 
+                .res_snp.SR.pc  = sum(.resid.snp)/TSS,
+
+                .res_snp.RS  = sum(.resid.snp),
+                .res_snp.RS.log = sign(.res_snp.RS) * log(abs(.res_snp.RS)),
+                .res_snp.RS.neg = sum(.resid.snp[.resid.snp<0]), 
+                .res_snp.RS.pos = sum(.resid.snp[.resid.snp>0]),
+                .res_snp.RS.avg = mean_(.resid.snp), 
            ) %>%
-  arrange(desc(.res_evo.SR.avg)) %>%
+  arrange(desc(.res_evo.RS.pc %>%
   dplyr::select(categories,source,property, col_prop, N, starts_with('.res_')) %>%
   distinct() %>% 
   group_by(categories) %>% mutate(rSR = dense_rank(.res_evo.SR.avg) , ncat=n())

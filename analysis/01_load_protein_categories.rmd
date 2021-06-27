@@ -371,6 +371,8 @@ CHEMFIT =  preload(saved.file = file.chemofit,
                 doing = "loading chemogenomic fitness signatures...")
 CHEMSIG=load.lee2014.data(rawdata=F)
 
+
+NMINI = 1
 ```
 
 ## Proteome organization in categories {.tabset .tabset-pills}
@@ -667,7 +669,7 @@ BIOPHYSICS$superfam.supfam_none   = setdiff(PROTEOME$ORF,supfam$seqid)
 BIOPHYSICS$superfam.supfam_single = supfam %>% filter(superfamily.ndom==1) %>% pull(seqid)
 BIOPHYSICS$superfam.supfam_pair   = supfam %>% filter(superfamily.ndom==2) %>% pull(seqid)
 BIOPHYSICS$superfam.supfam_multi  = supfam %>% filter(superfamily.ndom>=3) %>% pull(seqid)
-superfamilies = split(SUPERFAM$seqid,SUPERFAM$superfamily_description) %>% map(unique) %>% keep(function(x){ n_distinct(x)>9 }) 
+superfamilies = split(SUPERFAM$seqid,SUPERFAM$superfamily_description) %>% map(unique) %>% keep(function(x){ n_distinct(x)> NMINI }) 
 names(superfamilies) = paste0("superfamilies.supfam_",make_clean_names(names(superfamilies),case='none'))
 BIOPHYSICS = append(BIOPHYSICS,superfamilies)
 
@@ -682,7 +684,7 @@ BIOPHYSICS$pfam.HMM_none   = setdiff(PROTEOME$UNIPROTKB,pfam$seq_id)
 BIOPHYSICS$pfam.HMM_single = pfam %>% filter(pfam.ndom==1) %>% pull(seq_id)
 BIOPHYSICS$pfam.HMM_pair   = pfam %>% filter(pfam.ndom==2) %>% pull(seq_id)
 BIOPHYSICS$pfam.HMM_multi  = pfam %>% filter(pfam.ndom>=3) %>% pull(seq_id)
-pfam_clans = split(pfam$seq_id,pfam$clan_name) %>% map(unique) %>% keep(function(x){ n_distinct(x)>9 }) 
+pfam_clans = split(pfam$seq_id,pfam$clan_name) %>% map(unique) %>% keep(function(x){ n_distinct(x)> NMINI }) 
 names(pfam_clans) = paste0("pfamclan.clan_",make_clean_names(names(pfam_clans),case='none'))
 BIOPHYSICS = append(BIOPHYSICS,pfam_clans)
 
@@ -753,7 +755,7 @@ INTERACTIONS$intact.superhub_ppi = cent.INTACT %>% dplyr::filter(between(cent_de
 CYC_complexes = split(CYC$ORF,CYC$Complex)
 names(CYC_complexes) = paste0("pu2008.CYC_",janitor::make_clean_names(names(CYC_complexes),case='none'))
 CYC_oligomers = split(CYC$ORF,CYC$oligomers)
-CYC_machines = keep(CYC_complexes,function(X){ length(X) > 9  })
+CYC_machines = keep(CYC_complexes,function(X){ length(X) > NMINI  })
 INTERACTIONS=append(INTERACTIONS,CYC_machines)
 INTERACTIONS=append(INTERACTIONS,CYC_oligomers)
 
@@ -761,7 +763,7 @@ INTERACTIONS=append(INTERACTIONS,CYC_oligomers)
 EBI_complexes = split(CPX$members,CPX$CPLX_NAME)
 names(EBI_complexes) = paste0("meldal2019.EBI_",janitor::make_clean_names(names(EBI_complexes),case='none'))
 EBI_oligomers = split(CPX$members,CPX$oligomers)
-EBI_machines = keep(EBI_complexes,function(X){ length(X) > 9  })
+EBI_machines = keep(EBI_complexes,function(X){ length(X) > NMINI  })
 INTERACTIONS=append(INTERACTIONS,EBI_machines)
 INTERACTIONS=append(INTERACTIONS,EBI_oligomers)
 
@@ -789,7 +791,8 @@ check_chunk(df.interactions,INTERACTIONS)
 FUNCTIONS=list()
 
 unigo  = UNIGO %>% # get goterm from BP and MF not obsolete and with 30-1000 proteins annotated
-         filter(!obsolete & between(shared,30,1000) & ONTOLOGY != "CC")
+         #filter(!obsolete & between(shared,30,1000) & ONTOLOGY != "CC")
+         filter(!obsolete & shared > NMINI & ONTOLOGY != "CC")
 # Convert to a matrix format (columns = GO term, rows=proteome)
 unigo.m  = unigo %>%  mutate(seen=1) %>%
            pivot_wider( id_cols = c('UNIPROT'), names_from = 'go', values_from = 'seen', 
@@ -813,9 +816,9 @@ names(func_class) = paste0("costanzo2010.", make_clean_names(names(func_class),c
 FUNCTIONS = append(FUNCTIONS,func_class)
 
 # Biological circuits (KEGG)
-kegg_path   = keep(split(PATHWAY$id,PATHWAY$desc),function(X){ length(X) > 9  })
+kegg_path   = keep(split(PATHWAY$id,PATHWAY$desc),function(X){ length(X) > NMINI  })
 names(kegg_path) = paste0("keggpath.KO_", make_clean_names(names(kegg_path), case='none') )
-kegg_module = keep(split(MODULE$id,MODULE$desc),function(X){ length(X) > 9  })
+kegg_module = keep(split(MODULE$id,MODULE$desc),function(X){ length(X) > NMINI  })
 names(kegg_module) = paste0("keggmod.KO_",make_clean_names(names(kegg_module), case='none') )
 
 FUNCTIONS = append(FUNCTIONS,kegg_path)
@@ -855,7 +858,7 @@ PHENOTYPES$vanleeuwen2020.essential_dispensable = dispensable
 #                    file="plots/chemogenomic-fitness-signatures.pdf",
 #                    cellheight=5, cellwidth=5, height=80, width=500,
 #                    border_col=NA, fontsize=6 )
-signatures= keep(split(CHEMSIG$gene,CHEMSIG$response_signature), function(X){ length(X)>10 })
+signatures= keep(split(CHEMSIG$gene,CHEMSIG$response_signature), function(X){ length(X)>NMINI })
 names(signatures) = paste0("lee2014.chemsig_",make_clean_names(names(signatures), case='none') )
 
 PHENOTYPES=append(PHENOTYPES,signatures)
@@ -864,7 +867,7 @@ PHENOTYPES=append(PHENOTYPES,signatures)
 PHENOTYPES$uniprot.phase_separate = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
 PHENOTYPES$uniprot.isoform  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
 loc = split(uniloc$id,uniloc$loc) 
-subloc = keep(loc,function(X){ length(X)>30 })
+subloc = keep(loc,function(X){ length(X)>NMINI })
 names(subloc) = paste0("uniprot.loc_", make_clean_names(names(subloc),case='none',))
 PHENOTYPES=append(PHENOTYPES,subloc)
 
@@ -880,8 +883,6 @@ check_chunk(df=NULL,LIST=PHENOTYPES)
 ```{r features}
 when=timestamp(stamp = format(Sys.time(), "%d_%m_%Y"),prefix = "", suffix = "")
 KEYS=c('UNIPROTKB','SGD','ORF','GNAME','PNAME')
-
-
 
 FEATURES = PROTEOME %>% 
             left_join(df.genomics %>% rename_with(.fn=Pxx, px='cat_genomics',.cols=-all_of(KEYS)), by=KEYS) %>%
@@ -980,12 +981,11 @@ bp1 = ggplot(nfeat %>% dplyr::select(categories.f,N) %>% distinct(), aes(x=categ
 
 BP = ggplot(count.cat, aes(x=categories.f, y=N, label=N, fill=categories.f)) + 
   geom_col() +
-  geom_text(col='white',size=8,hjust='inward') + facet_wrap(~type) + 
+  geom_text(col='white',size=8,hjust='inward') + facet_wrap(~type,scales = 'free_x') + 
   scale_fill_tableau() + theme_black(base_size = 20) + theme(legend.pos='none') + coord_flip() + ylab('') + xlab("Categories")
 
 bp = plot_grid(plotlist = list(bp0,bp1),nrow = 1)
 save_plot(plot = BP, filename = "output/S0.prop-feat-count.png", base_height = 8, base_width = 8)
-
 save_plot(plot = bp0, filename = "output/S0_1.prop-count.png", base_height = 8, base_width = 8)
 save_plot(plot = bp1, filename = "output/S0_2.feat-count.png", base_height = 8, base_width = 8)
 
