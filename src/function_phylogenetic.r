@@ -351,3 +351,28 @@ read.R4S.param = function(r4s, as.df=F){
   return(r4s.param)
 }
 
+
+get_fungi_clades = function(){
+  fungi.clades = tibble::lst(
+    eurotio1    = c("535722","559305","554155","246410","222929","336963","559298","502779"),
+    eurotio2    = c("5061","162425","5057","36630","500485","441960","441959"),
+    eurotio3    = c("861557","426418","5022","13684"),
+    eurotio.all = c(eurotio1,eurotio2,eurotio3),
+    sordario1   = c("573729","306901","578455","515849","5141","771870","148305","318829","29850"),
+    sordario2   = c("5518","229533","117187","5507","140110","29875","51453","1047171"),
+    sordario.all = c(sordario1,sordario2),
+    leotio      = c("40559"),
+    pezizo      = c("39416"),
+    sacch.wgd   = c("1064592","1071378","4932","284593"),
+    cerevisiae  = c('4932'),
+    sacch.nowgd = c("4950","4956","1071381","436907","33169","931890","284590","381046"),
+    sacch.ctg   = c("294747","573826","379508","322104","4929","306902","644223"),
+    sacch.dipo  = c("4952"),
+    sacch.all   = c(sacch.wgd,sacch.nowgd,sacch.ctg),
+    schizo      = c("4896","402676"),
+    pombe       = c('4896'),
+    out         = c("578458","240176","5306","283643","214684","367775","5270"),
+    schizo.out  = c(schizo,out)
+  )
+  return(fungi.clades)
+}
