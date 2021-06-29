@@ -447,7 +447,8 @@ df.pangenome =  VARORF %>%
                 dplyr::select(orf.s288c,occurrences_confirmed_by_mapping) %>% 
                 dplyr::rename(peter2018.strains_presence=occurrences_confirmed_by_mapping)
 
-GENOMICS$peter2018.pangenome_cloud = df.pangenome %>% filter(peter2018.strains_presence<750) %>% pull(orf.s288c)
+GENOMICS$peter2018.pangenome_rare= df.pangenome %>% filter(peter2018.strains_presence<435) %>% pull(orf.s288c) # Removed from the pangem
+GENOMICS$peter2018.pangenome_cloud = df.pangenome %>% filter(between(peter2018.strains_presence,435,750)) %>% pull(orf.s288c)
 GENOMICS$peter2018.pangenome_variable = df.pangenome %>% filter(between(peter2018.strains_presence,750,1000)) %>% pull(orf.s288c)
 GENOMICS$peter2018.pangenome_core = df.pangenome %>% filter(peter2018.strains_presence>1000) %>% pull(orf.s288c)
 

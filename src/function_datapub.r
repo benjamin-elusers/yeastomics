@@ -620,9 +620,9 @@ load.dubreuil2019.data = function(d){
     library(openxlsx)
     res = openxlsx::read.xlsx(data.url,colNames=T,sheet=1, startRow=1)
   } else if( dubreuil$format[d] == 'TSV'){
-    res = read.delim(file = data.url, header=T, sep='\t', stringsAsFactors = F)
+    res = readr::read_delim(file = data.url, col_names = T, delim = '\t',  progress = T)
   } else if( dubreuil$format[d] == 'TSV.GZ' ){
-    res = read.delim(file=open.url(data.url), header=T, sep='\t',stringsAsFactors = F)
+    res = readr::read_delim(file =open.url(data.url), col_names = T, delim = '\t',  progress = T)
   }
   return(res)
 }
@@ -662,7 +662,7 @@ load.dubreuil2021.data = function(d){
   if( dubreuil$format[d] == 'TSV'){
     res = readr::read_delim(file = data.url, col_names=T, progress=T, delim='\t')
   } else if( dubreuil$format[d] == 'TSV.GZ' ){
-    res = read.delim(file=open.url(data.url), header=T, sep='\t',stringsAsFactors = F)
+    res = readr::read_delim(file=open.url(data.url), col_names=T, progress=T, delim='\t')
   }
   return(res)
 }
