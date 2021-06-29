@@ -108,11 +108,12 @@ get.uniprot.go = function(uniprot) {
 
   goevidence = go %>% mutate(checked = TRUE) %>% ungroup() %>%
     pivot_wider( id_cols = c(UNIPROT, GO), names_from = EVIDENCE,
-                 values_from = checked, values_fn = list(checked = sum)
-    ) %>% mutate( n_evi = rowSums(dplyr::select(.,IDA:RCA),na.rm=T) )
+                 values_from = checked, values_fn = list(checked = sum)) %>%
+    rowwise() %>%
+    mutate( n_evi = sum_(c_across(-c(UNIPROT, GO))))
 
   goinfo = dplyr::select(go,-EVIDENCE) %>%
-    left_join(goevidence %>% dplyr::select(-c(IDA:RCA))) %>%
+    left_join(goevidence %>% dplyr::select(UNIPROT,GO,ND)) %>%
     mutate(has_biodata = replace_na(ND<1,replace = TRUE)) %>%
     dplyr::select(-ND)%>%
     distinct() %>% ungroup()
