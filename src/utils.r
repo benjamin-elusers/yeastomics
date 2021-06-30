@@ -172,12 +172,12 @@ file_ext <- function (fn) {
 # Format values ----------------------------------------------------------------
 
 RoundUpToNearest <- function(nb, roundto=1){ # Round up numbers to unit or decimal specified
-  if (roundto){ return(nb) }
+  if (roundto==1){ return(nb) }
   else{ return( ceiling(nb / roundto) * roundto ) }
 }
 
 RoundDownToNearest <- function(nb, roundto=1){ # Round down numbers to unit or decimal specified
-  if (roundto){ return (nb) }
+  if (roundto==1){ return (nb) }
   else{ return( floor(nb / roundto) * roundto ) }
 }
 
