@@ -115,39 +115,36 @@ empty_theme <- theme_dviz_open(12, rel_small = 1, rel_large = 1) +
 ```{r protcat}
 # protein properties (qualitative)
 PROP=readRDS(get.last.file(here("output"),"proteome-properties")) %>% 
-          dplyr::select(-contains("chemsig_X"))
-
+          dplyr::select(-contains("chemsig_X")) %>% ungroup()
 # protein features (quantitative)
-FEAT = readRDS(get.last.file(here("output"),"proteome-features"))
+FEAT = readRDS(get.last.file(here("output"),"proteome-features")) %>% ungroup()
 
 # Matrix format of properties and features
 PROP.m = PROP %>% 
-      ungroup() %>% 
-      dplyr::select( where(is.logical) )  %>% 
-     hablar::convert(num(everything())) %>%
-      as.matrix
+         dplyr::select( where(is.logical) )  %>% 
+         hablar::convert(num(everything())) %>%
+         as.matrix
 
 FEAT.m = FEAT %>%
-        ungroup() %>% 
-        dplyr::select( where(is.numeric) ) %>%
-      as.matrix
+         dplyr::select( where(is.numeric) ) %>%
+         as.matrix
 
 TOT_PROP=ncol(PROP.m)
 TOT_FEAT=ncol(FEAT.m)
 
 prop = PROP %>% 
-        pivot_longer(cols = starts_with('cat_'),
+       pivot_longer(cols = starts_with('cat_'),
                      names_to = c('categories','source','property'), 
                      names_pattern="cat_(.+)\\.(.+)\\.(.+)",
                      values_to = "has_prop") %>%
-        mutate(col_prop = paste0(categories,'.',source,'.',property))
+       mutate(col_prop = paste0(categories,'.',source,'.',property))
 
 feat = FEAT %>% 
-        pivot_longer(cols = starts_with('cat_'),
+       pivot_longer(cols = starts_with('cat_'),
                      names_to = c('categories','source','feature'), 
                      names_pattern="cat_(.+)\\.(.+)\\.(.+)",
                      values_to = "value") %>%
-        mutate(col_feat = paste0(categories,'.',source,'.',feature))
+       mutate(col_feat = paste0(categories,'.',source,'.',feature))
 
 ```
 
@@ -163,8 +160,8 @@ We also gathered **`r TOT_FEAT`** protein features.
 ABUNDANCE = load.ho2018.data() %>% 
             dplyr::select(orf, MPC = mean.mpc, gfp=GFP.avg,ms=MS.avg) %>% # select the average expression
             group_by(orf) %>% dplyr::summarise(across(where(is.numeric),log10)) %>% # apply log10 to expression
-            rowwise()  %>% mutate( noval = mean(is.na(c_across(2:4))) ) %>% # check how many expression values
-            dplyr::filter(noval<1) %>% dplyr::select(-noval) # remove no values
+            rowwise() %>% mutate( noval = mean(is.na(c_across(where(is.numeric)))) ) %>% # check how many expression values
+            dplyr::filter(noval<1 || !is.na(MPC) ) %>% dplyr::select(-noval) # remove no values
 
 EXPRESSION = FEAT %>% 
              dplyr::select(ORF,contains(c("tAI","CU_cai","CU_fop","paxdb","TE_exponential"))) %>%
@@ -183,7 +180,6 @@ exp.type = rep(c('PROTEIN','GENE','ORTHOLOG'), times=c(length(colab),length(cole
 ```{r evodata}
 # EVOLUTIONARY RATE ON FUNGI
 FUNGI = load.dubreuil2021.data(1) %>% 
-     as_tibble() %>%
      dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT')) %>%
      hablar::convert(dbl(EVO.FULL), dbl(PPM)) %>% 
      ungroup() %>% 
@@ -195,7 +191,8 @@ STRAINS = readRDS(here("data","PROTEIN-EVO-FUNGI-SNP.rds")) %>%
        group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log)) %>% # apply log10 to SNP rate4site
        left_join(ABUNDANCE,by=c('ORF'='orf')) %>% 
        left_join(EXPRESSION,by=c('ORF'))
-
+### STRAINS CONTAIN ALL DATA ABOUT THE FUNGI LINEAGE EVOLUTIONARY RATE
+# n_distinct(with(STRAINS,ORF[IS_FUNGI])) N=3828 (3797 no duplicates)
 
 EVO = STRAINS %>% 
       dplyr::filter(IS_FUNGI & IS_STRAINS) %>% 
@@ -249,62 +246,62 @@ for( icat in seq_along(categories) ){
 }
 ```
 
-
-
-
-
 # Residual evolutionary rate (controlled for protein expression)
 
 ```{r fit-evo-exp}
 # Fitting mean Evolutionary rate (R) to Protein abundance (E)
 #init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
 init.params = getInitial(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),data=STRAINS)
-evo_mpc.fit = STRAINS %>%
-               broom::augment_columns(x=nls(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),start=init.params,data=.)) %>% 
-               mutate(RSS = sum(.resid^2), RS = sum(.resid), TSS = sum_(EVO.FULL-mean_(EVO.FULL)^2)) %>%
-               dplyr::rename_with(.fn=xxS, sx='evo',.cols=c(".fitted", ".resid", "RSS", "RS",'TSS') )
+evocols = STRAINS %>% dplyr::select(starts_with('EVO.')) %>% colnames
 
-snp_mpc.fit = STRAINS %>%
+fit.evo_mpc = STRAINS %>%
+               broom::augment_columns(x=nls(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),start=init.params,data=.)) %>% 
+               mutate(mfull=mean_(EVO.FULL), ESS=sum( (.fitted-mfull)^2 ), RSS=sum( (EVO.FULL-.fitted)^2 ), TSS=sum_( (EVO.FULL-mfull)^2 ), RS=sum(.resid)) %>%
+               dplyr::rename_with(.fn=xxS, sx='evo',.cols=c(".fitted", ".resid", "RSS", "RS",'TSS') ) 
+
+fit.snp_mpc = STRAINS %>%
                broom::augment_columns(x=lm(SNP.FULL ~ MPC,data=.)) %>% 
-               mutate(RSS = sum(.resid^2), RS = sum(.resid),TSS = sum_(SNP.FULL-mean_(SNP.FULL)^2)) %>% 
+               mutate(ESS=sum(.fitted^2), RSS = sum(.resid^2), RS = sum(.resid),TSS = sum_(SNP.FULL-mean_(SNP.FULL)^2)) %>% 
                dplyr::rename_with(.fn=xxS, sx='snp', .cols=c(".fitted", ".resid", "RSS", "RS","TSS") )
 
+# mpc.fit = STRAINS%>%
+#             broom::augment_columns(x=lm(SNP.FULL ~ MPC,data=.)) %>% 
+#             mutate(RSS = sum(.resid^2), RS = sum(.resid),TSS = sum_(SNP.FULL-mean_(SNP.FULL)^2)) %>% 
+#             dplyr::rename_with(.fn=xxS, sx='snp', .cols=c(".fitted", ".resid", "RSS", "RS","TSS") )%>%
+#             broom::augment_columns(x=nls(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),start=init.params,data=.)) %>% 
+#             mutate(RSS = sum(.resid^2), RS = sum(.resid), TSS = sum_(EVO.FULL-mean_(EVO.FULL)^2)) %>%
+#             dplyr::rename_with(.fn=xxS, sx='evo',.cols=c(".fitted", ".resid", "RSS", "RS",'TSS') )
+# 
+#           
+#           relocate(UNIPROT,ORF,IS_FUNGI,IS_STRAINS,colab,colexp,colortho,evocols) %>% arrange(desc(IS_FUNGI),desc(IS_STRAINS),UNIPROT,ORF)
+# dim(mpc.fit)
+# prop.mpc.fit = mpc.fit %>% %>%
 
-propfit = inner_join(evo_mpc.fit,snp_mpc.fit, suffix=c('.evo','.snp')) %>% 
-              left_join(prop) %>% dplyr::filter(has_prop)
-
-.res_prop = propfit %>% 
-              group_by(col_prop) %>% 
-              mutate(  N=n(),
-                .res_evo.RS.pc  = sum(.resid.evo)/TSS.evo,
-
-                .res_evo.neg = sum(.resid.evo<0), 
-                .res_evo.pos = sum(.resid.evo>0),
-                .res_evo.dN  = .res_evo.neg-.res_evo.pos,
-                .res_evo.rN  = .res_evo.pos/.res_evo.neg,
-                .res_evo.RS  = sum(.resid.evo),
-
-                .res_evo.RS.log = sign(.res_evo.RS) * log(abs(.res_evo.RS)),
-                .res_evo.RS.neg = sum(.resid.evo[.resid.evo<0]), 
-                .res_evo.RS.pos = sum(.resid.evo[.resid.evo>0]),
-                .res_evo.RS.avg = mean_(.resid.evo), 
-                
-                .res_snp.neg = sum(.resid.snp<0), 
-                .res_snp.pos = sum(.resid.snp>0),
-                .res_snp.dN  = .res_snp.neg-.res_snp.pos,
-                .res_snp.rN  = .res_snp.pos/.res_snp.neg,
-                .res_snp.RS.pc  = sum(.resid.snp)/TSS.snp,
-
-                .res_snp.RS  = sum(.resid.snp),
-                .res_snp.RS.log = sign(.res_snp.RS) * log(abs(.res_snp.RS)),
-                .res_snp.RS.neg = sum(.resid.snp[.resid.snp<0]), 
-                .res_snp.RS.pos = sum(.resid.snp[.resid.snp>0]),
-                .res_snp.RS.avg = mean_(.resid.snp), 
-           ) %>%
-  arrange(desc(.res_evo.RS.pc),desc(.res_snp.RS.pc)) %>%
-  dplyr::select(categories,source,property, col_prop, N, starts_with('.res_')) %>%
-  distinct() %>% 
-  group_by(categories) %>% mutate(rRS = dense_rank(.res_evo.RS.avg) , ncat=n())
+prop_evo_mpc = fit.evo_mpc %>% 
+               left_join(prop %>% dplyr::filter(has_prop)) %>% 
+               group_by(col_prop) %>% 
+               mutate(  N=n(), 
+                        N_RS_pos = sum(.resid.evo>0),
+                        N_RS_neg = sum(.resid.evo<0),
+                        RS     = sum(.resid.evo),
+                        RS.log = sign(RS) * log(abs(RS)),
+                        RS_pos = sum(.resid.evo[.resid.evo>0]),
+                        RS_neg = sum(.resid.evo[.resid.evo<0]),
+                        RS_avg = mean_(.resid.evo), 
+                        
+                        RSS  = sum(.resid.evo^2),
+                        RSS.pc  = sum(.resid.evo^2)/TSS.evo,
+                        RSS_pos = sum(.resid.evo[.resid.evo>0]^2),
+                        RSS_neg = sum(.resid.evo[.resid.evo<0]^2),
+                        
+                        RSS_delta  = RSS_neg-RSS_pos,
+                        RSS_ratio  = RSS_neg/RSS_pos,
+              ) %>% 
+              arrange(desc(RSS.pc)) %>% #,desc(.res_snp.RS.pc)) %>%
+              dplyr::select(categories,source,property, col_prop, colab, evocols, N,N_RS_pos,N_RS_neg, 
+                            starts_with('RS'),ends_with('.evo'),) %>%
+              distinct() %>% 
+  group_by(categories) %>% mutate(rRS = dense_rank(RSS.pc) , ncat=n())
 
 
 # residuals correlated to features 
@@ -313,26 +310,23 @@ feat.rk = left_join(STRAINS,feat) %>%
              group_by(col_feat) %>% 
              mutate(feat_n = n(), rk.value = dense_rank(value), rk.mpc = dense_rank(MPC))
 
-semifit.res = inner_join(evo_mpc.fit,snp_mpc.fit, suffix=c('.evo','.snp')) %>% 
-              left_join(feat.rk)
+semifit.res = fit.evo_mpc %>% left_join(feat.rk) %>% dplyr::filter(!is.na(col_feat))
 
 corfeat.res = semifit.res %>% 
   group_by(col_feat) %>% 
-  mutate( R2_evo=scor(.resid.evo,value)$estimate,  
-          R2_snp=scor(.resid.snp,value)$estimate) %>%
-  group_by(categories) %>% mutate( ncat=n(), 
-                                   r.R2_evo=dense_rank(R2_evo),
-                                   r.R2_snp=dense_rank(R2_snp)) %>% 
-  summarise(categories,source,feature,feat_n,R2_evo,R2_snp, r.R2_evo,r.R2_snp,ncat) %>% distinct()
+  mutate( rho2_evo=scor(.resid.evo,value)$estimate^2 ) %>%
+  group_by(categories) %>% mutate( ncat=n(), rk.rho2_evo=dense_rank(desc(rho2_evo)) ) %>%
+  summarise(categories,source,feature,feat_n, rho2_evo, rk.rho2_evo, ncat) %>% 
+  distinct() %>% arrange(rk.rho2_evo)
 
 ```
 
 ## Figure 1: Looking at residual evolutionary rate
 
 ```{r f1-analyze-residuals, fig.dim=c(20,7), eval=F}
-propsub = propfit %>% dplyr::filter( property  %in% c('essential_core') )
+propsub = prop_evo_mpc %>% dplyr::filter( property  %in% c('essential_core') )
 
-p1a= ggplot(evo_mpc.fit, aes(y = EVO.FULL, x = MPC)) +
+p1a= ggplot(fit.evo_mpc, aes(y = EVO.FULL, x = MPC)) +
           geom_ribbon(aes(ymin=.fitted.evo+0.01, ymax=Inf), fill='#BB0033',alpha=0.3)+
           geom_ribbon(aes(ymin=-Inf,ymax=.fitted.evo-0.01), fill='#00BB33',alpha=0.3)+
           geom_abline(slope=0,intercept = mean(evo_mpc.fit$EVO.FULL),size=2,col='gray',linetype=2)+
@@ -348,7 +342,7 @@ p1a= ggplot(evo_mpc.fit, aes(y = EVO.FULL, x = MPC)) +
 
 plot(p1a)
 
-p1b=     ggplot(data=evo_mpc.fit, aes(y=.resid.evo,x=MPC)) + 
+p1b=     ggplot(data=fit.evo_mpc, aes(y=.resid.evo,x=MPC)) + 
         geom_ribbon(aes(ymin=0.01, ymax=Inf), fill='#BB0033',alpha=0.3)+
         geom_ribbon(aes(ymin=-Inf,ymax=-0.01), fill='#00BB33',alpha=0.3)+
         geom_abline(slope=0,intercept = 0,size=2)+
@@ -361,12 +355,12 @@ p1b=     ggplot(data=evo_mpc.fit, aes(y=.resid.evo,x=MPC)) +
         xlab('Protein abundance (log10 mpc)') + ylab('Residuals (ER)') + theme(legend.position="none")
 plot(p1b) 
 
-propsubres = .res_prop %>% dplyr::filter( property  %in% c('essential_core') )
-YMIN = min(-0.2,propsubres$.res_evo.RS.pc)%>% round(digits = 1)
-YMAX = max(0.2,propsubres$.res_evo.RS.pc) %>% round(digits = 1)
+propsubres = prop_evo_mpc %>% dplyr::filter( property  %in% c('essential_core','essential_dispensable', 'pangenome_rare','pangenome_variable') )
+YMIN = min(0,propsubres$RSS.pc) %>% RoundDownToNearest(roundto = 0.1)
+YMAX = max(0,propsubres$RSS.pc) %>% RoundUpToNearest(roundto = 1)
 p1c =  ggplot(propsubres,
-             aes(x = reorder(str_trunc(property,w=50), -.res_evo.RS.pc),
-                 y = .res_evo.RS.pc, fill=property), group=source) +
+             aes(x = reorder(str_trunc(property,w=50), -RSS.pc),
+                 y = RSS.pc, fill=property), group=source) +
             geom_hline(yintercept = 0,size=1,col='gray',linetype=2) +
             geom_rect(aes(xmin=-Inf,xmax=Inf,ymin=0,ymax=Inf), fill='#BB0033',alpha=0.3)+
             geom_rect(aes(xmin=-Inf,xmax=Inf,ymin=-Inf,ymax=0), fill='#00BB33',alpha=0.3)+
@@ -465,16 +459,16 @@ for( icat in seq_along(categories) ){
 ## Thesis Figure 3.4: Top properties/features controlled by abundance
 
 ```{r phd-f3.4, fig.dim=c(25,20)}
-mu=mean_(STRAINS$EVO.FULL)
-s = sd_(STRAINS$EVO.FULL)
-md=median_(STRAINS$EVO.FULL)
-rg = range_(STRAINS$EVO.FULL)
+mu=mean_(FUNGI$EVO.FULL)
+s = sd_(FUNGI$EVO.FULL)
+md=median_(FUNGI$EVO.FULL)
+rg = range_(FUNGI$EVO.FULL)
 
 nsd = 2
 symmetry = function(x){ return( sort(c(x,x)) * (-1)^(1:length(x)) ) }
 sd_x = mu + s* symmetry(x=1:nsd)
 
-D=density(STRAINS$EVO.FULL,bw=0.1,na.rm=T)
+D=density(FUNGI$EVO.FULL,bw=0.1,na.rm=T)
 dy.ind = sapply(sd_x,function(X){ which(near(X,D$x,tol=2e-3)) })
 sd_y  = D$y[dy.ind]
 
@@ -483,7 +477,7 @@ df_sd =tibble(
   yy = sd_y
 )
 
-A = ggplot(subset(STRAINS,!is.na(EVO.FULL))) + 
+A = ggplot(subset(FUNGI,!is.na(EVO.FULL))) + 
           ggpubr::grids() +
           stat_density(bw = 0.1, aes(x=EVO.FULL)) + 
           geom_vline(xintercept = mu, col='white', linetype=1,size=1) + # mean
@@ -496,8 +490,8 @@ A = ggplot(subset(STRAINS,!is.na(EVO.FULL))) +
 A
 
 
-selected.prop = c('MF_nucleotide_binding','MF_molecular_function','essential_core','essential_dispensable','peter2018.pangenome_rare','peter2018.pangenome_cloud')
-ER.prop = propfit %>% dplyr::filter(property %in% selected.prop) %>% dplyr::select('EVO.FULL','.resid.evo')
+selected.prop = c('MF_nucleotide_binding','MF_molecular_function','essential_core','essential_dispensable','pangenome_rare','pangenome_cloud')
+ER.prop = propfit %>% dplyr::filter(property %in% selected.prop) %>% dplyr::select('property','EVO.FULL','.resid.evo')
 
 B = ggplot(ER.prop) +  
          geom_point(aes(x=EVO.FULL,y=0),size = 2, fill='yellow',shape = 21, stroke = 0.5,
