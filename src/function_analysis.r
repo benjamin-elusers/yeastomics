@@ -269,3 +269,8 @@ coalesce_join <- function(x, y,
   dplyr::bind_cols(joined, coalesced)[cols]
 }
 
+nearest=function(x,y,n=1){
+  d=abs(x-y)
+  ord = order(d)
+  return( ord[1:n] )
+}
