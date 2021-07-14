@@ -269,8 +269,13 @@ coalesce_join <- function(x, y,
   dplyr::bind_cols(joined, coalesced)[cols]
 }
 
-nearest=function(x,y,n=1){
+nearest=function(x,y,n=1,value=F){
+  if(length(x)>1){
+    warning('x must be a scalar (single value). Using the first value of x...')
+    x=x[1]
+  }
   d=abs(x-y)
   ord = order(d)
+  if(value){ return(y[ord[1:n]]) }
   return( ord[1:n] )
 }
