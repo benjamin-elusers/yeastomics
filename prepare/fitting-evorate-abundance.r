@@ -224,7 +224,7 @@ make_poly_fit = function(input,    # Input data
 make_expo_fit = function(input,    # Input data
                          y=Y, x=X, # X/Y Variables to fit
                          only.params=T){
-  xydata = get.XY.data(input,x,y,noNA=T)
+  xydata = get_XY_data(input,x,y,noNA=T)
   mu.y = xydata$mu['y']
   var.y=xydata$var['y']
   nXY = xydata$n['xy']
@@ -235,7 +235,7 @@ make_expo_fit = function(input,    # Input data
   f=as.formula(paste0(y,"~ expo(alpha,beta,",x,")"))
   init.params=list(alpha=1,beta=-1)
   m=nls(f,start = init.params,data=xydata$df)
-  m.params = get.model.params(m,xydata$XX,xydata$YY) %>%
+  m.params = get_model_params(m,xydata$XX,xydata$YY) %>%
     purrr::list_modify(model = model.name, xname=xydata$varnames['x'],yname=xydata$varnames['y'])
   if(only.params){ return(m.params) }
   # data with model #
