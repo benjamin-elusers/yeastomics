@@ -183,13 +183,15 @@ FUNGI = load.dubreuil2021.data(1) %>%
      dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT')) %>%
      hablar::convert(dbl(EVO.FULL), dbl(PPM)) %>% 
      ungroup() %>% 
-     left_join(ABUNDANCE,by=c('ORF'='orf'))
+     left_join(ABUNDANCE,by=c('ORF'='orf')) %>%
+     filter( !is.na(PPM) & !is.na(MPC) )
 
 # EVOLUTIONARY RATE ON BOTH FUNGI AND STRAINS
 STRAINS = readRDS(here("data","PROTEIN-EVO-FUNGI-SNP.rds")) %>%
        dplyr::select(c(starts_with(c('EVO.','SNP.')),'PPM','ORF','UNIPROT','IS_FUNGI','IS_STRAINS')) %>% 
        group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log)) %>% # apply log10 to SNP rate4site
        left_join(ABUNDANCE,by=c('ORF'='orf')) %>% 
+       filter( !is.na(PPM) & !is.na(MPC) ) %>%
        left_join(EXPRESSION,by=c('ORF'))
 ### STRAINS CONTAIN ALL DATA ABOUT THE FUNGI LINEAGE EVOLUTIONARY RATE
 # n_distinct(with(STRAINS,ORF[IS_FUNGI])) N=3828 (3797 no duplicates)
@@ -249,6 +251,11 @@ for( icat in seq_along(categories) ){
 # Residual evolutionary rate (controlled for protein expression)
 
 ```{r fit-evo-exp}
+saveRDS(FUNGI,   file=here("data", "fungi-evodata.rds") )
+saveRDS(STRAINS, file=here("data", "yeast_strains-evodata.rds") )
+saveRDS(prop,    file=here("data", "proteome-properties-info.rds") )
+
+
 # Fitting mean Evolutionary rate (R) to Protein abundance (E)
 #init.params =  list(Asym = 3, xmid = 1.5, scal=-1)
 init.params = getInitial(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),data=STRAINS)
@@ -256,8 +263,32 @@ evocols = STRAINS %>% dplyr::select(starts_with('EVO.')) %>% colnames
 
 fit.evo_mpc = STRAINS %>%
                broom::augment_columns(x=nls(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),start=init.params,data=.)) %>% 
-               mutate(mfull=mean_(EVO.FULL), ESS=sum( (.fitted-mfull)^2 ), RSS=sum( (EVO.FULL-.fitted)^2 ), TSS=sum_( (EVO.FULL-mfull)^2 ), RS=sum(.resid)) %>%
-               dplyr::rename_with(.fn=xxS, sx='evo',.cols=c(".fitted", ".resid", "RSS", "RS",'TSS') ) 
+               mutate(nfull=sum_(complete.cases(EVO.FULL,MPC)), mfull=mean_(EVO.FULL), vfull=var_(EVO.FULL),
+                      ESS=sum_( (.fitted-mfull)^2 ), RSS=sum_( (.resid)^2 ), TSS=sum_( (EVO.FULL-mfull)^2 ), 
+                      s2=TSS/(nfull-1), RS=sum(.resid)) %>%
+               dplyr::rename_with(.fn=xxS, sx='evo',.cols=c(".fitted", ".resid","ESS", "RSS", "RS",'TSS') ) 
+
+
+msig = nls(EVO.FULL ~ SSlogis(MPC,Asym,xmid,scal),start=init.params,data=FUNGI)
+y = msig$m$lhs() # Y values
+mu = mean(y)     # Y mean
+yfit = fitted(msig) # Y-Fitted
+yres = residuals(msig) # Y-Residuals
+
+pfit = coef(msig) # Fitted parameters (Asym, xmid, scal)
+
+RSS = sum( yres^2  ) # Deviance (Unexplained variance) 
+ESS = sum( (yfit-mu)^2 ) # Explained variance
+TSS = sum( (y-mu)^2 )
+RSS + ESS
+
+fit.evo_mpc %>% 
+  rowwise %>%
+  summarise(nfull,mfull,vfull,s2, RS.evo,ESS.evo, RSS.evo, TSS.evo) %>%
+  distinct %>% mutate(tss = s2 * (nfull-1) )
+
+test$TSS.evo-test$RSS.evo
+test$ESS.evo
 
 fit.snp_mpc = STRAINS %>%
                broom::augment_columns(x=lm(SNP.FULL ~ MPC,data=.)) %>% 
@@ -420,9 +451,9 @@ plot(S2)
 ## Figure 3: Top properties with proteins more/less conserved than expected (by abundance)
 
 ```{r f3-prop-resid, fig.dim=c(25,20)}
-F3 = ggplot(.res_prop %>% slice_min_max( order_by=.res_evo.RS.pc, n=10 ), 
-               aes(y = reorder(str_trunc(property,w=50), -.res_evo.RS.pc),
-                   x = .res_evo.RS.pc, fill=source)) +
+F3 = ggplot(prop_evo_mpc %>% slice_min_max( order_by=RSS.pc, n=10 ), 
+               aes(y = reorder(str_trunc(property,w=50), -RSS.pc),
+                   x = RSS.pc, fill=source)) +
       geom_bar(stat='identity',position='dodge')  + 
       geom_text(aes(label=N),hjust='inward',size=5,col='black') +
       geom_vline(xintercept = c(-0.05,-0.1,-0.15,0.05,0.1,0.15),col='gray50', size=0.25) +
