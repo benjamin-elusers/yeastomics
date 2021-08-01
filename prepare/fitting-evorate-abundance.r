@@ -13,6 +13,7 @@ library(tictoc)
 library(hablar)
 library(here)
 #### _Graphics ####
+library(cowplot)
 library(ggplot2)
 library(ggthemes)
 library(ggsci)
