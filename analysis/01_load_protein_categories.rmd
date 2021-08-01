@@ -516,7 +516,7 @@ TRANSCRIPTOMICS=list()
 ### Codon adaptation
 df.tai=load.trna.adaptation(inputseq=CDS) %>% dplyr::rename(codonr.tAI = tAI)
 df.CU=load.codon.usage(cds=CDS,with.counts=F) %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
-df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
+df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3), len.cds=lengths(CDS)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
  
 ### Amino-acid biosynthetic cost
 df.protinfo = UNIPROT %>%  dplyr::select(c(UNIPROTKB,REVIEWED,EXISTENCE,SCORE,qual))
