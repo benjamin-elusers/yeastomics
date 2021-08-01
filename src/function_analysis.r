@@ -279,3 +279,46 @@ nearest=function(x,y,n=1,value=F){
   if(value){ return(y[ord[1:n]]) }
   return( ord[1:n] )
 }
+
+text2corner = function(where){
+  corners=list()
+  corners$bottomleft = c(X=-Inf,Y=-Inf)
+  corners$topleft = c(X=-Inf,Y=Inf)
+  corners$topright = c(X=Inf,Y=Inf)
+  corners$bottomright = c(X=Inf,Y=-Inf)
+  which=match.arg(where, choices = c('bottomleft','topleft','topright','bottomright'),several.ok = F)
+  return(corners[[which]])
+}
+
+
+make_scatterplot  = function(data2plot,xvar,yvar,labx='',laby='',pal='Spectral',paldir=-1, theme2use = NULL, txtcorner='bottomleft'){
+  library(ggthemes)
+  library(ggplot2)
+  theme_set(theme2use)
+
+  corner=text2corner(txtcorner)
+  rho=spearman.toplot(data2plot[[xvar]],data2plot[[yvar]])
+
+  ggplot(data=data2plot,aes_string(x=xvar,y=yvar)) +
+    geom_point(size=0.7, alpha=0.8,shape=19) +
+    stat_density_2d(aes(fill = ..level..), geom = "polygon", colour=NA,size=0.25,alpha=0.25)+
+    geom_smooth(method = 'lm',col='gray50',se=F,size=1) +
+    geom_text(data=rho,aes(x=corner['X'],y=corner['Y'],label=toshow),hjust='inward',vjust='inward',size=5) +
+    xlab(labx) +
+    ylab(laby) +
+    scale_fill_distiller(palette = pal,direction=paldir)
+}
+
+get_clade_residual_evorate = function(cladedata){
+  cat("==> Get residuals of clade-specific evolutionary rate from abundance <==\n")
+  if(missing(cladedata)){ stop("Run get_clade_data() with the two clades you want to compare...") }
+
+  fit.evo = cladedata %>%
+    broom::augment_columns(x=lm(XX~log10(ppm1),data=.)) %>%
+    dplyr::rename(.resid.1 = .resid, .fitted.1=.fitted, .se.fit.1=.se.fit, .hat.1=.hat, .sigma.1=.sigma, .cooksd.1=.cooksd,.std.resid.1=.std.resid)  %>%
+    broom::augment_columns(x=lm(YY~log10(ppm2),data=.)) %>%
+    dplyr::rename(.resid.2 = .resid, .fitted.2=.fitted, .se.fit.2=.se.fit, .hat.2=.hat, .sigma.2=.sigma, .cooksd.2=.cooksd,.std.resid.2=.std.resid) %>%
+    mutate( rY=.resid.2, rX=.resid.1)
+  return(fit.evo)
+}
+
