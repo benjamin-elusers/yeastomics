@@ -376,3 +376,46 @@ get_fungi_clades = function(){
   )
   return(fungi.clades)
 }
+
+get_clade_data = function(data, g1='schizo', g2='sacch.wgd', rate='ratio',tolog=T, include.wgd=F, include.seqcomp=F){
+
+  seqcomp.cols = c(get.AA1(),get.codons4tai(noSTOP=T),'ncod','len.cdna','nAT','nGC')
+  wgd.cols = c('id1','o1','o2','ref','dup','anc','rlen.aa',
+               'PID.aa','PID.aa.str','PID.aa.f',
+               'PPM.dup','PPM.dup.f','PPM.ratio','PPM.ratio.f','PPM.log2FCH','PPM.log2FCH.f' )
+
+  if(missing(data)){
+    library(here)
+    warning('No input data! using the local eggnog/RaxML data for fungi...')
+    eggnog.raxml.data = load(here("data",'SC-phylo-ali-prot_data.Rdata'))
+    data = get('mySC.phy')
+  }
+
+  rate_type = match.arg(rate, choices=c('ratio','avg','nog'))
+  clade_names = get_fungi_clades() %>% names()
+  G1 = match.arg(g1, choices = clade_names) %>% paste(.,rate_type,sep='.')
+  G2 = match.arg(g2, choices = clade_names) %>% paste(.,rate_type,sep='.')
+  cat("==> Get clade-specific evolutionary data <==\n")
+  cat(sprintf("-> evorate      : %s     \n",rate_type))
+  cat(sprintf("-> clade #1 (X) : %s (%s)\n",g1,G1))
+  cat(sprintf("-> clade #2 (Y) : %s (%s)\n",g2,G2))
+
+  N = nrow(data)
+  cladedata = data %>%
+    mutate(XX= log10(data[[G1]]),YY= log10(data[[G2]]),
+           ppm1.log10 = log10(ppm1), ppm2.log10=log10(ppm2),
+           RX = rank(XX), RY = rank(YY),
+           scaledRX = scales::rescale(RX, to = range_(XX)),
+           scaledRY = scales::rescale(RY, to = range_(YY)),
+           clade1=g1, clade2=g2
+    ) %>%
+    filter(!is.na(XX) & !is.na(YY))
+
+  res = cladedata
+  if(!include.wgd){ res = dplyr::select(res, -wgd.cols) }
+  if(!include.seqcomp){ res=dplyr::select(res,-seqcomp.cols) }
+
+  return(res)
+}
+
+#get_clade_data(g1='schizo',g2='sacch.wgd')
