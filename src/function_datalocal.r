@@ -322,7 +322,7 @@ get.d2p2.diso = function(d2p2,as.df=F){
 }
 
 # Gene expression --------------------------------------------------------------
-get.codons4tai = function(){
+get.codons4tai = function(noSTOP=F){
   codon.ord = c('TTT', 'TTC', 'TTA', 'TTG', 'TCT', 'TCC', 'TCA', 'TCG',
                 'TAT', 'TAC', 'TAA', 'TAG', 'TGT', 'TGC', 'TGA', 'TGG',
                 'CTT', 'CTC', 'CTA', 'CTG', 'CCT', 'CCC', 'CCA', 'CCG',
@@ -332,6 +332,7 @@ get.codons4tai = function(){
                 'GTT', 'GTC', 'GTA', 'GTG', 'GCT', 'GCC', 'GCA', 'GCG',
                 'GAT', 'GAC', 'GAA', 'GAG', 'GGT', 'GGC', 'GGA', 'GGG'
   )
+  if(noSTOP){ return( setdiff(codon.ord,c('TAA','TAG','TGA')) ) }
   return(codon.ord)
 }
 
