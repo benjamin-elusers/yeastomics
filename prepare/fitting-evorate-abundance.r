@@ -581,30 +581,30 @@ FIT =  prop.lin %>%
 #             arrange(desc(dess),desc(rss))
 # best.prop = rank.prop %>% dplyr::filter(abs(drss)>1 & dess>1) %>% pull(col_prop) %>% paste0('cat_',.)
 df.best.prop = FIT %>% dplyr::filter(tss.pc > 1 & abs(dRSS.pc)>1 & abs(dESS.pc)>1)
-best.prop = df.best.prop %>% pull(col_prop) %>% paste0('cat_',.)
-
-mall.prop=lm(data=fitdata[,c('EVO.FULL','MPC',best.prop)], formula = EVO.FULL ~MPC)
-
-
-m0.prop=lm(data=fitdata[,c('EVO.FULL','MPC',best.prop)], formula = EVO.FULL ~MPC)
-m1.prop <- lm(data=fitdata,  I(EVO.FULL-coef(m0.prop)[1]) ~  offset(coef(m0.prop)[2]*MPC) + cat_functions.go.MF_nucleotide_binding + cat_functions.go.MF_molecular_function)
-m.bestprop=lm(".resid ~ offset(coef(m0.prop)[2] * MPC) + .", data =fitdata[,c('.resid','MPC',best.prop)])
-add.best = str_c(best.prop, collapse = ' + ')
-fitprop.final = step(m0.prop,scope = as.formula(paste0('. ~ . +',add.best)), direction = 'forward')
-selected.best = gsub("TRUE$","",names(coef(fitprop.final))) %>% grep(pattern='cat_',v=T) %>% gsub(patt='cat_',repl="")
-
-theme_update(axis.text.x = element_text(size=8,angle = 90),aspect.ratio=NULL)
-F3 = ggplot(FIT %>% dplyr::filter(col_prop %in% selected.best),
-            aes(x = reorder(str_trunc(property,w=50), -dRSS.pc*EXPECTED),
-                y = dRSS.pc*EXPECTED)) +
-  geom_bar(stat='identity',position='dodge')  +
-  #geom_text(aes(label=N),hjust='inward',size=5,col='black') +
-  geom_hline(yintercept = c(-5:5),col='gray50', size=0.25) +
-  facet_wrap(~EXPECTED,scales = 'free_x') + coord_flip() +
-  ylab('% of TSS\n(variance in evolutionary rate)') + xlab('Properties') + theme(axis.text.x = element_text(size=10,hjust = 1))
-plot(F3)
-save_plot(plot = F3, here("output",'f3.5E-barplot-best-prop-selected.pdf'), base_height=12, base_width=20)
-
+# best.prop = df.best.prop %>% pull(col_prop) %>% paste0('cat_',.)
+#
+# mall.prop=lm(data=fitdata[,c('EVO.FULL','MPC',best.prop)], formula = EVO.FULL ~MPC)
+#
+#
+# m0.prop=lm(data=fitdata[,c('EVO.FULL','MPC',best.prop)], formula = EVO.FULL ~MPC)
+# m1.prop <- lm(data=fitdata,  I(EVO.FULL-coef(m0.prop)[1]) ~  offset(coef(m0.prop)[2]*MPC) + cat_functions.go.MF_nucleotide_binding + cat_functions.go.MF_molecular_function)
+# m.bestprop=lm(".resid ~ offset(coef(m0.prop)[2] * MPC) + .", data =fitdata[,c('.resid','MPC',best.prop)])
+# add.best = str_c(best.prop, collapse = ' + ')
+# fitprop.final = step(m0.prop,scope = as.formula(paste0('. ~ . +',add.best)), direction = 'forward')
+# selected.best = gsub("TRUE$","",names(coef(fitprop.final))) %>% grep(pattern='cat_',v=T) %>% gsub(patt='cat_',repl="")
+#
+# theme_update(axis.text.x = element_text(size=8,angle = 90),aspect.ratio=NULL)
+# F3 = ggplot(FIT %>% dplyr::filter(col_prop %in% selected.best),
+#             aes(x = reorder(str_trunc(property,w=50), -dRSS.pc*EXPECTED),
+#                 y = dRSS.pc*EXPECTED)) +
+#   geom_bar(stat='identity',position='dodge')  +
+#   #geom_text(aes(label=N),hjust='inward',size=5,col='black') +
+#   geom_hline(yintercept = c(-5:5),col='gray50', size=0.25) +
+#   facet_wrap(~EXPECTED,scales = 'free_x') + coord_flip() +
+#   ylab('% of TSS\n(variance in evolutionary rate)') + xlab('Properties') + theme(axis.text.x = element_text(size=10,hjust = 1))
+# plot(F3)
+# save_plot(plot = F3, here("output",'f3.5E-barplot-best-prop-selected.pdf'), base_height=12, base_width=20)
+#
 
 
 
