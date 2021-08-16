@@ -412,10 +412,65 @@ get_clade_data = function(data, g1='schizo', g2='sacch.wgd', rate='ratio',tolog=
     filter(!is.na(XX) & !is.na(YY))
 
   res = cladedata
-  if(!include.wgd){ res = dplyr::select(res, -wgd.cols) }
-  if(!include.seqcomp){ res=dplyr::select(res,-seqcomp.cols) }
+  if(!include.wgd){ res = dplyr::select(res, -all_of(wgd.cols)) }
+  if(!include.seqcomp){ res=dplyr::select(res,-all_of(seqcomp.cols)) }
 
   return(res)
 }
 
 #get_clade_data(g1='schizo',g2='sacch.wgd')
+
+get_phylo_data = function(data, include.wgd=T,  include.ali=T,
+                          include.eggnog=T, include.raxml=F,
+                          include.seqcomp=F,include.nprot=F ){
+
+  seqcomp.cols = c(get.AA1(),get.codons4tai(noSTOP=T),'ncod','len.cdna','nAT','nGC')
+  nprot.cols = c('nP.4932','nP.6239','nP.7227','nP.7955','nP.9031','nP.9606','nP.9913','nP.10090','nP.224308','nP.511145','nP')
+  ali.cols =  c('SconsB62.avg','npos','ngaps','naa','naa.cons','ngaps.cons','ncons','nsub1','nsub2','nsub3','score.cons')
+  eggnog.cols = c("node",'Tax','NOG','ORTHO','PARA',
+                  "nP","nS","nS.paxdb","nS.1to1","nSmax.paxdb",
+                  "nog.1to1","uniq.nog","uniq.all",
+                  'pair','FunCat',"enog.Lt",
+                  "PID","PID.aas","PID.gaps","PID.aas.f",
+                  'orf','sp2','uni2','ppm2','mapped2','rk.max2','rk.ppm2','top.perc2',"enog.Lr2",
+                  'id1','sp1','uni1','ppm1','mapped1','rk.max1','rk.ppm1','top.perc1',"enog.Lr1")
+  clade_names = get_fungi_clades() %>% names()
+  branch.type =c(".nog",'.avg','.ratio')
+  branch.cols = lapply(branch.type, function(x){ paste0(clade_names,x)}) %>% unlist
+  raxml.cols = c('RAXML','raxml.Lr1.outgroup','raxml.Lr2.outgroup','raxml.Lt.outgroup',"r.raxml.f",
+                 branch.cols, "rlog2.ppm", "rlog2.ppm.f","rlog2.raxml")
+
+  wgd.cols = c('orf','o1','o2','ref','dup','anc','rlen.aa',
+               'PID.aa','PID.aa.str','PID.aa.f',
+               'PPM.dup','PPM.dup.f','PPM.ratio','PPM.ratio.f','PPM.log2FCH','PPM.log2FCH.f' )
+
+  if(missing(data)){
+    library(here)
+    warning('No input data! using the local eggnog/RaxML data for fungi...')
+    eggnog.raxml.data = load(here("data",'SC-phylo-ali-prot_data.Rdata'))
+    data = get('mySC.phy')
+  }
+
+  cat("==> Get fungi phylogenetic data <==\n")
+  cat(sprintf("-> with WGD      : %s \n",include.wgd))
+  cat(sprintf("-> with eggnog   : %s \n",include.eggnog))
+  cat(sprintf("-> with raxml    : %s \n",include.raxml))
+  cat(sprintf("-> with composeq : %s \n",include.seqcomp))
+  cat(sprintf("-> with aligned  : %s \n",include.ali))
+  cat(sprintf("-> with prot num : %s \n",include.nprot))
+
+  N = nrow(data)
+  phylodata = data %>%
+    mutate(ppm1.log10 = log10(ppm1), ppm2.log10=log10(ppm2),
+           PPM.log10 = log10(PPM), PPM.dup.log10=log10(PPM.dup))
+
+  res = phylodata
+  if(!include.wgd){ res = dplyr::select(res, -wgd.cols) }
+  if(!include.eggnog){ res = dplyr::select(res, -eggnog.cols) }
+  if(!include.raxml){ res = dplyr::select(res, -raxml.cols) }
+  if(!include.seqcomp){ res=dplyr::select(res,-seqcomp.cols) }
+  if(!include.ali){ res=dplyr::select(res,-nprot.cols) }
+  if(!include.nprot){ res=dplyr::select(res,-ali.cols) }
+
+  return(res)
+}
