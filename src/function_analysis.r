@@ -291,7 +291,12 @@ text2corner = function(where){
 }
 
 
-make_scatterplot  = function(data2plot,xvar,yvar,labx='',laby='',pal='Spectral',paldir=-1, theme2use = NULL, txtcorner='bottomleft'){
+make_scatterplot  = function(data2plot,xvar,yvar,
+                             pt.size = 0.7, pt.shape=19, pt.alpha=0.8, pt.col='black', pt.fill='black',
+                             labx='',laby='',
+                             pal='Spectral',paldir=-1,
+                             theme2use = NULL,
+                             txtcorner='bottomleft'){
   library(ggthemes)
   library(ggplot2)
   theme_set(theme2use)
@@ -300,7 +305,7 @@ make_scatterplot  = function(data2plot,xvar,yvar,labx='',laby='',pal='Spectral',
   rho=spearman.toplot(data2plot[[xvar]],data2plot[[yvar]])
 
   ggplot(data=data2plot,aes_string(x=xvar,y=yvar)) +
-    geom_point(size=0.7, alpha=0.8,shape=19) +
+    geom_point(size=pt.size, alpha=pt.alpha,shape=pt.shape,col=pt.col,fill=pt.fill) +
     stat_density_2d(aes(fill = ..level..), geom = "polygon", colour=NA,size=0.25,alpha=0.25)+
     geom_smooth(method = 'lm',col='gray50',se=F,size=1) +
     geom_text(data=rho,aes(x=corner['X'],y=corner['Y'],label=toshow),hjust='inward',vjust='inward',size=5) +
