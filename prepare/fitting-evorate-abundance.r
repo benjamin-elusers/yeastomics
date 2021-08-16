@@ -19,6 +19,7 @@ library(ggthemes)
 library(ggsci)
 library(ggrepel)
 library(ggpubr)
+library(see)
 mytheme =   theme_clean(base_size = 14) +
   theme(line=element_line(size=1),
         panel.grid.major = element_line(size=1,lineend='round',linetype='22',color='gray50'),
@@ -248,6 +249,23 @@ make_expo_fit = function(input,    # Input data
   return(fit)
 }
 
+decompose_variance = function(LM){
+  N=sum(complete.cases(LM$model))
+  TSS = var( LM$model[,1] ) * (N-1)
+  df.var = summary(aov(LM))[[1]]
+  nvar = nrow(df.var)
+  RSS = sum(df.var$`Sum Sq`[nvar])
+  ESS = sum(df.var$`Sum Sq`[-nvar])
+
+  ess.max = sum( (fitted(LM) - mean_(LM$model[,1]))^2 )
+  ess = TSS-RSS
+  #RSS =  deviance(LM)
+  #rss = sum( residuals(LM)^2)
+  #ESS =  TSS - RSS
+  cat(sprintf("TSS %.1f (n=%s)\n",TSS,N))
+  cat(sprintf("--> ESS total %.1f (%.0f%%) max. %.1f ==> gain=%.1f (+%.0f%%)\n",ess, 100*ess/TSS, ess.max, ESS, 100*ESS/TSS))
+  cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  100*RSS/TSS))
+}
 #### LOADING EVOLUTIONARY DATA (FUNGI & STRAINS) ####
 tic("Load data")
 CLADE = get_clade_data(g1='schizo',g2='sacch.wgd',rate = 'ratio')
@@ -431,7 +449,10 @@ res.evo = STRAINS %>%
 
 FXA = make_scatterplot(res.evo,xvar='SNP.FULL',yvar='EVO.FULL',
                        labx='SNP Evolutionary Rate',laby='mean Evolutionary Rate',
-                       theme2use = theme(),txtcorner = 'topleft') +  theme(legend.position='none',aspect.ratio = 1)
+                       theme2use = theme(),txtcorner = 'topleft') +
+      theme(legend.position='none',aspect.ratio = 1)
+
+
 FXB = make_scatterplot(res.evo,xvar='snpfull.resid',yvar='evofull.resid',
                        labx='residual SNP Evolutionary Rate',laby='residual Evolutionary Rate',
                        theme2use = theme(),txtcorner = 'bottomright') +  theme(legend.position='none',aspect.ratio = 1)
@@ -461,7 +482,43 @@ fig4.2=plot_grid(fig4.2.top,resi,nrow=2)
 ggsave(fig4.2,filename = here('output','f4.2-evofit.pdf'),scale=2,useDingbats=F)
 
 
+
+### REPRESENTING PROPERTIES AND FEATURES DATA MATRIX
+bigprop  = left_join(INPUT,PROP) %>%
+            ungroup() %>%  dplyr::select(where( ~ is_logical(.x) && sum(.x) >150)) %>%
+            rowwise %>% filter( sum(c_across(everything()))> 5) %>%
+            as.matrix
+rankcols = order( colSums(bigprop), decreasing = T)
+rankrows = order( rowSums(bigprop), decreasing = T)
+nc = ncol(bigprop)
+nr = nrow(bigprop)
+yeastQR = bigprop[rankrows,rankcols][sample(1:300,50,replace=F),sample(1:nc,50,replace=F)]
+pheatmap::pheatmap(mat=1-as.matrix(1*yeastQR),
+                   color = c('white','black'),
+                   show_rownames = F, show_colnames = F,
+                   cluster_rows = F, cluster_cols =T,legend = F,clustering_distance_rows = 'binary',
+                   clustering_distance_cols = 'binary',treeheight_col=0, treeheight_row=0,
+                   cutree_rows = 20, cutree_cols = 1,
+                   cellwidth = 12, cellheight = 12, border=NA,
+                   width=10,height=10, filename = here('output','fig3.6-yeast-qr-code-properties.pdf'))
+
+bigfeat = left_join(INPUT,features.norm) %>%  dplyr::select(where(~ is.numeric(.x) && max_(.x)< 1e4)) %>% as.matrix()
+nr=nrow(bigfeat)
+nc=ncol(bigfeat)
+pheatmap::pheatmap(mat=bigfeat[sample(1:nr,50),sample(1:nc,50)], scale='column',
+                   show_rownames = F, show_colnames = F,
+                   cluster_rows = F, cluster_cols =T,legend = F,
+                   clustering_distance_rows = 'binary',
+                   clustering_distance_cols = 'binary',
+                   treeheight_col=0, treeheight_row=0,
+                   cutree_rows = 20, cutree_cols = 1,
+                   cellwidth = 12, cellheight = 12, border=NA,
+                   width=10,height=10, filename = here('output','fig3.7-yeast-features-heatmap.pdf'))
+
+
+
 #### FINAL FIT AND RESIDUALS####
+
 prop.lin = left_join(M1,prop)
 colab = c('PPM','MPC','gfp','ms')
 
@@ -478,64 +535,80 @@ FIT =  prop.lin %>%
            RS_pos = sum(.resid[.resid>0]),
            RS_neg = sum(.resid[.resid<0]),
            RS_avg = mean_(.resid),
-           ESS  = sum( (.fitted-mu.y)^2),
-           RSS  = TSS - ESS ,
            RSS.pc  = RSS / TSS,
            ESS.pc  = ESS / TSS,
+           TSS.p  = sum( (EVO.FULL - mu.y)^2 ),
            ESS.p  = sum( (.fitted.prop-mu.y)^2),
-           RSS.p = TSS- ESS.p,
-           dRSS  = RSS-RSS.p,
-           dRSS.pc  = 100*dRSS / RSS,
-           dRSS.pc.signed = dRSS.pc * sign(RS_avg),
-           dESS  = ESS-ESS.p,
-           dESS.pc  = 100*dESS / TSS
+           RSS.p = TSS.p - ESS.p,
+           tss.pc = 100*TSS.p/TSS,
+           ess = sum( (.fitted-mu.y)^2),
+           rss = TSS.p - ess,
+           dRSS  = RSS.p-rss,
+           dRSS.pc  = 100*dRSS / TSS,
+           rss.pc  = (100*RSS.p / TSS.p) * sign(RS_avg),
+           dESS  = ESS.p-ess,
+           dESS.pc = 100*dESS / TSS,
+           ess.pc  = (100*ESS.p / TSS.p) * sign(RS_avg),
+           EXPECTED = sign(RS_avg)
   ) %>%
   arrange(desc(RSS.pc)) %>% #,desc(.res_snp.RS.pc)) %>%
-  dplyr::select(categories,source,property, col_prop, #colab, evocols,
+  dplyr::select(categories,source,property, col_prop, EXPECTED,#colab, evocols,
                 N,N_RS_pos,N_RS_neg,
-                TSS,RSE,LL, ESS,ESS.p,ESS.pc, dRSS,dRSS.pc, dRSS.pc.signed, dESS, dESS.pc,
+                RSE,LL,TSS,ESS,ESS.pc,RSS,RSS.pc,
+                TSS.p, ESS.p,ess , RSS.p,rss, tss.pc, ess.pc, rss.pc, dRSS, dESS, dESS.pc, dRSS.pc,
                 starts_with('RS')) %>%
   distinct() %>%
-  group_by(categories) %>% mutate(rRS = dense_rank(RSS.pc) , ncat=n()) %>%
-  arrange(desc(dRSS.pc))
+  group_by(categories) %>% mutate(rRS = dense_rank(rss.pc) , ncat=n()) %>%
+  arrange(desc(abs(dRSS.pc)),desc(TSS.p))
 
-rank.prop = group_by(FIT, property,col_prop) %>%
-            summarise(n=N,
-                      tss=mean_(TSS),
-                      ESS = mean(ESS),
-                      ess = mean(ESS.pc),
-                      RSS = mean(RSS),
-                      rss = mean(RSS.pc),
-                      ess.p=mean_(ESS.p),
-                      rss.p = mean_(RSS.p),
-                      res.avg=mean_(RS_avg),
-                      dRSS = rss.p-RSS,
-                      drss = 100*dRSS/tss,
-                      dESS = ess.p-ESS,
-                      dess = 100*dESS/tss) %>%
-            dplyr::filter(n>2) %>%
-            arrange(desc(dess),desc(rss))
-best.prop = rank.prop %>% dplyr::filter(abs(drss)>1 & dess>1) %>% pull(col_prop) %>% paste0('cat_',.)
 
-f0=lm(data=fitdata[,c('.resid','MPC',best.prop)], formula = EVO.FULL ~MPC)
-f1 <- lm(data=fitdata,  I(EVO.FULL-coef(f0)[1]) ~  offset(coef(f0)[2]*MPC) + cat_functions.go.MF_nucleotide_binding + cat_functions.go.MF_molecular_function)
-fbest=lm(".resid ~ offset(coef(f0)[2] * MPC) + .", data =fitdata[,c('.resid','MPC',best.prop)])
+#FIT %>% dplyr::filter(col_prop %in% selected.best)
+# rank.prop = group_by(FIT, property,col_prop) %>%
+#             summarise(n=N,
+#                       tss=mean_(TSS),
+#                       ESS = mean(ESS),
+#                       ess = mean(ESS.pc),
+#                       RSS = mean(RSS),
+#                       rss = mean(RSS.pc),
+#                       ess.p=mean_(ESS.p),
+#                       rss.p = mean_(RSS.p),
+#                       res.avg=mean_(RS_avg),
+#                       dRSS = rss.p-RSS,
+#                       drss = 100*dRSS/tss,
+#                       dESS = ess.p-ESS,
+#                       dess = 100*dESS/tss) %>%
+#             dplyr::filter(n>2) %>%
+#             arrange(desc(dess),desc(rss))
+# best.prop = rank.prop %>% dplyr::filter(abs(drss)>1 & dess>1) %>% pull(col_prop) %>% paste0('cat_',.)
+df.best.prop = FIT %>% dplyr::filter(tss.pc > 1 & abs(dRSS.pc)>1 & abs(dESS.pc)>1)
+best.prop = df.best.prop %>% pull(col_prop) %>% paste0('cat_',.)
+
+mall.prop=lm(data=fitdata[,c('EVO.FULL','MPC',best.prop)], formula = EVO.FULL ~MPC)
+
+
+m0.prop=lm(data=fitdata[,c('EVO.FULL','MPC',best.prop)], formula = EVO.FULL ~MPC)
+m1.prop <- lm(data=fitdata,  I(EVO.FULL-coef(m0.prop)[1]) ~  offset(coef(m0.prop)[2]*MPC) + cat_functions.go.MF_nucleotide_binding + cat_functions.go.MF_molecular_function)
+m.bestprop=lm(".resid ~ offset(coef(m0.prop)[2] * MPC) + .", data =fitdata[,c('.resid','MPC',best.prop)])
 add.best = str_c(best.prop, collapse = ' + ')
-fit.final = step(f0,scope = as.formula(paste0('. ~ . +',add.best)), direction = 'forward')
-
-selected.best = gsub("TRUE$","",names(coef(fit.final))) %>% grep(pattern='cat_',v=T) %>% gsub(patt='cat_',repl="")
+fitprop.final = step(m0.prop,scope = as.formula(paste0('. ~ . +',add.best)), direction = 'forward')
+selected.best = gsub("TRUE$","",names(coef(fitprop.final))) %>% grep(pattern='cat_',v=T) %>% gsub(patt='cat_',repl="")
 
 theme_update(axis.text.x = element_text(size=8,angle = 90),aspect.ratio=NULL)
 F3 = ggplot(FIT %>% dplyr::filter(col_prop %in% selected.best),
-            aes(x = reorder(str_trunc(property,w=50), -dRSS.pc.signed),
-                y = dRSS.pc.signed)) +
+            aes(x = reorder(str_trunc(property,w=50), -dRSS.pc*EXPECTED),
+                y = dRSS.pc*EXPECTED)) +
   geom_bar(stat='identity',position='dodge')  +
   #geom_text(aes(label=N),hjust='inward',size=5,col='black') +
   geom_hline(yintercept = c(-5:5),col='gray50', size=0.25) +
-  #facet_wrap(~categories,scales = 'free_y') +
+  facet_wrap(~EXPECTED,scales = 'free_x') + coord_flip() +
   ylab('% of TSS\n(variance in evolutionary rate)') + xlab('Properties') + theme(axis.text.x = element_text(size=10,hjust = 1))
 plot(F3)
 save_plot(plot = F3, here("output",'f3.5E-barplot-best-prop-selected.pdf'), base_height=12, base_width=20)
+
+
+
+
+
 
 # prop.res = res.data %>% dplyr::select(EVO.FULL, MPC, starts_with('cat_'))
 # f0=lm(data=prop.res, formula = EVO.FULL ~ MPC)
@@ -593,7 +666,209 @@ col_doublings = c("cat_genomics.sgd.len","cat_transcriptomics.sgd.prot_size",
                 "cat_biophysics.dubreuil2019.IUP20_L","cat_biophysics.dubreuil2019.IUP30_L","cat_biophysics.dubreuil2019.IUP40_L")
 features.norm[,col_doublings] =  log2(features[,col_doublings]+1)
 
-norm_features = features.norm %>%
+
+#### GET FULL DATASET WITH PROPERTIES AND FEATURES TOGETHER ####
+PROP_FEAT = left_join(PROP,features.norm)
+YEASTOMICS = left_join(M1,PROP_FEAT)
+dim(YEASTOMICS)
+
+BEST_PROP =  YEASTOMICS %>%
+       dplyr::select( colnames(PROP), colnames(M1) ) %>%
+       pivot_longer(cols = starts_with('cat_'),
+               names_to = c('categories','source','property'),
+               names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+               values_to = "has_prop") %>%
+       mutate(col_prop = paste0(categories,'.',source,'.',property)) %>%
+       dplyr::filter(has_prop) %>%
+       group_by(col_prop) %>%
+       mutate( N=n(),
+              .fitted.prop = .fitted + mean(.resid),
+              .resid.prop = .resid + mean(.resid),
+              RS_avg = mean_(.resid),
+              EXPECTED = sign(RS_avg),
+              TSS.p  = sum( (EVO.FULL - mu.y)^2 ),
+              ESS.p  = sum( (.fitted.prop-mu.y)^2),
+              RSS.p = TSS.p - ESS.p,
+              tss.pc = 100*TSS.p/TSS,
+              ess = sum( (.fitted-mu.y)^2),
+              rss = TSS.p - ess,
+              dRSS  = RSS.p-rss,
+              dRSS.pc  = 100*dRSS / TSS,
+              rss.pc  = (100*RSS.p / TSS.p) * sign(RS_avg),
+              dESS  = ESS.p-ess,
+              dESS.pc = 100*dESS / TSS,
+              ess.pc  = (100*ESS.p / TSS.p) * sign(RS_avg)
+  ) %>%
+  dplyr::select(categories,source,property, col_prop,
+                N, RS_avg, EXPECTED, TSS,ESS,RSS,
+                TSS.p, ESS.p,ess , RSS.p,rss,
+                tss.pc, ess.pc, rss.pc,
+                dRSS, dESS, dESS.pc, dRSS.pc) %>%
+  distinct() %>%
+  dplyr::filter(tss.pc > 1 & abs(dRSS.pc)>1 & abs(dESS.pc)>1)
+
+BEST_FEAT = YEASTOMICS %>%
+  dplyr::select( colnames(features.norm), colnames(M1) ) %>%
+  pivot_longer(cols = starts_with('cat_'),
+               names_to = c('categories','source','feature'),
+               names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+               values_to = "value") %>%
+  mutate(col_feat = paste0(categories,'.',source,'.',feature)) %>%
+  dplyr::filter(!is.na(value)) %>% add_count(col_feat,name='size') %>%
+  mutate( is.codon  = feature %in% get.codons4tai(), is.aa = feature %in% paste0('f_',get.AA1())) %>%
+  rowwise %>% mutate( feature=ifelse(is.codon ,sprintf('%s (%s)',tolower(feature), get.AA3()[Biostrings::GENETIC_CODE[feature]]),feature)) %>%
+  rowwise %>% mutate( feature=ifelse(is.aa ,sprintf('f(%s)',get.AA3()[gsub("f_","",feature)]),feature) ) %>%
+  group_by(col_feat,categories,source,feature) %>%
+  summarise( r=scor(.resid,value,met='pearson')$estimate,
+             rho=scor(.resid,value)$estimate,
+             nfeat = sum.na(value,notNA=T) ) %>%
+  ungroup() %>% mutate( rk = rank(-rho,ties.method = 'first') ) %>%
+  arrange(rk) %>% relocate(rk) %>%
+  filter(abs(r) > 0.2  & !grepl("byrne2005",col_feat) & !grepl("snp_",col_feat) ) %>%
+  mutate(SIGN=sign(r))
+library(see)
+
+col_means <- lapply(YEASTOMICS %>% dplyr::select(where(is.numeric)), mean, na.rm = TRUE)
+col_zeros = lapply(YEASTOMICS %>% dplyr::select(where(is.numeric)), function(x){ return(0) })
+YEASTOMICS.nona <- replace_na(YEASTOMICS, col_means)
+#YEASTOMICS.nona <- replace_na(YEASTOMICS, col_zeros)
+
+formula.bestprop = str_c("cat_",BEST_PROP$col_prop, collapse = ' + ')
+formula.bestfeat = str_c("cat_",BEST_FEAT$col_feat, collapse = ' + ')
+formula.best = paste0(formula.bestprop,"+",formula.bestfeat,collapse = ' + ')
+
+#### FUNGI DATA: ERfull ~ MPC  ####
+m0 = lm(data=YEASTOMICS.nona, EVO.FULL ~ MPC )
+decompose_variance(m0)
+formula.m0 = as.formula(paste0("EVO.FULL ~ offset(",coef(m0)[2],"*MPC) "))
+m00 = lm(data=YEASTOMICS.nona, formula.m0 )
+decompose_variance(m00)
+
+m1 = step(m00,scope = as.formula(paste0(". ~ . +",formula.bestprop)), direction = 'forward')
+decompose_variance(m1)
+
+m2 = step(m00,scope = as.formula(paste0('EVO.FULL ~ MPC +',formula.bestfeat)), direction = 'forward',na.action = "na.exclude")
+decompose_variance(m2)
+
+m3=step(m00,scope = as.formula(paste0('EVO.FULL ~ MPC +',formula.best)), direction = 'forward')
+decompose_variance(m3)
+
+
+
+
+theme_update(axis.text.x = element_text(size=8,angle = 90),aspect.ratio=NULL)
+Psel = gsub("TRUE$","",names(coef(m1))) %>% grep(pattern='cat_',v=T) %>% gsub(patt='cat_',repl="")
+F3 = ggplot(BEST_PROP %>% dplyr::mutate( kept = col_prop %in% Psel) %>% dplyr::filter(kept),
+            aes(x = reorder(str_trunc(property,w=50), abs(dRSS.pc*EXPECTED)),
+                y = dRSS.pc*EXPECTED, fill=factor(kept))) +
+  geom_bar(stat='identity',position='dodge', width = 0.6)  +
+  #geom_text(aes(label=N),hjust='inward',size=5,col='black') +
+  geom_hline(yintercept = c(-5:5),col='gray50', size=0.25) +
+  geom_hline(yintercept = 0,col='black', size=0.25) +
+  facet_wrap(~-EXPECTED,scales = 'free_y') + coord_flip() +
+  ylab('% of TSS\n(variance in evolutionary rate)') + xlab('Properties') + theme(axis.text.x = element_text(size=10,hjust = 1))
+plot(F3)
+
+Fsel = gsub("TRUE$","",names(coef(m2))) %>% grep(pattern='cat_',v=T) %>% gsub(patt='cat_',repl="")
+theme_update(axis.text.x = element_text(size=8,angle = 90),aspect.ratio=NULL)
+F4 = ggplot(BEST_FEAT %>% dplyr::mutate( kept = col_feat %in% Fsel) %>% dplyr::filter(kept),
+            aes(x = reorder(str_trunc(feature,w=50), abs(r*SIGN)),
+                y = r, fill=factor(kept))) +
+  geom_bar(stat='identity',position='dodge', width = 0.6)  +
+  geom_hline(yintercept = 0,col='black', size=0.25) +
+  #geom_text(aes(label=N),hjust='inward',size=5,col='black') +
+  facet_wrap(~-SIGN,scales = 'free_y') + coord_flip() +
+  ylab('Pearson correlation coefficient') + xlab('Features') + theme(axis.text.x = element_text(size=10,hjust = 1))
+plot(F4)
+
+BARS = plot_grid(F3,F4,nrow = 2) + theme(aspect.ratio = 1/2)
+save_plot(BARS,filename = here('output','f3.6-bars-model.pdf'), base_height = 12, base_width = 20)
+
+
+
+#### SNP DATA: ERfull ~ MPC + SNP ####
+
+YEASTOMICS.snp = YEASTOMICS %>% dplyr::filter( !is.na(cat_genomics.peter2018.snp_full) )
+col_means <- lapply(YEASTOMICS.snp %>% dplyr::select(where(is.numeric)), mean, na.rm = TRUE)
+col_zeros <- lapply(YEASTOMICS.snp %>% dplyr::select(where(is.numeric)), function(x){ return(0) })
+YEASTOMICS.snp_nona <- replace_na(YEASTOMICS.snp, col_means)
+#YEASTOMICS.snp_nona <- replace_na(YEASTOMICS.snp, col_zeros)
+
+m0 = lm(data=YEASTOMICS.snp, EVO.FULL ~ MPC + cat_genomics.peter2018.snp_full )
+decompose_variance(m0)
+formula.m0 = as.formula(paste0("EVO.FULL ~ offset(",coef(m0)[2],"*MPC) + offset(",coef(m0)[3],"*cat_genomics.peter2018.snp_full)"))
+m00 = lm(data=YEASTOMICS.snp_nona, formula.m0 )
+decompose_variance(m00)
+
+m1 = step(m00,scope = as.formula(paste0(". ~ . +",formula.bestprop)), direction = 'forward')
+decompose_variance(m1)
+
+m2 = step(m00,scope = as.formula(paste0(formula.m0,' + ',formula.bestfeat)), direction = 'forward',na.action = "na.exclude")
+decompose_variance(m2)
+
+m3=step(m00,scope = as.formula(paste0(formula.m0,' + ',formula.best)), direction = 'forward')
+decompose_variance(m3)
+
+
+#### SNP DATA: ERfull ~ MPC (SNP DATA) ####
+
+YEASTOMICS.snp = YEASTOMICS %>% dplyr::filter( !is.na(cat_genomics.peter2018.snp_full) )
+col_means <- lapply(YEASTOMICS.snp %>% dplyr::select(where(is.numeric)), mean, na.rm = TRUE)
+col_zeros <- lapply(YEASTOMICS.snp %>% dplyr::select(where(is.numeric)), function(x){ return(0) })
+YEASTOMICS.snp_nona <- replace_na(YEASTOMICS.snp, col_means)
+#YEASTOMICS.snp_nona <- replace_na(YEASTOMICS.snp, col_zeros)
+
+m0 = lm(data=YEASTOMICS.snp, EVO.FULL ~ MPC)
+decompose_variance(m0)
+formula.m0 = as.formula(paste0("EVO.FULL ~ offset(",coef(m0)[2],"*MPC)"))
+m00 = lm(data=YEASTOMICS.snp_nona, formula.m0 )
+decompose_variance(m00)
+
+m1 = step(m00,scope = as.formula(paste0(formula.m0," + ",formula.bestprop,'+cat_genomics.peter2018.snp_full')), direction = 'forward')
+decompose_variance(m1)
+
+m2 = step(m00,scope = as.formula(paste0(formula.m0,' + ',formula.bestfeat,'+cat_genomics.peter2018.snp_full')), direction = 'forward',na.action = "na.exclude")
+decompose_variance(m2)
+
+m3=step(m00,scope = as.formula(paste0(formula.m0,' + ',formula.best,'+cat_genomics.peter2018.snp_full')), direction = 'forward')
+decompose_variance(m3)
+
+msnp =  lm(data=YEASTOMICS.snp_nona, EVO.FULL ~ cat_genomics.peter2018.snp_full)
+decompose_variance(msnp)
+
+
+sigvar = M3[-42,] %>%
+         arrange(desc(`Sum Sq`)) %>%
+          filter(`Pr(>F)`<0.05) %>%
+          rename(SS=`Sum Sq`) %>%
+          separate(variable, sep='\\.', into=c('categories','source','variable')  ) %>%
+          mutate(variable=str_trim(variable), type = ifelse(variable %in% BEST_PROP$property, 'property','feature'))
+
+F3.7=ggplot(sigvar, aes(y=reorder(variable,SS), x=SS,fill=type)) +
+  geom_bar(stat='identity',orientation = 'y', width=0.5) +
+  geom_text(aes(label=reorder(paste0(round(SS,1)," ",variable),SS), x=SS+1),col='black',hjust=0) +
+  ylab('Variable') + scale_fill_metro() + scale_x_discrete(expand=c(0,0)) +
+  theme_cowplot() + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+plot(F3.7)
+save_plot(F3.7, filename = here('output','FIG3.7-significant-variables-stepwise-reg.pdf'), base_height = 6, base_width = 8)
+
+library(treemap)
+treemap(sigvar, index = 'variable', vSize = 'SS',inflate.labels = T, aspRatio = 1, )
+
+#### FIND RELATION BETWEEN PARAMETERS
+# library(ess)
+# g <- fit_graph(m1$model, trace = FALSE)
+# plot(g, vertex.size = 1)
+
+selected.best = gsub("TRUE$","",names(coef(fitprop.final))) %>% grep(pattern='cat_',v=T) %>% gsub(patt='cat_',repl="")
+
+library(correlation)
+library(see)
+featmat = features.norm %>%
+  dplyr::select( ORF, where(is.numeric) & !contains(c('snp','byrne2005','IUP20','IUP40'))) %>%
+  bind_cols(EVO.SNP_FULL = features.norm$cat_genomics.peter2018.snp_full)
+
+norm_features = featmat %>%
   pivot_longer(cols = starts_with('cat_'),
              names_to = c('categories','source','feature'),
              names_pattern="cat_(.+)\\.(.+)\\.(.+)",
@@ -604,39 +879,103 @@ norm_features = features.norm %>%
   rowwise %>% mutate( feature=ifelse(is.codon ,sprintf('%s (%s)',tolower(feature), get.AA3()[Biostrings::GENETIC_CODE[feature]]),feature)) %>%
   rowwise %>% mutate( feature=ifelse(is.aa ,sprintf('f(%s)',get.AA3()[gsub("f_","",feature)]),feature) )
 
+#results <- summary(correlation(featmat))
+#plot(results)
+
 corfeat.res = left_join(M1,norm_features) %>%
-  dplyr::filter( !grepl('^snp',feature) & !(feature %in% c('pid','PID1','score_B100','S','G','N')) ) %>%
+  #dplyr::filter( !grepl('^snp',feature) & !(feature %in% c('pid','PID1','score_B100','S','G','N','RLEN')) ) %>%
   group_by(col_feat,categories,source,feature) %>%
-  summarise( rho2_evo=scor(.resid,value,met='pearson')$estimate,
+  summarise( r=scor(.resid,value,met='pearson')$estimate,
+             rho=scor(.resid,value)$estimate,
              nfeat = sum.na(value,notNA=T) ) %>%
-  ungroup() %>% mutate( rk = rank(-rho2_evo,ties.method = 'first') ) %>%
+  ungroup() %>% mutate( rk = rank(-rho,ties.method = 'first') ) %>%
   arrange(rk) %>% relocate(rk)
 corfeat.res
 
-bestfeat  = corfeat.res %>% filter(abs(rho2_evo) > 0.2 & nfeat > 100 )
-
-theme_update(axis.text.x = element_text(size=8,angle = 90),aspect.ratio=NULL)
-F4 = ggplot(bestfeat,
-            aes(x = reorder(str_trunc(feature,w=50), -rho2_evo),
-                y = rho2_evo)) +
-  geom_bar(stat='identity',position='dodge')  +
-  #facet_wrap(~categories,scales = 'free_y') +
-  ylab('Pearson correlation coefficient') + xlab('Features') + theme(axis.text.x = element_text(size=10,hjust = 1))
-plot(F4 )
-save_plot(plot = F3, here("output",'f4.3-barplot-prop.pdf'), base_height=12, base_width=20)
+bestfeat  = corfeat.res %>% filter(abs(rho) > 0.2 & nfeat > 100 ) %>%
+            mutate(SIGN=sign(rho))
 
 evompc.features = FUNGI %>%
-  dplyr::select(ORF,EVO.FULL,MPC) %>%
   left_join(features.norm) %>%
-  filter(complete.cases(EVO.FULL,MPC))
-colnames(evompc.features) = gsub("cat_","",colnames(evompc.features))
-evompc.features[is.na(evompc.features)] = 0
+  dplyr::select(ORF,EVO.FULL,MPC,paste0('cat_',bestfeat$col_feat)) %>%
+  filter(complete.cases(EVO.FULL,MPC)) %>% distinct %>%
+  ungroup() %>% mutate_if(is.numeric, function(x) replace(x, is.na(x), mean(x, na.rm = TRUE)))
 
-evofeat.best = evompc.features[,c('ORF','EVO.FULL','MPC',bestfeat$col_feat)]
-f0=lm(data=evofeat.best, formula = EVO.FULL ~MPC)
-evofeat.best$evofull.resid = residuals(f0)
-f1=lm("evofull.resid ~ offset(coef(f0)[2] * MPC) + .", data =evofeat.best)
-step(f0, scope = . ~ . , direction = "forward")
+colnames(evompc.features) = gsub("cat_","",colnames(evompc.features))
+#evompc.features[is.na(evompc.features)] = 0
+summary(evompc.features)
+
+evofeat.best = evompc.features[,c('ORF','EVO.FULL','MPC',bestfeat[,c('feature','col_feat')])]
+m0.feat=lm(data=evofeat.best, formula = EVO.FULL ~MPC,na.action=na.omit)
+evofeat.best$EVO.FULL = residuals(m0.feat)
+m1.feat=lm(formula = as.formula("EVO.FULL ~ offset(coef(m0.feat)[2] * MPC) + ."), data =evofeat.best[,-1],na.action=na.exclude)
+add.bestfeat = str_c(bestfeat$col_feat, collapse = ' + ')
+fitfeat.final = step(m0.feat,scope = as.formula(paste0('. ~ . +',add.bestfeat)), direction = 'forward')
+selected.feat = names(coef(fitfeat.final))[-c(1:2)]
+
+coef(fitfeat.final)
+deviance(m1.feat)
+deviance(fitfeat.final)
+SSTotal <- var( fitfeat.final$model[,1] ) * (nrow(fitfeat.final$model)-1)
+
+theme_update(axis.text.x = element_text(size=8,angle = 90),aspect.ratio=NULL)
+F4 = ggplot(bestfeat %>% dplyr::filter(col_feat %in% selected.feat) ,
+            aes(x = reorder(feature, -rho2_evo),y = rho2_evo)) +
+  geom_bar(stat='identity',position='dodge')  +
+  facet_wrap(~SIGN,scales = 'free_x') + coord_flip() +
+  ylab('Pearson correlation coefficient') + xlab('Features') + theme(axis.text.x = element_text(size=10,hjust = 1))
+plot(F4 )
+save_plot(plot = F4, here("output",'f4.5-barplot-feat.pdf'), base_height=12, base_width=20)
+
+
+SSTotal-deviance(fit.final)
+
+#Fbest = evompc.features[,c('ORF','EVO.FULL','MPC',bestfeat$col_feat)]
+#Pbest = fitdata %>% dplyr::select(ORF,EVO.FULL,MPC, paste0('cat_',selected.best))
+#FULL = left_join(Fbest,Pbest)
+
+
+
+
+SSTotal <- var( M3.final$model[,1] ) * (nrow(M3.final$model)-1)
+SSTotal-deviance(M3.final)
+
+
+SNP = FUNGI %>%
+      left_join(features.norm) %>%
+      dplyr::select(ORF,EVO.FULL,MPC,snp_full=cat_genomics.peter2018.snp_full)
+M4.0=lm(data=SNP, formula = EVO.FULL ~ MPC + snp_full, na.action=na.omit)
+deviance(M4.0) / SSTotal
+
+Fbest = evompc.features[,c('ORF','EVO.FULL','MPC',bestfeat$col_feat)]
+Pbest = fitdata %>% dplyr::select(ORF,EVO.FULL,MPC, paste0('cat_',selected.best))
+FULL = left_join(Fbest,Pbest)
+
+all.best = str_c(colnames(FULL)[-c(1:2)], collapse = ' + ')
+M4.final=step(M3.0,scope = as.formula(paste0('. ~ . +',all.best)), direction = 'forward')
+
+SSTotal <- var( M3.final$model[,1] ) * (nrow(M3.final$model)-1)
+SSTotal-deviance(M3.final)
+
+
+
+test2 = FUNGI %>%
+  left_join(features.norm) %>%
+  dplyr::select(EVO.FULL,MPC,paste0('cat_',c(bestfeat$col_feat,'genomics.peter2018.snp_full'))) %>%
+  filter(complete.cases(EVO.FULL,MPC)) %>% distinct %>%
+  ungroup() %>% mutate_if(is.numeric, function(x) replace(x, is.na(x), mean(x, na.rm = TRUE)))
+
+M0=lm(data=test2, formula = EVO.FULL ~MPC, na.action=na.omit)
+M00=lm(data=test2, formula = EVO.FULL ~MPC+cat_genomics.peter2018.snp_full, na.action=na.omit)
+deviance(M0)
+deviance(M00)
+test2$EVO.FULL = residuals(M0)
+M1=lm(formula = as.formula("EVO.FULL~ offset(coef(M0)[2] * MPC) + ."), data =test2,na.action=na.exclude)
+add.bestfeat = str_c(c(bestfeat$col_feat,"genomics.peter2018.snp_full"), collapse = ' + ')
+fit.final = step(M0,scope = as.formula(paste0('. ~ . +',add.bestfeat)), direction = 'forward')
+#coef(fit.final)
+deviance(M1)
+deviance(fit.final)
 
 
 MF1 = lm(data=FEATEVO[,c(colnames(features),"MPC")], formula= MPC ~ .)
@@ -647,47 +986,47 @@ featevo = left_join(M1,feat) %>% ungroup()
 correlate(FEATEVO) %>% dplyr::filter(var2 == '.resid') %>% arrange(coef_corr) %>% print(n=245)
 
 
-additive.model = function(M0,addTerm,fulldata){
-  ymean = mean(M0$model[,1])
-  yname = names(M0$model)[1]
-  nXY = sum(complete.cases(M0$model))
-
-  cat("------------\n")
-  old.formula = deparse(formula(M0))
-  cat("Previous Model: ",old.formula,"\n")
-  print(M0)
-#  cat("Estimated coefficients :",coef(M0),"\n")
-  RSS0 = deviance(M0)
-  ESS0 = sum( (fitted(M0)-ymean)^2 )
-  cat("RSS0: ",RSS0,"\n")
-  cat("ESS0: ",ESS0,"\n")
-
-  fit0 = broom::augment_columns(x=M0,data = fulldata) %>%
-    mutate(ESS=sum_( (.fitted-ymean)^2 ), TSS=sum_( (!!sym(yname)-ymean)^2 ), RSS=TSS-ESS,
-           RSE=sqrt( (1 / (nXY-2)) * RSS), AIC = AIC(M0), BIC=BIC(M0), LL = readr::parse_number(as.character(logLik(M0))))
-
-  cat("------------\n")
-
-  if(!missing(addTerm)){
-    cat("Adding variable :",addTerm,"\n")
-    target = '.resid ~ '
-    depvar = paste0( sprintf("offset(%.4f * %s)",coef(M0)[-1],variable.names(M0)[-1]), collapse=" + " )
-    intercept = sprintf("offset(%s)",coef(M0)[1])
-    new.formula = paste(target, depvar, " + ", addTerm)
-    cat("New Model: ",new.formula,"\n")
-
-    M1 = update(M0, as.formula(new.formula),data=fit0)
-    RSS1 = deviance(M1)
-    ESS1 = sum( (fitted(M1)-ymean)^2 )
-
-    cat("Estimated coefficients :",coef(M1),"\n")
-    cat("RSS1: ",RSS1,"(d=", RSS0-RSS1,")\n")
-    cat("ESS1: ",ESS1,"(d=", ESS1-ESS0,")\n")
-  }else{
-    M1=M0
-  }
-  return(M1)
-}
+# additive.model = function(M0,addTerm,fulldata){
+#   ymean = mean(M0$model[,1])
+#   yname = names(M0$model)[1]
+#   nXY = sum(complete.cases(M0$model))
+#
+#   cat("------------\n")
+#   old.formula = deparse(formula(M0))
+#   cat("Previous Model: ",old.formula,"\n")
+#   print(M0)
+# #  cat("Estimated coefficients :",coef(M0),"\n")
+#   RSS0 = deviance(M0)
+#   ESS0 = sum( (fitted(M0)-ymean)^2 )
+#   cat("RSS0: ",RSS0,"\n")
+#   cat("ESS0: ",ESS0,"\n")
+#
+#   fit0 = broom::augment_columns(x=M0,data = fulldata) %>%
+#     mutate(ESS=sum_( (.fitted-ymean)^2 ), TSS=sum_( (!!sym(yname)-ymean)^2 ), RSS=TSS-ESS,
+#            RSE=sqrt( (1 / (nXY-2)) * RSS), AIC = AIC(M0), BIC=BIC(M0), LL = readr::parse_number(as.character(logLik(M0))))
+#
+#   cat("------------\n")
+#
+#   if(!missing(addTerm)){
+#     cat("Adding variable :",addTerm,"\n")
+#     target = '.resid ~ '
+#     depvar = paste0( sprintf("offset(%.4f * %s)",coef(M0)[-1],variable.names(M0)[-1]), collapse=" + " )
+#     intercept = sprintf("offset(%s)",coef(M0)[1])
+#     new.formula = paste(target, depvar, " + ", addTerm)
+#     cat("New Model: ",new.formula,"\n")
+#
+#     M1 = update(M0, as.formula(new.formula),data=fit0)
+#     RSS1 = deviance(M1)
+#     ESS1 = sum( (fitted(M1)-ymean)^2 )
+#
+#     cat("Estimated coefficients :",coef(M1),"\n")
+#     cat("RSS1: ",RSS1,"(d=", RSS0-RSS1,")\n")
+#     cat("ESS1: ",ESS1,"(d=", ESS1-ESS0,")\n")
+#   }else{
+#     M1=M0
+#   }
+#   return(M1)
+# }
 
 evompc.features = FUNGI %>%
                   dplyr::select(ORF,EVO.FULL,MPC) %>%
@@ -709,5 +1048,8 @@ for( feat in ranked.features[1:10] ){
 
 f0.fitted.data = get_fit_data(get_XY_data(evompc.features),m = f0)
 mycols=c('.resid',colnames(evompc.features)[-1])
+add.bestfeat = str_c(best.prop, collapse = ' + ')
+fit.final = step(f0,scope = as.formula(paste0('. ~ . +',add.best)), direction = 'forward')
+
 f1=lm(".resid ~ offset(coef(f0)[2] * MPC) + .", data =f0.fitted.data[,mycols])
 step(f0, scope = . ~ . , direction = "forward")
