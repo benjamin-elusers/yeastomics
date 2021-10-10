@@ -137,6 +137,25 @@ get.sc.ohno = function(myseq) {
   return(pair)
 }
 
+# get sequence identifier from STRING ID (without the prefix taxon)
+get.id.STRING = function(id,noprint=FALSE){
+
+  if(!is.character(id)){
+    warning("input is not a character")
+    return(NA)
+  }
+
+  if( str_detect(id,pattern='^([0-9]+)\\.(\\w+)') ){
+    taxon = str_extract(id,pattern='^([0-9]+)')
+    string = str_split_fixed(id,pattern = '^([0-9]+)\\.',2)[,2]
+    if(!noprint){ cat(sprintf("taxon %s id %s\n",taxon,string)) }
+    return(string)
+  }else{
+    warning("Unrecognized input format (should be taxon.id)")
+    return(id)
+  }
+}
+
 get.ortho.pair = function(ortho = load.pombe.orthologs() ){
   return(ortho[,c('PombaseID','ORF')])
 }
