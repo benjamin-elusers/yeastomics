@@ -620,9 +620,9 @@ load.dubreuil2019.data = function(d){
     library(openxlsx)
     res = openxlsx::read.xlsx(data.url,colNames=T,sheet=1, startRow=1)
   } else if( dubreuil$format[d] == 'TSV'){
-    res = readr::read_delim(file = data.url, col_names = T, delim = '\t',  progress = T)
+    res = readr::read_delim(file = data.url, col_names = T, delim = '\t',  progress = T,guess_max=50000)
   } else if( dubreuil$format[d] == 'TSV.GZ' ){
-    res = readr::read_delim(file =open.url(data.url), col_names = T, delim = '\t',  progress = T)
+    res = readr::read_delim(file = read.url(data.url), col_names = T, delim = '\t',  progress = T,guess_max=50000)
   }
   return(res)
 }
@@ -660,14 +660,52 @@ load.dubreuil2021.data = function(d){
   with(choice,cat(sprintf("Your choice was:\n [%s] %s\n-----> from %s%s (formatted as %s)\n",d,name,base_url,num,format)))
   data.url = sprintf('%s/%s',dubreuil$base_url[d], dubreuil$num[d])
   if( dubreuil$format[d] == 'TSV'){
-    res = readr::read_delim(file = data.url, col_names=T, progress=T, delim='\t')
+    res = readr::read_delim(file = data.url, col_names=T, progress=T, delim='\t',guess_max=50000)
   } else if( dubreuil$format[d] == 'TSV.GZ' ){
-    res = readr::read_delim(file=open.url(data.url), col_names=T, progress=T, delim='\t')
+    res = readr::read_delim(file=read.url(data.url), col_names=T, progress=T, delim='\t',guess_max=50000)
   }
   return(res)
 }
 
 # Resource databases with proteome data available ------------------------------
+load.alphafold = function(uniprot,extension=c('cif','pdb'),quiet=T,local=""){
+  library(bio3d)
+  if(!file.exists(local)){
+    url_alphafold="https://alphafold.ebi.ac.uk/files"
+    AF_uniprot=sprintf("%s/AF-%s-F1-model_v1.%s",url_alphafold,uniprot,extension)
+  }else{ # if you want to use locally predicted alphafold files
+    AF_uniprot=local # provide full path to the predicted file
+    stopifnot(file.exists(AF_uniprot),
+              "Alphafold predicted model not found locally! check the full path...")
+  }
+  # Read from cif or pdb (the output format is the same)
+  url_found = RCurl::url.exists(AF_uniprot)
+  if( url_found ){
+    AF = switch(extension, cif=bio3d::read.cif(AF_uniprot,verbose=!quiet), pdb=bio3d::read.pdb(AF_uniprot,verbose=!quiet))
+    Ca = AF_cif$atom[AF_cif$calpha,]
+    df.res = Ca %>% mutate(uni=uniprot) %>% select(uni,chain,resn=resno,resi=resid,plddt=b)
+    return(df.res)
+  }else{
+    df.res=tibble(uni=uniprot)
+    warning(sprintf("%s was not found on the EBI/AlphaFold server!\n",uniprot))
+    return(df.res)
+  }
+}
+
+check.alphafold = function(uniprot,extension=c('cif','pdb'),local="",quiet=T){
+  if(!quiet){ cat(uniprot," --> ") }
+  if(!file.exists(local)){
+    url_alphafold="https://alphafold.ebi.ac.uk/files"
+    ext=match.arg(extension,extension)
+    AF_uniprot=sprintf("%s/AF-%s-F1-model_v1.%s",url_alphafold,uniprot,ext)
+    found =  RCurl::url.exists(AF_uniprot)
+  }else{ # if you want to use locally predicted alphafold files
+    AF_uniprot=local # provide full path to the predicted file
+    found = file.exists(AF_uniprot)
+  }
+  if(!quiet){ cat(found,"\n") }
+  return(found)
+}
 
 load.superfamily = function(tax='xs'){
   # Load domain assignments from superfamily SCOP level (SUPFAM.org)
