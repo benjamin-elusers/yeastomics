@@ -682,7 +682,7 @@ load.alphafold = function(uniprot,extension=c('cif','pdb'),quiet=T,local=""){
   url_found = RCurl::url.exists(AF_uniprot)
   if( url_found ){
     AF = switch(extension, cif=bio3d::read.cif(AF_uniprot,verbose=!quiet), pdb=bio3d::read.pdb(AF_uniprot,verbose=!quiet))
-    Ca = AF_cif$atom[AF_cif$calpha,]
+    Ca = AF$atom[AF$calpha,]
     df.res = Ca %>% mutate(uni=uniprot) %>% select(uni,chain,resn=resno,resi=resid,plddt=b)
     return(df.res)
   }else{
