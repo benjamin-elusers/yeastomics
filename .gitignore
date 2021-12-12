@@ -1,4 +1,5 @@
 ### R ###
+misc/*
 # History files
 .Rhistory
 .Rapp.history
@@ -9,6 +10,10 @@
 # Example code in package build process
 *-Ex.R
 data/datasaved-*.zip
+data/*.rds
+data/*.rdata
+output/*.rds
+output/*.rdata
 # Output files from R CMD build
 /*.tar.gz
 # Output files from R CMD check
