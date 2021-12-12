@@ -1,32 +1,5 @@
 #### SETUP ####
-#### _Functions ####
-yeastomics="https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/"
-source(file.path(yeastomics,"src/utils.r"))
-source(file.path(yeastomics,"src/function_annotation.r"))
-source(file.path(yeastomics,"src/function_sequence.r"))
-source(file.path(yeastomics,"src/function_phylogenetic.r"))
-source(file.path(yeastomics,"src/function_analysis.r"))
-source(file.path(yeastomics,"src/function_datalocal.r"))
-source(file.path(yeastomics,"src/function_datapub.r"))
-library(tidyverse)
-library(tictoc)
-library(hablar)
-library(here)
-#### _Graphics ####
-library(cowplot)
-library(ggplot2)
-library(ggthemes)
-library(ggsci)
-library(ggrepel)
-library(ggpubr)
-library(see)
-mytheme =   theme_clean(base_size = 14) +
-  theme(line=element_line(size=1),
-        panel.grid.major = element_line(size=1,lineend='round',linetype='22',color='gray50'),
-        panel.grid.minor = element_line(size=0.5,lineend='round',linetype='12',color='gray50'),
-        axis.ticks.length = unit(1.5,'mm'),
-        axis.ticks = element_line(size=0.5),
-        legend.position = 'none')
+source("https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/src/__setup_yeastomics__.r")
 source("https://raw.githubusercontent.com/clauswilke/dviz.supp/master/R/dviz.supp.R")
 source("https://raw.githubusercontent.com/clauswilke/dviz.supp/master/R/themes.R")
 empty_theme <- theme_dviz_open(12, rel_small = 1, rel_large = 1) +
@@ -36,7 +9,7 @@ empty_theme <- theme_dviz_open(12, rel_small = 1, rel_large = 1) +
     axis.ticks = element_blank(),
     axis.ticks.length = grid::unit(0, "pt")
   )
-theme_set( theme_modern(base_size = 16, axis.text.angle = 45,legend.position = 'none') + theme(aspect.ratio=1) )
+# theme_set( theme_modern(base_size = 16, axis.text.angle = 45,legend.position = 'none') + theme(aspect.ratio=1) )
 
 #### _Analysis ####
 show_density = function(input, # Input data
