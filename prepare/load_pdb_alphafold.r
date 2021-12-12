@@ -1,15 +1,5 @@
-yeastomics="https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/"
-source(file.path(yeastomics,"src/utils.r"))
-source(file.path(yeastomics,"src/function_annotation.r"))
-source(file.path(yeastomics,"src/function_sequence.r"))
-source(file.path(yeastomics,"src/function_phylogenetic.r"))
-source(file.path(yeastomics,"src/function_analysis.r"))
-source(file.path(yeastomics,"src/function_datalocal.r"))
-source(file.path(yeastomics,"src/function_datapub.r"))
-library(tidyverse)
-library(hablar)
+source("https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/src/__setup_yeastomics__.r")
 library(bio3d)
-library(tictoc)
 
 ##### 1. UNIPROT PROTEOME #####
 scprot=load.dubreuil2019.data(4)
