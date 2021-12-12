@@ -267,12 +267,48 @@ decompose_variance = function(LM){
   cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  100*RSS/TSS))
 }
 #### LOADING EVOLUTIONARY DATA (FUNGI & STRAINS) ####
+
 tic("Load data")
+
+ABUNDANCE = load.ho2018.data() %>%
+  dplyr::select(orf, MPC = mean.mpc, gfp=GFP.avg,ms=MS.avg) %>% # select the average expression
+  group_by(orf) %>% dplyr::summarise(across(where(is.numeric),log10)) %>% # apply log10 to expression
+  rowwise() %>% mutate( noval = mean(is.na(c_across(where(is.numeric)))) ) %>% # check how many expression values
+  dplyr::filter(noval<1 || !is.na(MPC) ) %>% dplyr::select(-noval) # remove no values
+
 CLADE = get_clade_data(g1='schizo',g2='sacch.wgd',rate = 'ratio')
-FUNGI = readRDS(paste0(here("data"),"fungi-evodata.rds")) %>% filter( !is.na(PPM) & !is.na(MPC) )
-STRAINS = readRDS(paste0(here("data"),"yeast_strains-evodata.rds")) %>%
-          filter( !is.na(PPM) & !is.na(MPC) ) %>% distinct %>%
-          filter(!(is.dup(UNIPROT) & is.na(EVO.FULL)))
+#FUNGI = readRDS(here("data","fungi-evodata.rds")) %>% filter( !is.na(PPM) & !is.na(MPC) )
+# EVOLUTIONARY RATE ON FUNGI
+FUNGI = load.dubreuil2021.data(1) %>%
+        dplyr::select(c(starts_with('EVO.'),'PPM','ORF','UNIPROT')) %>%
+        ungroup() %>%
+        left_join(ABUNDANCE,by=c('ORF'='orf')) %>%
+        filter( !is.na(PPM) & !is.na(MPC) )
+
+FUNGI.NORM = FUNGI %>% mutate(rel_EVO.FULL=log2(EVO.FULL),
+                              rel_EVO.DISORDER=log2(EVO.DISORDER),
+                              rel_EVO.NOT_DISORDER=log2(EVO.NOT_DISORDER),
+                              rel_EVO.DOMAINS=log2(EVO.DOMAINS),
+                              rel_EVO.ANTI_DOMAIN=log2(EVO.ANTI_DOMAIN),
+                              rel_EVO.PDB=log2(EVO.PDB),
+                              rel_EVO.SURFACE=log2(EVO.SURFACE),
+                              rel_EVO.BURIED=log2(EVO.BURIED))
+
+# STRAINS = readRDS(here("data","yeast_strains-evodata.rds")) %>%
+#           filter( !is.na(PPM) & !is.na(MPC) ) %>% distinct %>%
+#           filter(!(is.dup(UNIPROT) & is.na(EVO.FULL)))
+
+
+STRAINS = readRDS(here("data","PROTEIN-EVO-FUNGI-SNP.rds")) %>%
+  dplyr::select(c(starts_with(c('EVO.','SNP.')),'PPM','ORF','UNIPROT','IS_FUNGI','IS_STRAINS')) %>%
+  group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log)) %>% # apply log10 to SNP rate4site
+  left_join(ABUNDANCE,by=c('ORF'='orf')) %>%
+  filter( !is.na(PPM) & !is.na(MPC) ) %>%
+  filter(!(is.dup(UNIPROT) & is.na(EVO.FULL)))
+
+
+### STRAINS CONTAIN ALL DATA ABOUT THE FUNGI LINEAGE EVOLUTIONARY RATE
+
 PROP=readRDS(get.last.file(here("output"),"proteome-properties")) %>%
   dplyr::select(-contains("chemsig_X")) %>% ungroup()
 
@@ -294,12 +330,12 @@ features = FEAT %>%
   dplyr::filter(!is.na(value)) %>% add_count(col_feat,name='size')
 toc()
 
-INPUT = FUNGI
-evocols = INPUT %>% dplyr::select(starts_with('EVO.')) %>% colnames
+INPUT = FUNGI.NORM
+evocols = INPUT %>% dplyr::select(starts_with('rel_EVO.')) %>% colnames
 #EVO = left_join(INPUT,PROP) %>% ungroup()
 
 #### EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ####
-Y = "EVO.FULL" # mean Evolutionary rate (full sequence)
+Y = "rel_EVO.FULL" # mean Evolutionary rate (full sequence)
 #X = "PPM" # Protein Abundance (log10 ppm)
 X = "MPC" # median Molecules Per Cell
 XYDATA = get_XY_data(INPUT,x=X,y=Y)
@@ -326,17 +362,19 @@ ggsave(plot=f4.2A, filename = here('output','f4.2A-evofit.pdf'), scale = 1, useD
 
 #### _Fiting model ####
 M1=make_linear_fit(input,only.params = F)
-M2=make_logistic_fit(input,only.params = F)
+#M2=make_logistic_fit(input,only.params = F)
 M3=make_poly_fit(input,only.params = F,deg=3)
 M4=make_expo_fit(input,only.params = F)
 M = bind_rows(M1,M2,M3,M4)
 
+M = M1
+
 selected.par =c('model','RSS','ESS','TSS')
 fit.params = bind_rows(
     make_linear_fit(input,only.params = T)[selected.par],
-    make_logistic_fit(input,only.params =T)[selected.par],
-    make_poly_fit(input,only.params = T,deg=3)[selected.par],
-    make_expo_fit(input,only.params = T)[selected.par]
+#    make_logistic_fit(input,only.params =T)[selected.par],
+#    make_poly_fit(input,only.params = T,deg=3)[selected.par],
+#    make_expo_fit(input,only.params = T)[selected.par]
   )
 fit.params
 
@@ -349,7 +387,7 @@ pXY=ggplot(input,aes_string(y=Y,x=X)) +
   stat_density2d(size=0.5,color='gray20') +
   #  geom_text(data=CC.ER, aes(label=sprintf(" r %.2f \n p %.1e \n N %s ",estimate,p.value,n)),
   #            x=Inf,y=Inf,hjust='inward',vjust='inward',size=3) +
-  ylab('') + xlab('Median Protein Abundance (log10 mpc)') +
+  ylab('mean Evolutionary Rate (log2)') + xlab('Median Protein Abundance (log10 mpc)') +
   geom_hline(yintercept = mu.y, col='black',linetype=1,size=1) + # mean
   ylim(rg.y) + theme(legend.position = 'none',aspect.ratio = 1) +
   ggpubr::grids()
@@ -360,8 +398,8 @@ pXY.fit = pXY+
   geom_text(M.x1 ,mapping=aes(label=model,col=model,y=.fitted-0.2),x=0.8,size=5,check_overlap = T,show.legend = F) +
   stat_smooth(method = 'loess', fullrange=T, span=1.2, se = F, col='gray40',size=1) + annotate('text',y=1.9,x=0.8,label='Loess',col='gray40',size=5)
   #coord_cartesian(xlim = c(-2.5, 4.5), ylim = c(0, 3.5),expand = F) +
-pXY
-ggsave(plot=pXY, filename=here("output","F4.2C_evo_mpc_fit.pdf"))
+pXY.fit
+ggsave(plot=pXY.fit, filename="~/Desktop/logER-vs-abundance.png",scale=1.2)
 
 MF_nuc_bind = PROP$ORF[PROP$cat_functions.go.MF_nucleotide_binding]
 MF_unknown  = PROP$ORF[PROP$cat_functions.go.MF_molecular_function]
@@ -369,7 +407,7 @@ linfit = geom_line(M1,mapping=aes(y=.fitted,col=model),size=1,show.legend = F)
 PXY=plot_grid(pXY.fit,
           pXY + geom_point(data=input %>% filter(ORF %in% MF_unknown), color='green',size=1)+linfit,
           pXY + geom_point(data=input %>% filter(ORF %in% MF_nuc_bind) , color='blue',size=1) +linfit,
-          nrow=3) + theme_clean2()
+          nrow=3) + ggiraphExtra::theme_clean2()
 
 #### _ RESIDUAL EVO.vs.MPC SCATTERPLOT (EVO.FULL) ####
 col.samples = PROP %>% dplyr::select(contains(samples)) %>% colnames
@@ -380,8 +418,8 @@ fitdata = left_join(M1,PROP, by='ORF')# %>%
           #bind_rows(M1 %>% mutate(property='all_orthologs', has_prop=T) ) %>%
           #dplyr::filter( property %in% c(samples,'all_orthologs')) %>% mutate(property = as.factor(property))
 #res.ortho = res.data %>% filter(property=='all_orthologs')
-f0=lm(data=fitdata, formula = EVO.FULL ~MPC)
-f1=lm(data=fitdata, formula = EVO.FULL ~ offset(coef(f0)[2]*MPC) + cat_functions.go.MF_nucleotide_binding + cat_functions.go.MF_molecular_function)
+f0=lm(data=fitdata, formula = rel_EVO.FULL ~MPC)
+f1=lm(data=fitdata, formula = rel_EVO.FULL ~ offset(coef(f0)[2]*MPC) + cat_functions.go.MF_nucleotide_binding + cat_functions.go.MF_molecular_function)
 
 fitdata$fitted.intercept = predict(f1)
 fitdata$resid.intercept = residuals(f1)
@@ -737,22 +775,38 @@ formula.bestprop = str_c("cat_",BEST_PROP$col_prop, collapse = ' + ')
 formula.bestfeat = str_c("cat_",BEST_FEAT$col_feat, collapse = ' + ')
 formula.best = paste0(formula.bestprop,"+",formula.bestfeat,collapse = ' + ')
 
+best_var = c(BEST_PROP$col_prop,BEST_FEAT$col_feat)
+
+cor(YEASTOMICS$MPC,YEASTOMICS[,paste0("cat_",best_var)],use='complete','spearman')
+tmp=abs(cor(YEASTOMICS$MPC,YEASTOMICS[,paste0("cat_",best_var)],use='complete','spearman'))<0.4
+no_mpc_var = colnames(tmp)[!is.na(tmp) & unlist(tmp)==T]
+
+formula.nompc = str_c(no_mpc_var, collapse = ' + ')
+
 #### FUNGI DATA: ERfull ~ MPC  ####
-m0 = lm(data=YEASTOMICS.nona, EVO.FULL ~ MPC )
+
+mnull = lm(data=YEASTOMICS.nona, rel_EVO.FULL ~ 1 )
+decompose_variance(mnull)
+
+m0 = lm(data=YEASTOMICS.nona, rel_EVO.FULL ~ MPC )
 decompose_variance(m0)
-formula.m0 = as.formula(paste0("EVO.FULL ~ offset(",coef(m0)[2],"*MPC) "))
+formula.m0 = as.formula(paste0("rel_EVO.FULL ~ offset(",coef(m0)[2],"*MPC) "))
 m00 = lm(data=YEASTOMICS.nona, formula.m0 )
 decompose_variance(m00)
 
 m1 = step(m00,scope = as.formula(paste0(". ~ . +",formula.bestprop)), direction = 'forward')
 decompose_variance(m1)
 
-m2 = step(m00,scope = as.formula(paste0('EVO.FULL ~ MPC +',formula.bestfeat)), direction = 'forward',na.action = "na.exclude")
+m2 = step(m00,scope = as.formula(paste0('rel_EVO.FULL ~ MPC +',formula.bestfeat)), direction = 'forward',na.action = "na.exclude")
 decompose_variance(m2)
 
-m3=step(m00,scope = as.formula(paste0('EVO.FULL ~ MPC +',formula.best)), direction = 'forward')
+m3=step(m00,scope = as.formula(paste0('rel_EVO.FULL ~ MPC +',formula.best)), direction = 'forward')
 decompose_variance(m3)
 
+
+m4=step(mnull,scope = as.formula(paste0('rel_EVO.FULL ~ ',formula.nompc)), direction = 'forward')
+decompose_variance(m4)
+anova(m4)
 
 
 
@@ -794,9 +848,9 @@ col_zeros <- lapply(YEASTOMICS.snp %>% dplyr::select(where(is.numeric)), functio
 YEASTOMICS.snp_nona <- replace_na(YEASTOMICS.snp, col_means)
 #YEASTOMICS.snp_nona <- replace_na(YEASTOMICS.snp, col_zeros)
 
-m0 = lm(data=YEASTOMICS.snp, EVO.FULL ~ MPC + cat_genomics.peter2018.snp_full )
+m0 = lm(data=YEASTOMICS.snp, rel_EVO.FULL ~ MPC + cat_genomics.peter2018.snp_full )
 decompose_variance(m0)
-formula.m0 = as.formula(paste0("EVO.FULL ~ offset(",coef(m0)[2],"*MPC) + offset(",coef(m0)[3],"*cat_genomics.peter2018.snp_full)"))
+formula.m0 = as.formula(paste0("rel_EVO.FULL ~ offset(",coef(m0)[2],"*MPC) + offset(",coef(m0)[3],"*cat_genomics.peter2018.snp_full)"))
 m00 = lm(data=YEASTOMICS.snp_nona, formula.m0 )
 decompose_variance(m00)
 
@@ -818,9 +872,9 @@ col_zeros <- lapply(YEASTOMICS.snp %>% dplyr::select(where(is.numeric)), functio
 YEASTOMICS.snp_nona <- replace_na(YEASTOMICS.snp, col_means)
 #YEASTOMICS.snp_nona <- replace_na(YEASTOMICS.snp, col_zeros)
 
-m0 = lm(data=YEASTOMICS.snp, EVO.FULL ~ MPC)
+m0 = lm(data=YEASTOMICS.snp, rel_EVO.FULL ~ MPC)
 decompose_variance(m0)
-formula.m0 = as.formula(paste0("EVO.FULL ~ offset(",coef(m0)[2],"*MPC)"))
+formula.m0 = as.formula(paste0("rel_EVO.FULL ~ offset(",coef(m0)[2],"*MPC)"))
 m00 = lm(data=YEASTOMICS.snp_nona, formula.m0 )
 decompose_variance(m00)
 
@@ -830,12 +884,17 @@ decompose_variance(m1)
 m2 = step(m00,scope = as.formula(paste0(formula.m0,' + ',formula.bestfeat,'+cat_genomics.peter2018.snp_full')), direction = 'forward',na.action = "na.exclude")
 decompose_variance(m2)
 
+
+m3.0=step(m00,scope = as.formula(paste0(formula.m0,' + ',formula.best)), direction = 'forward')
+decompose_variance(m3.0)
 m3=step(m00,scope = as.formula(paste0(formula.m0,' + ',formula.best,'+cat_genomics.peter2018.snp_full')), direction = 'forward')
 decompose_variance(m3)
 
-msnp =  lm(data=YEASTOMICS.snp_nona, EVO.FULL ~ cat_genomics.peter2018.snp_full)
+msnp =  lm(data=YEASTOMICS.snp_nona, rel_EVO.FULL ~ cat_genomics.peter2018.snp_full)
 decompose_variance(msnp)
 
+m0snp =  lm(data=YEASTOMICS.snp_nona, rel_EVO.FULL ~ MPC + cat_genomics.peter2018.snp_full)
+decompose_variance(m0snp)
 
 sigvar = M3[-42,] %>%
          arrange(desc(`Sum Sq`)) %>%
