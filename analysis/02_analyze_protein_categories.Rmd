@@ -164,7 +164,7 @@ ABUNDANCE = load.ho2018.data() %>%
             dplyr::filter(noval<1 || !is.na(MPC) ) %>% dplyr::select(-noval) # remove no values
 
 EXPRESSION = FEAT %>% 
-             dplyr::select(ORF,contains(c("tAI","CU_cai","CU_fop","paxdb","TE_exponential"))) %>%
+             dplyr::select(ORF,contains(c("tAI","CU_cai","CU_fop","paxdb","TE_exponential","TE_metaphase_I","TE_metaphase_II","TE_anaphase","TE_premeiotic_entry"))) %>%
              dplyr::select(-paste0("cat_transcriptomics.paxdb.ortho_ppm_", c("sd","cv","max","min","n")))%>%
              dplyr::rename_with(.cols=everything(), str_replace, pattern="cat_.+\\..+\\.(.+)$",replacement="\\1")
 
@@ -172,6 +172,16 @@ colab = c('PPM','MPC','gfp','ms')
 colexp = c("tAI","CU_cai","CU_fop","TE_exponential","TE_exponential_A14201","TE_exponential_gb15")
 colortho = c('ppm_4932','ppm_214684','ppm_4896','ppm_5061','ortho_ppm_avg')
 exp.type = rep(c('PROTEIN','GENE','ORTHOLOG'), times=c(length(colab),length(colexp),length(colortho)))
+
+# TMP  = left_join(ABUNDANCE,EXPRESSION,by=c('orf'='ORF'))
+# 
+# spearman(TMP$MPC,TMP$TE_metaphase_I)
+# spearman(TMP$MPC,TMP$TE_metaphase_II)
+# spearman(TMP$MPC,TMP$TE_anaphase)
+# spearman(TMP$MPC,TMP$TE_premeiotic_entry)
+# spearman(TMP$MPC,TMP$TE_exponential)
+# spearman(TMP$MPC,TMP$TE_exponential_A14201)
+# spearman(TMP$MPC,TMP$TE_exponential_gb15)
 
 ```
 
@@ -189,7 +199,7 @@ FUNGI = load.dubreuil2021.data(1) %>%
 # EVOLUTIONARY RATE ON BOTH FUNGI AND STRAINS
 STRAINS = readRDS(here("data","PROTEIN-EVO-FUNGI-SNP.rds")) %>%
        dplyr::select(c(starts_with(c('EVO.','SNP.')),'PPM','ORF','UNIPROT','IS_FUNGI','IS_STRAINS')) %>% 
-       group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log)) %>% # apply log10 to SNP rate4site
+       group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log10)) %>% # apply log10 to SNP rate4site
        left_join(ABUNDANCE,by=c('ORF'='orf')) %>% 
        filter( !is.na(PPM) & !is.na(MPC) ) %>%
        left_join(EXPRESSION,by=c('ORF'))

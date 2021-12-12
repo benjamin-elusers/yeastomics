@@ -50,8 +50,6 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
   return(binned)
 }
 
-
-
 # Calculate the spearman correlation of two variables by group
 cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
   # if( length(BY) == 1){
@@ -81,8 +79,6 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
   }
   return(CC)
 }
-
-
 
 # Measure centrality of a network
 network.centrality = function(fromTo,namenet=''){
@@ -195,7 +191,6 @@ fivebins = function(x, applyto=NULL,
   return(BINS)
 }
 
-
 slice_min_max <- function(df, order_by = value, n = 1) {
   order_by = enquo(order_by)
   min <- slice_min(df, !!order_by, n = n) %>%
@@ -242,7 +237,6 @@ AACOUNT2SCORE = function(COUNT,SCORE, opposite=F){
   }
   return(S)
 }
-
 
 coalesce_join <- function(x, y,
                           by = NULL, suffix = c(".x", ".y"),
@@ -291,7 +285,7 @@ text2corner = function(where){
 }
 
 
-make_scatterplot  = function(data2plot,xvar,yvar,
+make_scatterplot  = function(data2plot,xvar,yvar, grp=NULL,
                              pt.size = 0.7, pt.shape=19, pt.alpha=0.8, pt.col='black', pt.fill='black',
                              labx='',laby='',
                              pal='Spectral',paldir=-1,
@@ -301,17 +295,25 @@ make_scatterplot  = function(data2plot,xvar,yvar,
   library(ggplot2)
   theme_set(theme2use)
 
+  print(head(data2plot))
   corner=text2corner(txtcorner)
   rho=spearman.toplot(data2plot[[xvar]],data2plot[[yvar]])
+  p = ggplot(data=data2plot,aes_string(x=xvar,y=yvar)) +
+      geom_point(size=pt.size, alpha=pt.alpha,shape=pt.shape,col=pt.col,fill=pt.fill)
 
-  ggplot(data=data2plot,aes_string(x=xvar,y=yvar)) +
-    geom_point(size=pt.size, alpha=pt.alpha,shape=pt.shape,col=pt.col,fill=pt.fill) +
+  if(!is.null(grp)){
+    p = ggplot(data=data2plot,aes_string(x=xvar,y=yvar,fill=grp)) +
+        geom_point(size=pt.size, alpha=pt.alpha,shape=pt.shape)
+  }
+  p = p +
     stat_density_2d(aes(fill = ..level..), geom = "polygon", colour=NA,size=0.25,alpha=0.25)+
     geom_smooth(method = 'lm',col='gray50',se=F,size=1) +
     geom_text(data=rho,aes(x=corner['X'],y=corner['Y'],label=toshow),hjust='inward',vjust='inward',size=5) +
     xlab(labx) +
     ylab(laby) +
     scale_fill_distiller(palette = pal,direction=paldir)
+  plot(p)
+  return(p)
 }
 
 get_clade_residual_evorate = function(cladedata){
@@ -327,3 +329,240 @@ get_clade_residual_evorate = function(cladedata){
   return(fit.evo)
 }
 
+
+
+
+
+
+#### _analysis function ####
+show_density = function(input, # Input data
+                        var,   # Variable name
+                        nsd=2  # Number of standard deviation to show
+){
+
+  V = input[[var]]
+
+  # Statistics
+  mu = mean_(V) # Y mean
+  md = median_(V) # Y median
+  s  = sd_(V) # Y standard deviation
+  rg = range_(V)
+  symmetry = function(x){ return( sort(c(x,x)) * (-1)^(1:length(x)) ) }
+  sd_x = mu + s* symmetry(x=1:nsd)
+  # Density
+  D=density(V,bw=0.1,na.rm=T)
+  dy.ind = sapply(sd_x,function(X){ nearest(X,D$x) })
+  sd_y  = D$y[dy.ind]
+
+  df_sd =tibble( xx = sd_x, yy = sd_y)
+
+  A = ggplot(input) +
+    ggpubr::grids() +
+    stat_density(bw = 0.1, aes_string(x=V)) +
+    geom_vline(xintercept = mu, col='white', linetype=1,size=1) + # mean
+    geom_segment(data=df_sd,aes(x=xx,xend=xx,y=rep(0,nsd*2),yend=yy), col='white', linetype=2,size=1) + # median
+    geom_segment(data=df_sd[1:2,],aes(x=xx,xend=xx,y=yy,yend=c(1,1)), col='red', linetype=2,size=0.25) + # standard deviation (outside)
+    geom_errorbarh(data=df_sd,aes(xmin=xx[1],xmax=xx[2],y=0.8,height=0.05),col='red',linetype=1,size=1) + # standard deviation
+    ylim(0,1) + scale_y_continuous(position = "left") + xlab("Mean Evolutionary Rate") +
+    theme( axis.line.x = element_blank(),axis.ticks = element_blank()) + #aspect.ratio = 3/2,
+    coord_flip(xlim=rg, ylim=c(1,0))
+  return(A)
+}
+
+show_sample = function(input, # Input data
+                       pop.mean,pop.range,
+                       name='property', # column for sample name
+                       id='ORF', # column for id of single observation
+                       value=c('MF_nucleotide_binding','MF_molecular_function'), # sample names
+                       var){
+
+  which.sample = input[[name]] %in% value
+  selected = input %>% dplyr::filter(which.sample) %>% dplyr::select(!!sym(name), !!sym(id), !!sym(var))
+  mu.sample = mean_(selected[[var]])
+
+  df.mu = group_by(selected,!!sym(name)) %>%
+    summarise(n=n(),mu.sample=mean_(!!sym(var)),sd.sample=sd_(!!sym(var)),
+              sdmin=mu.sample-sd.sample, sdmax=mu.sample+sd.sample) %>%
+    mutate(MU = pop.mean)
+
+
+  #selected.prop = c('MF_nucleotide_binding','MF_molecular_function','essential_core','essential_dispensable','pangenome_rare','pangenome_cloud')
+  #ER.prop = propfit %>% dplyr::filter(property %in% selected.prop) %>% dplyr::select('property','EVO.FULL','.resid.evo')
+  library(ggbeeswarm)
+  library(see)
+
+  B = ggplot(selected,aes(y=!!sym(var),fill=!!sym(name),col=!!sym(name))) +
+    geom_violinhalf(aes_string(x=name),color=NA,alpha=0.9,show.legend = F) +
+    geom_beeswarm(aes_string(x=name),size = 2,  shape = 21, stroke = 0, alpha=0.5,groupOnX = T,dodge.width=0) +
+    geom_pointrange_borderless(data=df.mu,mapping = aes(x=!!sym(name),y=mu.sample,ymin=sdmin,ymax=sdmax),size=1,fatten=6, position=position_dodge2(width=1)) +
+    #geom_crossbar(data=df.mu,mapping = aes(x=!!sym(name),y=mu.sample,ymin=sdmin,ymax=sdmax),alpha=0.1,size=0.5,fatten=0) +
+    geom_hline(df.mu,mapping = aes(yintercept = MU), col='black',linetype=1,size=1) + # mean
+    geom_text(data=df.mu,mapping = aes(label=n,x=!!sym(name),y=2.5,vjust='inward'),show.legend = F) +
+    xlab(name) + scale_y_continuous(name='',limits = pop.range, expand = c(0,0)) + ylab('') +
+    #theme(legend.position = 'none',legend.direction = 'vertical',axis.text.x = element_text(angle = 45)) +
+    ggpubr::grids()+
+    #scale_fill_material_d(palette = "ice") + scale_color_material_d(palette = "ice")
+    scale_fill_material_d(palette="full") + scale_color_material_d(palette="full")
+  B
+  return(B)
+}
+
+get_XY_data = function(input,x=X,y=Y,noNA=T){
+  res=dplyr::lst(XX=input[[x]], YY=input[[y]],
+                 varnames=c('x'=x,'y'=y),
+                 n = c('x'=sum(!is.na(XX)), 'y' = sum(!is.na(YY)), 'xy' = sum(complete.cases(YY,XX)) ),
+                 mu = c('x'=mean_(XX),'y'=mean_(YY)),
+                 md = c('x'=median_(XX),'y'=median_(YY)),
+                 var = c('x'=var_(XX),'y'=var_(YY))
+  )
+
+  res$df = input %>% ungroup()
+  if( noNA ){
+    df.noNA = res$df %>% dplyr::filter(complete.cases(!!sym(y),!!sym(x)))
+    res$df = df.noNA
+    res$YY=res$df[[y]]
+    res$XX=res$df[[x]]
+
+  }
+  return(res)
+}
+
+get_model_params = function(m,x,y){
+
+  nXY=sum( complete.cases(x,y) )
+  mu.y=mean_(y)
+  m.params = dplyr::lst(
+    fit  = m,
+    xx = x,
+    yy = y,
+    yfit = fitted(fit), # Y-Fitted
+    yres = residuals(fit), # Y-Residual
+    pfit = coef(fit), # Fitted parameters (intercept, PPM)
+    TSS = sum( (yy-mu.y)^2 ),
+    ESS = sum( (yfit-mu.y)^2 ), # Explained variance
+    RSS = TSS-ESS, # Deviance (Unexplained variance)
+    RSE = sqrt( (1 / (nXY-2)) * RSS ), # Residual standard error
+  )
+  return(m.params)
+}
+
+get_fit_data = function(d,m){
+  mu.y = d$mu['y']
+  var.y=d$var['y']
+  nXY = d$n['xy']
+  xname=d$varnames['x']
+  yname=d$varnames['y']
+  fit = d$df %>%
+    broom::augment_columns(x=m) %>%
+    mutate(ESS=sum_( (.fitted-mu.y)^2 ), TSS=sum_( (!!sym(yname)-mu.y)^2 ), RSS=TSS-ESS,
+           s2=TSS/(nXY-1), s2.y = var.y, RS=sum(.resid),
+           RSE=sqrt( (1 / (nXY-2)) * RSS), AIC = AIC(m), BIC=BIC(m), LL = readr::parse_number(as.character(logLik(m))))
+  return(fit)
+}
+
+
+make_linear_fit = function(input,    # Input data
+                           x=X, y=Y, # X/Y Variables to fit
+                           only.params=T){
+
+  xydata = get_XY_data(input,x,y,noNA=T)
+  mu.y = xydata$mu['y']
+  var.y=xydata$var['y']
+  nXY = xydata$n['xy']
+  # model #
+  model.name='Linear'
+  f=as.formula(paste0(y,"~",x))
+  m = lm(formula =f , data=xydata$df)
+  m.params = get_model_params(m,xydata$XX,xydata$YY) %>%
+    purrr::list_modify(model = model.name, xname=xydata$varnames['x'],yname=xydata$varnames['y'])
+  if(only.params){ return(m.params) }
+  # data with model #
+  fit = get_fit_data(xydata,m) %>% mutate(model=model.name)
+  return(fit)
+}
+
+make_logistic_fit = function(input,    # Input data
+                             y=Y, x=X, # X/Y Variables to fit
+                             only.params=T){
+  xydata = get_XY_data(input,x,y,noNA=T)
+  mu.y = xydata$mu['y']
+  var.y=xydata$var['y']
+  nXY = xydata$n['xy']
+
+  # model #
+  model.name='Sigmoid\n(logisitic)'
+  f=as.formula(paste0(y,"~","SSlogis(",x,",Asym,xmid,scal)"))
+  init.params = getInitial( f,data=xydata$df)
+  m = nls(formula = f, start = init.params, data=xydata$df)
+  m.params = get_model_params(m,xydata$XX,xydata$YY) %>%
+    purrr::list_modify(model =model.name, xname=xydata$varnames['x'],yname=xydata$varnames['y'])
+  if(only.params){ return(m.params) }
+  # data with model #
+  fit = get_fit_data(xydata,m) %>% mutate(model=model.name)
+  return(fit)
+}
+
+make_poly_fit = function(input,    # Input data
+                         y=Y, x=X, # X/Y Variables to fit
+                         deg=3,
+                         only.params=T){
+  xydata = get_XY_data(input,x,y,noNA=T)
+  mu.y = xydata$mu['y']
+  var.y=xydata$var['y']
+  nXY = xydata$n['xy']
+
+  # model #
+  model.name=sprintf('Polynomial\n(d = %s)',deg)
+  f=as.formula(paste0(y,"~poly(",x,",degree=",deg,",raw=T)"))
+  m = glm(formula =f , data=xydata$df)
+  m.params = get_model_params(m,xydata$XX,xydata$YY) %>%
+    purrr::list_modify(model = model.name, xname=xydata$varnames['x'],yname=xydata$varnames['y'])
+  if(only.params){ return(m.params) }
+  # data with model #
+  fit = get_fit_data(xydata,m) %>% mutate(model=model.name)
+  return(fit)
+}
+
+make_expo_fit = function(input,    # Input data
+                         y=Y, x=X, # X/Y Variables to fit
+                         only.params=T){
+  xydata = get_XY_data(input,x,y,noNA=T)
+  mu.y = xydata$mu['y']
+  var.y=xydata$var['y']
+  nXY = xydata$n['xy']
+
+  expo = function(alpha=1,beta=0,x){ return(alpha * exp(beta*x)) }
+  # model #
+  model.name='Exponential'
+  f=as.formula(paste0(y,"~ expo(alpha,beta,",x,")"))
+  init.params=list(alpha=1,beta=-1)
+  m=nls(f,start = init.params,data=xydata$df)
+  m.params = get_model_params(m,xydata$XX,xydata$YY) %>%
+    purrr::list_modify(model = model.name, xname=xydata$varnames['x'],yname=xydata$varnames['y'])
+  if(only.params){ return(m.params) }
+  # data with model #
+  fit = get_fit_data(xydata,m) %>% mutate(model=model.name)
+  return(fit)
+}
+
+decompose_variance = function(LM){
+  N=sum(complete.cases(LM$model))
+  TSS = var( LM$model[,1] ) * (N-1)
+  df.var = summary(aov(LM))[[1]]
+  nvar = nrow(df.var)
+  RSS = sum(df.var$`Sum Sq`[nvar])
+  ESS = sum(df.var$`Sum Sq`[-nvar])
+
+  ess.max = sum( (fitted(LM) - mean_(LM$model[,1]))^2 )
+  ess = TSS-RSS
+  #RSS =  deviance(LM)
+  #rss = sum( residuals(LM)^2)
+  #ESS =  TSS - RSS
+  cat(sprintf("TSS %.1f (n=%s)\n",TSS,N))
+  cat(sprintf("--> ESS total %.1f (%.0f%%) max. %.1f ==> gain=%.1f (+%.0f%%)\n",ess, 100*ess/TSS, ess.max, ESS, 100*ESS/TSS))
+  cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  100*RSS/TSS))
+}
+
+extract_variables = function(LM){
+  df.imp = aov(LM)
+}
