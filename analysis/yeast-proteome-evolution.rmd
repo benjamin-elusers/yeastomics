@@ -154,10 +154,17 @@ have been produced and published in [*J. Peter et al.*, Nature 2018](https://doi
 ## 1011 strains
 riboseq_strains = c('AMH','BAN','BED','BPL','BTI','CMP','CPI','CQC') # Strains with riboseq data (on 14/01/21)
 strains.info = load.peter2018.data(1) %>%  # strains info from supp mat of Science paper
-                 mutate( has_riboseq = standardized.name %in% riboseq_strains)
+                 mutate( has_riboseq = standardized_name %in% riboseq_strains)
 
 # saveRDS(load.1011.strains(),"data/proteome-1011-strains.rds") # Takes >5mn for 6575 ids
 YK11 = readRDS(here("data","proteome-1011-strains.rds"))  # 1011 strains proteomes sequences
+
+# Restrict to the 8 strains used in RNA-seq/Ribo-seq/Proteomics
+Y8 = lapply(YK11, function(E){ E[get.strain_orf(E,"strains") %in% riboseq_strains] }) %>% purrr::compact()
+#table(lengths(y8))
+
+Y2 = lapply(YK11, function(E){ E[get.strain_orf(E,"strains") %in% c('CQC','BTI')] }) %>% purrr::compact()
+table(lengths(Y2))
 ```
 
 All strains read were aligned on the reference yeast genome (ATCC 204508 / S288c). 
@@ -376,12 +383,44 @@ P = tibble( orf=names(YK11),
             len = sapply(widths(YK11),unique)
     ) %>% left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
     mutate( match_wt = len == len.s288c )
+
+
+P8 = tibble( orf=names(Y8), 
+            n_strains=lengths(Y8),
+            len = sapply(widths(Y8),unique)
+    ) %>% left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
+    mutate( match_wt = len == len.s288c )
+sum_(!P8$match_wt)
+
+P2 = tibble( orf=names(Y2), 
+            n_strains=lengths(Y2),
+            len = sapply(widths(Y2),unique)
+    ) %>% left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
+    mutate( match_wt = len == len.s288c )
+sum_(!P2$match_wt)
+
 VAR = preload(var.file, loading.call = map_df(YK11, get.variants,verbose=F),doing='Find all variants...')
+VAR8 = map_df(Y8, get.variants,verbose=F)
+VAR2 = map_df(Y2, get.variants,verbose=F)
+get.maxfreq(VAR2)
 SNP = get.variants.to.SNP(VAR) %>% 
         add_count(id,ref_pos,name='nvar') %>%
         group_by(id,ref_pos) %>% 
         mutate( alt_cumfr=sum(alt_fr)) %>% 
         left_join(P,by=c('id'='orf'))
+
+SNP8 = get.variants.to.SNP(VAR8) %>% 
+        add_count(id,ref_pos,name='nvar') %>%
+        group_by(id,ref_pos) %>% 
+        mutate( alt_cumfr=sum(alt_fr)) %>% 
+        left_join(P8,by=c('id'='orf'))
+
+SNP2 = get.variants.to.SNP(VAR2) %>% 
+        add_count(id,ref_pos,name='nvar') %>%
+        group_by(id,ref_pos) %>% 
+        mutate( alt_cumfr=sum(alt_fr)) %>% 
+        left_join(P2,by=c('id'='orf'))
+
 WT = get.positions(S288C) %>% 
      group_by(orf) %>% 
      mutate(bin.pos=dplyr::ntile(wt_pos,100))
@@ -392,6 +431,22 @@ PROT_SNP = left_join(SNP,WT, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len
              early_stop = (alt_aa == "*" & ref_pos != len), 
              dSTI.ref=get.score.mutation(ref_aa,alt_aa),
              dSTI.wt=get.score.mutation(wt_aa,alt_aa))
+
+PROT_SNP8 = left_join(SNP8,WT, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
+      mutate(wt_low = alt_aa == wt_aa, 
+             wt_missing=is.na(wt_aa),
+             early_stop = (alt_aa == "*" & ref_pos != len), 
+             dSTI.ref=get.score.mutation(ref_aa,alt_aa),
+             dSTI.wt=get.score.mutation(wt_aa,alt_aa))
+
+PROT_SNP2 = left_join(SNP2,WT, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
+      mutate(wt_low = alt_aa == wt_aa, 
+             wt_missing=is.na(wt_aa),
+             early_stop = (alt_aa == "*" & ref_pos != len), 
+             dSTI.ref=get.score.mutation(ref_aa,alt_aa),
+             dSTI.wt=get.score.mutation(wt_aa,alt_aa))
+
+
 
 BRK.FREQ = c(0,0.0001,1e-3,1e-2,5e-2,1e-1,5e-1)
 LAB.FREQ = paste.pair(trimws(sprintf("%.4f",BRK.FREQ), whitespace = '0', which = 'right'),s='-')
