@@ -1,5 +1,9 @@
-# Load yeastomics scripts via URL
-yeastomics="https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/"
+# Load yeastomics scripts (either via URL or locally
+if(curl::has_internet){ # If connected to internet
+  yeastomics="https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/"
+}else{ # else load locally
+  yeastomics=here::here("src")
+}
 fx=c("annotation","sequence","phylogenetic","analysis","datalocal","datapub")
 fct.r=stringr::str_c("function_",fx,".r")
 scripts=file.path(yeastomics,"src",c("utils.r",fct.r))
