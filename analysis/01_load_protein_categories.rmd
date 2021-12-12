@@ -252,7 +252,7 @@ VARORF = load.peter2018.data(2)
 file.r4s.fungi_snp=here("data","PROTEIN-EVO-FUNGI-SNP.rds")
 SNP_STRAIN = readRDS(file.r4s.fungi_snp) %>% 
               dplyr::select(starts_with('SNP.'),'ORF','UNIPROT','IS_FUNGI','IS_STRAINS') %>% 
-              group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log)) # apply log10 to SNP rate4site %>% 
+              group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log10)) # apply log10 to SNP rate4site %>% 
 
 # CHROMOSOME GENES  ------------------------------------------------------------
 CHR = SGD %>%
