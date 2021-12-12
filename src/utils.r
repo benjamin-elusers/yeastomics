@@ -152,8 +152,8 @@ subname=function(name,sep="\\.",lc=F){ # extracts substring until first separato
   return(part1)
 }
 
-strfind = function(strings, patterns){ # search multiple patterns in character vectors
-  sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
+strfind = function(strings, patterns, index=F){ # search multiple patterns in character vectors
+  sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = !index) })
 }
 
 file_ext <- function (fn) {
