@@ -733,8 +733,7 @@ get.alphafold.proteome = function(id_uniprot){
   })
 
   df.af = do.call(rbind,af)
-
-  n_af  = n_distinct(af)
+  n_af  = df.af %>% summarize(n=n_distinct(uni), na=sum(is.na(uni)))
   cat(sprintf("--> found %s/%s predicted alphafold\n",n_af,n_uni))
 
   if( n_af>0 ){
