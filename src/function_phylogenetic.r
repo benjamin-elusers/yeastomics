@@ -398,6 +398,7 @@ get_fungi_clades = function(){
 
 get_clade_data = function(data, g1='schizo', g2='sacch.wgd', rate='ratio',tolog=T, include.wgd=F, include.seqcomp=F){
 
+  enog.cols = c('Tax','NOG','nog.1to1','RAXML','FunCat','STRING','sp1','sp2','uni1','uni2','ppm1','ppm2')
   seqcomp.cols = c(get.AA1(),get.codons4tai(noSTOP=T),'ncod','len.cdna','nAT','nGC')
   wgd.cols = c('id1','o1','o2','ref','dup','anc','rlen.aa',
                'PID.aa','PID.aa.str','PID.aa.f',
