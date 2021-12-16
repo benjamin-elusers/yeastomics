@@ -741,7 +741,7 @@ get.alphafold.proteome = function(id_uniprot){
     af_brk = c(0,50,70,90,100)
     af_lab = c('D','L','M','H')
     af_uni = id_uniprot[has_alphafold]
-    afprot= %>%
+    afprot= df.af %>%
            as_tibble() %>%
            mutate(aa_af = aa321(resi),
                   plddt_bin = cut(plddt,breaks=af_brk, labels=af_lab, include.lowest=T))
