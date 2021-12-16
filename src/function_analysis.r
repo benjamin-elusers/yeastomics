@@ -169,9 +169,13 @@ slice.d10  = function(x,...){ dplyr::slice_min(x,prop=0.1,with_ties = T,...) }
 slice.d90  = function(x,...){ dplyr::slice_max(x,prop=0.1,with_ties = T,...) }
 slice.q25  = function(x,...){ dplyr::slice_min(x,prop=0.25,with_ties = T,...) }
 slice.q75  = function(x,...){ dplyr::slice_max(x,prop=0.25,with_ties = T,...) }
-slice.iqr  = function(.data,x,lower,upper,...){
+slice.iqr  = function(.data,x,lower,upper,negate=F,...){
   col <- enquo(x)
-  dplyr::filter(.data,between(!!col,quantile(!!col,lower),quantile(!!col,upper)))
+  if(!negate){
+    dplyr::filter(.data,between(!!col,quantile(!!col,lower),quantile(!!col,upper)))
+  }else{
+    dplyr::filter(.data,!between(!!col,quantile(!!col,lower),quantile(!!col,upper)))
+  }
 }
 
 # Generate five bins arbitrarily defined at quantiles: 10, 25, 40-60, 75, 90
