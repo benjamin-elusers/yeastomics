@@ -145,7 +145,7 @@ load.costanzo2010.data = function(){
   # doi: https://doi.org/10.1126/science.1180823.
 
   S6="https://boonelab.ccbr.utoronto.ca/supplement/costanzo2009/bioprocess_annotations_costanzo2009.xls"
-  costanzo = readxl::read_xls(path=, sheet = 1)
+  #costanzo = readxl::read_xls(path=S6, sheet = 1)
   todownload="data/bioprocess_annotations_costanzo2009.xls"
   downloaded=download.file(S6, destfile = todownload)
   if(!downloaded){
@@ -343,7 +343,10 @@ load.vanleeuwen2016.data = function(){
   # doi: https://doi.org/10.1126/science.aag0839
 
   # Sheet 1 is the functional classes
-  S7="https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx"
+  S7="https://www.science.org/doi/suppl/10.1126/science.aag0839/suppl_file/aag0839tables7.xlsx"
+  ## EDIT 13.12.21: OLD URL NOT VALID ANYMORE
+  ## https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx"
+
   .class_function = c(
     'A'="Amio acid biosynth & transport",
     'B'="Autophagy",
@@ -668,43 +671,87 @@ load.dubreuil2021.data = function(d){
 }
 
 # Resource databases with proteome data available ------------------------------
-load.alphafold = function(uniprot,extension=c('cif','pdb'),quiet=T,local=""){
-  library(bio3d)
-  if(!file.exists(local)){
+
+check.alphafold = function(uniprot,extension=c('cif','pdb'),quiet=T,as.path=T){
+  if(!file.exists(uniprot)){
+    # Check whether a uniprot is associated to an alphafold model
     url_alphafold="https://alphafold.ebi.ac.uk/files"
-    AF_uniprot=sprintf("%s/AF-%s-F1-model_v1.%s",url_alphafold,uniprot,extension)
-  }else{ # if you want to use locally predicted alphafold files
-    AF_uniprot=local # provide full path to the predicted file
-    stopifnot(file.exists(AF_uniprot),
-              "Alphafold predicted model not found locally! check the full path...")
+    ext=match.arg(extension,extension)
+    AF_uniprot=sprintf("%s/AF-%s-F1-model_v1.%s",url_alphafold,uniprot,ext)
+    found =  RCurl::url.exists(AF_uniprot)
+  }else{ # for locally predicted alphafold files, use full path instead of uniprot accession number
+    AF_uniprot=uniprot # provide full path to the predicted file
+    found = file.exists(AF_uniprot)
   }
-  # Read from cif or pdb (the output format is the same)
-  url_found = RCurl::url.exists(AF_uniprot)
-  if( url_found ){
-    AF = switch(extension, cif=bio3d::read.cif(AF_uniprot,verbose=!quiet), pdb=bio3d::read.pdb(AF_uniprot,verbose=!quiet))
+  if(!quiet){ cat(uniprot," --> ",found,"\n") }
+  if(found & as.path){ return(setNames(found,AF_uniprot)) }
+  return(setNames(found,uniprot))
+}
+
+load.alphafold = function(uniprot,extension=c('cif','pdb'),quiet=T){
+  # Load alphafold predicted structure from uniprot along with the confidence score per residue
+  library(bio3d)
+  has_alphafold = check.alphafold(uniprot,extension,as.path=T)
+  if( has_alphafold ){
+    AF = switch(extension, cif=bio3d::read.cif(names(has_alphafold),verbose=!quiet), pdb=bio3d::read.pdb(names(has_alphafold),verbose=!quiet))
     Ca = AF$atom[AF$calpha,]
     df.res = Ca %>% mutate(uni=uniprot) %>% select(uni,chain,resn=resno,resi=resid,plddt=b)
     return(df.res)
   }else{
-    df.res=tibble(uni=uniprot)
+    df.res=tibble(uni=uniprot, chain=NA, resn=NA, resi=NA,plddt=NA)
     warning(sprintf("%s was not found on the EBI/AlphaFold server!\n",uniprot))
     return(df.res)
   }
 }
 
-check.alphafold = function(uniprot,extension=c('cif','pdb'),local="",quiet=T){
-  if(!quiet){ cat(uniprot," --> ") }
-  if(!file.exists(local)){
-    url_alphafold="https://alphafold.ebi.ac.uk/files"
-    ext=match.arg(extension,extension)
-    AF_uniprot=sprintf("%s/AF-%s-F1-model_v1.%s",url_alphafold,uniprot,ext)
-    found =  RCurl::url.exists(AF_uniprot)
-  }else{ # if you want to use locally predicted alphafold files
-    AF_uniprot=local # provide full path to the predicted file
-    found = file.exists(AF_uniprot)
+get.alphafold.proteome = function(id_uniprot){
+  #library(doParallel)
+  #library(parallel)
+  library(tidyverse)
+  library(tictoc)
+  library(progressr)
+  library(future.apply)
+  plan(multisession)
+
+  # Use a cluster to accelerate the process
+  #ncpus = detectCores(logical = F)-1
+  #cl <- makeCluster(ncpus, type='SOCK')
+  #registerDoParallel(cl)
+  #n <- 100
+
+  n_uni = length(id_uniprot)
+  # Check the existence of the alphafold model for each uniprot
+  with_progress({
+    p <- progressor(along = id_uniprot)
+    tic("Retrieving alphafold model... (using future.apply")
+    # Retrieve the alphafold predicted structure model from the input identifiers
+    af =  future_lapply(1:n_uni, function(i){
+      p(sprintf("i=%.f",i))
+      load.alphafold(uniprot=id_uniprot[i],extension='pdb')
+    })
+    toc()
+  })
+
+  df.af = do.call(rbind,af)
+
+  n_af  = n_distinct(af)
+  cat(sprintf("--> found %s/%s predicted alphafold\n",n_af,n_uni))
+
+  if( n_af>0 ){
+    af_brk = c(0,50,70,90,100)
+    af_lab = c('D','L','M','H')
+    af_uni = id_uniprot[has_alphafold]
+    afprot= %>%
+           as_tibble() %>%
+           mutate(aa_af = aa321(resi),
+                  plddt_bin = cut(plddt,breaks=af_brk, labels=af_lab, include.lowest=T))
+    #Stop the cluster
+    #stopCluster(cl)
+
+    return(afprot)
+  }else{
+    stop("None of the identifiers given correspond to an alphafold model!")
   }
-  if(!quiet){ cat(found,"\n") }
-  return(found)
 }
 
 load.superfamily = function(tax='xs'){
@@ -983,4 +1030,51 @@ get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated")
       arrange(NOG,taxid,protid)
 
   return (ortho_ppms)
+}
+
+# show.eggnog.nodes = function(ver=5,species=4891) {
+#   library(rio)
+#   library(RCurl)
+#   library(hablar)
+#   eggnog_nodes=sprintf("http://eggnog%s.embl.de/download/latest/e%s.level_info.tar.gz",ver,ver)
+#   "http://eggnog5.embl.de/download/eggnog_5.0/e5.taxid_info.tsv"
+#   # download the archive
+#   temp<-tempfile()
+#   download.file(eggnog_nodes,temp)
+#
+#   # Find the list of files in the archive (taxonomic nodes)
+#   header_col =  readr::read_delim(temp,delim='\t',skip=0) %>% grep(pattern="^#", x = ., value = T)
+#
+#   eggnog_levels = readr::read_delim(file = temp)$Name %>%
+#     str_subset("\\.txt") %>%
+#     basename %>%
+#     str_remove(".orthgroups.consistent.txt") %>%
+#     gtools::mixedsort()
+#
+#   if(show.nodes){ return(paxdb_nodes) }
+#   # Check the taxonomic node selected
+#   node_exists= !purrr::is_empty(node)
+#   is_paxdb_node=F
+#
+#   if(node_exists){
+#     numnode=grep(node,paxdb_nodes)
+#     if(length(numnode)==1 ){
+#       is_paxdb_node=T
+#       node_full=grep(node,paxdb_nodes,v=T)
+#       message("taxonomic node (",node_full,") is valid!")
+#     }else if(length(numnode)>1){
+#       warning("(",node,") is not unique! Please select a valid unique node",immediate.=T)
+#       is_paxdb_node=F
+#     }
+#   }
+#
+#   if(!is_paxdb_node){
+#     warning("(",node,") is not a valid taxonomic node from paxDB orthologs!",immediate.=T)
+#     numnode = menu(paxdb_nodes, title = "Pick a taxonomic node from the list below",graphics = T)
+#   }
+# }
+
+get.eggnogg.node=function(node=4890){
+  url_eggnog = "http://eggnog5.embl.de/download/latest/per_tax_level/"
+  #paste0(url_eggnog,node)
 }
