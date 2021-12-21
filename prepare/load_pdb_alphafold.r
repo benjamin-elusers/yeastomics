@@ -6,66 +6,87 @@ scprot=load.dubreuil2019.data(4)
 scres=load.dubreuil2019.data(3)
 scevo=load.dubreuil2021.data(3)
 
-library(doParallel)
-registerDoParallel(6)
-uni = scprot$UNIPROT
-tic()
-has_alphafold = foreach(u=uni) %dopar% setNames(check.alphafold(u,quiet=T),u) %>% unlist
-toc()
+saved.alphafold = here::here('prepare','alphafold-uniprot-yeast.rds')
+id_uniprot = scprot$UNIPROT
+if(!file.exists(saved.alphafold )){
+  #stickiness = get.stickiness()[aa_af]
+  #group_by(uni,plddt_bin) %>%
+  #mutate(sti.afbin = mean(stickiness))
+  afprot = get.alphafold.proteome(scprot$UNIPROT)
+
+  # Average stickiness per region to wide format
+  # afprot %>% pivot_wider(id_cols=c(uni,chain,resn,resi,plddt,aa_af), names_from=plddt_bin, names_glue = "sti.af_{plddt_bin}",values_from = sti.af )
+  # CHECKPOINT
+  write_rds(afprot,here::here('prepare','alphafold-uniprot-yeast.rds'))
+}
+afprot=read_rds(saved.alphafold )
 
 
-##### 2. ALPHAFOLD PROTEOME #####
-af_brk = c(0,50,70,90,100)
-af_lab = c('D','L','M','H')
+get_alphafold_content = function(afprot, plddt_cutoff=30){
+  #afprot=read_rds( here::here('prepare','alphafold-yeast-uniprotKB_dubreuil2019.rds') )
+  # By proteins
+  AF.content = afprot %>% mutate( plddt30 = plddt<=30 ) %>%
+       group_by(uni) %>%
+       summarise(fct_count(plddt_bin,prop=T)) %>%
+       dplyr::rename(bin=f,f=p,L=n) %>%
+       pivot_wider(id_cols=c(uni,bin),names_from=bin,names_glue="{.value}.af_{bin}",values_from=c(f,L))
+  return(AF.content)
+}
 
-uni_af = uni[has_alphafold]
-tic()
-af = foreach(u=uni_af) %dopar% load.alphafold(uniprot=u,extension='pdb')
-afprot=do.call(rbind,af) %>%
-       as_tibble() %>%
-       mutate(aa_af = aa321(resi),
-              plddt_bin = cut(plddt,breaks=af_brk, labels=af_lab, include.lowest=T),
-              stickiness = get.stickiness()[aa_af] ) %>%
-       group_by(uni,plddt_bin) %>%
-       mutate(sti.afbin = mean(stickiness))
+test = get_alphafold_content(afprot)
 
-# Average stickiness per region to wide format
-# afprot %>% pivot_wider(id_cols=c(uni,chain,resn,resi,plddt,aa_af), names_from=plddt_bin, names_glue = "sti.af_{plddt_bin}",values_from = sti.af )
-head(afprot)
-dim(afprot)
-toc()
-# CHECKPOINT
-write_rds(afprot,here::here('prepare','alphafold-yeast-uniprotKB_dubreuil2019.rds'))
+get_alphafold_stickiness = function(){
+  afprot=read_rds( here::here('prepare','alphafold-yeast-uniprotKB_dubreuil2019.rds') )
+  AF.sti = group_by(afprot, uni,plddt_bin,sti.afbin) %>%
+           pivot_wider(id_cols=c(uni,plddt_bin),names_from=plddt_bin,names_glue="stickiness.af_{plddt_bin}",values_from = sti.afbin,values_fn = {unique})
+}
 
-# By proteins
-AF.content = group_by(afprot,uni) %>%
-     summarise(fct_count(plddt_bin,prop=T)) %>%
-     dplyr::rename(bin=f,f=p,L=n) %>%
-     pivot_wider(id_cols=c(uni,bin),names_from=bin,names_glue="{.value}.af_{bin}",values_from=c(f,L))
-AF.sti = group_by(afprot, uni,plddt_bin,sti.afbin) %>%
-         pivot_wider(id_cols=c(uni,plddt_bin),names_from=plddt_bin,names_glue="stickiness.af_{plddt_bin}",values_from = sti.afbin,values_fn = {unique})
+get_d2p2_content = function(MIN_D2P2=7){
 
-AF = left_join(AF.content,AF.sti) %>%
-     # Reorder columns by type of bins of alphafold confidence scores
-     select(uni, str_order(str_sub(colnames(AF),start=-4)) )
+  # Get D2P2 predictions of disorder
+  sc_d2p2 = read_rds(here::here('data','d2p2-yeast-uniprotKB.rds')) %>%
+            get.d2p2.diso(.,as.df = T)
+    #        mutate(d2p2.seg = find.consecutive(d2p2.diso>=MIN_D2P2, TRUE, min=3),
+    #               d2p2.gap = find.consecutive(d2p2.diso>=MIN_D2P2, FALSE, min=1)) %>%
+    #group_by(d2p2.seg) %>% mutate( d2p2.seglen = sum_(d2p2.seg!=0)) %>%
+    #group_by(d2p2.gap) %>% mutate( d2p2.gaplen = sum_(d2p2.gap!=0))
 
-# Get D2P2 predictions of disorder
-sc_d2p2 = read_rds(here::here('data','d2p2-yeast-uniprotKB.rds')) %>%
-          get.d2p2.diso(.,as.df = T) %>%
-          mutate(d2p2.seg = find.consecutive(d2p2.diso>=7, TRUE, min=3),
-                 d2p2.gap = find.consecutive(d2p2.diso>=7, FALSE, min=1)) %>%
-  group_by(d2p2.seg) %>% mutate( d2p2.seglen = sum_(d2p2.seg!=0)) %>%
-  group_by(d2p2.gap) %>% mutate( d2p2.gaplen = sum_(d2p2.gap!=0))
+  D2P2.content = sc_d2p2 %>% dplyr::filter(has.d2p2) %>%
+    dplyr::select(-c(has.d2p2,d2p2.size)) %>%
+    group_by(d2p2.id) %>%
+    summarise(L.d2p2 = sum_(d2p2.diso>=MIN_D2P2),
+              f.d2p2 = mean_(d2p2.diso>=MIN_D2P2))
+              #d2p2.nseg = n_distinct(d2p2.seg) - 1*(sum_(d2p2.seg==0)>0),
+              #d2p2.Lseg = sort(unique(d2p2.seglen[d2p2.seglen>0])),
+              #d2p2.iseg = row_number(d2p2.Lseg),
+              #d2p2.Lsegmax = max(d2p2.seglen))
+  return(D2P2.content)
+}
 
-D2P2.content = sc_d2p2 %>% dplyr::filter(has.d2p2) %>%
-  dplyr::select(-c(has.d2p2,d2p2.size)) %>%
-  group_by(d2p2.id) %>%
-  summarise(L.d2p2 = sum_(d2p2.diso>=7),
-            f.d2p2 = mean_(d2p2.diso>=7),
-            d2p2.nseg = n_distinct(d2p2.seg) - 1*(sum_(d2p2.seg==0)>0),
-            d2p2.Lseg = sort(unique(d2p2.seglen[d2p2.seglen>0])),
-            d2p2.iseg = row_number(d2p2.Lseg),
-            d2p2.Lsegmax = max(d2p2.seglen))
+prot = scprot %>% dplyr::select(UNIPROT,STRING,GENENAME,
+                         standard,medium,high,rejected,isMB,
+                         mean.mpc,median.mpc,bins.abundance,ppm,
+                         prot.size,starts_with(c('L.','f.','stickiness.')))
+
+d2p2.content = get_d2p2_content(MIN_D2P2=7)
+af.content = get_alphafold_content()
+
+df= prot %>%
+  left_join(d2p2.content,by=c('UNIPROT'='d2p2.id')) %>%
+  left_join(af.content,by=c('UNIPROT'='uni'))
+
+ggplot(df, aes(y=f.d2p2,x=f.af_D)) +
+  geom_point() + facet_wrap(~bins.abundance)
+cor.sub.by(df,'f.d2p2','f.af_D',BY = 'bins.abundance')
+spearman.toplot(df$f.d2p2,df$f.af_D)
+
+
+AF = left_join(get_alphafold_content(),get_alphafold_stickiness()) %>%
+  # Reorder columns by type of bins of alphafold confidence scores
+  dplyr::select(uni, str_order(str_sub(colnames(.),start=-4)) )
+head(AF)
+
+
 
 
 tmp1 = sc_d2p2 %>%
