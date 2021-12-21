@@ -343,9 +343,15 @@ load.vanleeuwen2016.data = function(){
   # doi: https://doi.org/10.1126/science.aag0839
 
   # Sheet 1 is the functional classes
-  S7="https://www.science.org/doi/suppl/10.1126/science.aag0839/suppl_file/aag0839tables7.xlsx"
-  ## EDIT 13.12.21: OLD URL NOT VALID ANYMORE
+  S7="https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aag0839&file=aag0839tables7.xlsx"
+  ## EDIT 21.12.21: NEW URL THAT REPLACED THE PREVIOUS ONE IS REDIRECTING TO DOWNLOAD THE FILE
+  ## Using the target url for downloading the file.
+  ##  xlsx file is: https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aag0839&file=aag0839tables7.xlsx
+  #S7="https://www.science.org/doi/suppl/10.1126/science.aag0839/suppl_file/aag0839tables7.xlsx"
+  ## EDIT 13.12.21: OLD URL BELOW NOT VALID ANYMORE
   ## https://science.sciencemag.org/highwire/filestream/686300/field_highwire_adjunct_files/6/aag0839TableS7.xlsx"
+  #temp=tempfile()
+  #download.file(S7, destfile = temp)
 
   .class_function = c(
     'A'="Amio acid biosynth & transport",
@@ -726,14 +732,15 @@ get.alphafold.proteome = function(id_uniprot){
     tic("Retrieving alphafold model... (using future.apply")
     # Retrieve the alphafold predicted structure model from the input identifiers
     af =  future_lapply(1:n_uni, function(i){
-      p(sprintf("i=%.f",i))
+      p()
       load.alphafold(uniprot=id_uniprot[i],extension='pdb')
     })
     toc()
   })
 
   df.af = do.call(rbind,af)
-  n_af  = df.af %>% summarize(n=n_distinct(uni), na=sum(is.na(uni)))
+
+  n_af  = df.af %>% summarize(n=n_distinct(uni), na=sum(is.na(c_across(-1)))
   cat(sprintf("--> found %s/%s predicted alphafold\n",n_af,n_uni))
 
   if( n_af>0 ){
