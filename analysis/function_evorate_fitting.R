@@ -15,7 +15,7 @@ load.clade = function(){
   # BRANCH LENGTH IN FUNGI CLADES
   # Normalized branch length (Kc):
   #  Kc = SUM(branch lengths in clade subtree Tc) / SUM(branch lengths in species tree Ts)
-  enog.cols = c('Tax','NOG','nog.1to1','RAXML','FunCat','STRING','sp1','sp2','uni1','uni2','ppm1','ppm2')
+  enog.cols = c('Tax','NOG','nog.1to1','RAXML','FunCat','STRING','orf','sp1','sp2','uni1','uni2','ppm1','ppm2')
   clade.cols = c('ppm1.log10','ppm2.log10','clade1','clade2','XX','YY')
   clade = get_clade_data(g1='schizo',g2='sacch.wgd',rate = 'ratio') %>%
     dplyr::select(all_of(enog.cols), all_of(clade.cols), starts_with('schizo'), starts_with('sacch.wgd')) %>%

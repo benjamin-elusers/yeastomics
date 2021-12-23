@@ -2,26 +2,35 @@
 source(here::here("analysis","function_evorate_fitting.R"))
 
 tic("Load data")
+# EXPRESSION DATA
 ABUNDANCE = load.abundance()
+dim(ABUNDANCE)
+# EVOLUTION DATA
 CLADE = load.clade()
 FUNGI = load.fungi.evo()
 STRAINS = load.strains.evo()
-PROP = load.properties()
-FEAT = load.features() %>% normalize_features()
-SGD_DESC = read_rds(here('data','uniprot-sgd-annotation.rds'))
-UNI_FEAT = read_rds(here('data','uniprot-features.rds'))
-BIOFUNC = load.vanleeuwen2016.data()
-toc()
-
-dim(ABUNDANCE)
 dim(CLADE)
 dim(FUNGI)
 dim(STRAINS)
+EVOLUTION = full_join(FUNGI,CLADE,by=c('ORF'='orf')) #%>% full_join(CLADE,by=c('ORF'='orf')) %>% arrange(ORF)
+dim(EVOLUTION)
+head(EVOLUTION)
 
-dim(DESC)
+# PROTEOME QUALITATIVE AND QUANTITATIVE VARIABLES
+PROP = load.properties()
+FEAT = load.features() %>% normalize_features()
+# ANNOTATION DATA
+SGD_DESC = read_rds(here('data','uniprot-sgd-annotation.rds'))
+UNI_FEAT = read_rds(here('data','uniprot-features.rds'))
+BIOFUNC = load.vanleeuwen2016.data()
+dim(SGD_DESC)
+dim(UNI_FEAT)
 dim(BIOFUNC)
 ANNOTATION=full_join(SGD_DESC,BIOFUNC,by="ORF") %>% full_join(UNI_FEAT,by='SGD')
-head(ANNOTATION)
+toc()
+
+
+
 dim(PROP)
 dim(FEAT)
 
