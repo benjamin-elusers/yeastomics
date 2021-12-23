@@ -1,12 +1,15 @@
+# SETUP DATA -------------------------------------------------------------------
 source(here::here("analysis","function_evorate_fitting.R"))
+
 tic("Load data")
 ABUNDANCE = load.abundance()
 CLADE = load.clade()
 FUNGI = load.fungi.evo()
 STRAINS = load.strains.evo()
 PROP = load.properties()
-FEAT = load.features() #%>% normalize_features()
-DESC = read_rds(here('data','uniprot-sgd-annotation.rds'))
+FEAT = load.features() %>% normalize_features()
+SGD_DESC = read_rds(here('data','uniprot-sgd-annotation.rds'))
+UNI_FEAT = read_rds(here('data','uniprot-features.rds'))
 BIOFUNC = load.vanleeuwen2016.data()
 toc()
 
@@ -14,44 +17,40 @@ dim(ABUNDANCE)
 dim(CLADE)
 dim(FUNGI)
 dim(STRAINS)
-dim(PROP)
-dim(FEAT)
+
 dim(DESC)
 dim(BIOFUNC)
+ANNOTATION=full_join(SGD_DESC,BIOFUNC,by="ORF") %>% full_join(UNI_FEAT,by='SGD')
+head(ANNOTATION)
+dim(PROP)
+dim(FEAT)
 
-#### EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ####
-INPUT=FUNGI %>% left_join(DESC,by='ORF')
-
-Y = "log10.norm.EVO.FULL" # mean Evolutionary rate (full sequence)
+# INITIAL PARAMETERS -----------------------------------------------------------
+INPUT = FUNGI.DATA
+Y = "rel_EVO.FULL" # mean Evolutionary rate (full sequence)
 X = "MPC" # median Molecules Per Cell
-#X = "PPM" # Protein Abundance (log10 ppm)
+# X = "PPM" # Protein Abundance (log10 ppm) # ALTERNATIVELY
+
 XYDATA = get_XY_data(INPUT,x=X,y=Y)
-input = XYDATA$df
-
+YY = XYDATA$YY
+XX = XYDATA$XX
+n.xy = XYDATA$n['xy']
 mu.y = XYDATA$mu['y']
-rg.y = range_(XYDATA$YY)
-dim(input)
-#n.xy = XYDATA$n['xy']
-#var.y = XYDATA$var['y']
+var.y = XYDATA$var['y']
+input = XYDATA$df
+rg.y = range_(YY)
 
 
+# ANALYZE EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ---------------------
 M1=make_linear_fit(input,only.params = F)
-selected.par =c('model','RSS','ESS','TSS')
-fit.params = bind_rows(
-  make_linear_fit(input,only.params = T)[selected.par],
-  #    make_logistic_fit(input,only.params =T)[selected.par],
-  #    make_poly_fit(input,only.params = T,deg=3)[selected.par],
-  #    make_expo_fit(input,only.params = T)[selected.par]
-)
-fit.params
 
-
+### _FIGURE 1A: EVOLUTION vs EXPRESSION -------------------------------------------
 Y = "log10.norm.EVO.FULL" # mean Evolutionary rate (full sequence)
 OUTLIERS.Y = filter(INPUT, dense_rank(log10.norm.EVO.FULL) < 11 | dense_rank(-log10.norm.EVO.FULL) < 11)
 OUTLIERS.X =  filter(INPUT, dense_rank(MPC) < 11 | dense_rank(-MPC) < 11)
 #slice.iqr(INPUT,x=MPC, lower = 0.005, upper=0.995,negate = T)
 
-F1=ggplot(INPUT,aes_string(y=Y,x=X)) +
+F1A=ggplot(INPUT,aes_string(y=Y,x=X)) +
   ggiraph::geom_point_interactive(aes(tooltip=FUNCTION, data_id=ORF),size=2.5,shape=19,alpha=0.5,color='gray70',stroke=0) +
   stat_density2d(size=0.5,color='gray20') +
   geom_hline(yintercept = mean_(INPUT$log10.EVO.FULL), col='red',linetype=2,size=0.5) + # mean
@@ -60,12 +59,16 @@ F1=ggplot(INPUT,aes_string(y=Y,x=X)) +
   geom_text_repel(data=OUTLIERS.Y, aes(label = GENENAME),max.overlaps = 20,col='blue') +
   geom_text_repel(data=OUTLIERS.X, aes(label = GENENAME),max.overlaps = 20,col='red')
 
-F1
-ggiraph::girafe(ggobj = F1)
+F1A
+ggiraph::girafe(ggobj = F1A)
 
-TMP = left_join(CLADE,INPUT, by=c('uni2'='UNIPROT.x'))
+### _FIGURE 1B: BRANCH LENGTH vs EXPRESSION ---------------------------------------
+F1B
+
+### _FIGURE 1C: SNP EVOLUTION vs EXPRESSION ---------------------------------------
 plot(y=TMP$Kc2.log10, x=TMP$ppm2.log10)
 
+TMP = left_join(CLADE,INPUT, by=c('uni2'='UNIPROT.x'))
 m=lm(data=TMP,Kc2.log10~ppm2.log10)
 decompose_variance(m)
 dim(TMP)
@@ -81,7 +84,12 @@ pXY.fit = pXY+
 #coord_cartesian(xlim = c(-2.5, 4.5), ylim = c(0, 3.5),expand = F) +
 pXY.fit
 
+
 # Filter variables (abs cor MPC<0.4)
 # Make M0 and M3
 # Refine variables selections
+
+
+
+
 
