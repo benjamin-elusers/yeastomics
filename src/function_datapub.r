@@ -378,10 +378,11 @@ load.vanleeuwen2016.data = function(){
 
   vanleeuwen = read.xlsx( xlsxFile = S7, sheet = 2) %>%
     separate_rows(Function,sep=",") %>%
-    mutate( FUNCTION = str_trim(Function),
-            FN=factor(FUNCTION,levels=unique(FUNCTION),labels = invert(.class_function))
+    mutate( BIOPROCESS = str_trim(Function),
+            FN=factor(BIOPROCESS,levels=unique(BIOPROCESS),labels = invert(.class_function))
     ) %>% dplyr::select(-Function) %>%
-    group_by(ORF) %>% mutate(FN_all=paste0(unique(FN),collapse = ""))
+    group_by(ORF) %>% mutate(FN_all=paste0(unique(FN),collapse = ""),
+                             BIOPROCESS_all = paste0(unique(BIOPROCESS),collapse="+\n"))
 
   return(vanleeuwen)
 }
