@@ -150,15 +150,14 @@ load.costanzo2010.data = function(){
   downloaded=download.file(S6, destfile = todownload)
   if(!downloaded){
     costanzo = readxl::read_excel(path = todownload, sheet = 1, progress = T,
-                                  col_names = c("ORF","GENE","FUNCTIONS"),na = c("unknown")) %>%
-      separate_rows(FUNCTIONS,sep=";") %>%
-      mutate(FUNCTION=str_trim(FUNCTIONS))
+                                  col_names = c("ORF","GENE","bioprocess"),na = c("unknown")) %>%
+      separate_rows(bioprocess,sep=";") %>%
+      mutate(BIOPROCESS=str_trim(bioprocess)) %>%  dplyr::select(-bioprocess)
     #         FN=factor(FUNCTION,levels=unique(FUNCTION),labels = invert(.class_function))
     # ) %>% dplyr::select(-Function) %>%
     #   group_by(ORF) %>% mutate(FN_all=paste0(unique(FN),collapse = ""))
     file.remove(todownload)
     return(costanzo)
-
   }else{
     stop("Could not download the supplementary table!")
     return(NA)
@@ -385,7 +384,8 @@ load.vanleeuwen2016.data = function(){
                              BIOPROCESS_all = paste0(unique(BIOPROCESS),collapse="+\n"))
 
   return(vanleeuwen)
-}
+
+  }
 
 load.villen2017.data = function(){
   library(openxlsx)
