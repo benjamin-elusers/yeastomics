@@ -169,6 +169,10 @@ file_ext <- function (fn) {
   ext
 }
 
+catn = function(x, ...){
+cat(x,"\n",...)
+}
+
 # Format values ----------------------------------------------------------------
 
 RoundUpToNearest <- function(nb, roundto=1){ # Round up numbers to unit or decimal specified
