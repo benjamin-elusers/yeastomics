@@ -197,13 +197,38 @@ fivebins = function(x, applyto=NULL,
 
 slice_min_max <- function(df, order_by = value, n = 1) {
   order_by = enquo(order_by)
-  min <- slice_min(df, !!order_by, n = n) %>%
-    mutate(type = "min")
-  max <- slice_max(df, !!order_by, n = n) %>%
-    mutate(type = "max")
-  df <- bind_rows(min, max) %>%
-    as_tibble()
+  min <- slice_min(df, !!order_by, n = n) %>% mutate(type = "min")
+  max <- slice_max(df, !!order_by, n = n) %>% mutate(type = "max")
+  df <- bind_rows(min, max) %>% as_tibble()
   return(df)
+}
+
+slice_min_max <- function(df, order_by = value, n = 1) {
+  # Find extreme records using quoted column name
+  order_by = enquo(order_by)
+  min <- slice_min(df, !!order_by, n = n) %>% mutate(type = "min")
+  max <- slice_max(df, !!order_by, n = n) %>% mutate(type = "max")
+  df <- bind_rows(min, max) %>% as_tibble()
+  return(df)
+}
+
+get_outliers_index = function(v,nout=10){
+  # Get index of extreme (outliers) values from a vector
+  ord=order(v,decreasing=F)
+  rev_ord=order(v,decreasing=T)
+  out = c(ord[1:nout],rev_ord[nout:1])
+  return(out)
+}
+
+get_outliers = function(v,nout){
+  # Get outliers values (extremes) from a vector
+  return( v[get_outliers_index(v,nout)] )
+}
+
+get_extremes = function(df,column,n=3){
+  # Find extreme records using string as column names
+  extremes = df[ get_outliers_index(df[[column]]), ]
+  return(extremes)
 }
 
 # TESTING
