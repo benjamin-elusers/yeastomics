@@ -242,7 +242,6 @@ decompose_variance = function(LM){
 fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                                  PREDVAR=PREDICTORS, xcor.max=0.6, ycor.max=0.6){
   txt_section_break = repchar("-",50)
-  # INITIAL PARAMETERS -----------------------------------------------------------
   #INPUT = EVOLUTION
   #Y = "log10.EVO.FULL" # mean Evolutionary rate (full sequence)
   #X = "MPC" # median Molecules Per Cell
@@ -283,7 +282,7 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
 
   excluded_var = unique(x_excluded_var,y_excluded_var)
   n_out = length(excluded_var)
-  cat(sprintf("In total, %s predictors are excluded:\n",n_out,section))
+  cat(sprintf("In total, %s predictors are excluded:\n",n_out))
   cat(txt_section_break,"\n ")
   cat(sprintf("%3s. %s\n",1:n_out,excluded_var))
 
