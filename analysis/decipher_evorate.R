@@ -27,12 +27,8 @@ dim(BIOFUNC)
 ANNOTATION=full_join(SGD_DESC,BIOFUNC,by="ORF") %>% full_join(UNI_FEAT,by='SGD')
 toc()
 
-
 # ANALYZE EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ---------------------
-
 m0 = fit_linear_regression(EVOLUTION, X='PPM', Y="log10.EVO.FULL", PREDICTORS, 0.6, 0.8) %>% left_join(SGD_DESC)
-
-
 ### _FIGURE 1A: EVOLUTION vs EXPRESSION -------------------------------------------
 F1A=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL')
 x = ggiraph::girafe(ggobj = F1A)
