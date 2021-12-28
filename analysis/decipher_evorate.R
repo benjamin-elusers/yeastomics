@@ -1,5 +1,6 @@
 # SETUP DATA -------------------------------------------------------------------
 source(here::here("analysis","function_evorate_fitting.R"))
+txt_section_break = repchar("-",50)
 
 tic("Load data")
 # EXPRESSION DATA
@@ -9,16 +10,13 @@ dim(ABUNDANCE)
 CLADE = load.clade()
 FUNGI = load.fungi.evo()
 STRAINS = load.strains.evo()
-dim(CLADE)
-dim(FUNGI)
-dim(STRAINS)
-EVOLUTION = full_join(FUNGI,CLADE,by=c('ORF'='orf')) #%>% full_join(CLADE,by=c('ORF'='orf')) %>% arrange(ORF)
-dim(EVOLUTION)
-head(EVOLUTION)
+EVOLUTION = full_join(STRAINS,CLADE,by=c('ORF'='orf'))
 
 # PROTEOME QUALITATIVE AND QUANTITATIVE VARIABLES
 PROP = load.properties()
 FEAT = load.features() %>% normalize_features()
+PREDICTORS = full_join(PROP,FEAT)
+
 # ANNOTATION DATA
 SGD_DESC = read_rds(here('data','uniprot-sgd-annotation.rds'))
 UNI_FEAT = read_rds(here('data','uniprot-features.rds'))
@@ -30,45 +28,80 @@ ANNOTATION=full_join(SGD_DESC,BIOFUNC,by="ORF") %>% full_join(UNI_FEAT,by='SGD')
 toc()
 
 
-
-dim(PROP)
-dim(FEAT)
-
-# INITIAL PARAMETERS -----------------------------------------------------------
-INPUT = FUNGI.DATA
-Y = "rel_EVO.FULL" # mean Evolutionary rate (full sequence)
-X = "MPC" # median Molecules Per Cell
-# X = "PPM" # Protein Abundance (log10 ppm) # ALTERNATIVELY
-
-XYDATA = get_XY_data(INPUT,x=X,y=Y)
-YY = XYDATA$YY
-XX = XYDATA$XX
-n.xy = XYDATA$n['xy']
-mu.y = XYDATA$mu['y']
-var.y = XYDATA$var['y']
-input = XYDATA$df
-rg.y = range_(YY)
-
-
 # ANALYZE EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ---------------------
-M1=make_linear_fit(input,only.params = F)
+fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
+                                 PREDVAR=PREDICTORS, xcor.max=0.6, ycor.max=0.6){
+  txt_section_break = repchar("-",50)
+  # INITIAL PARAMETERS -----------------------------------------------------------
+  #INPUT = EVOLUTION
+  #Y = "log10.EVO.FULL" # mean Evolutionary rate (full sequence)
+  #X = "MPC" # median Molecules Per Cell
+  #X = "PPM" # Protein Abundance (log10 ppm) # ALTERNATIVELY
+  key_id=c("ORF","UNIPROT")
+  key_filter=c("IS_FUNGI","IS_STRAINS")
+
+  LINREG = INPUT %>% dplyr::select(all_of(c(key_id,key_filter,X,Y)))
+
+  XYDATA = get_XY_data(INPUT,x=X,y=Y)
+  YY = XYDATA$YY
+  XX = XYDATA$XX
+  n.xy = XYDATA$n['xy']
+  mu.y = XYDATA$mu['y']
+  var.y = XYDATA$var['y']
+  input = XYDATA$df
+  rg.y = range_(YY)
+  var_names = starting(colnames(PREDICTORS),'cat_')
+
+  Y_X=make_linear_fit(LINREG ,x=X, y=Y, only.params = F)
+  M0=left_join(Y_X,PREDICTORS)
+  M0$yavg   = mu.y
+  M0$yvar   = var.y
+  M0$ymin = rg.y[1]
+  M0$ymxa = rg.y[2]
+  M0$nxy = n.xy
+
+  # excluding variables with correlation to X/Y
+  cor_x = cor(x=M0[,var_names],y=M0[[X]],use = 'pairwise') %>% as_vector %>% na.omit()
+  x_excluded_var = rownames(cor_x)[abs(cor_x) >= xcor.max]
+  n_xout = length(x_excluded_var)
+  cat(sprintf("Excluding %s predictors with cor. to X > %s (%s)\n",n_xout,xcor.max,X))
+  cor_y = cor(x=M0[,var_names],y=M0[[Y]],use = 'pairwise') %>% as_vector %>% na.omit()
+
+  y_excluded_var = rownames(cor_y)[abs(cor_y) >= ycor.max]
+  n_yout = length(y_excluded_var)
+  cat(sprintf("Excluding %s predictors with cor. to Y > %s (%s)\n",n_yout,ycor.max,Y))
+
+  excluded_var = unique(x_excluded_var,y_excluded_var)
+  n_out = length(excluded_var)
+  cat(sprintf("In total, %s predictors are excluded:\n",n_out,section))
+  cat(txt_section_break,"\n ")
+  cat(sprintf("%3s. %s\n",1:n_out,excluded_var))
+
+  return(M0 %>% dplyr::select(-all_of(excluded_var)))
+}
+
+m0 = fit_linear_regression(EVOLUTION, X='PPM', Y="log10.EVO.FULL", PREDICTORS, 0.6, 0.8) %>% left_join(SGD_DESC)
+
 
 ### _FIGURE 1A: EVOLUTION vs EXPRESSION -------------------------------------------
-Y = "log10.norm.EVO.FULL" # mean Evolutionary rate (full sequence)
-OUTLIERS.Y = filter(INPUT, dense_rank(log10.norm.EVO.FULL) < 11 | dense_rank(-log10.norm.EVO.FULL) < 11)
-OUTLIERS.X =  filter(INPUT, dense_rank(MPC) < 11 | dense_rank(-MPC) < 11)
-#slice.iqr(INPUT,x=MPC, lower = 0.005, upper=0.995,negate = T)
+make_figure_1 = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",ANNOT=SGD_DESC, id=c('ORF','UNIPROT')){
 
-F1A=ggplot(INPUT,aes_string(y=Y,x=X)) +
-  ggiraph::geom_point_interactive(aes(tooltip=FUNCTION, data_id=ORF),size=2.5,shape=19,alpha=0.5,color='gray70',stroke=0) +
-  stat_density2d(size=0.5,color='gray20') +
-  geom_hline(yintercept = mean_(INPUT$log10.EVO.FULL), col='red',linetype=2,size=0.5) + # mean
-  ylab('mean Evolutionary Rate (log10)') + xlab('Mean Protein Abundance (log10 mpc)') +
-  ggpubr::grids() +
-  geom_text_repel(data=OUTLIERS.Y, aes(label = GENENAME),max.overlaps = 20,col='blue') +
-  geom_text_repel(data=OUTLIERS.X, aes(label = GENENAME),max.overlaps = 20,col='red')
+  dat_annot = left_join(dat,ANNOT,by=id)
+  OUTLIERS.Y = get_outliers(dat_annot,X)
+  OUTLIERS.X = get_outliers(dat_annot,Y)
+  yavg = mean(dat_annot[[Y]])
+  F1A=ggplot(dat_annot,aes_string(y=Y,x=X)) +
+    ggiraph::geom_point_interactive(aes(tooltip=FUNCTION, data_id=ORF),size=2.5,shape=19,alpha=0.5,color='gray70',stroke=0) +
+    stat_density2d(size=0.5,color='gray20') +
+    geom_hline(yintercept = yavg, col='red',linetype=2,size=0.5) + # mean
+    ylab('mean Evolutionary Rate (log10)') + xlab('Mean Protein Abundance (log10 ppm)') +
+    ggpubr::grids() +
+    geom_text_repel(data=OUTLIERS.Y, aes(label = GENENAME),max.overlaps = 20,col='blue') +
+    geom_text_repel(data=OUTLIERS.X, aes(label = GENENAME),max.overlaps = 20,col='red')
 
-F1A
+  return(F1A)
+}
+make_figure_1(dat=EVOLUTION,X=PPM,Y=log10.EVO.FULL)
 ggiraph::girafe(ggobj = F1A)
 
 ### _FIGURE 1B: BRANCH LENGTH vs EXPRESSION ---------------------------------------
