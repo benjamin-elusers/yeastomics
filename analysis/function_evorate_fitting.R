@@ -292,10 +292,12 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
 
 # 3. PLOTS FIT ----------------------------------------------------------------
 
-make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",ANNOT=SGD_DESC, id=c('ORF','UNIPROT')){
+make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
+                        ANNOT=SGD_DESC, id=c('ORF','UNIPROT'),
+                        add.outliers=10){
   dat_annot = left_join(dat,ANNOT,by=id)
-  OUTY = get_extremes(dat_annot,X)
-  OUTX = get_extremes(dat_annot,Y)
+  OUTY = get_extremes(dat_annot,X,n=add.outliers)
+  OUTX = get_extremes(dat_annot,Y,n=add.outliers)
   yavg = mean(dat_annot[[Y]])
   F1A=ggplot(dat_annot,aes_string(y=Y,x=X)) +
     ggiraph::geom_point_interactive(aes(tooltip=FUNCTION, data_id=ORF),size=2,shape=19,alpha=0.5,color='gray70',stroke=0) +
@@ -303,9 +305,11 @@ make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",ANNOT=SGD_DES
     geom_hline(yintercept = yavg, col='red',linetype=2,size=0.5) + # mean
     ylab('mean Evolutionary Rate (log10)') + xlab('Mean Protein Abundance (log10 ppm)') +
     ggpubr::grids() +
-    geom_text_repel(data=OUTX, aes(label = GENENAME),max.overlaps = 20,col='blue') +
-    geom_text_repel(data=OUTY, aes(label = GENENAME),max.overlaps = 20,col='red') +
-    geom_point(data=OUTX, col='blue',size=0.5) +
-    geom_point(data=OUTY, col='red',size=0.5)
+    if(add.outliers>0){
+      geom_text_repel(data=OUTX, aes(label = GENENAME),max.overlaps = 20,col='blue') +
+      geom_text_repel(data=OUTY, aes(label = GENENAME),max.overlaps = 20,col='red') +
+      geom_point(data=OUTX, col='blue',size=0.5) +
+      geom_point(data=OUTY, col='red',size=0.5)
+    }
   return(F1A)
 }
