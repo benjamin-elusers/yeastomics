@@ -227,7 +227,7 @@ get_outliers = function(v,nout){
 
 get_extremes = function(df,column,n=3){
   # Find extreme records using string as column names
-  extremes = df[ get_outliers_index(df[[column]]), ]
+  extremes = df[ get_outliers_index(df[[column]],nout = n), ]
   return(extremes)
 }
 
