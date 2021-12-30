@@ -11,14 +11,14 @@ load.abundance = function(){
   return(abundance)
 }
 
-load.clade = function(){
+load.clade = function(clade1='schizo',clade2='sacch.wgd'){
   # BRANCH LENGTH IN FUNGI CLADES
   # Normalized branch length (Kc):
   #  Kc = SUM(branch lengths in clade subtree Tc) / SUM(branch lengths in species tree Ts)
   enog.cols = c('Tax','NOG','nog.1to1','RAXML','FunCat','STRING','orf','sp1','sp2','uni1','uni2','ppm1','ppm2')
   clade.cols = c('ppm1.log10','ppm2.log10','clade1','clade2','XX','YY')
-  clade = get_clade_data(g1='schizo',g2='sacch.wgd',rate = 'ratio') %>%
-    dplyr::select(all_of(enog.cols), all_of(clade.cols), starts_with('schizo'), starts_with('sacch.wgd')) %>%
+  clade = get_clade_data(g1=clade1,g2=clade2,rate = 'ratio') %>%
+    dplyr::select(all_of(enog.cols), all_of(clade.cols), starts_with(clade1), starts_with(clade2)) %>%
     dplyr::rename(Kc1.log10=XX,Kc2.log10=YY)
   return(clade)
 }
@@ -240,7 +240,7 @@ decompose_variance = function(LM){
 
 
 fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
-                                 PREDVAR=PREDICTORS, xcor.max=0.6, ycor.max=0.6){
+                                 PREDVAR=PREDICTORS, xcor_max=0.6, ycor_max=0.6){
   txt_section_break = repchar("-",50)
   #INPUT = EVOLUTION
   #Y = "log10.EVO.FULL" # mean Evolutionary rate (full sequence)
@@ -271,14 +271,14 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
 
   # excluding variables with correlation to X/Y
   cor_x = cor(x=M0[,var_names],y=M0[[X]],use = 'pairwise') %>% as_vector %>% na.omit()
-  x_excluded_var = rownames(cor_x)[abs(cor_x) >= xcor.max]
+  x_excluded_var = rownames(cor_x)[abs(cor_x) >= xcor_max]
   n_xout = length(x_excluded_var)
-  cat(sprintf("Excluding %s predictors with cor. to X > %s (%s)\n",n_xout,xcor.max,X))
+  cat(sprintf("Excluding %s predictors with cor. to X > %s (%s)\n",n_xout,xcor_max,X))
   cor_y = cor(x=M0[,var_names],y=M0[[Y]],use = 'pairwise') %>% as_vector %>% na.omit()
 
-  y_excluded_var = rownames(cor_y)[abs(cor_y) >= ycor.max]
+  y_excluded_var = rownames(cor_y)[abs(cor_y) >= ycor_max]
   n_yout = length(y_excluded_var)
-  cat(sprintf("Excluding %s predictors with cor. to Y > %s (%s)\n",n_yout,ycor.max,Y))
+  cat(sprintf("Excluding %s predictors with cor. to Y > %s (%s)\n",n_yout,ycor_max,Y))
 
   excluded_var = unique(x_excluded_var,y_excluded_var)
   n_out = length(excluded_var)
@@ -290,25 +290,103 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
 }
 
 # 3. PLOTS FIT ----------------------------------------------------------------
-
 make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                         ANNOT=SGD_DESC, id=c('ORF','UNIPROT'),
-                        add.outliers=10){
+                        add_outliers=10){
   dat_annot = left_join(dat,ANNOT,by=id)
-  OUTY = get_extremes(dat_annot,X,n=add.outliers)
-  OUTX = get_extremes(dat_annot,Y,n=add.outliers)
+  OUTY = get_extremes(dat_annot,X,n=add_outliers)
+  OUTX = get_extremes(dat_annot,Y,n=add_outliers)
   yavg = mean(dat_annot[[Y]])
   F1A=ggplot(dat_annot,aes_string(y=Y,x=X)) +
     ggiraph::geom_point_interactive(aes(tooltip=FUNCTION, data_id=ORF),size=2,shape=19,alpha=0.5,color='gray70',stroke=0) +
     stat_density2d(size=0.5,color='gray20') +
     geom_hline(yintercept = yavg, col='red',linetype=2,size=0.5) + # mean
     ylab('mean Evolutionary Rate (log10)') + xlab('Mean Protein Abundance (log10 ppm)') +
-    ggpubr::grids() +
-    if(add.outliers>0){
-      geom_text_repel(data=OUTX, aes(label = GENENAME),max.overlaps = 20,col='blue') +
-      geom_text_repel(data=OUTY, aes(label = GENENAME),max.overlaps = 20,col='red') +
-      geom_point(data=OUTX, col='blue',size=0.5) +
-      geom_point(data=OUTY, col='red',size=0.5)
+    ggpubr::grids()
+    if(add_outliers>0){
+      F1A  = F1A +
+        geom_text_repel(data=OUTX, aes(label = GENENAME),max.overlaps = 20,col='blue') +
+        geom_text_repel(data=OUTY, aes(label = GENENAME),max.overlaps = 20,col='red') +
+        geom_point(data=OUTX, col='blue',size=0.5) +
+        geom_point(data=OUTY, col='red',size=0.5)
     }
   return(F1A)
 }
+
+make_plot_1B = function(clade1='schizo',clade2='sacch.wgd',control_var='ppm',use_residuals=F,tolog=T,force_intercept=T){
+
+  data2plot = load.clade(clade1,clade2)
+  xvar='Kc1'
+  yvar='Kc2'
+  labx=paste('Kc',clade1)
+  laby=paste('Kc',clade2)
+  if(tolog){
+    xvar=paste0(xvar,'.log10')
+    yvar=paste0(yvar,'.log10')
+    labx=paste(labx,'(log10)')
+    laby=paste(laby,'(log10)')
+  }
+
+  if(use_residuals){
+    cat(sprintf("Controlling for variable '%s'\n",control_var))
+    ctrl1=paste0(control_var,"1.log10")
+    ctrl2=paste0(control_var,"2.log10")
+    cat(sprintf("Controlling branch length in %s by corresponding protein expression '%s'\n",clade1,ctrl1))
+    first = data2plot %>%
+      broom::augment_columns(x=lm(reformulate(response = xvar, termlabels = ctrl1, intercept = force_intercept),data=.)) %>%
+      dplyr::rename(.resid.1 = .resid, .fitted.1=.fitted, .se.fit.1=.se.fit, .hat.1=.hat, .sigma.1=.sigma, .cooksd.1=.cooksd,.std.resid.1=.std.resid)
+
+    cat(sprintf("Controlling branch length in %s by corresponding protein expression '%s'\n",clade2,ctrl2))
+    data2plot = first %>%
+      broom::augment_columns(x=lm(reformulate(response = yvar, termlabels = ctrl2, intercept = force_intercept),data=.)) %>%
+      dplyr::rename(.resid.2 = .resid, .fitted.2=.fitted, .se.fit.2=.se.fit, .hat.2=.hat, .sigma.2=.sigma, .cooksd.2=.cooksd,.std.resid.2=.std.resid) %>%
+      mutate( rY=.resid.2, rX=.resid.1)
+
+    xvar='rX'
+    yvar='rY'
+    labx=paste('resid.',labx)
+    laby=paste('resid.',laby)
+  }
+
+  rho=spearman.toplot(data2plot[[xvar]],data2plot[[yvar]])
+
+  F1B = ggplot(data=data2plot,aes_string(x=xvar,y=yvar)) +
+    geom_point(size=0.7, alpha=0.8,shape=19) +
+    stat_density_2d(aes(fill = ..level..), geom = "polygon", colour=NA,size=0.25,alpha=0.25,show.legend = F)+
+    geom_smooth(method = 'lm',col='black',se=F,size=1) +
+    geom_text(data=rho,aes(x=-Inf,y=-Inf,label=toshow),hjust='inward',vjust='inward',size=4) +
+    xlab(labx) + ylab(laby) +
+    scale_fill_distiller(palette = 'Spectral',direction = -1) +
+    ggpubr::grids()
+  return(F1B)
+}
+
+make_plot_1C = function(data2plot=EVOLUTION,Y='EVO.FULL',X='SNP.FULL',control_var='PPM',use_residuals=F,force_intercept=T){
+
+  if(use_residuals){
+    cat(sprintf("Controlling %s by protein expression '%s'\n",X,control_var))
+    first = data2plot %>%
+      broom::augment_columns(x=lm(reformulate(response=X, termlabels=control_var, intercept=force_intercept),data=.)) %>%
+      dplyr::rename(.resid_x = .resid, .fitted_x=.fitted, .se.fit_x=.se.fit, .hat_x=.hat, .sigma_x=.sigma, .cooksd_x=.cooksd,.std.resid_x=.std.resid)
+
+    cat(sprintf("Controlling %s by protein expression '%s'\n",Y,control_var))
+    data2plot = first %>%
+      broom::augment_columns(x=lm(reformulate(response=Y, termlabels=control_var, intercept=force_intercept),data=.)) %>%
+      dplyr::rename(.resid_y = .resid, .fitted_y=.fitted, .se.fit_y=.se.fit, .hat_y=.hat, .sigma_y=.sigma, .cooksd_y=.cooksd,.std.resid_y=.std.resid)
+    X='.resid_x'
+    Y='.resid_y'
+  }
+
+  rho=spearman.toplot(data2plot[[X]],data2plot[[Y]])
+
+  F1C = ggplot(data=data2plot,aes_string(x=X,y=Y)) +
+    geom_point(size=0.7, alpha=0.8,shape=19) +
+    stat_density_2d(aes(fill = ..level..), geom = "polygon", colour=NA,size=0.25,alpha=0.25,show.legend = F)+
+    geom_smooth(method = 'lm',col='black',se=F,size=1) +
+    geom_text(data=rho,aes(x=-Inf,y=Inf,label=toshow),hjust='inward',vjust='inward',size=4) +
+    scale_fill_distiller(palette = 'Spectral',direction = -1) +
+    ggpubr::grids() + theme()
+  return(F1C)
+}
+
+
