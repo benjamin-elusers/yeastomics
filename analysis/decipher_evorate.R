@@ -30,15 +30,23 @@ toc()
 # ANALYZE EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ---------------------
 m0 = fit_linear_regression(EVOLUTION, X='PPM', Y="log10.EVO.FULL", PREDICTORS, 0.6, 0.8) %>% left_join(SGD_DESC)
 ### _FIGURE 1A: EVOLUTION vs EXPRESSION -------------------------------------------
-F1A=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL')
+F1A=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL',add_outliers = 5)
 x = ggiraph::girafe(ggobj = F1A)
 x <-  ggiraph::girafe_options(x, ggiraph::opts_hover(css = "fill-opacity:1;fill:orange;stroke:red;") )
 x
 ### _FIGURE 1B: BRANCH LENGTH vs EXPRESSION ---------------------------------------
-F1B
-
+F1B=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = F)
+F1B.y0=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = T,force_intercept = T) + xlab("") + ylab("")
+F1B.y=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = T,force_intercept = F)  + xlab("") + ylab("")
 ### _FIGURE 1C: SNP EVOLUTION vs EXPRESSION ---------------------------------------
-plot(y=TMP$Kc2.log10, x=TMP$ppm2.log10)
+F1C=make_plot_1C(EVOLUTION,Y='log10.EVO.FULL',X='log10.SNP.FULL','PPM',use_residuals = F)
+F1C.y0=make_plot_1C(EVOLUTION,Y='log10.EVO.FULL',X='log10.SNP.FULL','PPM',use_residuals = T,force_intercept = T)  + xlab("") + ylab("")
+F1C.y=make_plot_1C(EVOLUTION,Y='log10.EVO.FULL',X='log10.SNP.FULL','PPM',use_residuals = T,force_intercept = F) + xlab("") + ylab("")
+
+library(patchwork)
+FIGURE1 = (F1A | (F1B/F1B.y0/F1B.y) | (F1C/F1C.y0/F1C.y)) + plot_layout(widths = 1) +  plot_annotation(tag_levels = 'A') + theme(axis.text = element_text(size=2))
+ggsave(FIGURE1,filename = "draft-figure1.png",device = 'png',scale = 2, path = "~/Desktop/")
+ggsave(FIGURE1,filename = "draft-figure1.pdf",device = 'pdf',scale = 2, path = "~/Desktop/")
 
 TMP = left_join(CLADE,INPUT, by=c('uni2'='UNIPROT.x'))
 m=lm(data=TMP,Kc2.log10~ppm2.log10)
@@ -48,7 +56,7 @@ dim(TMP)
 spearman(TMP[[Y]], TMP$MPC)
 
 INPUT %>%
-slice.iqr
+  slice.iqr
 pXY.fit = pXY+
   geom_line(M,mapping=aes(y=.fitted,col=model),size=1,show.legend = F) +
   geom_text(M.x1 ,mapping=aes(label=model,col=model,y=.fitted-0.2),x=0.8,size=5,check_overlap = T,show.legend = F) +
