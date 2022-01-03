@@ -11,11 +11,12 @@ CLADE = load.clade()
 FUNGI = load.fungi.evo()
 STRAINS = load.strains.evo()
 EVOLUTION = full_join(STRAINS,CLADE,by=c('ORF'='orf'))
+orf_orthologs = EVOLUTION$ORF
 
 # PROTEOME QUALITATIVE AND QUANTITATIVE VARIABLES
 PROP = load.properties()
 FEAT = load.features() %>% normalize_features()
-PREDICTORS = full_join(PROP,FEAT) %>% filter(ORF %in% EVOLUTION$ORF)
+PREDICTORS = full_join(PROP,FEAT) %>% filter(ORF %in% orf_orthologs)
 
 # ANNOTATION DATA
 ANNOTATION=load.annotation()
@@ -23,7 +24,7 @@ toc()
 
 # ANALYZE EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ---------------------
 ### _FIGURE 1A: EVOLUTION vs EXPRESSION -------------------------------------------
-F1A=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL',add_outliers = 5)
+F1A=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL',add_outliers = 5,ANNOT = ANNOTATION)
 x = ggiraph::girafe(ggobj = F1A)
 x <-  ggiraph::girafe_options(x, ggiraph::opts_hover(css = "fill-opacity:1;fill:orange;stroke:red;") )
 x
@@ -46,10 +47,9 @@ ggsave(FIGURE1,filename = "draft-figure1.pdf",device = 'pdf',scale = 2, path = "
 na_count = colSums(is.na(PREDICTORS))
 na_vars = na_count[na_count>0]
 
-
-
 m0 = fit_linear_regression(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL", PREDVAR=PREDICTORS,
-                           xcor_max = 0.6,ycor_max = 0.6, min_obs=5 ) %>% left_join(SGD_DESC)
+                           xcor_max = 0.6,ycor_max = 0.6, min_obs=1 )
+
 
 # Imputation (replacing NAs)
 col_means <- lapply(YEASTOMICS %>% dplyr::select(where(is.numeric)), mean, na.rm = TRUE)
