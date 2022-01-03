@@ -25,7 +25,8 @@ load.annotation = function(){
                full_join(biofunc,by='ORF')  %>%
                relocate(SGD,GENENAME,ORF,UNIPROT,PNAME,L,FAMILIES,FUNCTION,ROLE,
                         BIOPROCESS_all,LOC,COMPLEX,ORTHO,OTHER,KEYWORDS,
-                        EXISTENCE,SCORE)
+                        EXISTENCE,SCORE) %>%
+               filter(!is.na(ORF) | is.na(UNIPROT))
 
   return(annotation)
 }
@@ -300,7 +301,7 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   n_yout = length(y_excluded_var)
   cat(sprintf("Excluding %s predictors with cor. to Y > %s (%s)\n",n_yout,ycor_max,Y))
 
-  binary_vars = var_names[ sapply(M0[,var_names],is.binary) ]
+  binary_vars = var_names[ apply(M0[,var_names],2,is.binary) ]
   rare_excluded_var = binary_vars[ colSums(M0[binary_vars]) < min_obs ]
   n_min_obs = length(rare_excluded_var)
   cat(sprintf("Excluding %s predictors with less than %s observations\n",n_min_obs,min_obs))
@@ -316,7 +317,7 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
 
 # 3. PLOTS FIT ----------------------------------------------------------------
 make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
-                        ANNOT=SGD_DESC, id=c('ORF','UNIPROT'),
+                        ANNOT=ANNOTATION, id=c('ORF','UNIPROT'),
                         add_outliers=10){
   dat_annot = left_join(dat,ANNOT,by=id)
   OUTY = get_extremes(dat_annot,X,n=add_outliers)
