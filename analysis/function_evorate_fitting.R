@@ -138,7 +138,43 @@ normalize_features=function(feat){
   return(feat_norm)
 }
 
-# 2. LINEAR FIT ----------------------------------------------------------------
+
+# 2. FIX MISSING VALUES --------------------------------------------------------
+#### a. codons counts ####
+get_codons_col = function(df,col_prefix='cat_transcriptomics.sgd.'){
+  regex_codons=paste0(col_prefix,get.codons4tai(),"$")
+  res = df %>% dplyr::select(matches(regex_codons,ignore.case = F))
+  return(res)
+}
+
+find_na_codons = function(df,as.indices=F){
+  NA_codon = rowsNA(get_codons_col(df)) > 0
+  if(as.indices){ return(which(NA_codon)) }
+  return(df[which(NA_codon),])
+}
+
+retrieve_missing_codons = function(orf_missing){
+  # Retrieve CSD and count codons for orf with missing values
+  cod = paste0(get.codons4tai(),"$")
+  cds = load.sgd.CDS()
+  codon_counts = coRdon::codonCounts(coRdon::codonTable(cds[orf_missing]))
+
+  codon_missing = tibble(ORF=orf_missing, as_tibble(codon_counts))
+  return(codon_missing)
+}
+
+fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
+  # Replace  orf with missing values with retrieved codons counts from CDS
+  orf_missing = find_na_codons(df)$ORF
+  get_codons_col(df) %>% colnames %>% hutils::longest_prefix()
+  df_na_codon = retrieve_missing_codons(orf_missing) %>%
+    dplyr::rename_with(.cols=matches(cod),.fn=Pxx, px=col_prefix)
+  df_fixed = coalesce_join(x = df, y=df_na_codon, by = id)
+
+  return(df_fixed)
+}
+
+# 3. LINEAR FIT ----------------------------------------------------------------
 
 get_XY_data = function(input,x=X,y=Y,noNA=T){
   # GETTING XY DATA FOR CURVE FITTING
@@ -315,7 +351,7 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   return(M0 %>% dplyr::select(-all_of(excluded_var)))
 }
 
-# 3. PLOTS FIT ----------------------------------------------------------------
+# 4. PLOTS FIT ----------------------------------------------------------------
 make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                         ANNOT=ANNOTATION, id=c('ORF','UNIPROT'),
                         add_outliers=10){
