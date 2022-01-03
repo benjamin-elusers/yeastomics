@@ -98,8 +98,9 @@ geomean <- function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) } # returns geom
 geosd   <- function(x) {  exp(sd(log(x[x != 0 & !is.na(x)]))) } # returns geometrical standard deviation
 
 rowsNA = function(m){ # counts how many rows have NAs
+  # input must be 2D array (matrix/dataframe)
   nas = apply(as.matrix(m),1,sum.na)
-  if(sum(nas)>0){ message(sprintf('%s rows contain NA values.',sum(nas))) }
+  if(sum(nas)>0){ message(sprintf('%s rows contain NA values.',sum(nas>0))) }
   return(nas)
 }
 
