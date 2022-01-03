@@ -19,8 +19,7 @@ load.annotation = function(){
   uni_feat = read_rds(here('data','uniprot-features.rds')) %>%
       dplyr::select(-c(REVIEWED,COMMENTS,SUBLOC))
   sgd_desc = read_rds(here('data','uniprot-sgd-annotation.rds'))
-  biofunc = load.vanleeuwen2016.data(uniq) %>%
-            dplyr::select(ORF,BIOPROCESS_all) %>% distinct()
+  biofunc = load.vanleeuwen2016.data(single_orf=T)
 
   annotation = full_join(sgd_desc,uni_feat,by=c("SGD","UNIPROT"='UNIPROTKB')) %>%
                full_join(biofunc,by='ORF')  %>%
