@@ -5,7 +5,6 @@ txt_section_break = repchar("-",50)
 tic("Load data")
 # EXPRESSION DATA
 ABUNDANCE = load.abundance()
-dim(ABUNDANCE)
 # EVOLUTION DATA
 CLADE = load.clade()
 FUNGI = load.fungi.evo()
@@ -17,6 +16,8 @@ orf_orthologs = EVOLUTION$ORF
 PROP = load.properties()
 FEAT = load.features() %>% normalize_features()
 PREDICTORS = full_join(PROP,FEAT) %>% filter(ORF %in% orf_orthologs)
+# Predictors with missing values must be corrected
+PREDICTORS.1 = fix_missing_codons(PREDICTORS)
 
 # ANNOTATION DATA
 ANNOTATION=load.annotation()
@@ -28,10 +29,12 @@ F1A=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL',add_outliers = 5,ANNOT
 x = ggiraph::girafe(ggobj = F1A)
 x <-  ggiraph::girafe_options(x, ggiraph::opts_hover(css = "fill-opacity:1;fill:orange;stroke:red;") )
 x
+
 ### _FIGURE 1B: BRANCH LENGTH vs EXPRESSION ---------------------------------------
 F1B=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = F)
 F1B.y0=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = T,force_intercept = T) + xlab("") + ylab("")
 F1B.y=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = T,force_intercept = F)  + xlab("") + ylab("")
+
 ### _FIGURE 1C: SNP EVOLUTION vs EXPRESSION ---------------------------------------
 F1C=make_plot_1C(EVOLUTION,Y='log10.EVO.FULL',X='log10.SNP.FULL','PPM',use_residuals = F)
 F1C.y0=make_plot_1C(EVOLUTION,Y='log10.EVO.FULL',X='log10.SNP.FULL','PPM',use_residuals = T,force_intercept = T)  + xlab("") + ylab("")
@@ -43,13 +46,28 @@ ggsave(FIGURE1,filename = "draft-figure1.png",device = 'png',scale = 2, path = "
 ggsave(FIGURE1,filename = "draft-figure1.pdf",device = 'pdf',scale = 2, path = "~/Desktop/")
 
 
-# Fitting Protein Expression to Evolutionary rate (M0)
-na_count = colSums(is.na(PREDICTORS))
-na_vars = na_count[na_count>0]
 
+id_vars = c("UNIPROTKB","SGD","ORF","GNAME","PNAME")
+# 1ST REGRESSION of Protein Expression and Evolutionary rate (M0) -----------
 m0 = fit_linear_regression(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL", PREDVAR=PREDICTORS,
                            xcor_max = 0.6,ycor_max = 0.6, min_obs=1 )
 
+# PROTEIN FEATURES ENGINEERING -------------------------------------------------
+predictors = m0 %>% dplyr::select(all_of(id_vars),starts_with('cat'), -contains(c("peter2018","byrne2005")))
+
+# Missing value imputation
+na_count = colSums(is.na(predictors))
+na_vars = na_count[na_count>0]
+grep(x=names(na_vars),"transcriptomics.sgd",v=T)
+
+sum( sapply(predictors[,names(na_vars)],is.binary))
+
+predictors %>%
+    filter(is.na(cat_biophysics.uniprot.f_A) | is.na(cat_transcriptomics.sgd.AAG) ) %>%
+    dplyr::select(1:5)
+
+
+coRdon::codonCounts(coRdon::codonTable(load.sgd.CDS()['YKR104W']))
 
 # Imputation (replacing NAs)
 col_means <- lapply(YEASTOMICS %>% dplyr::select(where(is.numeric)), mean, na.rm = TRUE)
@@ -79,6 +97,7 @@ evo_rec = recipe(x=m0) %>%
   update_role(m0_vars, new_role = "none") %>%
   update_role(pred_vars, new_role = "predictor") %>%
   update_role(".resid", new_role = "outcome") %>%
+  step_unknown(all_nominal_predictors()) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_zv(all_predictors()) %>%
   step_center(all_predictors(), -all_outcomes()) %>%
