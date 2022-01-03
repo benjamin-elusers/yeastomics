@@ -270,6 +270,10 @@ AACOUNT2SCORE = function(COUNT,SCORE, opposite=F){
 coalesce_join <- function(x, y,
                           by = NULL, suffix = c(".x", ".y"),
                           join = dplyr::full_join, ...) {
+  # Coalesce: To combine two datasets without duplicating rows on NAs
+  # Missing values in x will be replaced by defined values from y for the same key
+  # And conversely between NAs of y and defined values of x
+
   joined <- join(x, y, by = by, suffix = suffix, ...)
   # names of desired output
   cols <- union(names(x), names(y))
@@ -357,11 +361,6 @@ get_clade_residual_evorate = function(cladedata){
     mutate( rY=.resid.2, rX=.resid.1)
   return(fit.evo)
 }
-
-
-
-
-
 
 #### _analysis function ####
 show_density = function(input, # Input data
@@ -575,6 +574,7 @@ make_expo_fit = function(input,    # Input data
 }
 
 decompose_variance = function(LM){
+  # DECOMPOSE VARIANCE FROM LINEAR REGRESSION
   N=sum(complete.cases(LM$model))
   TSS = var( LM$model[,1] ) * (N-1)
   df.var = summary(aov(LM))[[1]]
@@ -591,6 +591,7 @@ decompose_variance = function(LM){
   cat(sprintf("--> ESS total %.1f (%.0f%%) max. %.1f ==> gain=%.1f (+%.0f%%)\n",ess, 100*ess/TSS, ess.max, ESS, 100*ESS/TSS))
   cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  100*RSS/TSS))
 }
+
 
 extract_variables = function(LM){
   df.imp = aov(LM)
