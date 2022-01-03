@@ -386,9 +386,7 @@ load.vanleeuwen2016.data = function(single_orf=F){
     # Return merged functions for each orf
     vanleeuwen =  vanleeuwen %>% dplyr::select(-c(FN,BIOPROCESS)) %>% distinct()
   }
-
   return(vanleeuwen)
-
 }
 
 load.villen2017.data = function(){
