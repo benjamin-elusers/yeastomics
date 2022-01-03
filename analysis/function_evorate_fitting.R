@@ -11,6 +11,24 @@ load.abundance = function(){
   return(abundance)
 }
 
+load.annotation = function(){
+  # Preloaded uniprot data can be generated in 5min with:
+  #   uni = load.uniprot.features(tax="559292",refdb="UNIPROTKB")
+  #   sgd = load.sgd.features()
+
+  uni_feat = read_rds(here('data','uniprot-features.rds')) %>%
+      dplyr::select(-c(REVIEWED,COMMENTS,SUBLOC))
+  sgd_desc = read_rds(here('data','uniprot-sgd-annotation.rds'))
+  biofunc = load.vanleeuwen2016.data() %>% dplyr::select(ORF,BIOPROCESS_all) %>% distinct()
+
+  annotation = full_join(sgd_desc,uni_feat,by=c("SGD","UNIPROT"='UNIPROTKB')) %>%
+               full_join(biofunc,by='ORF')  %>%
+               relocate(SGD,GENENAME,ORF,UNIPROT,PNAME,L,FAMILIES,FUNCTION,ROLE,
+                        BIOPROCESS_all,LOC,COMPLEX,ORTHO,OTHER,KEYWORDS,
+                        EXISTENCE,SCORE)
+
+  return(annotation)
+
 load.clade = function(clade1='schizo',clade2='sacch.wgd'){
   # BRANCH LENGTH IN FUNGI CLADES
   # Normalized branch length (Kc):
@@ -240,7 +258,8 @@ decompose_variance = function(LM){
 
 
 fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
-                                 PREDVAR=PREDICTORS, xcor_max=0.6, ycor_max=0.6){
+                                 PREDVAR=PREDICTORS, xcor_max=0.6, ycor_max=0.6,
+                                 min_obs=5){
   txt_section_break = repchar("-",50)
   #INPUT = EVOLUTION
   #Y = "log10.EVO.FULL" # mean Evolutionary rate (full sequence)
@@ -280,7 +299,12 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   n_yout = length(y_excluded_var)
   cat(sprintf("Excluding %s predictors with cor. to Y > %s (%s)\n",n_yout,ycor_max,Y))
 
-  excluded_var = unique(x_excluded_var,y_excluded_var)
+  binary_vars = var_names[ sapply(M0[,var_names],is.binary) ]
+  rare_excluded_var = binary_vars[ colSums(M0[binary_vars]) < min_obs ]
+  n_min_obs = length(rare_excluded_var)
+  cat(sprintf("Excluding %s predictors with less than %s observations\n",n_min_obs,min_obs))
+
+  excluded_var = unique(c(x_excluded_var,y_excluded_var,rare_excluded_var))
   n_out = length(excluded_var)
   cat(sprintf("In total, %s predictors are excluded:\n",n_out))
   cat(txt_section_break,"\n ")
