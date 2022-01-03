@@ -335,7 +335,7 @@ load.lee2014.data = function(rawdata=F){
   }
 }
 
-load.vanleeuwen2016.data = function(){
+load.vanleeuwen2016.data = function(single_orf=F){
   # load gene classification of biological functions (based on costanzo 2010)
   message("REF: J. Van Leeuwen et al., 2016, Science")
   message("Exploring genetic suppression interactions on a global scale")
@@ -381,11 +381,15 @@ load.vanleeuwen2016.data = function(){
             FN=factor(BIOPROCESS,levels=unique(BIOPROCESS),labels = invert(.class_function))
     ) %>% dplyr::select(-Function) %>%
     group_by(ORF) %>% mutate(FN_all=paste0(unique(FN),collapse = ""),
-                             BIOPROCESS_all = paste0(unique(BIOPROCESS),collapse="+\n"))
+                             BIOPROCESS_all = paste0(unique(BIOPROCESS),collapse=" # "))
+  if(single_orf){
+    # Return merged functions for each orf
+    vanleeuwen =  vanleeuwen %>% dplyr::select(-c(FN,BIOPROCESS)) %>% distinct()
+  }
 
   return(vanleeuwen)
 
-  }
+}
 
 load.villen2017.data = function(){
   library(openxlsx)
