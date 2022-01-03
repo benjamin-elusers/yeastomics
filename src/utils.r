@@ -39,8 +39,8 @@ get.last.file = function(path,pattern){
 
 # Testing/Subsetting -----------------------------------------------------------
 is.whole  <- function(x){ all(floor(x) == x) }      # checks if a value has decimal part (not necessarily integer e.g. 1.0 is whole)
-is.string <- function(x){ is.character(x) && length(x) == 1 } # cheks if a value is a single string of letters
-is.binary <- function(x){ all(1*x %in% 0:1) }       # checks if a value is 0/1 (binary/logical)
+is.string <- function(x){ is.character(x) && length(x) == 1 } # checks if a value is a single string of letters
+is.binary <- function(x){ all( (1*x) %in% 0:1) }    # checks if a value is 0/1 (binary/logical)
 is.even   <- function(x){ as.integer(x) %% 2 == 0 } # checks if a value is even
 is.odd    <- function(x){ as.integer(x) %% 2 != 0 } # checks if a value is odd
 is.dup    <- function(x){ x %in% x[duplicated(x)] } # detects duplicates
