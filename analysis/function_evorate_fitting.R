@@ -181,12 +181,6 @@ get_codons_col = function(df,col_prefix='cat_transcriptomics.sgd.'){
   return(res)
 }
 
-find_na_codons = function(df,as.indices=F){
-  NA_codon = rowsNA(get_codons_col(df)) > 0
-  if(as.indices){ return(which(NA_codon)) }
-  return(df[which(NA_codon),])
-}
-
 retrieve_missing_codons = function(orf_missing){
   # Retrieve CSD and count codons for orf with missing values
   cod = paste0(get.codons4tai(),"$")
@@ -199,7 +193,7 @@ retrieve_missing_codons = function(orf_missing){
 
 fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
   # Replace orf with missing values with retrieved codons counts from CDS
-  orf_missing = find_na_codons(df)$ORF
+  orf_missing = get_codons_col(df,col_prefix) %>% find_na_rows() %>% pull(ORF)
   cat("Replace columns of codons counts with missing values...\n")
   df_na_codon = retrieve_missing_codons(orf_missing) %>%
     dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
@@ -222,19 +216,13 @@ retrieve_missing_centrality = function(orf_missing,type='string'){
   return(cent)
 }
 
-find_na_centrality = function(df,as.indices=F){
-  NA_codon = rowsNA(get_centrality_col(df)) > 0
-  if(as.indices){ return(which(NA_codon)) }
-  return(df[which(NA_codon),])
-}
-
 fix_missing_centrality = function(df,col_prefix='cat_interactions.string.'){
   # Replace orf with missing values for centrality with 0's
-  orf_missing = find_na_centrality(df)$ORF
+  orf_missing =   get_centrality_col(df,col_prefix) %>% find_na_rows() %>% pull(ORF)
+  df_na_centrality = retrieve_missing_centrality(orf_missing)
   #load.string(phy = F,min.score=900)
 
   cat("Replace columns of network centrality with missing values...\n")
-  df_na_centrality = retrieve_missing_centrality(orf_missing)
   df_fixed = coalesce_join(x = df, y=df_na_centrality, by = "ORF")
   return(df_fixed)
 }
