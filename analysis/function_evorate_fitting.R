@@ -215,8 +215,11 @@ get_centrality_col = function(df,col_prefix="cat_interactions.string."){
 
 retrieve_missing_centrality = function(orf_missing,type='string'){
   interactions=load.network('string')
-  net=interactions %>% dplyr::select(ORF1,ORF2)
-  #network.centrality(net)
+  cent=interactions %>%
+        filter(ORF1 %in% orf_missing | ORF2 %in%orf_missing) %>%
+        dplyr::select(ORF1,ORF2) %>%
+        network.centrality(fromTo = ., namenet = 'STRING')
+  return(cent)
 }
 
 find_na_centrality = function(df,as.indices=F){
