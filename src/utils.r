@@ -44,7 +44,8 @@ is.string <- function(x){ is.character(x) && length(x) == 1 } # checks if a valu
 
 is_num_bin <- function(x){ is.numeric(x) && length(unique(na.omit(x))) == 2 } # checks if a numeric vector has only 2 values
 is_fac_bin <- function(x){ is.factor(x) && nlevels(na.omit(x)) == 2 }         # checks if a factor vector has only 2 levels
-is.binary  <- function(x){ is_num_bin(x) || is_fac_bin(x) || is.logical(x) }   # checks if a value is binary (2 unique outcomes)
+# checks if a value is binary (2 unique outcomes -- by default numeric values must be either 0 and 1)
+is.binary  <- function(x,xvals=c(0,1)){ is_num_bin(x) && range(na.omit(x)) == xvals[1:2] || is_fac_bin(x) || is.logical(x) }
 
 is.even   <- function(x){ as.integer(x) %% 2 == 0 } # checks if a value is even
 is.odd    <- function(x){ as.integer(x) %% 2 != 0 } # checks if a value is odd
