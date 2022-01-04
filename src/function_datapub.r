@@ -820,6 +820,12 @@ load.string = function(tax="4932",phy=T,ful=T,min.score=700){
   message(sprintf("FILTERED BY:\n physical links = %s \nAND\n full evidence =  %s \nAND\n min. score >= %s", phy, ful, min.score))
   # each numeric column is an evidence score out of 1000 to asssess the existence of the link between protein
   # _transferred means information was inferred from a different organism (homology or orthologous group)
+
+  # EDIT 04/01/22 :
+  # Error in open.connection(con, "rb") :
+  #    server certificate verification failed. CAfile: /etc/ssl/certs/ca-certificates.crt CRLfile: none
+  # fixed by reinstalling ca-certificates in terminal:
+  #  sudo apt update ; sudo apt-get install apt-transport-https ca-certificates -y ; sudo update-ca-certificates
   STRING_net = readr::read_delim(STRING_url,delim = " ") %>% filter(combined_score >= min.score)
   return(STRING_net)
 }
