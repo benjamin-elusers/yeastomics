@@ -39,15 +39,10 @@ load.network = function(net=c('string','intact')){
              ORF2 = str_extract(protein2,SGD.nomenclature())
       ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
   }else if(ref_net=='intact'){
-    test = load.intact.yeast(min.intact.score = 0.75)
+    #network = load.intact.yeast(min.intact.score = 0.75)
+    network = load.intact()
   }
-  ## INTACT Molecular Interaction Database ---------------------------------------
-  file.intact = here("data","intact-yeast-ppi.rds")
-  valid_ids=unique(c(names(S288C),UNI$UNIPROTKB))
-  INTACT = preload(saved.file = file.intact,
-                   loading.call =
-                   doing = "loading PPIs from INTACT...") %>%
-    dplyr::filter(protA %in% valid_ids & protB %in% valid_ids)
+  return(network)
 }
 
 load.clade = function(clade1='schizo',clade2='sacch.wgd'){
