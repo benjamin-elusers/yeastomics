@@ -95,7 +95,9 @@ load.properties=function(tolong=F){
 }
 
 load.features=function(tolong=F){
-  feat = readRDS(get.last.file(here("output"),"proteome-features")) %>% ungroup()
+  feat = readRDS(get.last.file(here("output"),"proteome-features")) %>%
+          ungroup() %>%
+          distinct()
 
   if(tolong){
     long_feat = feat %>%
@@ -120,7 +122,8 @@ normalize_features=function(feat){
   feat_norm[,col_codons] =  100 * feat[,col_codons] / (feat$cat_transcriptomics.sgd.prot_size+1)
 
   # b. Normalize amino acid frequencies (0-100) => 31 COLUMNS  -----------------
-  col_f_aa = grep("cat_biophysics.uniprot.f_",colnames(feat))
+  # 04.01.22 changed to use sgd sequences instead of uniprot
+  col_f_aa = grep("cat_biophysics.sgd.f_",colnames(feat))
   feat_norm[,col_f_aa] =  100 * feat[,col_f_aa]
 
   # c. Normalize all other fraction (0-100) => 4 COLUMNS  ----------------------
@@ -193,7 +196,7 @@ retrieve_missing_codons = function(orf_missing){
 
 fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
   # Replace orf with missing values with retrieved codons counts from CDS
-  orf_missing = get_codons_col(df,col_prefix) %>% find_na_rows() %>% pull(ORF)
+  orf_missing = df %>% column_to_rownames('ORF') %>% get_codons_col(df,col_prefix) %>% find_na_rows() %>% pull(rownames(.))
   cat("Replace columns of codons counts with missing values...\n")
   df_na_codon = retrieve_missing_codons(orf_missing) %>%
     dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
