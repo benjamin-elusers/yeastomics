@@ -16,8 +16,22 @@ orf_orthologs = EVOLUTION$ORF
 PROP = load.properties()
 FEAT = load.features() %>% normalize_features()
 PREDICTORS = full_join(PROP,FEAT) %>% filter(ORF %in% orf_orthologs)
+dim(PREDICTORS)
+
 # Predictors with missing values must be corrected
-PREDICTORS.1 = fix_missing_codons(PREDICTORS)
+#  I.  Remove unnecessary variables (columns):
+#     A) rarely observed data (less than 2 observations)
+PREDICTORS.1 = remove_rare_vars(PREDICTORS)
+#  II. Fix missing observations for certain genes (rows):
+#     A) missing codons counts
+PREDICTORS.2 = fix_missing_codons(PREDICTORS.1,col_prefix="cat_transcriptomics.sgd.")
+#     B) missing centrality values (STRING and INTACT network are treated individually)
+PREDICTORS.3.1 = fix_missing_centrality(PREDICTORS.2,col_prefix="cat_interactions.string.")
+PREDICTORS.3.2 = fix_missing_centrality(PREDICTORS.3.1,col_prefix="cat_interactions.intact.")
+
+missing_var = PREDICTORS.3.2 %>%
+  dplyr::select(where(~!is.logical(.x))) %>%
+  skimr::skim(.) %>% filter(complete_rate<1)
 
 # ANNOTATION DATA
 ANNOTATION=load.annotation()
@@ -49,7 +63,7 @@ ggsave(FIGURE1,filename = "draft-figure1.pdf",device = 'pdf',scale = 2, path = "
 
 id_vars = c("UNIPROTKB","SGD","ORF","GNAME","PNAME")
 # 1ST REGRESSION of Protein Expression and Evolutionary rate (M0) -----------
-m0 = fit_linear_regression(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL", PREDVAR=PREDICTORS,
+m0 = fit_linear_regression(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL", PREDVAR=PREDICTORS.1,
                            xcor_max = 0.6,ycor_max = 0.6, min_obs=1 )
 
 # PROTEIN FEATURES ENGINEERING -------------------------------------------------
