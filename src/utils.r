@@ -63,6 +63,13 @@ is.outlier <- function(x,thr=0.1,coef=1.5) { # return outliers outliers from dis
   return(x < quantile(x, thr,na.rm=T) - whiskers | x > quantile(x, 1-thr,na.rm=T) + whiskers)
 }
 
+find_na_rows = function(df,as.indices=F){
+  # return dataframe rows with NA values (or just indices of NA row)
+  NA_codon = rowsNA(df) > 0
+  if(as.indices){ return(which(NA_codon)) }
+  return(df[which(NA_codon),])
+}
+
 find.consecutive = function(x,val,minilen=2){  # return stretch of identical consecutive values in vector
   y=rle(x)
   V=y$values

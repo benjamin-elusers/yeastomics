@@ -267,6 +267,12 @@ AACOUNT2SCORE = function(COUNT,SCORE, opposite=F){
   return(S)
 }
 
+find_na_rows = function(df,as.indices=F){
+  NA_codon = rowsNA(df) > 0
+  if(as.indices){ return(which(NA_codon)) }
+  return(df[which(NA_codon),])
+}
+
 coalesce_join <- function(x, y,
                           by = NULL, suffix = c(".x", ".y"),
                           join = dplyr::full_join, ...) {
