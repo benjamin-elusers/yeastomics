@@ -604,14 +604,14 @@ load.intact.yeast = function(with_direct=T,with_biophysical=T,with_reliable=T,
   cat("-> Filter quality interactions...\n")
   # 5.1 filter for direct association
   if(with_direct){
-    direct =c("MI:0407",get.MI.annotation('MI:0407','descendants')[,'id'])
+    direct= c("MI:0407",get.MI.annotation('MI:0407','descendants')[,'id'])
     direct_regex= paste0(direct,'"',collapse="|")
     is_direct = grepl(direct_regex,x=INTACT.4$typeAB)
     cat(" >>> as direct association :",sum(is_direct),"\n")
   }
   # 5.2 filter for biophysical methods
   if(with_biophysical){
-    biophysical =c("MI:0013",get.MI.annotation('MI:0013','descendants')[,'id'])
+    biophysical= c("MI:0013",get.MI.annotation('MI:0013','descendants')[,'id'])
     biophysical_regex= paste0(biophysical,'"',collapse="|")
     is_biophysical = grepl(biophysical_regex,x=INTACT.4$method)
     cat(" >>> with biophysical methods : ",sum(is_biophysical),"\n")
@@ -624,8 +624,7 @@ load.intact.yeast = function(with_direct=T,with_biophysical=T,with_reliable=T,
                 "0013","0017","0040","0042","0052","0067","0069","0091","0104","0232","0404",
                 "0410","0419","0426","0512","0807","0825","0841","0859","0872","0947","0953",
                 "0964","0982","1022","1104","1147","1246","2289","2338")
-
-     hugo_keep_extended= c(hugo_keep,"0018","0027","0029","0030","0054","0055","0090","0226","0231","0398",
+    hugo_keep_extended= c(hugo_keep,"0018","0027","0029","0030","0054","0055","0090","0226","0231","0398",
                          "0676","1112","1203","1311","1356","2215")
      reliable_regex= paste0("MI:",hugo_keep,'"',collapse="|")
      is_reliable = grepl(reliable_regex,x=INTACT.4$method)
@@ -641,6 +640,18 @@ load.intact.yeast = function(with_direct=T,with_biophysical=T,with_reliable=T,
   cat(sprintf("(5) TOTAL INTERACTIONS : %s \n",nrow(INTACT.5)))
   return(INTACT.5)
 }
+
+load.intact = function(tax=559292){
+  int = PItools::fullInteractome( taxid = tax,
+                                  database = "IntActFTP", # load all interactions from IntAct FTP storage (https://www.ebi.ac.uk/intact/downloads)
+                                  format = "tab27",
+                                  clean = TRUE, # parse into usable format (takes 5-10 minutes)
+                                  protein_only = TRUE, # filter protein interactions
+                                  directory = NULL, # keep data files inside R library or specify your directory
+                                  releaseORdate = NULL)  # keep track of the release date e.g. 2019Mar23, (first download set to NULL)
+  return(int)
+}
+
 
 # Quaternary structures (3d-complex) -------------------------------------------
 load.3dcomplex.yeast = function(limit = F, n = 1000) {
