@@ -40,7 +40,12 @@ get.last.file = function(path,pattern){
 # Testing/Subsetting -----------------------------------------------------------
 is.whole  <- function(x){ all(floor(x) == x) }      # checks if a value has decimal part (not necessarily integer e.g. 1.0 is whole)
 is.string <- function(x){ is.character(x) && length(x) == 1 } # checks if a value is a single string of letters
-is.binary <- function(x){ all( (1*x) %in% 0:1) }    # checks if a value is 0/1 (binary/logical)
+#is.binary <- function(x){ all( (1*x) %in% 0:1) }    # checks if a value is 0/1 (binary/logical)
+
+is_num_bin <- function(x){ is.numeric(x) && length(unique(na.omit(x))) == 2 } # checks if a numeric vector has only 2 values
+is_fac_bin <- function(x){ is.factor(x) && nlevels(na.omit(x)) == 2 }         # checks if a factor vector has only 2 levels
+is.binary  <- function(x){ is_num_bin(x) || is_fac_bin(x) || is.logical(x) }   # checks if a value is binary (2 unique outcomes)
+
 is.even   <- function(x){ as.integer(x) %% 2 == 0 } # checks if a value is even
 is.odd    <- function(x){ as.integer(x) %% 2 != 0 } # checks if a value is odd
 is.dup    <- function(x){ x %in% x[duplicated(x)] } # detects duplicates
