@@ -709,8 +709,8 @@ BIOPHYSICS$villen2017.shortlived_prot = df.HLprot %>% dplyr::filter(villen2017.H
 BIOPHYSICS$belle2006.shortlived_prot = df.HLprot %>% dplyr::filter(belle2006.HL_prot < 5) %>% pull(ORF)
 
 df.biophysics = PROTEOME %>% 
-                left_join(df.aa,by=c('UNIPROTKB'='id')) %>%
-                left_join(df.aa_class,by=c('UNIPROTKB'='id')) %>%
+                left_join(df.aa,by=c('ORF'='id')) %>%
+                left_join(df.aa_class,by=c('ORF'='id')) %>%
                 left_join(df.d2p2,by=c('UNIPROTKB'='d2p2.id')) %>%
                 left_join(df.pepstats,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.iup,by=c('UNIPROTKB'='UNIPROT')) %>%
