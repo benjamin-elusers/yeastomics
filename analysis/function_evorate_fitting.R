@@ -228,17 +228,14 @@ find_na_centrality = function(df,as.indices=F){
   return(df[which(NA_codon),])
 }
 
-
-
 fix_missing_centrality = function(df,col_prefix='cat_interactions.string.'){
   # Replace orf with missing values for centrality with 0's
   orf_missing = find_na_centrality(df)$ORF
-  load.string(phy = F,min.score=900)
+  #load.string(phy = F,min.score=900)
 
   cat("Replace columns of network centrality with missing values...\n")
-  df_na_centrality = retrieve_missing_codons(orf_missing) %>%
-    dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
-  df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
+  df_na_centrality = retrieve_missing_centrality(orf_missing)
+  df_fixed = coalesce_join(x = df, y=df_na_centrality, by = "ORF")
   return(df_fixed)
 }
 
