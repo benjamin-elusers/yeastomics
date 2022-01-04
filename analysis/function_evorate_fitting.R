@@ -140,7 +140,28 @@ normalize_features=function(feat){
 
 
 # 2. FIX MISSING VALUES --------------------------------------------------------
-#### a. codons counts ####
+#### A. IN COLUMNS ####
+get_binary_col = function(df){
+  # Binary variables: logical or numeric with 2 unique values or factors with 2 levels
+
+
+  df %>% dplyr::select(where(~ (is_numeric(.x) && n_distinct(.x)==2) || is_logical(.x) ))
+  binary_vars = df[,apply(df,2,is.binary)]
+  return(df)
+}
+
+remove_rare_vars = function(df,min_obs=2){
+  # Find binary variables with rare observations (preferably 0's and singletons)
+  rare_vars = binary_vars[ colSums( df[get_binary_colbinary_vars]) < min_obs ]
+  n_rare = length(rare_vars)
+  cat(sprintf("Excluding %s predictors with less than %s observations\n",n_rare,n_rare))
+  df_fixed = df %>% dplyr::select(-all_of(rare_vars))
+  return(df_fixed)
+}
+
+
+#### B. IN ROWS ####
+#### 1. codons counts ####
 get_codons_col = function(df,col_prefix='cat_transcriptomics.sgd.'){
   regex_codons=paste0(col_prefix,get.codons4tai(),"$")
   res = df %>% dplyr::select(matches(regex_codons,ignore.case = F))
@@ -157,22 +178,23 @@ retrieve_missing_codons = function(orf_missing){
   # Retrieve CSD and count codons for orf with missing values
   cod = paste0(get.codons4tai(),"$")
   cds = load.sgd.CDS()
+  cat(sprintf("Retrieving missing codons counts for %s ORF...\n",n_distinct(orf_missing)))
   codon_counts = coRdon::codonCounts(coRdon::codonTable(cds[orf_missing]))
-
   codon_missing = tibble(ORF=orf_missing, as_tibble(codon_counts))
   return(codon_missing)
 }
 
 fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
-  # Replace  orf with missing values with retrieved codons counts from CDS
+  # Replace orf with missing values with retrieved codons counts from CDS
   orf_missing = find_na_codons(df)$ORF
-  get_codons_col(df) %>% colnames %>% hutils::longest_prefix()
+  cat("Replace columns of codons counts with missing values...\n")
   df_na_codon = retrieve_missing_codons(orf_missing) %>%
-    dplyr::rename_with(.cols=matches(cod),.fn=Pxx, px=col_prefix)
-  df_fixed = coalesce_join(x = df, y=df_na_codon, by = id)
-
+    dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
+  df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
   return(df_fixed)
 }
+
+
 
 # 3. LINEAR FIT ----------------------------------------------------------------
 
@@ -337,12 +359,7 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   n_yout = length(y_excluded_var)
   cat(sprintf("Excluding %s predictors with cor. to Y > %s (%s)\n",n_yout,ycor_max,Y))
 
-  binary_vars = var_names[ apply(M0[,var_names],2,is.binary) ]
-  rare_excluded_var = binary_vars[ colSums(M0[binary_vars]) < min_obs ]
-  n_min_obs = length(rare_excluded_var)
-  cat(sprintf("Excluding %s predictors with less than %s observations\n",n_min_obs,min_obs))
-
-  excluded_var = unique(c(x_excluded_var,y_excluded_var,rare_excluded_var))
+  excluded_var = unique(c(x_excluded_var,y_excluded_var))
   n_out = length(excluded_var)
   cat(sprintf("In total, %s predictors are excluded:\n",n_out))
   cat(txt_section_break,"\n ")
