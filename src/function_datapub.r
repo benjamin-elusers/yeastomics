@@ -416,7 +416,13 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
   message("REF: P. Leuenberger et al., 2017, Science")
   message("Cell-wide analysis of protein thermal unfolding reveals determinants of thermostability")
   species=match.arg(species, choices = c('S. cerevisiae','E. coli', 'Human HeLa Cells','T. thermophilus'), several.ok = F)
-  S3.url = "https://science.sciencemag.org/highwire/filestream/690833/field_highwire_adjunct_files/2/aai7825_Leuenberger_Table-S3.xlsx"
+  S3.url="https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx"
+  ## EDIT 04.01.22: OLD URL BELOW NOT VALID ANYMORE - NEW URL USES REDIRECTION TO DOWNLOAD THE FILE
+  # S3.url = "https://science.sciencemag.org/highwire/filestream/690833/field_highwire_adjunct_files/2/aai7825_Leuenberger_Table-S3.xlsx"
+  # REDIRECTED URL : https://www.science.org/doi/suppl/10.1126/science.aai7825/suppl_file/aai7825_leuenberger_table-s3.xlsx
+  # Target url for downloading the file is:
+  # https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx
+
   #download.file(S3.url, destfile = "aai7825_Leuenberger_Table-S3.xlsx" )
   LIP_MS = openxlsx::read.xlsx(xlsxFile = S3.url,
                                sheet = species, detectDates = T,
