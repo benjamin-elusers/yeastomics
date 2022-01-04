@@ -31,6 +31,25 @@ load.annotation = function(){
   return(annotation)
 }
 
+load.network = function(net=c('string','intact')){
+  ref_net = match.arg(net,choices = net, several.ok = F)
+  if(ref_net=='string'){
+    network = load.string(tax="4932",phy=F, ful=T, min.score = 900) %>%
+      mutate(ORF1 = str_extract(protein1,SGD.nomenclature()),
+             ORF2 = str_extract(protein2,SGD.nomenclature())
+      ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
+  }else if(ref_net=='intact'){
+    test = load.intact.yeast(min.intact.score = 0.75)
+  }
+  ## INTACT Molecular Interaction Database ---------------------------------------
+  file.intact = here("data","intact-yeast-ppi.rds")
+  valid_ids=unique(c(names(S288C),UNI$UNIPROTKB))
+  INTACT = preload(saved.file = file.intact,
+                   loading.call =
+                   doing = "loading PPIs from INTACT...") %>%
+    dplyr::filter(protA %in% valid_ids & protB %in% valid_ids)
+}
+
 load.clade = function(clade1='schizo',clade2='sacch.wgd'){
   # BRANCH LENGTH IN FUNGI CLADES
   # Normalized branch length (Kc):
@@ -141,21 +160,20 @@ normalize_features=function(feat){
 
 # 2. FIX MISSING VALUES --------------------------------------------------------
 #### A. IN COLUMNS ####
-get_binary_col = function(df){
-  # Binary variables: logical or numeric with 2 unique values or factors with 2 levels
-
-
-  df %>% dplyr::select(where(~ (is_numeric(.x) && n_distinct(.x)==2) || is_logical(.x) ))
-  binary_vars = df[,apply(df,2,is.binary)]
-  return(df)
+get_binary_col = function(df,only.names=F){
+  # Binary variables (only 2 outcomes)
+  df_bin = df %>% dplyr::select(where(~is.binary(.x)))
+  if(only.names){ return( colnames(df_bin) ) }
+  return(df_bin)
 }
 
 remove_rare_vars = function(df,min_obs=2){
   # Find binary variables with rare observations (preferably 0's and singletons)
-  rare_vars = binary_vars[ colSums( df[get_binary_colbinary_vars]) < min_obs ]
+  binary_vars = get_binary_col(df)
+  rare_vars = binary_vars[ colSums(binary_vars) < min_obs ]
   n_rare = length(rare_vars)
-  cat(sprintf("Excluding %s predictors with less than %s observations\n",n_rare,n_rare))
-  df_fixed = df %>% dplyr::select(-all_of(rare_vars))
+  cat(sprintf("Excluding %s/%s predictors with less than %s observations\n",n_rare,ncol(df),min_obs))
+  df_fixed = df %>% dplyr::select(-all_of(names(rare_vars)))
   return(df_fixed)
 }
 
@@ -193,8 +211,36 @@ fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
   df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
   return(df_fixed)
 }
+#### 2. network centrality ####
+get_centrality_col = function(df,col_prefix="cat_interactions.string."){
+  regex_centrality = paste0("^",col_prefix,"cent_")
+  res = df %>% dplyr::select(matches(regex_centrality,ignore.case = F))
+  return(res)
+}
+
+retrieve_missing_centrality = function(orf_missing){
+  if(network)
+}
+
+find_na_centrality = function(df,as.indices=F){
+  NA_codon = rowsNA(get_centrality_col(df)) > 0
+  if(as.indices){ return(which(NA_codon)) }
+  return(df[which(NA_codon),])
+}
 
 
+
+fix_missing_centrality = function(df,col_prefix='cat_interactions.string.'){
+  # Replace orf with missing values for centrality with 0's
+  orf_missing = find_na_centrality(df)$ORF
+  load.string(phy = F,min.score=900)
+
+  cat("Replace columns of network centrality with missing values...\n")
+  df_na_centrality = retrieve_missing_codons(orf_missing) %>%
+    dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
+  df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
+  return(df_fixed)
+}
 
 # 3. LINEAR FIT ----------------------------------------------------------------
 
