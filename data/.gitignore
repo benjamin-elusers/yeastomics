@@ -1,3 +1,7 @@
 uniprot-human-features.rds
 uniprot-eggnog-fungi.tab
 uniprot-sgd-annotation.rds
+proteome-properties-info.rds
+
+fungi-evodata.rds
+yeast_strains-evodata.rds
