@@ -61,14 +61,14 @@ suppressPackageStartupMessages({
   library(stringr)
   library(hablar)
   library(here)
-  
-  source(here("src","utils.r"))
-  source(here("src","function_annotation.r"))
-  source(here("src","function_sequence.r"))
-  source(here("src","function_phylogenetic.r"))
-  source(here("src","function_analysis.r"))
-  source(here("src","function_datalocal.r"))
-  source(here("src","function_datapub.r"))
+  source(here("src","__setup_yeastomics__.r"))
+  # source(here("src","utils.r"))
+  # source(here("src","function_annotation.r"))
+  # source(here("src","function_sequence.r"))
+  # source(here("src","function_phylogenetic.r"))
+  # source(here("src","function_analysis.r"))
+  # source(here("src","function_datalocal.r"))
+  # source(here("src","function_datapub.r"))
 
 })
 
@@ -250,9 +250,9 @@ scor(test$ppm.avg, test$paxdb.ppm_4896)
 # VARIABLE ORF (PANGENOMICS) -------------------------------------------------
 VARORF = load.peter2018.data(2)
 file.r4s.fungi_snp=here("data","PROTEIN-EVO-FUNGI-SNP.rds")
-SNP_STRAIN = readRDS(file.r4s.fungi_snp) %>% 
-              dplyr::select(starts_with('SNP.'),'ORF','UNIPROT','IS_FUNGI','IS_STRAINS') %>% 
-              group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log10)) # apply log10 to SNP rate4site %>% 
+SNP_STRAIN = readRDS(file.r4s.fungi_snp) %>% distinct(ORF,UNIPROT,.keep_all=T) %>%
+              dplyr::select(starts_with('SNP.'),'ORF','UNIPROT','IS_FUNGI','IS_STRAINS')
+              #group_by(ORF) %>% dplyr::mutate(across(starts_with("SNP."),log10)) # apply log10 to SNP rate4site %>% 
 
 # CHROMOSOME GENES  ------------------------------------------------------------
 CHR = SGD %>%
@@ -261,8 +261,8 @@ CHR = SGD %>%
       dplyr::select(name)
 
 # AMINO ACID FREQUENCIES -------------------------------------------------------
-AA.FR = letterFrequency(UNI.SC,as.prob = T,letters = get.AA1()) %>% bind_cols( id=names(UNI.SC)) 
-AA.COUNT = letterFrequency(UNI.SC,as.prob = F,letters = get.AA1())%>% bind_cols( id=names(UNI.SC)) 
+AA.FR = letterFrequency(S288C,as.prob = T,letters = get.AA1()) %>% bind_cols( id=names(S288C)) 
+AA.COUNT = letterFrequency(S288C,as.prob = F,letters = get.AA1())%>% bind_cols( id=names(S288C)) 
 
 # PFAM AA CLASSES
 # alcohol         o    S,T
@@ -289,7 +289,7 @@ sum.aa.fr = function(BS,alphabet){
 }
 aa.set = map_chr(aa.prop,str_c,collapse='')
 aa.class = paste0(tolower(sub(x=names(aa.set),"\\.","")),"_",aa.set)
-AACLASS.FR = map(aa.prop, sum.aa.fr, BS=UNI.SC )
+AACLASS.FR = map(aa.prop, sum.aa.fr, BS=S288C )
 
 # DISORDER (D2P2 + IUP)  -------------------------------------------------------
 file.d2p2=here("data","d2p2-yeast-uniprotKB.rds")
@@ -614,12 +614,12 @@ BIOPHYSICS=list()
 
 ### Single amino-acid frequencies ------------------------------------------------
 df.aa = AA.FR %>%
-        rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-id)
+        rename_with(.fn = Pxx, px="sgd.f",s='_',.cols=-id)
 
 
 ### Grouped amino-acid frequencies -----------------------------------------------
 df.aa_class =  AACLASS.FR %>% purrr::reduce(full_join,by='id') %>% rename_with(~aa.class, starts_with('fr')) %>%
-          rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-id)
+          rename_with(.fn = Pxx, px="sgd.f",s='_',.cols=-id)
 names(df.aa_class)
 
 
@@ -709,8 +709,8 @@ BIOPHYSICS$villen2017.shortlived_prot = df.HLprot %>% dplyr::filter(villen2017.H
 BIOPHYSICS$belle2006.shortlived_prot = df.HLprot %>% dplyr::filter(belle2006.HL_prot < 5) %>% pull(ORF)
 
 df.biophysics = PROTEOME %>% 
-                left_join(df.aa,by=c('UNIPROTKB'='id')) %>%
-                left_join(df.aa_class,by=c('UNIPROTKB'='id')) %>%
+                left_join(df.aa,by=c('ORF'='id')) %>%
+                left_join(df.aa_class,by=c('ORF'='id')) %>%
                 left_join(df.d2p2,by=c('UNIPROTKB'='d2p2.id')) %>%
                 left_join(df.pepstats,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.iup,by=c('UNIPROTKB'='UNIPROT')) %>%
@@ -811,8 +811,8 @@ names(go) = paste0("go.", make_clean_names(names(go),case='none') )
 FUNCTIONS=append(FUNCTIONS,go)
 
 # Classification of Biological functions
-biofunc = load.vanleeuwen2016.data()
-func_class = split(biofunc$ORF,biofunc$FUNCTION)
+biofunc = load.vanleeuwen2016.data(single_orf = F)
+func_class = split(biofunc$ORF,biofunc$BIOPROCESS)
 names(func_class) = paste0("costanzo2010.", make_clean_names(names(func_class),case='none') )
 FUNCTIONS = append(FUNCTIONS,func_class)
 
@@ -925,7 +925,6 @@ for( C in names(PROPERTIES)){
 
 saveRDS(PROP,sprintf("output/proteome-properties-%s.rds",when))
 save.image(sprintf("output/loaded-datasets-%s.rds",when))
-
 #load("output/loaded-datasets-04_05_2021.rds")
 ```
 

@@ -11,6 +11,40 @@ load.abundance = function(){
   return(abundance)
 }
 
+load.annotation = function(){
+  # Preloaded uniprot data can be generated in 5min with:
+  #   uni = load.uniprot.features(tax="559292",refdb="UNIPROTKB")
+  #   sgd = load.sgd.features()
+
+  uni_feat = read_rds(here('data','uniprot-features.rds')) %>%
+      dplyr::select(-c(REVIEWED,COMMENTS,SUBLOC))
+  sgd_desc = read_rds(here('data','uniprot-sgd-annotation.rds'))
+  biofunc = load.vanleeuwen2016.data(single_orf=T)
+
+  annotation = full_join(sgd_desc,uni_feat,by=c("SGD","UNIPROT"='UNIPROTKB')) %>%
+               full_join(biofunc,by='ORF')  %>%
+               relocate(SGD,GENENAME,ORF,UNIPROT,PNAME,L,FAMILIES,FUNCTION,ROLE,
+                        BIOPROCESS_all,LOC,COMPLEX,ORTHO,OTHER,KEYWORDS,
+                        EXISTENCE,SCORE) %>%
+               filter(!is.na(ORF) | is.na(UNIPROT))
+
+  return(annotation)
+}
+
+load.network = function(net=c('string','intact')){
+  ref_net = match.arg(net,choices = net, several.ok = F)
+  if(ref_net=='string'){
+    network = load.string(tax="4932",phy=F, ful=T, min.score = 900) %>%
+      mutate(ORF1 = str_extract(protein1,SGD.nomenclature()),
+             ORF2 = str_extract(protein2,SGD.nomenclature())
+      ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
+  }else if(ref_net=='intact'){
+    #network = load.intact.yeast(min.intact.score = 0.75)
+    network = load.intact()
+  }
+  return(network)
+}
+
 load.clade = function(clade1='schizo',clade2='sacch.wgd'){
   # BRANCH LENGTH IN FUNGI CLADES
   # Normalized branch length (Kc):
@@ -61,7 +95,9 @@ load.properties=function(tolong=F){
 }
 
 load.features=function(tolong=F){
-  feat = readRDS(get.last.file(here("output"),"proteome-features")) %>% ungroup()
+  feat = readRDS(get.last.file(here("output"),"proteome-features")) %>%
+          ungroup() %>%
+          distinct()
 
   if(tolong){
     long_feat = feat %>%
@@ -86,7 +122,8 @@ normalize_features=function(feat){
   feat_norm[,col_codons] =  100 * feat[,col_codons] / (feat$cat_transcriptomics.sgd.prot_size+1)
 
   # b. Normalize amino acid frequencies (0-100) => 31 COLUMNS  -----------------
-  col_f_aa = grep("cat_biophysics.uniprot.f_",colnames(feat))
+  # 04.01.22 changed to use sgd sequences instead of uniprot
+  col_f_aa = grep("cat_biophysics.sgd.f_",colnames(feat))
   feat_norm[,col_f_aa] =  100 * feat[,col_f_aa]
 
   # c. Normalize all other fraction (0-100) => 4 COLUMNS  ----------------------
@@ -118,7 +155,82 @@ normalize_features=function(feat){
   return(feat_norm)
 }
 
-# 2. LINEAR FIT ----------------------------------------------------------------
+
+# 2. FIX MISSING VALUES --------------------------------------------------------
+#### A. IN COLUMNS ####
+get_binary_col = function(df,only.names=F){
+  # Binary variables (only 2 outcomes)
+  df_bin = df %>% dplyr::select(where(~is.binary(.x)))
+  if(only.names){ return( colnames(df_bin) ) }
+  return(df_bin)
+}
+
+remove_rare_vars = function(df,min_obs=2){
+  # Find binary variables with rare observations (preferably 0's and singletons)
+  binary_vars = get_binary_col(df)
+  rare_vars = binary_vars[ colSums(binary_vars) < min_obs ]
+  n_rare = length(rare_vars)
+  cat(sprintf("Excluding %s/%s predictors with less than %s observations\n",n_rare,ncol(df),min_obs))
+  df_fixed = df %>% dplyr::select(-all_of(names(rare_vars)))
+  return(df_fixed)
+}
+
+
+#### B. IN ROWS ####
+#### 1. codons counts ####
+get_codons_col = function(df,col_prefix='cat_transcriptomics.sgd.'){
+  regex_codons=paste0(col_prefix,get.codons4tai(),"$")
+  res = df %>% dplyr::select(matches(regex_codons,ignore.case = F))
+  return(res)
+}
+
+retrieve_missing_codons = function(orf_missing){
+  # Retrieve CSD and count codons for orf with missing values
+  cod = paste0(get.codons4tai(),"$")
+  cds = load.sgd.CDS()
+  cat(sprintf("Retrieving missing codons counts for %s ORF...\n",n_distinct(orf_missing)))
+  codon_counts = coRdon::codonCounts(coRdon::codonTable(cds[orf_missing]))
+  codon_missing = tibble(ORF=orf_missing, as_tibble(codon_counts))
+  return(codon_missing)
+}
+
+fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
+  # Replace orf with missing values with retrieved codons counts from CDS
+  orf_missing = df %>% column_to_rownames('ORF') %>% get_codons_col(df,col_prefix) %>% find_na_rows() %>% pull(rownames(.))
+  cat("Replace columns of codons counts with missing values...\n")
+  df_na_codon = retrieve_missing_codons(orf_missing) %>%
+    dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
+  df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
+  return(df_fixed)
+}
+#### 2. network centrality ####
+get_centrality_col = function(df,col_prefix="cat_interactions.string."){
+  regex_centrality = paste0("^",col_prefix,"cent_")
+  res = df %>% dplyr::select(matches(regex_centrality,ignore.case = F))
+  return(res)
+}
+
+retrieve_missing_centrality = function(orf_missing,type='string'){
+  interactions=load.network('string')
+  cent=interactions %>%
+        filter(ORF1 %in% orf_missing | ORF2 %in%orf_missing) %>%
+        dplyr::select(ORF1,ORF2) %>%
+        network.centrality(fromTo = ., namenet = 'STRING')
+  return(cent)
+}
+
+fix_missing_centrality = function(df,col_prefix='cat_interactions.string.'){
+  # Replace orf with missing values for centrality with 0's
+  orf_missing =   get_centrality_col(df,col_prefix) %>% find_na_rows() %>% pull(ORF)
+  df_na_centrality = retrieve_missing_centrality(orf_missing)
+  #load.string(phy = F,min.score=900)
+
+  cat("Replace columns of network centrality with missing values...\n")
+  df_fixed = coalesce_join(x = df, y=df_na_centrality, by = "ORF")
+  return(df_fixed)
+}
+
+# 3. LINEAR FIT ----------------------------------------------------------------
 
 get_XY_data = function(input,x=X,y=Y,noNA=T){
   # GETTING XY DATA FOR CURVE FITTING
@@ -240,7 +352,8 @@ decompose_variance = function(LM){
 
 
 fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
-                                 PREDVAR=PREDICTORS, xcor_max=0.6, ycor_max=0.6){
+                                 PREDVAR=PREDICTORS, xcor_max=0.6, ycor_max=0.6,
+                                 min_obs=5){
   txt_section_break = repchar("-",50)
   #INPUT = EVOLUTION
   #Y = "log10.EVO.FULL" # mean Evolutionary rate (full sequence)
@@ -280,7 +393,7 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   n_yout = length(y_excluded_var)
   cat(sprintf("Excluding %s predictors with cor. to Y > %s (%s)\n",n_yout,ycor_max,Y))
 
-  excluded_var = unique(x_excluded_var,y_excluded_var)
+  excluded_var = unique(c(x_excluded_var,y_excluded_var))
   n_out = length(excluded_var)
   cat(sprintf("In total, %s predictors are excluded:\n",n_out))
   cat(txt_section_break,"\n ")
@@ -289,9 +402,9 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   return(M0 %>% dplyr::select(-all_of(excluded_var)))
 }
 
-# 3. PLOTS FIT ----------------------------------------------------------------
+# 4. PLOTS FIT ----------------------------------------------------------------
 make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
-                        ANNOT=SGD_DESC, id=c('ORF','UNIPROT'),
+                        ANNOT=ANNOTATION, id=c('ORF','UNIPROT'),
                         add_outliers=10){
   dat_annot = left_join(dat,ANNOT,by=id)
   OUTY = get_extremes(dat_annot,X,n=add_outliers)

@@ -39,8 +39,14 @@ get.last.file = function(path,pattern){
 
 # Testing/Subsetting -----------------------------------------------------------
 is.whole  <- function(x){ all(floor(x) == x) }      # checks if a value has decimal part (not necessarily integer e.g. 1.0 is whole)
-is.string <- function(x){ is.character(x) && length(x) == 1 } # cheks if a value is a single string of letters
-is.binary <- function(x){ all(1*x %in% 0:1) }       # checks if a value is 0/1 (binary/logical)
+is.string <- function(x){ is.character(x) && length(x) == 1 } # checks if a value is a single string of letters
+#is.binary <- function(x){ all( (1*x) %in% 0:1) }    # checks if a value is 0/1 (binary/logical)
+
+is_num_bin <- function(x){ is.numeric(x) && length(unique(na.omit(x))) == 2 } # checks if a numeric vector has only 2 values
+is_fac_bin <- function(x){ is.factor(x) && nlevels(na.omit(x)) == 2 }         # checks if a factor vector has only 2 levels
+# checks if a value is binary (2 unique outcomes -- by default numeric values must be either 0 and 1)
+is.binary  <- function(x,xvals=c(0,1)){ is_num_bin(x) && range(na.omit(x)) == xvals[1:2] || is_fac_bin(x) || is.logical(x) }
+
 is.even   <- function(x){ as.integer(x) %% 2 == 0 } # checks if a value is even
 is.odd    <- function(x){ as.integer(x) %% 2 != 0 } # checks if a value is odd
 is.dup    <- function(x){ x %in% x[duplicated(x)] } # detects duplicates
@@ -55,6 +61,13 @@ is.in = function(el,set,case.sensitive=T,withNames=T){
 is.outlier <- function(x,thr=0.1,coef=1.5) { # return outliers outliers from distribution
   whiskers = coef * IQR(x,na.rm=T)
   return(x < quantile(x, thr,na.rm=T) - whiskers | x > quantile(x, 1-thr,na.rm=T) + whiskers)
+}
+
+find_na_rows = function(df,as.indices=F){
+  # return dataframe rows with NA values (or just indices of NA row)
+  NA_codon = rowsNA(df) > 0
+  if(as.indices){ return(which(NA_codon)) }
+  return(df[which(NA_codon),])
 }
 
 find.consecutive = function(x,val,minilen=2){  # return stretch of identical consecutive values in vector
@@ -98,8 +111,9 @@ geomean <- function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) } # returns geom
 geosd   <- function(x) {  exp(sd(log(x[x != 0 & !is.na(x)]))) } # returns geometrical standard deviation
 
 rowsNA = function(m){ # counts how many rows have NAs
+  # input must be 2D array (matrix/dataframe)
   nas = apply(as.matrix(m),1,sum.na)
-  if(sum(nas)>0){ message(sprintf('%s rows contain NA values.',sum(nas))) }
+  if(sum(nas)>0){ message(sprintf('%s rows contain NA values.',sum(nas>0))) }
   return(nas)
 }
 

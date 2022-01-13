@@ -335,7 +335,7 @@ load.lee2014.data = function(rawdata=F){
   }
 }
 
-load.vanleeuwen2016.data = function(){
+load.vanleeuwen2016.data = function(single_orf=F){
   # load gene classification of biological functions (based on costanzo 2010)
   message("REF: J. Van Leeuwen et al., 2016, Science")
   message("Exploring genetic suppression interactions on a global scale")
@@ -381,11 +381,13 @@ load.vanleeuwen2016.data = function(){
             FN=factor(BIOPROCESS,levels=unique(BIOPROCESS),labels = invert(.class_function))
     ) %>% dplyr::select(-Function) %>%
     group_by(ORF) %>% mutate(FN_all=paste0(unique(FN),collapse = ""),
-                             BIOPROCESS_all = paste0(unique(BIOPROCESS),collapse="+\n"))
-
-  return(vanleeuwen)
-
+                             BIOPROCESS_all = paste0(unique(BIOPROCESS),collapse=" # "))
+  if(single_orf){
+    # Return merged functions for each orf
+    vanleeuwen =  vanleeuwen %>% dplyr::select(-c(FN,BIOPROCESS)) %>% distinct()
   }
+  return(vanleeuwen)
+}
 
 load.villen2017.data = function(){
   library(openxlsx)
@@ -414,7 +416,13 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
   message("REF: P. Leuenberger et al., 2017, Science")
   message("Cell-wide analysis of protein thermal unfolding reveals determinants of thermostability")
   species=match.arg(species, choices = c('S. cerevisiae','E. coli', 'Human HeLa Cells','T. thermophilus'), several.ok = F)
-  S3.url = "https://science.sciencemag.org/highwire/filestream/690833/field_highwire_adjunct_files/2/aai7825_Leuenberger_Table-S3.xlsx"
+  S3.url="https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx"
+  ## EDIT 04.01.22: OLD URL BELOW NOT VALID ANYMORE - NEW URL USES REDIRECTION TO DOWNLOAD THE FILE
+  # S3.url = "https://science.sciencemag.org/highwire/filestream/690833/field_highwire_adjunct_files/2/aai7825_Leuenberger_Table-S3.xlsx"
+  # REDIRECTED URL : https://www.science.org/doi/suppl/10.1126/science.aai7825/suppl_file/aai7825_leuenberger_table-s3.xlsx
+  # Target url for downloading the file is:
+  # https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx
+
   #download.file(S3.url, destfile = "aai7825_Leuenberger_Table-S3.xlsx" )
   LIP_MS = openxlsx::read.xlsx(xlsxFile = S3.url,
                                sheet = species, detectDates = T,
@@ -818,6 +826,12 @@ load.string = function(tax="4932",phy=T,ful=T,min.score=700){
   message(sprintf("FILTERED BY:\n physical links = %s \nAND\n full evidence =  %s \nAND\n min. score >= %s", phy, ful, min.score))
   # each numeric column is an evidence score out of 1000 to asssess the existence of the link between protein
   # _transferred means information was inferred from a different organism (homology or orthologous group)
+
+  # EDIT 04/01/22 :
+  # Error in open.connection(con, "rb") :
+  #    server certificate verification failed. CAfile: /etc/ssl/certs/ca-certificates.crt CRLfile: none
+  # fixed by reinstalling ca-certificates in terminal:
+  #  sudo apt update ; sudo apt-get install apt-transport-https ca-certificates -y ; sudo update-ca-certificates
   STRING_net = readr::read_delim(STRING_url,delim = " ") %>% filter(combined_score >= min.score)
   return(STRING_net)
 }
