@@ -4,14 +4,12 @@ features-spearman.rds
 heatmap-protein-binary-properties.pdf
 properties-correlation.rds
 properties-jaccard.rds
-
 schizo-sacch-evoclade.pdf
 PHD-THESIS-F*.1-ortholog-abundance-pombe-cerevisiae-*.pdf
-
 checkpoint-fitting-evorate.rdata
 ortholog-abundance-fungi-checkpoint.rdata
-
 proteome-features-29_04_2021.rds
 proteome-properties-29_04_2021.rds
 proteome-features-27_06_2021.rds
 proteome-properties-27_06_2021.rds
+yeastOmics-290921.rds
