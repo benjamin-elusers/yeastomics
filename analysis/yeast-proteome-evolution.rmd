@@ -152,7 +152,7 @@ have been produced and published in [*J. Peter et al.*, Nature 2018](https://doi
 
 ```{r y1k11}
 ## 1011 strains
-riboseq_strains = c('AMH','BAN','BED','BPL','BTI','CMP','CPI','CQC') # Strains with riboseq data (on 14/01/21)
+riboseq_strains = c('AMH','BAN','BED','BPL','BTT','CMP','CPI','CQC') # Strains with riboseq data (on 14/01/21)
 strains.info = load.peter2018.data(1) %>%  # strains info from supp mat of Science paper
                  mutate( has_riboseq = standardized_name %in% riboseq_strains)
 
@@ -163,7 +163,7 @@ YK11 = readRDS(here("data","proteome-1011-strains.rds"))  # 1011 strains proteom
 Y8 = lapply(YK11, function(E){ E[get.strain_orf(E,"strains") %in% riboseq_strains] }) %>% purrr::compact()
 #table(lengths(y8))
 
-Y2 = lapply(YK11, function(E){ E[get.strain_orf(E,"strains") %in% c('CQC','BTI')] }) %>% purrr::compact()
+Y2 = lapply(YK11, function(E){ E[get.strain_orf(E,"strains") %in% c('CQC','BTT')] }) %>% purrr::compact()
 table(lengths(Y2))
 ```
 
