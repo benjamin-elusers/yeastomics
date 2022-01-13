@@ -196,7 +196,10 @@ retrieve_missing_codons = function(orf_missing){
 
 fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
   # Replace orf with missing values with retrieved codons counts from CDS
-  orf_missing = df %>% column_to_rownames('ORF') %>% get_codons_col(df,col_prefix) %>% find_na_rows() %>% pull(rownames(.))
+  orf_missing = df %>% column_to_rownames('ORF') %>%
+                       get_codons_col(col_prefix) %>%
+                       find_na_rows() %>% rownames_to_column("ORF") %>%
+                       pull(ORF)
   cat("Replace columns of codons counts with missing values...\n")
   df_na_codon = retrieve_missing_codons(orf_missing) %>%
     dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
