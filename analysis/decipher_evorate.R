@@ -14,10 +14,8 @@ orf_orthologs = EVOLUTION$ORF
 
 # PROTEOME QUALITATIVE AND QUANTITATIVE VARIABLES
 PROP = load.properties()
-FEAT = load.features() %>% normalize_features()
-PREDICTORS = full_join(PROP,FEAT) %>% filter(ORF %in% orf_orthologs)
-dim(PREDICTORS)
-
+FEAT = load.features() %>% normalize_features() %>% distinct()
+PREDICTORS = inner_join(PROP,FEAT) %>% filter(ORF %in% orf_orthologs)
 # Predictors with missing values must be corrected
 #  I.  Remove unnecessary variables (columns):
 #     A) rarely observed data (less than 2 observations)
@@ -26,10 +24,11 @@ PREDICTORS.1 = remove_rare_vars(PREDICTORS)
 #     A) missing codons counts
 PREDICTORS.2 = fix_missing_codons(PREDICTORS.1,col_prefix="cat_transcriptomics.sgd.")
 #     B) missing centrality values (STRING and INTACT network are treated individually)
+test = fix_missing_centrality(PREDICTORS.2,col_prefix="cat_interactions.string.")
 PREDICTORS.3.1 = fix_missing_centrality(PREDICTORS.2,col_prefix="cat_interactions.string.")
 PREDICTORS.3.2 = fix_missing_centrality(PREDICTORS.3.1,col_prefix="cat_interactions.intact.")
 
-missing_var = PREDICTORS.3.2 %>%
+missing_var = PREDICTORS.2 %>%
   dplyr::select(where(~!is.logical(.x))) %>%
   skimr::skim(.) %>% filter(complete_rate<1)
 
