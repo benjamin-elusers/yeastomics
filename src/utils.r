@@ -376,6 +376,22 @@ ls.objects <- function (pos = 1, pattern, order.by, decreasing=FALSE, head=FALSE
   out
 }
 
+get_os <- function(){
+  # Check OS type (distinguish MacOS and Linux)
+  sysinf <- Sys.info()
+  if (!is.null(sysinf)){
+    os <- sysinf['sysname']
+    if (os == 'Darwin')
+      os <- "osx"
+  } else { ## mystery machine
+    os <- .Platform$OS.type
+    if (grepl("^darwin", R.version$os))
+      os <- "osx"
+    if (grepl("linux-gnu", R.version$os))
+      os <- "linux"
+  }
+  tolower(os)
+}
 # shorthands -------------------------------------------------------------------
 lsos <- function(..., n=10) { # checks top10 memory consumption from R objects
   ls.objects(..., order.by="Size", decreasing=TRUE, head=TRUE, n=n)
