@@ -26,7 +26,7 @@ get.strain_orf= function(x,what=c('orf','strains','both')){
 
   genericName = hutils::longest_suffix(nms)
   orf = stringr::str_extract( string=genericName, pattern="([Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?)|(Q[0-9]{4})|(R[0-9]{4}[WC])")
-  strains = stringr::str_replace(string = nms, pattern = fixed(genericName), replacement = "")
+  strains = stringr::str_replace(string = nms, pattern = stringr::fixed(genericName), replacement = "")
   res = data.frame( strain_orf = orf, strain_name = strains, stringsAsFactors = F)
 
   what = match.arg(arg=tolower(what),choices = c('orf','strains','both'), several.ok = F)
