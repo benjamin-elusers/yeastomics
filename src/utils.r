@@ -67,7 +67,7 @@ find_na_rows = function(df,as.indices=F){
   # return dataframe rows with NA values (or just indices of NA row)
   NA_codon = rowsNA(df) > 0
   if(as.indices){ return(which(NA_codon)) }
-  return(df[which(NA_codon),])
+  return(df[which(NA_codon),,drop = F]) # drop=F to keep the same dimensions (no coercion)
 }
 
 find.consecutive = function(x,val,minilen=2){  # return stretch of identical consecutive values in vector

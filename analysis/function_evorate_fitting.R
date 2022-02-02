@@ -34,13 +34,14 @@ load.annotation = function(){
 load.network = function(net=c('string','intact')){
   ref_net = match.arg(net,choices = net, several.ok = F)
   if(ref_net=='string'){
-    network = load.string(tax="4932",phy=F, ful=T, min.score = 900) %>%
+    network = load.string(tax="4932",phy=F, ful=T, min.score = 700) %>%
       mutate(ORF1 = str_extract(protein1,SGD.nomenclature()),
              ORF2 = str_extract(protein2,SGD.nomenclature())
       ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
   }else if(ref_net=='intact'){
-    #network = load.intact.yeast(min.intact.score = 0.75)
-    network = load.intact()
+    network = load.intact.yeast(min.intact.score = 0.4) %>%
+              dplyr::rename(ORF1=protA,ORF2=protB)
+    #network = load.intact()
   }
   return(network)
 }
@@ -203,7 +204,49 @@ fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
   df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
   return(df_fixed)
 }
-#### 2. network centrality ####
+
+#### 2. protein length / Average Molecular Weight ####
+fix_missing_peptide_stats = function(df,
+                                     col_len='cat_transcriptomics.sgd.prot_size',
+                                     col_mw='cat_biophysics.pepstats.mw',
+                                     col_mw_avg='cat_transcriptomics.pepstats.mean_MW',
+                                     col_charge='cat_biophysics.pepstats.netcharge',
+                                     col_pi='cat_biophysics.pepstats.pI'
+                                     ){
+  col_pep = c(col_len,col_mw,col_mw_avg,col_charge,col_pi)
+  # Replace orf with missing values for average molecular weight
+  orf_missing = df %>% column_to_rownames('ORF') %>% dplyr::select(all_of(col_pep)) %>% find_na_rows() %>% rownames()
+  if(length(orf_missing)>1){
+    cat("Replace columns with missing values for protein length / average molecular weight...\n")
+    prot_missing = load.sgd.proteome()[orf_missing] %>% as.character
+
+    library(Peptides)
+    df_na_pep = tibble(orf_missing,
+                      missing_len = Peptides::lengthpep(prot_missing),
+                      missing_mw  = Peptides::mw(prot_missing),
+                      missing_mw_avg = missing_mw / missing_len,
+                      missing_charge = Peptides::charge(prot_missing),
+                      missing_pi = Peptides::pI(prot_missing),
+                      cat_transcriptomics.pepstats.AA_costly = missing_mw_avg > 118,
+                      cat_transcriptomics.pepstats.AA_cheap = missing_mw_avg <= 105) %>%
+      dplyr::rename(ORF := orf_missing,
+                    !!col_len:=missing_len,
+                    !!col_mw:=missing_mw,
+                    !!col_mw_avg:=missing_mw_avg,
+                    !!col_charge:=missing_charge,
+                    !!col_pi:=missing_pi
+                    )
+
+    df_fixed = coalesce_join(x = df, y=df_na_pep, by = "ORF")
+    return(df_fixed)
+  }else{
+    warning("No missing values found for any of the peptide stats columns!")
+
+    return(df)
+  }
+}
+
+#### 3. network centrality ####
 get_centrality_col = function(df,col_prefix="cat_interactions.string."){
   regex_centrality = paste0("^",col_prefix,"cent_")
   res = df %>% dplyr::select(matches(regex_centrality,ignore.case = F))
@@ -211,22 +254,42 @@ get_centrality_col = function(df,col_prefix="cat_interactions.string."){
 }
 
 retrieve_missing_centrality = function(orf_missing,type='string'){
-  interactions=load.network('string')
+  interactions=load.network(type)
   cent=interactions %>%
-        filter(ORF1 %in% orf_missing | ORF2 %in%orf_missing) %>%
+        filter(ORF1 %in% orf_missing | ORF2 %in% orf_missing) %>%
         dplyr::select(ORF1,ORF2) %>%
-        network.centrality(fromTo = ., namenet = 'STRING')
+        network.centrality(fromTo = ., namenet = toupper(type)) %>%
+        filter(ids %in% orf_missing)
   return(cent)
 }
 
-fix_missing_centrality = function(df,col_prefix='cat_interactions.string.'){
+fix_missing_centrality = function(df,col_prefix='cat_interactions.string.',NA_default_val=0){
   # Replace orf with missing values for centrality with 0's
-  orf_missing = df %>% column_to_rownames('ORF') %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
-  df_na_centrality = retrieve_missing_centrality(orf_missing)
-  net=load.network('string')
+  net_type = str_extract(col_prefix,'(string|intact)')
+  if(net_type=='string'){
+    orf_missing = df %>% column_to_rownames('ORF') %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
+  }else if(net_type=='intact'){
+    orf_missing = df %>% filter(!is.dup(UNIPROTKB)) %>% column_to_rownames('UNIPROTKB') %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
+  }
+
+  df_missing = tibble(ORF = orf_missing)
+
+  df_na_centrality = retrieve_missing_centrality(orf_missing,net_type) %>%
+                     dplyr::rename(ORF=ids) %>%
+                     right_join(df_missing,by='ORF') %>%
+                     dplyr::rename_with(.cols=starts_with('cent_'), Pxx, px=col_prefix, s='')
+  # Persistent NAs are modified to a predefined value (e.g. 0)
+  warning(sprintf("Remaining missing centrality measures are replaced by %s\n",NA_default_val))
+  df_na_centrality[is.na(df_na_centrality)] = NA_default_val
 
   cat("Replace columns of network centrality with missing values...\n")
-  df_fixed = coalesce_join(x = df, y=df_na_centrality, by = "ORF")
+
+  if(net_type=='intact'){
+    df_na_centrality = df_na_centrality %>% dplyr::rename(UNIPROTKB=ORF)
+    df_fixed = coalesce_join(x = df, y=df_na_centrality, by = 'UNIPROTKB')
+  }else{
+    df_fixed = coalesce_join(x = df, y=df_na_centrality, by = 'ORF')
+  }
   return(df_fixed)
 }
 
@@ -372,10 +435,10 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   var.y = XYDATA$var['y']
   input = XYDATA$df
   rg.y = range_(YY)
-  var_names = starting(colnames(PREDICTORS),'cat_')
+  var_names = starting(colnames(PREDVAR),'cat_')
 
   Y_X=make_linear_fit(LINREG ,x=X, y=Y, only.params = F)
-  M0=left_join(Y_X,PREDICTORS)
+  M0=left_join(Y_X,PREDVAR)
   M0$yavg   = mu.y
   M0$yvar   = var.y
   M0$ymin = rg.y[1]
