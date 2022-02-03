@@ -1,4 +1,10 @@
 source(here::here("src","__setup_yeastomics__.r"))
+library(log)
+.info  = infoLog()
+.error =  errorLog()
+.warn  = warningLog()
+.succ  = successLog()
+
 # 1. LOAD DATASETS -------------------------------------------------------------
 load.abundance = function(){
   # UNIFIED ABUNDANCE OF S.CEREVISIAE PROTEOME
@@ -158,6 +164,14 @@ normalize_features=function(feat){
 
 
 # 2. FIX MISSING VALUES --------------------------------------------------------
+check_missing_var = function(input){
+  library(skimr)
+  # Filter columns that contains NA
+  input_na = input %>% dplyr::select(where(~ any(is.na(.x))))
+  missing_var = input_na %>% skimr::skim(.) %>% filter(complete_rate<1)
+  return(missing_var)
+}
+
 #### A. IN COLUMNS ####
 get_binary_col = function(df,only.names=F){
   # Binary variables (only 2 outcomes)
@@ -171,7 +185,7 @@ remove_rare_vars = function(df,min_obs=2){
   binary_vars = get_binary_col(df)
   rare_vars = binary_vars[ colSums(binary_vars) < min_obs ]
   n_rare = length(rare_vars)
-  cat(sprintf("Excluding %s/%s predictors with less than %s observations\n",n_rare,ncol(df),min_obs))
+  .succ$log(sprintf("Excluding %s/%s predictors with less than %s observations\n",n_rare,ncol(df),min_obs))
   df_fixed = df %>% dplyr::select(-all_of(names(rare_vars)))
   return(df_fixed)
 }
@@ -186,19 +200,19 @@ get_codons_col = function(df,col_prefix='cat_transcriptomics.sgd.'){
 }
 
 retrieve_missing_codons = function(orf_missing){
-  # Retrieve CSD and count codons for orf with missing values
+  .info$log(sprintf("Retrieving missing codons counts for %s ORF...\n",n_distinct(orf_missing)))
+  # Retrieve CDS and count codons for orf with missing values
   cod = paste0(get.codons4tai(),"$")
   cds = load.sgd.CDS()
-  cat(sprintf("Retrieving missing codons counts for %s ORF...\n",n_distinct(orf_missing)))
   codon_counts = coRdon::codonCounts(coRdon::codonTable(cds[orf_missing]))
   codon_missing = tibble(ORF=orf_missing, as_tibble(codon_counts))
   return(codon_missing)
 }
 
 fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
+  .warn$log("Replace columns of codons counts with missing values...\n")
   # Replace orf with missing values with retrieved codons counts from CDS
   orf_missing = df %>% column_to_rownames('ORF') %>% get_codons_col(col_prefix) %>% find_na_rows() %>% rownames()
-  cat("Replace columns of codons counts with missing values...\n")
   df_na_codon = retrieve_missing_codons(orf_missing) %>%
     dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
   df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
@@ -217,7 +231,7 @@ fix_missing_peptide_stats = function(df,
   # Replace orf with missing values for average molecular weight
   orf_missing = df %>% column_to_rownames('ORF') %>% dplyr::select(all_of(col_pep)) %>% find_na_rows() %>% rownames()
   if(length(orf_missing)>1){
-    cat("Replace columns with missing values for protein length / average molecular weight...\n")
+    .warn$log("Replace columns with missing values for protein length / average molecular weight...\n")
     prot_missing = load.sgd.proteome()[orf_missing] %>% as.character
 
     library(Peptides)
@@ -240,7 +254,7 @@ fix_missing_peptide_stats = function(df,
     df_fixed = coalesce_join(x = df, y=df_na_pep, by = "ORF")
     return(df_fixed)
   }else{
-    warning("No missing values found for any of the peptide stats columns!")
+    .warn$log("No missing values found for any of the peptide stats columns!")
 
     return(df)
   }
@@ -262,6 +276,9 @@ retrieve_missing_centrality = function(orf_missing,type='string'){
         filter(ids %in% orf_missing)
   return(cent)
 }
+
+
+
 
 fix_missing_centrality = function(df,col_prefix='cat_interactions.string.',NA_default_val=0){
   # Replace orf with missing values for centrality with 0's
@@ -291,6 +308,32 @@ fix_missing_centrality = function(df,col_prefix='cat_interactions.string.',NA_de
     df_fixed = coalesce_join(x = df, y=df_na_centrality, by = 'ORF')
   }
   return(df_fixed)
+}
+
+### WORKFLOW PROCESSING MISSING VALUES
+PROCESS_MISSING_VALUES = function(MAT, IDS){
+  check_missing_var(MAT)
+  # Predictors with missing values must be corrected
+  #  I. Fix missing observations for certain genes (rows):
+  #     A) missing codons counts
+  PREDICTORS.1 = fix_missing_codons(MAT,col_prefix="cat_transcriptomics.sgd.")
+  #     B) missing protein length/MW
+  PREDICTORS.2 = fix_missing_peptide_stats(PREDICTORS.1,
+                                           col_len='cat_transcriptomics.sgd.prot_size',
+                                           col_mw='cat_biophysics.pepstats.mw',
+                                           col_mw_avg='cat_transcriptomics.pepstats.mean_MW',
+                                           col_charge='cat_biophysics.pepstats.netcharge',
+                                           col_pi='cat_biophysics.pepstats.pI')
+  #     C) missing centrality values (STRING and INTACT network are treated individually)
+  PREDICTORS.3 = fix_missing_centrality(PREDICTORS.2,col_prefix="cat_interactions.string.")
+  PREDICTORS.4 = fix_missing_centrality(PREDICTORS.3,col_prefix="cat_interactions.intact.")
+  #     D) missing protein disorder (D2P2/IUP)
+  #     E) missing transcriptomics in barton 2010
+
+  #  II.  Remove unnecessary variables (columns):
+  #     A) rarely observed data (less than 2 observations)
+  PREDICTORS.5 = PREDICTORS.4 %>% filter(ORF %in% IDS) %>% remove_rare_vars()
+  return(PREDICTORS.5)
 }
 
 # 3. LINEAR FIT ----------------------------------------------------------------
@@ -465,6 +508,44 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   return(M0 %>% dplyr::select(-all_of(excluded_var)))
 }
 
+# CHECK EACH VARIABLE
+fit_lm_one_var = function(varname,target='.resid',inputdata,verbose=F){
+  if(verbose)
+    catn(varname)
+  formula_var = paste0(target,' ~ ',varname)
+  linreg = lm(formula_var, data=inputdata)
+  #decompose_variance(linreg)
+
+  not0 = inputdata[,varname]!=0
+  N=sum(complete.cases(linreg$model))
+  TSS = var( linreg$model[,1] ) * (N-1)
+  RSS = deviance(linreg)
+  ESS = TSS - RSS
+
+  mu.y = mean_(inputdata[,target][not0])
+  .fitted.prop = inputdata$`.fitted`[not0] + mu.y
+  .resid.prop = inputdata[,target][not0] + mu.y
+  TSS.p  = sum( (inputdata[,target][not0] - mu.y)^2 )
+  ESS.p  = sum( (.fitted.prop-mu.y)^2)
+  RSS.p = TSS.p - ESS.p
+
+  return(tibble(var=str_split_fixed(pattern='\\.',varname,n = 2)[,2],
+                tss0=TSS,rss0=RSS,ess0=ESS, nprot_var = sum(not0),
+                tss_var=TSS.p,rss_var=RSS.p,ess_var=ESS.p))
+}
+
+# Compute R^2 from true and predicted values
+eval_results <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  R_square <- 1 - SSE / SST
+  RMSE = sqrt(SSE/nrow(df))
+
+  # Model performance metrics
+  data.frame( RMSE = RMSE, r2 = R_square
+  )
+
+}
 # 4. PLOTS FIT ----------------------------------------------------------------
 make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                         ANNOT=ANNOTATION, id=c('ORF','UNIPROT'),
