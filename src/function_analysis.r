@@ -293,11 +293,10 @@ coalesce_join <- function(x, y,
     nchar(to_coalesce) - nchar(suffix_used)
   ))
 
-  coalesced = readr::read_csv("\n",col_names = to_coalesce,show_col_types = FALSE)
-  coalesced <- coalesced %>% purrr::map_dfc(colnames(.), ~dplyr::coalesce(
+  coalesced <- purrr::map_dfc(set_names(to_coalesce), ~dplyr::coalesce(
     joined[[paste0(.x, suffix[1])]],
     joined[[paste0(.x, suffix[2])]]
-  ))
+  )) %>% setNames(to_coalesce)
 
   dplyr::bind_cols(joined, coalesced)[cols]
 }
