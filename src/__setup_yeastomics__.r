@@ -13,7 +13,7 @@ library(xfun)
 dep.pkg = c("BiocManager","parallel","stats4","hutils","RCurl")
 xfun::pkg_attach2(dep.pkg)
 bioc.pkg = c("BiocGenerics","Biobase","S4Vectors","XVector","AnnotationDbi","IRanges")
-BiocManager::install(bioc.pkg)
+BiocManager::install(bioc.pkg,update=F)
 # Load visualization packages ----------------------------------------------------
 viz.pkg = c("cowplot","ggplot2","ggtext","ggpubr","ggrepel","gridExtra","plotly")
 xfun::pkg_attach2(viz.pkg)
