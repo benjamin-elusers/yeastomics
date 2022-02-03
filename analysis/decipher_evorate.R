@@ -4,63 +4,33 @@ library(tidyverse)
 txt_section_break = repchar("-",50)
 
 tic("Load data")
-# EXPRESSION DATA
-ABUNDANCE = load.abundance()
-# EVOLUTION DATA
+ABUNDANCE = load.abundance() # EXPRESSION DATA
 CLADE = load.clade()
 FUNGI = load.fungi.evo()
 STRAINS = load.strains.evo()
-EVOLUTION = full_join(STRAINS,CLADE,by=c('ORF'='orf'))
+EVOLUTION = full_join(STRAINS,CLADE,by=c('ORF'='orf')) # EVOLUTION DATA
+
 orf_evolution = EVOLUTION %>% pull(ORF) %>% unique
 orf_orthologs = EVOLUTION %>% filter(IS_FUNGI) %>% pull(ORF) %>% unique
+
+# ANNOTATION DATA
+ANNOTATION=load.annotation()
 
 # PROTEOME QUALITATIVE AND QUANTITATIVE VARIABLES
 PROP = load.properties()
 FEAT = load.features() %>% normalize_features() %>% distinct()
-PREDICTORS = inner_join(PROP,FEAT) %>% filter(ORF %in% orf_evolution)
-missing_var_0 = PREDICTORS %>%
-  dplyr::select(where(~!is.logical(.x))) %>%
-  skimr::skim(.) %>% filter(complete_rate<1)
+PROP_FEAT = inner_join(PROP,FEAT) %>% filter(ORF %in% orf_evolution)
+PREDICTORS = PROCESS_MISSING_VALUES(MAT=PROP_FEAT, IDS=orf_orthologs)
+missing_var = check_missing_var(PREDICTORS)
 
-# Predictors with missing values must be corrected
-#  I. Fix missing observations for certain genes (rows):
-#     A) missing codons counts
-PREDICTORS.1 = fix_missing_codons(PREDICTORS,col_prefix="cat_transcriptomics.sgd.")
-#     B) missing protein length/MW
-PREDICTORS.2 = fix_missing_peptide_stats(PREDICTORS.1,
-                                         col_len='cat_transcriptomics.sgd.prot_size',
-                                         col_mw='cat_biophysics.pepstats.mw',
-                                         col_mw_avg='cat_transcriptomics.pepstats.mean_MW',
-                                         col_charge='cat_biophysics.pepstats.netcharge',
-                                         col_pi='cat_biophysics.pepstats.pI')
-#     C) missing centrality values (STRING and INTACT network are treated individually)
-PREDICTORS.3 = fix_missing_centrality(PREDICTORS.2,col_prefix="cat_interactions.string.")
-PREDICTORS.4 = fix_missing_centrality(PREDICTORS.3,col_prefix="cat_interactions.intact.")
-#  II.  Remove unnecessary variables (columns):
-#     A) rarely observed data (less than 2 observations)
-PREDICTORS.5 = PREDICTORS.4 %>% filter(ORF %in% orf_orthologs) %>% remove_rare_vars()
-
-missing_var = PREDICTORS.5 %>%
-  dplyr::select(where(~!is.logical(.x))) %>%
-  skimr::skim(.) %>% filter(complete_rate<1)
-
-#     C) missing protein disorder (D2P2/IUP)
-#     D) missing transcriptomics in barton 2010
-
-library(mice)
-library(VIM)
-# mice_plot <- aggr(PR %>%  dplyr::select(where(~!is.logical(.x))),
-#                    col=c('navyblue','yellow'), numbers=TRUE, sortVars=TRUE,
-#                    labels=names(PREDICTORS.5), cex.axis=.7, gap=3, ylab=c("Missing data","Pattern"))
-# imputed_Data <- mice(PREDICTORS.5, m=5, maxit = 50, method = 'pmm', seed = 500)
-#sum(is.na(PREDICTORS.5)) / prod(dim(PREDICTORS.5))
-
-# ANNOTATION DATA
-ANNOTATION=load.annotation()
 toc()
 
-
-PREDICTORS.5[is.na(PREDICTORS.5)] = 0
+# Missing value imputation (replacing NAs)
+# col_means <- lapply(YEASTOMICS %>% dplyr::select(where(is.numeric)), mean, na.rm = TRUE)
+# col_zeros = lapply(YEASTOMICS %>% dplyr::select(where(is.numeric)), function(x){ return(0) })
+PREDICTORS[is.na(PREDICTORS)] = 0
+na_count = colSums(is.na(PREDICTORS))
+na_vars = na_count[na_count>0]
 
 # ANALYZE EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ---------------------
 ### _FIGURE 1A: EVOLUTION vs EXPRESSION -------------------------------------------
@@ -85,39 +55,125 @@ ggsave(FIGURE1,filename = "draft-figure1.png",device = 'png',scale = 2, path = "
 ggsave(FIGURE1,filename = "draft-figure1.pdf",device = 'pdf',scale = 2, path = "~/Desktop/")
 
 
-
 id_vars = c("UNIPROTKB","SGD","ORF","GNAME","PNAME")
 m0_vars = c(".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid","ESS","TSS","RSS","s2","s2.y","RS","RSE","AIC","BIC","LL","model")
-# 1ST REGRESSION of Protein Expression and Evolutionary rate (M0) -----------
+
+# LINEAR REGRESSION of Protein Expression and Evolutionary rate (M0) -----------
 m0 = fit_linear_regression(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL", PREDVAR=PREDICTORS.5,
                            xcor_max = 0.6,ycor_max = 0.6, min_obs=1 )
 
-
-# PROTEIN FEATURES ENGINEERING -------------------------------------------------
-predictors = m0 %>% dplyr::select(all_of(c(id_vars,m0_vars)),starts_with('cat'),'PPM', "log10.EVO.FULL",
-                                  -contains(c("peter2018","byrne2005")))
+predictors = m0 %>%
+            dplyr::select(all_of(c(id_vars,m0_vars)),
+                          starts_with('cat'),
+                          'PPM', "log10.EVO.FULL",
+                           -contains(c("peter2018","byrne2005")))
+# LINEAR MODEL M0
 LM0 = lm(data=predictors, log10.EVO.FULL ~ PPM )
 decompose_variance(LM0)
 coef0=coef(LM0)
-
 pred_vars = colnames(predictors) %>% str_extract("cat_.+") %>% setdiff(NA)
 x0 = sprintf("offset(%s*%s)",coef0[2],names(coef0)[2])
 
-# Missing value imputation
-na_count = colSums(is.na(predictors))
-na_vars = na_count[na_count>0]
-sum.na(pred_vars)
+yeastomics = read_rds("released-dataset/yeastOmics-290921-v0.rds") %>%
+              filter(ORF %in% orf_orthologs) %>% ungroup()
+yeastomics_var = yeastomics %>% dplyr::select(starts_with('cat_')) %>% colnames
+yeastomics$log10.EVO.FULL = log10(yeastomics$EVO.FULL)
+yeastomics_model =make_linear_fit(x='PPM', y="log10.EVO.FULL",input = yeastomics,only.params = F)
 
-# Imputation (replacing NAs)
-# col_means <- lapply(YEASTOMICS %>% dplyr::select(where(is.numeric)), mean, na.rm = TRUE)
-# col_zeros = lapply(YEASTOMICS %>% dplyr::select(where(is.numeric)), function(x){ return(0) })
+##### VARIABLE SELECTION #####
+lm_single=tibble(variable=yeastomics_var) %>%
+  group_by(variable) %>%
+  mutate(fit_lm_one_var(variable,'.resid',yeastomics_model)) %>%
+  mutate(pc.ess_var = 100*ess_var / tss_var,
+         dess =  ess_var-ess0,
+         pc.dess = dess/tss0,
+         pc0.ess_var = 100*ess_var / tss0,
+         pc0.rss_var = 100*rss_var / tss0,
+         pc0.tss = 100*tss_var/tss0)
 
+best_lm_single = lm_single %>% filter(pc0.ess_var > 1 & pc0.rss_var>1 & pc0.tss> 1 & abs(pc.dess) > 0.01)
+best_var = best_lm_single$variable
+
+
+yeastomics_lm_long =  yeastomics_model %>%
+  pivot_longer(cols = starts_with('cat_'),
+               names_to = c('categories','source','property'),
+               names_pattern="cat_(.+)\\.(.+)\\.(.+)",
+               values_to = "has_prop")
+mu.y = mean_(yeastomics$EVO.FULL)
+
+BEST_PROP = yeastomics_lm_long %>%
+            mutate(col_prop = paste0(categories,'.',source,'.',property)) %>%
+            dplyr::filter(has_prop!=0) %>%
+            group_by(col_prop) %>%
+            mutate( N=n(),
+                    .fitted.prop = .fitted + mean(.resid),
+                    .resid.prop = .resid + mean(.resid),
+                    RS_avg = mean_(.resid),
+                    EXPECTED = sign(RS_avg),
+                    TSS.p  = sum( (EVO.FULL - mu.y)^2 ),
+                    ESS.p  = sum( (.fitted.prop-mu.y)^2),
+                    RSS.p = TSS.p - ESS.p,
+                    tss.pc = 100*TSS.p/TSS,
+                    ess = sum( (.fitted-mu.y)^2),
+                    rss = TSS.p - ess,
+                    dRSS  = RSS.p-rss,
+                    dRSS.pc  = 100*dRSS / TSS,
+                    rss.pc  = (100*RSS.p / TSS.p) * sign(RS_avg),
+                    dESS  = ESS.p-ess,
+                    dESS.pc = 100*dESS / TSS,
+                    ess.pc  = (100*ESS.p / TSS.p) * sign(RS_avg)
+            ) %>%
+  dplyr::select(categories,source,property, col_prop,
+                N, RS_avg, EXPECTED, TSS,ESS,RSS,
+                TSS.p, ESS.p,ess , RSS.p,rss,
+                tss.pc, ess.pc, rss.pc,
+                dRSS, dESS, dESS.pc, dRSS.pc) %>%
+  distinct() %>%
+  dplyr::filter(tss.pc > 1 & abs(dRSS.pc)>1 & abs(dESS.pc)>1)
+
+
+#### LASSO REGRESSION ####
+library(glmnet)
+lambdas <- 10^seq(5, -5, by = -.05)
+# Setting alpha = 1 implements lasso regression
+lasso_reg <- cv.glmnet(as.matrix(m0[,best_var]), m0$`.resid`, alpha = 0, lambda = lambdas, standardize = TRUE, nfolds = 5)
+lambda_best <- lasso_reg$lambda.min
+lasso_model <- glmnet(as.matrix(m0[,best_var]), m0$`.resid`, alpha = 0, lambda = lambda_best, standardize = TRUE)
+summary(lasso_model)
+lasso_vip=caret::varImp(lasso_model,lambda_best)
+
+lasso_vip %>% filter(Overall>0) %>% arrange(desc(Overall)) %>% dplyr::slice_head(n = 10)
+lasso_pred = predict(lasso_model, s = lambda_best, newx = as.matrix(m0[,best_var]))
+eval_results(m0$.resid, lasso_pred, m0[,best_var] )
+
+#### STEPWISE REGRESSION ####
+formula_best_pred=paste0(".resid ~ ",paste0(best_var,collapse="+"))
+m_best = step(object=LM1, scope = as.formula(formula_best_pred), direction = 'both')
+decompose_variance(m_best)
+summary(m_best)
+
+length( coef(m_best) )
+
+
+sigvar = M3[-42,] %>%
+  arrange(desc(`Sum Sq`)) %>%
+  filter(`Pr(>F)`<0.05) %>%
+  rename(SS=`Sum Sq`) %>%
+  separate(variable, sep='\\.', into=c('categories','source','variable')  ) %>%
+  mutate(variable=str_trim(variable), type = ifelse(variable %in% BEST_PROP$property, 'property','feature'))
+
+
+# RESIDUAL LINEAR REGRESSION WITH NO PREDICTORS
 LM1 = lm(data=predictors, .resid ~ 1 )
 decompose_variance(LM1)
 
+
+
 formula_all_pred=paste0(".resid ~ ",paste0(pred_vars,collapse="+"))
-#formula_all_pred=reformulate(termlabels = c(x0,pred_vars), response = "log10.EVO.FULL",intercept = T)
-m1 = step(object=LM1, scope = as.formula(formula_all_pred), direction = 'both')
+
+#m1 = step(object=LM1, scope = as.formula(formula_all_pred), direction = 'both')
+
 decompose_variance(m1)
 
 
@@ -179,40 +235,3 @@ coefficients = sort(coefficients, decreasing = TRUE)
 
 
 
-# CHECK EACH VARIABLE
-test_var = function(varname,inputdata,verbose=F){
-  if(verbose)
-    catn(varname)
-  formula_var = paste0('.resid ~ ',varname)
-  linreg = lm(formula_var, data=inputdata)
-  #decompose_variance(linreg)
-
-  not0 = inputdata[,varname]!=0
-  N=sum(complete.cases(linreg$model))
-  TSS = var( linreg$model[,1] ) * (N-1)
-  RSS = deviance(linreg)
-  ESS = TSS - RSS
-
-  mu.y = mean_(inputdata$`.resid`[not0])
-  .fitted.prop = inputdata$`.fitted`[not0] + mu.y
-  .resid.prop = inputdata$`.resid`[not0] + mu.y
-  TSS.p  = sum( (inputdata$`.resid`[not0] - mu.y)^2 )
-  ESS.p  = sum( (.fitted.prop-mu.y)^2)
-  RSS.p = TSS.p - ESS.p
-
-  return(tibble(var=str_split_fixed(pattern='\\.',varname,n = 2)[,2],
-                tss0=TSS,rss0=RSS,ess0=ESS, nprot_var = sum(not0),
-                tss_var=TSS.p,rss_var=RSS.p,ess_var=ESS.p))
-}
-
-
-res_lm1=tibble(variable=pred_vars) %>%
-        group_by(variable) %>%
-        mutate(test_var(variable,predictors)) %>%
-        mutate(pc.ess_var = 100*ess_var / tss_var,
-               pc0.ess_var = 100*ess_var / tss0)
-
-best_var = res_lm1$variable[res_lm1$pc0.ess_var>0.5]
-formula_best_pred=paste0(".resid ~ ",paste0(best_var,collapse="+"))
-m_best = step(object=LM1, scope = as.formula(formula_best_pred), direction = 'both')
-decompose_variance(m_best)

@@ -376,6 +376,13 @@ ls.objects <- function (pos = 1, pattern, order.by, decreasing=FALSE, head=FALSE
   out
 }
 
+quiet <- function(x) {
+  # Make a function quiet
+  sink("/dev/null")
+  on.exit(sink())
+  invisible(force(x))
+}
+
 get_os <- function(){
   # Check OS type (distinguish MacOS and Linux)
   sysinf <- Sys.info()
@@ -392,6 +399,7 @@ get_os <- function(){
   }
   tolower(os)
 }
+
 # shorthands -------------------------------------------------------------------
 lsos <- function(..., n=10) { # checks top10 memory consumption from R objects
   ls.objects(..., order.by="Size", decreasing=TRUE, head=TRUE, n=n)
