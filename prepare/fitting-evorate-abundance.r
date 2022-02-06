@@ -306,9 +306,10 @@ toc()
 INPUT = FUNGI.NORM
 evocols = INPUT %>% dplyr::select(starts_with('rel_EVO.')) %>% colnames
 #EVO = left_join(INPUT,PROP) %>% ungroup()
+INPUT$EVO.FULL = log10(INPUT$EVO.FULL)
 
 #### EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ####
-Y = "rel_EVO.FULL" # mean Evolutionary rate (full sequence)
+Y = "EVO.FULL" # mean Evolutionary rate (full sequence)
 #X = "PPM" # Protein Abundance (log10 ppm)
 X = "MPC" # median Molecules Per Cell
 XYDATA = get_XY_data(INPUT,x=X,y=Y)
