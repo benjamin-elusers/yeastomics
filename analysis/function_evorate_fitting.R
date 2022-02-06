@@ -438,7 +438,6 @@ make_logistic_fit = function(input,    # Input data
 
 decompose_variance = function(LM){
   # DECOMPOSE VARIANCE FROM LINEAR REGRESSION
-
   N=sum(complete.cases(LM$model))
   TSS = var( LM$model[,1] ) * (N-1)
   df.var = summary(aov(LM))[[1]]
@@ -451,14 +450,20 @@ decompose_variance = function(LM){
   #RSS =  deviance(LM)
   #rss = sum( residuals(LM)^2)
   #ESS =  TSS - RSS
+  one_line_formula =paste(deparse1(formula(LM)))
+  nterms = n_distinct(labels(LM))
+
+  cat(sprintf("%s\n",one_line_formula))
+  cat(sprintf("(%s predictor variables)\n",nterms))
   cat(sprintf("TSS %.1f (n=%s)\n",TSS,N))
-  cat(sprintf("--> ESS total %.1f (%.0f%%) max. %.1f ==> gain=%.1f (+%.0f%%)\n",ess, 100*ess/TSS, ess.max, ESS, 100*ESS/TSS))
+  cat(sprintf("--> ESS %.1f (%.0f%%)\n",ess, 100*ess/TSS))
   cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  100*RSS/TSS))
 }
 
 
 fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                                  PREDVAR=PREDICTORS, xcor_max=0.6, ycor_max=0.6,
+                                 ADD.VARIABLES = 'log10.SNP.FULL',
                                  min_obs=5){
   txt_section_break = repchar("-",50)
   #INPUT = EVOLUTION
@@ -468,7 +473,7 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   key_id=c("ORF","UNIPROT")
   key_filter=c("IS_FUNGI","IS_STRAINS")
 
-  LINREG = INPUT %>% dplyr::select(all_of(c(key_id,key_filter,X,Y)))
+  LINREG = INPUT %>% dplyr::select(all_of(c(key_id,key_filter,X,Y,ADD.VARIABLES)))
 
   XYDATA = get_XY_data(INPUT,x=X,y=Y)
   YY = XYDATA$YY
@@ -512,26 +517,32 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
 fit_lm_one_var = function(varname,target='.resid',inputdata,verbose=F){
   if(verbose)
     catn(varname)
+  shortname = str_split_fixed(pattern='\\.',varname,n = 2)[,2]
+  not_na = !is.na(inputdata[,varname])
+  not_0  = not_na & inputdata[,varname] != 0
+
   formula_var = paste0(target,' ~ ',varname)
-  linreg = lm(formula_var, data=inputdata)
+  linreg = lm(formula_var, data=inputdata[not_na,])
   #decompose_variance(linreg)
 
-  not0 = inputdata[,varname]!=0
   N=sum(complete.cases(linreg$model))
-  TSS = var( linreg$model[,1] ) * (N-1)
+  TSS = var( linreg$model[,target] ) * (N-1)
   RSS = deviance(linreg)
   ESS = TSS - RSS
+  n=sum(not_0)
 
-  mu.y = mean_(inputdata[,target][not0])
-  .fitted.prop = inputdata$`.fitted`[not0] + mu.y
-  .resid.prop = inputdata[,target][not0] + mu.y
-  TSS.p  = sum( (inputdata[,target][not0] - mu.y)^2 )
-  ESS.p  = sum( (.fitted.prop-mu.y)^2)
-  RSS.p = TSS.p - ESS.p
+  # tss_rel = 100*tss/TSS
+  # rss_rel = 100*rss/TSS
+  # ess_rel = 100*ess/TSS
+  #
+  # mu.y = mean_(inputdata[,target][has_var])
+  # .fitted.prop = inputdata$`.fitted`[has_var] + mu.y
+  # .resid.prop = inputdata[,target][has_var] + mu.y
 
-  return(tibble(var=str_split_fixed(pattern='\\.',varname,n = 2)[,2],
-                tss0=TSS,rss0=RSS,ess0=ESS, nprot_var = sum(not0),
-                tss_var=TSS.p,rss_var=RSS.p,ess_var=ESS.p))
+  return(tibble(var=shortname, nprot_var=n,
+                tss_var=TSS,rss_var=RSS,ess_var=ESS))
+                #tss_var=tss,rss_var=rss,ess_var=ess,
+                #pc_tss_var = tss_rel,pc_rss_var=rss_rel,pc_ess_var=ess_rel))
 }
 
 # Compute R^2 from true and predicted values
