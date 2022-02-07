@@ -461,19 +461,18 @@ get.aascales=function(){
   )
 }
 
-
 # Protein-Protein interactions (intact dataset from Hugo) ------------------------------
 load.intact.yeast = function(with_direct=T,with_biophysical=T,with_reliable=T,
                              min.intact.score=0.5,
                              rm.useless=T,
                              orga="cerevisiae",
-                             intact.data=sprintf("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_%s.txt",orga),
-                             from.MACOS=F){
+                             intact.data=sprintf("/media/elusers/users/hugo/07_3DComplex_scripts/PPIs_analysis/INTACT/PPIs_%s.txt",orga)){
 
   #/media/elusers/users/hugo/07_3DComplex_scripts/scripts_PPIs_networks/stack_studies_PPIs_nored_PMID_28122020_INTACT.R
   # intact.url="ftp://ftp.ebi.ac.uk/pub/databases/intact/current/psimitab/intact.txt"
-
+  from.MACOS = exists('get_os') && get_os()=="osx"
   if(from.MACOS){ intact.data=gsub("/media","/Volumes",intact.data) }
+
   IntAct = read.csv(intact.data,sep = "\t", quote = "", stringsAsFactors = F)
   colnames(IntAct) = c("protA","protB","altA","altB","aliasA","aliasB",
                        "method","pub.author1","pub.id",
