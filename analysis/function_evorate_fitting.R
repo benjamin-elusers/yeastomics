@@ -68,7 +68,7 @@ load.fungi.evo = function(){
   ### FUNGI CONTAIN ALL DATA ABOUT THE FUNGI LINEAGE EVOLUTIONARY RATE
   fungi = load.dubreuil2021.data(1) %>%
     dplyr::select('ORF','UNIPROT','PPM',c(starts_with('EVO.'))) %>%
-    filter(!(is.dup(UNIPROT) & is.na(EVO.FULL))) %>%
+    filter(!(is.dup(UNIPROT) & is.na(EVO.FULL) & is.na(PPM))) %>%
     #dplyr::mutate(across(starts_with("EVO."),function(x){ x/mean_(x) },.names="norm.{.col}")) %>% # scale and center all evo rate
     dplyr::mutate(across(starts_with("log10.EVO."),log10,.names = "log10.{.col}")) # # apply log10 to rate4site
     return(fungi)
@@ -78,7 +78,7 @@ load.strains.evo = function(){
   ### STRAINS CONTAIN ALL DATA ABOUT THE FUNGI LINEAGE EVOLUTIONARY RATE AND THE S.CEREVISIAE POPULATION
   strains = readRDS(here("data","PROTEIN-EVO-FUNGI-SNP.rds")) %>%
     dplyr::select(c(starts_with(c('EVO.','SNP.')),'PPM','ORF','UNIPROT','IS_FUNGI','IS_STRAINS')) %>%
-    filter(!(is.dup(UNIPROT) & is.na(EVO.FULL))) %>%
+    filter(!(is.dup(UNIPROT) & is.na(EVO.FULL) & is.na(PPM))) %>%
     #dplyr::mutate(across(starts_with(c("EVO.","SNP.")),function(x){ x/mean_(x) },.names="norm.{.col}")) %>% # scale and center all EVO/SNP rate
     dplyr::mutate(across(starts_with(c("EVO.","SNP.")),log10,.names = "log10.{.col}")) %>% # apply log10 to SNP rate4site
     relocate(ORF,UNIPROT,PPM,IS_FUNGI,IS_STRAINS) %>%
