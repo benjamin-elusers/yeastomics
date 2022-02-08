@@ -225,6 +225,13 @@ get_outliers = function(v,nout){
   return( v[get_outliers_index(v,nout)] )
 }
 
+get_outliers_boundary = function(v,nout){
+  val = v[get_outliers_index(v,nout)]
+  return(c('min'=head(val,n=1),'out_min'=val[nout], 'out_max'=val[nout+1], max=last(val)))
+}
+
+
+
 get_extremes = function(df,column,n=3){
   # Find extreme records using string as column names
   extremes = df[ get_outliers_index(df[[column]],nout = n), ]
