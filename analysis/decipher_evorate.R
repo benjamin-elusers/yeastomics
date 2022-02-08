@@ -10,8 +10,9 @@ FUNGI = load.fungi.evo()
 STRAINS = load.strains.evo()
 EVOLUTION = full_join(STRAINS,CLADE,by=c('ORF'='orf')) # EVOLUTION DATA
 
+orthologs = EVOLUTION %>% filter(IS_FUNGI)
 orf_evolution = EVOLUTION %>% pull(ORF) %>% unique
-orf_orthologs = EVOLUTION %>% filter(IS_FUNGI) %>% pull(ORF) %>% unique
+orf_orthologs = orthologs %>% pull(ORF) %>% unique
 
 # ANNOTATION DATA
 ANNOTATION=load.annotation()
@@ -27,21 +28,54 @@ toc()
 # ANALYZE EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ---------------------
 ### _FIGURE 1A: EVOLUTION vs EXPRESSION -------------------------------------------
 F1A=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL',add_outliers = 5,ANNOT = ANNOTATION)
-x = ggiraph::girafe(ggobj = F1A)
+
+F1.out=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL',add_outliers = 20,ANNOT = ANNOTATION)
+x = ggiraph::girafe(ggobj = F1.out)
 x <-  ggiraph::girafe_options(x, ggiraph::opts_hover(css = "fill-opacity:1;fill:orange;stroke:red;") )
 x
+library(clusterProfiler)
+library(org.Sc.sgd.db)
+library(enrichplot)
+outliers = get_extremes(orthologs,'log10.EVO.FULL',n=50) %>%
+            dplyr::select(ORF,UNIPROT,PPM,log10.EVO.FULL) %>%
+            mutate(rk=dense_rank(log10.EVO.FULL))
+
+#entrez_out = bitr(outliers$ORF, fromType = "ORF",toType = "ENTREZID",OrgDb = org.Sc.sgd.db)
+#entrez_ortho = bitr(orthologs$ORF, fromType = "ORF",toType = "ENTREZID",OrgDb = org.Sc.sgd.db)
+
+ego <- enrichGO(gene          = outliers$ORF,
+                universe      = orthologs$ORF,
+                keyType       = "ORF",
+                OrgDb         = org.Sc.sgd.db,
+                minGSSize	    = 5,
+                ont           = 'ALL',
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.01,
+                qvalueCutoff  = 0.05,
+                pool=T)
+goplot(ego)
+dotplot(ego)
+
+kk <- enrichKEGG(gene         = outliers$ORF,
+                 organism     = 'sce',
+                 pvalueCutoff = 0.05)
+mkk <- enrichMKEGG(gene = outliers$ORF,
+                   organism = 'sce',
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 1)
+enrichWP(outliers$ORF, organism = "Saccharomyces cerevisiae")
 ### _FIGURE 1B: BRANCH LENGTH vs EXPRESSION ---------------------------------------
 F1B=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = F)
-F1B.resi=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = T,force_intercept = T) + xlab("") + ylab("")
+F1B.resi=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = T,force_intercept = T)
 
 ### _FIGURE 1C: SNP EVOLUTION vs EXPRESSION ---------------------------------------
 F1C=make_plot_1C(EVOLUTION,Y='log10.EVO.FULL',X='log10.SNP.FULL','PPM',use_residuals = F)
-F1C.resi=make_plot_1C(EVOLUTION,Y='log10.EVO.FULL',X='log10.SNP.FULL','PPM',use_residuals = T,force_intercept = T)  + xlab("") + ylab("")
+F1C.resi=make_plot_1C(EVOLUTION,Y='log10.EVO.FULL',X='log10.SNP.FULL','PPM',use_residuals = T,force_intercept = T)
 
 library(patchwork)
-FIGURE1 = (F1A | (F1B/F1B.resi) | (F1C/F1C.resi)) + plot_layout(widths = 1) +  plot_annotation(tag_levels = 'A') + theme(axis.text = element_text(size=2))
-ggsave(FIGURE1,filename = "draft-figure1.png",device = 'png',scale = 2, path = "~/Desktop/")
-ggsave(FIGURE1,filename = "draft-figure1.pdf",device = 'pdf',scale = 2, path = "~/Desktop/")
+FIGURE1 = (F1A | (F1B/F1B.resi) | (F1C/F1C.resi)) + plot_layout(widths = 2) +  plot_annotation(tag_levels = 'A') + theme(axis.text = element_text(size=2))
+ggsave(FIGURE1,filename = "draft-figure1.png",device = 'png',scale = 1.5, path = "~/Desktop/")
+ggsave(FIGURE1,filename = "draft-figure1.pdf",device = 'pdf',scale = 1.5, path = "~/Desktop/")
 
 
 id_vars = c("UNIPROTKB","SGD","ORF","GNAME","PNAME")
@@ -120,13 +154,54 @@ decompose_variance(m_best)
 decompose_variance(m_best_no_ppm)
 decompose_variance(m_best_snp)
 
-#### LASSO REGRESSION ####
-target=predictors$log10.EVO.FULL
+#### ELASTIC NET (LASSO/RIDGE) REGRESSION ####
+set.seed(42)  # Set seed for reproducibility
+n=nrow(predictors)
+train_rows = sample(n,size=0.66*n)
+target = "log10.EVO.FULL"
+RESPONSE = predictors[[target]]
+
 best_noppm = predictors[,best_var]
 best_var_ppm = predictors[,c('PPM',best_var)]
 best_var_ppm_snp =predictors[,c('PPM','log10.SNP.FULL',best_var)]
 
+BEST=best_noppm
+x.train = BEST[train_rows,]
+x.test = BEST[-train_rows,]
+
+y.train = RESPONSE[train_rows]
+y.test = RESPONSE[-train_rows]
+
 library(glmnet)
+#alpha.fit <- cv.glmnet(x.train, y.train, type.measure="mse", alpha=0.5, family="gaussian")
+alpha_val = seq(0,1,by=0.01)
+alpha_fits = lapply(alpha_val,function(a){
+  fit = cv.glmnet(as.matrix(x.train), as.matrix(y.train), type.measure="mse", alpha=a, family="gaussian")
+  return(fit)
+})
+
+results = sapply(1:101,function(i){
+ y.fitted = predict(alpha_fits[[i]],s=alpha_fits[[i]]$lambda.1se, newx=as.matrix(x.test))
+ mse <- mean_((y.test - y.fitted)^2)
+ return(mse)
+})
+
+## View the results
+names(results) = paste0("a=",alpha_val)
+
+best_alpha = alpha_fits[[which.min(results)]]
+y.trained = predict(best_alpha,s=best_alpha$lambda.1se,newx=as.matrix(x.train))
+cor(y.train,y.trained)^2
+
+y.predicted = predict(best_alpha,s=best_alpha$lambda.1se,newx=as.matrix(x.test))
+cor(y.test,y.predicted)^2
+
+best_elastic <- glmnet(as.matrix(best_noppm), target, alpha = 1, lambda = lambda_best, standardize = TRUE)
+
+as.matrix(x.train), as.matrix(y.train), type.measure="mse", alpha=a, family="gaussian"
+lasso_vip=caret::varImp(best_alpha,best_alpha$lambda.1se)
+
+
 lambdas <- 10^seq(5, -5, by = -.05)
 # Setting alpha = 1 implements lasso regression
 lasso_reg <- cv.glmnet(as.matrix(best_var_ppm), target, alpha = 1, lambda = lambdas, standardize = TRUE, nfolds = 5)
