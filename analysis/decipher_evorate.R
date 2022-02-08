@@ -10,7 +10,7 @@ FUNGI = load.fungi.evo()
 STRAINS = load.strains.evo()
 EVOLUTION = full_join(STRAINS,CLADE,by=c('ORF'='orf')) # EVOLUTION DATA
 
-orthologs = EVOLUTION %>% filter(IS_FUNGI)
+orthologs = EVOLUTION %>% filter(IS_FUNGI & !is.na(PPM) & !is.na(log10.EVO.FULL))
 orf_evolution = EVOLUTION %>% pull(ORF) %>% unique
 orf_orthologs = orthologs %>% pull(ORF) %>% unique
 
@@ -29,41 +29,10 @@ toc()
 ### _FIGURE 1A: EVOLUTION vs EXPRESSION -------------------------------------------
 F1A=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL',add_outliers = 5,ANNOT = ANNOTATION)
 
-F1.out=make_plot_1A(dat=EVOLUTION,X='PPM',Y='log10.EVO.FULL',add_outliers = 20,ANNOT = ANNOTATION)
+F1.out=make_plot_1A(dat=orthologs,X='PPM',Y='log10.EVO.FULL',add_outliers = 20,ANNOT = ANNOTATION)
 x = ggiraph::girafe(ggobj = F1.out)
 x <-  ggiraph::girafe_options(x, ggiraph::opts_hover(css = "fill-opacity:1;fill:orange;stroke:red;") )
 x
-library(clusterProfiler)
-library(org.Sc.sgd.db)
-library(enrichplot)
-outliers = get_extremes(orthologs,'log10.EVO.FULL',n=50) %>%
-            dplyr::select(ORF,UNIPROT,PPM,log10.EVO.FULL) %>%
-            mutate(rk=dense_rank(log10.EVO.FULL))
-
-#entrez_out = bitr(outliers$ORF, fromType = "ORF",toType = "ENTREZID",OrgDb = org.Sc.sgd.db)
-#entrez_ortho = bitr(orthologs$ORF, fromType = "ORF",toType = "ENTREZID",OrgDb = org.Sc.sgd.db)
-
-ego <- enrichGO(gene          = outliers$ORF,
-                universe      = orthologs$ORF,
-                keyType       = "ORF",
-                OrgDb         = org.Sc.sgd.db,
-                minGSSize	    = 5,
-                ont           = 'ALL',
-                pAdjustMethod = "BH",
-                pvalueCutoff  = 0.01,
-                qvalueCutoff  = 0.05,
-                pool=T)
-goplot(ego)
-dotplot(ego)
-
-kk <- enrichKEGG(gene         = outliers$ORF,
-                 organism     = 'sce',
-                 pvalueCutoff = 0.05)
-mkk <- enrichMKEGG(gene = outliers$ORF,
-                   organism = 'sce',
-                   pvalueCutoff = 0.05,
-                   qvalueCutoff = 1)
-enrichWP(outliers$ORF, organism = "Saccharomyces cerevisiae")
 ### _FIGURE 1B: BRANCH LENGTH vs EXPRESSION ---------------------------------------
 F1B=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = F)
 F1B.resi=make_plot_1B('schizo','sacch.wgd','ppm',use_residuals = T,force_intercept = T)
