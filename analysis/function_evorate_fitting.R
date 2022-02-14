@@ -32,7 +32,8 @@ load.annotation = function(){
                relocate(SGD,GENENAME,ORF,UNIPROT,PNAME,L,FAMILIES,FUNCTION,ROLE,
                         BIOPROCESS_all,LOC,COMPLEX,ORTHO,OTHER,KEYWORDS,
                         EXISTENCE,SCORE) %>%
-               filter(!is.na(ORF) | is.na(UNIPROT))
+               filter(!is.na(ORF) | is.na(UNIPROT)) %>%
+               mutate(GENENAME = ifelse(is.na(GENENAME),ORF,GENENAME))
 
   return(annotation)
 }
@@ -436,28 +437,37 @@ make_logistic_fit = function(input,    # Input data
   return(fit)
 }
 
-decompose_variance = function(LM){
+decompose_variance = function(LM,to.df=F){
   # DECOMPOSE VARIANCE FROM LINEAR REGRESSION
   N=sum(complete.cases(LM$model))
   TSS = var( LM$model[,1] ) * (N-1)
   df.var = summary(aov(LM))[[1]]
   nvar = nrow(df.var)
   RSS = sum(df.var$`Sum Sq`[nvar])
+  rss.pc =100*RSS/TSS
   ESS = sum(df.var$`Sum Sq`[-nvar])
 
   ess.max = sum( (fitted(LM) - mean_(LM$model[,1]))^2 )
   ess = TSS-RSS
+  ess.pc =100*ess/TSS
   #RSS =  deviance(LM)
   #rss = sum( residuals(LM)^2)
   #ESS =  TSS - RSS
-  one_line_formula =paste(deparse1(formula(LM)))
+  one_line_formula =  paste(deparse1(formula(LM))) %>%
+                      str_trunc(side = 'center', width = 80)
   nterms = n_distinct(labels(LM))
 
   cat(sprintf("%s\n",one_line_formula))
   cat(sprintf("(%s predictor variables)\n",nterms))
   cat(sprintf("TSS %.1f (n=%s)\n",TSS,N))
-  cat(sprintf("--> ESS %.1f (%.0f%%)\n",ess, 100*ess/TSS))
-  cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  100*RSS/TSS))
+  cat(sprintf("--> ESS %.1f (%.0f%%)\n",ess, ess.pc))
+  cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  rss.pc))
+  if(to.df){
+    res=tibble(N=N,nterms=nterms,TSS=TSS,ESS=ESS,RSS=RSS,
+               RSS_rel = rss.pc, ESS_rel=ess.pc
+               )
+    return(res)
+  }
 }
 
 
@@ -560,17 +570,24 @@ eval_results <- function(true, predicted, df) {
 # 4. PLOTS FIT ----------------------------------------------------------------
 make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                         ANNOT=ANNOTATION, id=c('ORF','UNIPROT'),
-                        add_outliers=10){
+                        add_outliers=10,noplot=F){
   dat_annot = left_join(dat,ANNOT,by=id)
   OUTY = get_extremes(dat_annot,X,n=add_outliers)
   OUTX = get_extremes(dat_annot,Y,n=add_outliers)
   yavg = mean(dat_annot[[Y]])
-  F1A=ggplot(dat_annot,aes_string(y=Y,x=X)) +
+  yavg_line = geom_hline(yintercept = yavg, col='black',linetype=2,size=0.5) # mean
+
+
+  F1A=ggplot(dat_annot,aes_string(y=Y,x=X)) + ggpubr::grids(axis = 'xy') +
+      ylab('mean Evolutionary Rate (log10)') +
+      xlab('Mean Protein Abundance (log10 ppm)')
+
+  if(noplot){ return(F1A + yavg_line )}
+
+  F1A = F1A +
     ggiraph::geom_point_interactive(aes(tooltip=FUNCTION, data_id=ORF),size=2,shape=19,alpha=0.5,color='gray70',stroke=0) +
     stat_density2d(size=0.5,color='gray20') +
-    geom_hline(yintercept = yavg, col='red',linetype=2,size=0.5) + # mean
-    ylab('mean Evolutionary Rate (log10)') + xlab('Mean Protein Abundance (log10 ppm)') +
-    ggpubr::grids()
+    yavg_line
     if(add_outliers>0){
       F1A  = F1A +
         geom_text_repel(data=OUTX, aes(label = GENENAME),max.overlaps = 20,col='blue') +
