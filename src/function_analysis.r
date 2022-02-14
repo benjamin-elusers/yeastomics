@@ -571,7 +571,7 @@ make_expo_fit = function(input,    # Input data
   var.y=xydata$var['y']
   nXY = xydata$n['xy']
 
-  expo = function(alpha=1,beta=0,x){ return(alpha * exp(beta*x)) }
+  fexpo = function(alpha=1,beta=0,x){ return(alpha * exp(beta*x)) }
   # model #
   model.name='Exponential'
   f=as.formula(paste0(y,"~ expo(alpha,beta,",x,")"))
@@ -585,26 +585,35 @@ make_expo_fit = function(input,    # Input data
   return(fit)
 }
 
-decompose_variance = function(LM){
+decompose_variance = function(LM,to.df=F){
   # DECOMPOSE VARIANCE FROM LINEAR REGRESSION
   N=sum(complete.cases(LM$model))
   TSS = var( LM$model[,1] ) * (N-1)
   df.var = summary(aov(LM))[[1]]
   nvar = nrow(df.var)
   RSS = sum(df.var$`Sum Sq`[nvar])
+  rss.pc =100*RSS/TSS
   ESS = sum(df.var$`Sum Sq`[-nvar])
 
   ess.max = sum( (fitted(LM) - mean_(LM$model[,1]))^2 )
   ess = TSS-RSS
+  ess.pc =100*ess/TSS
   #RSS =  deviance(LM)
   #rss = sum( residuals(LM)^2)
   #ESS =  TSS - RSS
+  one_line_formula =  paste(deparse1(formula(LM))) %>%
+    str_trunc(side = 'center', width = 80)
+  nterms = n_distinct(labels(LM))
+
+  cat(sprintf("%s\n",one_line_formula))
+  cat(sprintf("(%s predictor variables)\n",nterms))
   cat(sprintf("TSS %.1f (n=%s)\n",TSS,N))
-  cat(sprintf("--> ESS total %.1f (%.0f%%) max. %.1f ==> gain=%.1f (+%.0f%%)\n",ess, 100*ess/TSS, ess.max, ESS, 100*ESS/TSS))
-  cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  100*RSS/TSS))
-}
-
-
-extract_variables = function(LM){
-  df.imp = aov(LM)
+  cat(sprintf("--> ESS %.1f (%.0f%%)\n",ess, ess.pc))
+  cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  rss.pc))
+  if(to.df){
+    res=tibble(N=N,nterms=nterms,TSS=TSS,ESS=ESS,RSS=RSS,
+               RSS_rel = rss.pc, ESS_rel=ess.pc
+    )
+    return(res)
+  }
 }
