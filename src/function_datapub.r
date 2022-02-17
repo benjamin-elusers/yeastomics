@@ -246,6 +246,21 @@ load.marguerat2012.data = function(raw=F){
 return(expdata)
 }
 
+
+load.christiano2014.data = function(sp='cerevisiae'){
+  message("REF: R Christiano et al, Cell Reports, 2014")
+  message("Global Proteome Turnover Analyses of the Yeasts S. cerevisiae and S. pombe")
+  S1.url="https://ars.els-cdn.com/content/image/1-s2.0-S2211124714009346-mmc2.xlsx" # cerevisiae
+  S2.url="https://ars.els-cdn.com/content/image/1-s2.0-S2211124714009346-mmc3.xlsx" # pombe
+  if(sp == 'cerevisiae'){
+    prot.turnover = rio::import(S1.url,na='n.d.') %>% as_tibble() %>% janitor::clean_names()
+    #openxlsx::read.xlsx(xlsxFile = S1.url, sheet = 1, detectDates = F, skipEmptyRows = T, skipEmptyCols = T, startRow = 1)
+  }else if(sp == 'pombe'){
+    prot.turnover = rio::import(S2.url,na='n.d.') %>% as_tibble() %>% janitor::clean_names()
+  }
+  return(prot.turnover)
+}
+
 load.geisberg2014.data = function(nodesc=T){
   library(openxlsx)
   # Load mRNA half-lives
