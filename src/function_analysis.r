@@ -87,6 +87,7 @@ network.centrality = function(fromTo,namenet=''){
   library(network)
   library(CINNA)
   library(centiserve)
+  library(linkcomm)
   library(sna)
   library(tictoc)
   #library(tidygraph)
@@ -118,14 +119,15 @@ network.centrality = function(fromTo,namenet=''){
       cent_harmonic = CINNA::harmonic_centrality(fullnet),
       cent_localbridging = CINNA::local_bridging_centrality(fullnet)
     )
+  toc()
 
   tic("      * sna centralities...")
   sna.centrality = node.centrality %>%
     add_column(
       cent_stress = sna::stresscent(full),
       cent_load = sna::loadcent(full),
-      cent_flowbet = sna::flowbet(full),
-      cent_info = sna::infocent(full)
+      #cent_flowbet = sna::flowbet(full), # quite slow
+      #cent_info = sna::infocent(full) # quite slow
     )
   toc()
 
@@ -139,7 +141,7 @@ network.centrality = function(fromTo,namenet=''){
       cent_eigen = igraph::eigen_centrality(fullnet,scale = T)$vector,
       cent_authority = igraph::authority_score(fullnet,scale = T)$vector,
       cent_hub = igraph::hub_score(fullnet,scale = T)$vector,
-      cent_subgraph= igraph::subgraph_centrality(fullnet,diag = F),
+      #cent_subgraph= igraph::subgraph_centrality(fullnet,diag = F), # quite slow
       cent_coreness = igraph::coreness(fullnet)
     )
   toc()
@@ -147,27 +149,26 @@ network.centrality = function(fromTo,namenet=''){
   tic("      * centiserve centralities...")
   centiserve.centrality = node.centrality %>%
     add_column(
-      cent_topcoef = centiserve::topocoefficient(fullnet),
-      cent_bottleneck = centiserve::bottleneck(fullnet),
-      cent_clustrank  = centiserve::clusterrank(fullnet),
+      cent_topcoef = centiserve::topocoefficient(fullnet), # quite slow -- finished in 2mn
+      #cent_bottleneck = centiserve::bottleneck(fullnet),  # quite slow
+      cent_clustrank  = centiserve::clusterrank(fullnet), # may be incorrect -- error expected
       cent_diffusion = centiserve::diffusion.degree(fullnet),
       cent_dmnc = centiserve::dmnc(fullnet),
       cent_mnc = centiserve::mnc(fullnet),
       cent_geodesic = centiserve::geokpath(fullnet),
-      cent_katz = centiserve::katzcent(fullnet),
-      cent_markov = centiserve::markovcent(fullnet),
-      cent_laplacian = centiserve::laplacian(fullnet),
-      cent_epc = centiserve::epc(fullnet),
+      #cent_katz = centiserve::katzcent(fullnet), # quite slow
+      #cent_markov = centiserve::markovcent(fullnet), # quite slow
+      cent_laplacian = centiserve::laplacian(fullnet), # quite slow -- finished in 1mn
+      #cent_epc = centiserve::epc(fullnet), # quite slow
       cent_leverage = centiserve::leverage(fullnet),
-      cent_entropy = centiserve::entropy(fullnet),
-      cent_crossclique = centiserve::crossclique(fullnet),
-      cent_community = centiserve::communitycent(fullnet), # requires linkcomm package
+      #cent_entropy = centiserve::entropy(fullnet), # quite slow
+      #cent_crossclique = centiserve::crossclique(fullnet), # quite slow
+      #cent_community = centiserve::communitycent(fullnet), # quite slow -- requires linkcomm package
       cent_closeness_latora =  centiserve::closeness.latora(fullnet,normalized = T),
       cent_closeness_resid  = centiserve::closeness.residual(fullnet),
-      cent_semilocal = centiserve::semilocal(fullnet) # may be slow
+      #cent_semilocal = centiserve::semilocal(fullnet) # too slow
    )
   toc()
-
 
   global_centrality = node.centrality %>%
                       left_join(igraph.centrality) %>%
@@ -185,23 +186,23 @@ network.centrality = function(fromTo,namenet=''){
   toc()
 
   # Compute centrality measures for nodes of largest connected component
-  tic(" - Compute centrality measures in connected component...")
-  path.centrality = tibble( ids = as_ids(V(connet)) ) %>%
+  tic("Compute centrality measures in connected component...")
+  connected.centrality = tibble( ids = as_ids(V(connet)) ) %>%
     mutate(
       #cent_alpha = igraph::alpha_centrality(connet,loops = T),
       cent_closeness = igraph::closeness(connet,normalized = T),
-      cent_closeness_current = centiserve::closeness.currentflow(connet),
+      #cent_closeness_current = centiserve::closeness.currentflow(connet), # quite slow
       #cent_closeness_vitality = centiserve::closeness.vitality(connet), # ERROR Subgraph of graph is not strongly connected
       #cent_hubbell = centiserve::hubbell(connet), # ERROR Hubbell index centrality is not solvable for this graph
       cent_avgdist = centiserve::averagedis(connet),
       cent_barycenter = centiserve::barycenter(connet),
-      cent_centroid = centiserve::centroid(connet),
+      #cent_centroid = centiserve::centroid(connet), # quite slow
       cent_decay = centiserve::decay(connet),
-      cent_radiality = centiserve::radiality(connet)
+      cent_radiality = centiserve::radiality(connet) # quite slow -- finished in 1mn
   )
   toc()
-  centrality = left_join(node.centrality,path.centrality)
-  #p=proper_centralities(ZZ)
+
+  centrality = left_join(global_centrality,connected.centrality)
   # Benchmark correlation for the centrality measures
   tic(" - Find correlation between centrality measures...")
   corrplot::corrplot(cor(centrality[,-1],use = 'complete',method ='spearman'),
