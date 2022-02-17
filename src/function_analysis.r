@@ -105,7 +105,8 @@ network.centrality = function(fromTo,namenet=''){
   cat("\n\n")
   toc()
 
-  tic(" - Compute global network centralities (even if not fully connected)...")
+  tic('    - Global centrality...')
+  message(" - Compute global network centralities (even if not fully connected)...\n")
   node.centrality = tibble( ids = as_ids(V(fullnet)) )
   tic("      * igraph centralities...")
   igraph.centrality = node.centrality %>%
