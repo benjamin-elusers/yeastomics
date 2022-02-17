@@ -95,6 +95,7 @@ network.centrality = function(fromTo,namenet=''){
   tic(" - Build graph...")
   fullnet = graph_from_data_frame(fromTo,directed = F)
   full = network::network(as_edgelist(fullnet))
+  fullnet_noloop = igraph::simplify(fullnet)
 
   message("Number of nodes: ",length(V(fullnet)))
   comp = igraph::components(fullnet)
@@ -181,6 +182,7 @@ network.centrality = function(fromTo,namenet=''){
   # Get the largest connected component
   tic(" - Find largest connected component...")
   connet = decompose(fullnet)[[which.max(comp$csize)]]
+  connet_noloop = simplify(connet)
   nnodes= length(V(connet))
   message("Maximum number of nodes: ",nnodes)
   toc()
@@ -194,7 +196,7 @@ network.centrality = function(fromTo,namenet=''){
       #cent_closeness_current = centiserve::closeness.currentflow(connet), # quite slow
       #cent_closeness_vitality = centiserve::closeness.vitality(connet), # ERROR Subgraph of graph is not strongly connected
       #cent_hubbell = centiserve::hubbell(connet), # ERROR Hubbell index centrality is not solvable for this graph
-      cent_avgdist = centiserve::averagedis(connet),
+      cent_avgdist = centiserve::averagedis(connet_noloop),
       cent_barycenter = centiserve::barycenter(connet),
       #cent_centroid = centiserve::centroid(connet), # quite slow
       cent_decay = centiserve::decay(connet),
