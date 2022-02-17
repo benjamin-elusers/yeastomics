@@ -26,24 +26,23 @@ output:
     theme: lumen
   editor_options: 
     chunk_output_type: console
+    markdown: 
+      wrap: 80
   bibliography: bibliography.bib
   csl: biomed-central.csl
 ---
-<!-- Github Logo -->
-<a href="https://github.com/benjamin-elusers/yeastomics/" class="github-corner" aria-label="View source on Github">
-  <svg width="80" height="80" viewBox="0 0 250 250" style="fill:#69b3a2; color:#fff; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true">
-    <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
-    <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path>
-    <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path>
-  </svg>
-</a>
 
+<!-- Github Logo -->
+
+<a href="https://github.com/benjamin-elusers/yeastomics/" class="github-corner" aria-label="View source on Github"> <svg width="80" height="80" viewBox="0 0 250 250" style="fill:#69b3a2; color:#fff; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true"> <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path> <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path> <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path> </svg> </a>
+
+```{=html}
 <style> 
 .github-corner:hover .octo-arm{animation:octocat-wave 560ms ease-in-out}
 @keyframes octocat-wave{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-25deg)}40%,80%{transform:rotate(10deg)}}
 @media (max-width:500px){.github-corner:hover .octo-arm{animation:none}.github-corner .octo-arm{animation:octocat-wave 560ms ease-in-out}}
 </style>
-
+```
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, 
                       collapse = TRUE,
@@ -107,85 +106,45 @@ options(dplyr.summarise.inform = FALSE,dplyr.width=Inf)
 
 # Introduction to "yeast-omics"
 
-Yeast is a model unicellular organism belonging to the fungi kingdom, within the
-eukaryotes ("true nucleus") domain of life. The yeast genome of 12Mbp seems tiny
-when compared to higher eukaryotes, which is at least one order of magnitude
-more compact in size. Nonetheless, the yeast proteome contains ~6000
-protein-coding genes, making it only 3 to 4 times smaller than eukaryotes.
-Strictly quantitatively, the yeast genome/proteome would be comparable to the
-largest bacteria, similar to those of E.coli (4.5Mbp/4300) or B.subtilis
-(4.3Mbp/4800).
+Yeast is a model unicellular organism belonging to the fungi kingdom, within the eukaryotes ("true nucleus") domain of life. The yeast genome of 12Mbp seems tiny when compared to higher eukaryotes, which is at least one order of magnitude more compact in size. Nonetheless, the yeast proteome contains \~6000 protein-coding genes, making it only 3 to 4 times smaller than eukaryotes. Strictly quantitatively, the yeast genome/proteome would be comparable to the largest bacteria, similar to those of E.coli (4.5Mbp/4300) or B.subtilis (4.3Mbp/4800).
 
-The yeast cellular volume is estimated around 50um^3 for haploid cells which is
-occupied at 80% by the cellular proteome (42 Millions of expressed
-macromolecules). The cell interior is incredibly crowded with a protein density
-of around 3-4 millions of molecules per femtoliter. Despite the crowdedness,
-proteins are freely diffusing within the cell at an admirably fast pace of
-around 0.2us from one extremity to another.
+The yeast cellular volume is estimated around 50um\^3 for haploid cells which is occupied at 80% by the cellular proteome (42 Millions of expressed macromolecules). The cell interior is incredibly crowded with a protein density of around 3-4 millions of molecules per femtoliter. Despite the crowdedness, proteins are freely diffusing within the cell at an admirably fast pace of around 0.2us from one extremity to another.
 
-Yet, the dynamic arrangements between millions of macromolecules within the cell
-is not trivial.
+Yet, the dynamic arrangements between millions of macromolecules within the cell is not trivial.
 
-## Proteome evolution 
+## Proteome evolution
 
-The approach to understand the organization of the yeast proteome consist in
-searching for factors influencing the evolution of proteins.
+The approach to understand the organization of the yeast proteome consist in searching for factors influencing the evolution of proteins.
 
-As previously reported, protein abundance holds a particularly important role in
-driving molecular evolution of protein, explaining up to 50% of the variability
-in conservation rate among proteins.
+As previously reported, protein abundance holds a particularly important role in driving molecular evolution of protein, explaining up to 50% of the variability in conservation rate among proteins.
 
-The general trend is that highly expressed proteins are the most conserved
-following the chemical law of mass action.
-The association of protein expression with sequence conservation was found to be
-supported by several underlying mechanisms, yet their degree of complementarity
-is still a matter of active debate.
+The general trend is that highly expressed proteins are the most conserved following the chemical law of mass action. The association of protein expression with sequence conservation was found to be supported by several underlying mechanisms, yet their degree of complementarity is still a matter of active debate.
 
-How abundance really affects protein evolution is likely to require multi-causal
-explanations which we will not expand here. (e.g. translation cost, protein/mRNA
-stability and degradation, misinteractions ...)
+How abundance really affects protein evolution is likely to require multi-causal explanations which we will not expand here. (e.g. translation cost, protein/mRNA stability and degradation, misinteractions ...)
 
-Nonetheless, protein abundance cannot fully account for the conservation of all
-residues in proteins. Even worse, the effect of abundance is likely to be
-involved in many biological processes, creating a potentially strong confounding
-factor that may bias most evolutionary comparison between proteins.
+Nonetheless, protein abundance cannot fully account for the conservation of all residues in proteins. Even worse, the effect of abundance is likely to be involved in many biological processes, creating a potentially strong confounding factor that may bias most evolutionary comparison between proteins.
 
-Here, we explore a number of quantitative and qualitative variables (referred as
-features and properties) derived from proteins, in order to unveil the dark side
-of proteome evolution.
+Here, we explore a number of quantitative and qualitative variables (referred as features and properties) derived from proteins, in order to unveil the dark side of proteome evolution.
 
-However, we investigated how residual differences of protein conservation can be
-explained by those features and properties after controlling for abundance.
+However, we investigated how residual differences of protein conservation can be explained by those features and properties after controlling for abundance.
 
-Finally, we analyzed it within different protein categories which correspond to
-lists of related properties and features  (Sequence, Biophysics, Phenotypes...).
+Finally, we analyzed it within different protein categories which correspond to lists of related properties and features (Sequence, Biophysics, Phenotypes...).
 
 ## Definitions
 
-A protein feature is a measurable quantity related to its activity,
-composition... The numerical values will be stored in a vector as a column of
-proteome data table. (e.g. disorder content, sequence length)
+A protein feature is a measurable quantity related to its activity, composition... The numerical values will be stored in a vector as a column of proteome data table. (e.g. disorder content, sequence length)
 
-A protein property is a shared non-quantitative trait among a subset of
-proteins. A vector named after the common characteristic will store the
-identifiers (ORF, UNIPROT...) of the subset members. (e.g. localization,
-pathway, function...)
+A protein property is a shared non-quantitative trait among a subset of proteins. A vector named after the common characteristic will store the identifiers (ORF, UNIPROT...) of the subset members. (e.g. localization, pathway, function...)
 
-Finally, a protein category correspond to a list of features or properties
-(Sequence, Biophysics, Phenotypes...) Quantitative variables will be aggregated
-in one Proteome table (rows=proteins, columns=variables)
+Finally, a protein category correspond to a list of features or properties (Sequence, Biophysics, Phenotypes...) Quantitative variables will be aggregated in one Proteome table (rows=proteins, columns=variables)
 
 # Datasets
 
 ## Reference proteome sequence
 
-SGD and Uniprot are the most reliable database gathering information about genes
-and proteins sequences. SGD is the main provider for the assembled genome of S.
-cerevisiae as well as annotations about the genes.
+SGD and Uniprot are the most reliable database gathering information about genes and proteins sequences. SGD is the main provider for the assembled genome of S. cerevisiae as well as annotations about the genes.
 
-Uniprot is a primary resource for protein information aggregating data from
-multiple specialized databases (structure, interactions, evolution, expression
-...)
+Uniprot is a primary resource for protein information aggregating data from multiple specialized databases (structure, interactions, evolution, expression ...)
 
 ```{r reference}
 # REFERENCE PROTEIN DATABASE ---------------------------------------------------
@@ -314,7 +273,8 @@ DELTAG = load.leuenberger2017.data() %>%
 MRNA.HL = load.geisberg2014.data() 
 ## PROTEIN HALFLIFE ------------------------------------------------------------
 PROT.HL = load.belle2006.data() %>% 
-          left_join( load.villen2017.data(), by = c('ORF'))
+          left_join( load.villen2017.data(), by = c('ORF')) %>%
+          left_join( load.christiano2014.data(), by=c('ORF'='ensg'))
 
 # PROTEIN-PROTEIN INTERACTIONS  ------------------------------------------------
 ## STRING functional protein association networks ------------------------------
@@ -379,49 +339,45 @@ NMINI = 1
 
 ### Genomics
 
-- Genome arrangement
-      
-      * Chromosomes
-      
-      
-          Genes are distributed along the genomic DNA which is itself organized
-          between separate chromosomal structures.
-      
-      * Gene duplications
-      
-      
-          The genome must be duplicated at every generation to give rise to a new
-          cell. Yet, copied genomes may incorporate unidentical version of their
-          template. Single genes may be lost or duplicated in the process or
-          during genetic recombination. Rarely, whole genome duplication may occur
-          subsequently increasing the number of duplicated genes.
-      
-      * Pangenome
-        
-        
-          Genome may be decomposed in two sets: core and cloud genes. Core genes
-          are present in all strains of a species, while the presence of cloud
-          genes may vary across strains.
-      
-      * Protein-coding genes
-      
-      
-          Protein coding genes may be splitted in translated and untranslated
-          segments (e.g. exons and introns). In yeast, very few genes contains
-          introns meaning that there is an exact correspondence between genomic and
-          proteomic sequences.
-      
-      
-  - DNA composition
-  
-      * GC content
-      
-          The genomic sequence made of DNA molecules is composed of 2 pairs of complementary nucleic acids called bases (AT & CG).
-          Variations in usage of both pairs exist.
-      
-      * Coding length
-      
-  
+-   Genome arrangement
+
+        * Chromosomes
+
+
+            Genes are distributed along the genomic DNA which is itself organized
+            between separate chromosomal structures.
+
+        * Gene duplications
+
+
+            The genome must be duplicated at every generation to give rise to a new
+            cell. Yet, copied genomes may incorporate unidentical version of their
+            template. Single genes may be lost or duplicated in the process or
+            during genetic recombination. Rarely, whole genome duplication may occur
+            subsequently increasing the number of duplicated genes.
+
+        * Pangenome
+
+
+            Genome may be decomposed in two sets: core and cloud genes. Core genes
+            are present in all strains of a species, while the presence of cloud
+            genes may vary across strains.
+
+        * Protein-coding genes
+
+
+            Protein coding genes may be splitted in translated and untranslated
+            segments (e.g. exons and introns). In yeast, very few genes contains
+            introns meaning that there is an exact correspondence between genomic and
+            proteomic sequences.
+
+    -   DNA composition
+
+        -   GC content
+
+            The genomic sequence made of DNA molecules is composed of 2 pairs of complementary nucleic acids called bases (AT & CG). Variations in usage of both pairs exist.
+
+        -   Coding length
 
 ```{r genomic}
 GENOMICS=list()
@@ -474,42 +430,27 @@ check_chunk(df.genomics,GENOMICS)
 
 ```
 
-### Transcriptomics 
+### Transcriptomics
 
-  - Codon Usage
-      
-      
-      * tRNA adapation
-      
-      
-        Some codons are faster to translate than others, even when both code for
-        the same amino acid, i.e. synonymous codons. The copy number of tRNA
-        genes determine how fast tRNA can load the amino acid corresponding to a
-        particular codon. Genes optimized for translation are likely to use
-        codons for which tRNA genes have high copy number.
-      
-      * codon usage measures
-        
-        
-        Other measures of codon usage are commonly used but they often require
-        to compare to a set of optimized genes. Generally, ribosomal genes are
-        used as the set of reference to.
-    
-  - Amino acid biosynthetic cost
-  
-  
-      * Molecular weight per AA
-        
-        
-        The average amino acid molecular weight of a particular protein sequence
-        informs on how cost-effective is its production.
-      
-      * Consumption of ATP per AA
-      
-      
-        Other measure of biosynthetic cost of amino acid are often used. For
-        example, by measuring how many ATP molecules are required to synthetize
-        each amino acid.
+-   Codon Usage
+
+    -   tRNA adapation
+
+        Some codons are faster to translate than others, even when both code for the same amino acid, i.e. synonymous codons. The copy number of tRNA genes determine how fast tRNA can load the amino acid corresponding to a particular codon. Genes optimized for translation are likely to use codons for which tRNA genes have high copy number.
+
+    -   codon usage measures
+
+        Other measures of codon usage are commonly used but they often require to compare to a set of optimized genes. Generally, ribosomal genes are used as the set of reference to.
+
+-   Amino acid biosynthetic cost
+
+    -   Molecular weight per AA
+
+        The average amino acid molecular weight of a particular protein sequence informs on how cost-effective is its production.
+
+    -   Consumption of ATP per AA
+
+        Other measure of biosynthetic cost of amino acid are often used. For example, by measuring how many ATP molecules are required to synthetize each amino acid.
 
 ```{r transcriptomics}
 TRANSCRIPTOMICS=list()
@@ -575,39 +516,29 @@ check_chunk(df.transcriptomics,TRANSCRIPTOMICS)
 
 ```
 
-### Biophysics 
+### Biophysics
 
-  - Amino acid composition
-  
-  
-      * single AA frequencies
-  
-  
-      * Frequencies of AA class
-  
-  
-  
-  - Intrinsic Disorder in proteins 
-  
-  
-      * Number of segments
-  
-  
-      * Relative content
-  
-  
-      * Absolute content
-  
-  
-  - Protein domains & families
+-   Amino acid composition
 
-  - Protein stability
-    
-    
-      * Turnover (half-life)
-    
-      
-      * Melting temperature (Tm)
+    -   single AA frequencies
+
+    -   Frequencies of AA class
+
+-   Intrinsic Disorder in proteins
+
+    -   Number of segments
+
+    -   Relative content
+
+    -   Absolute content
+
+-   Protein domains & families
+
+-   Protein stability
+
+    -   Turnover (half-life)
+
+    -   Melting temperature (Tm)
 
 ```{r biophysical}
 BIOPHYSICS=list()
@@ -700,13 +631,22 @@ BIOPHYSICS$leuenberger2017.Tm_unstable = DELTAG %>% dplyr::filter( protinfo == "
 
 
 df.HLprot = PROT.HL %>%
-            dplyr::select(ORF,halflife.avg,halflife_mn_corrected) %>%
+            dplyr::select(ORF,halflife.avg,halflife_mn_corrected,degradation_rates_min_1,t1_2_min) %>%
             dplyr::rename(villen2017.HL_prot=halflife.avg,
-                          belle2006.HL_prot=halflife_mn_corrected)
+                          belle2006.HL_prot=halflife_mn_corrected,
+                          christiano2014.HL_prot = t1_2_min,
+                          christiano2014.deg_rate = degradation_rates_min_1)
+
 BIOPHYSICS$villen2017.longlived_prot = df.HLprot %>% dplyr::filter(villen2017.HL_prot > 5) %>% pull(ORF)
 BIOPHYSICS$belle2006.longlived_prot = df.HLprot %>% dplyr::filter(belle2006.HL_prot > 300) %>% pull(ORF)
+BIOPHYSICS$christiano2014.longlived_prot = df.HLprot %>% dplyr::filter(christiano2014.HL_prot > 900) %>% pull(ORF)
+
+BIOPHYSICS$christiano2014.shortlived_prot = df.HLprot %>% dplyr::filter(christiano2014.HL_prot < 150) %>% pull(ORF)
 BIOPHYSICS$villen2017.shortlived_prot = df.HLprot %>% dplyr::filter(villen2017.HL_prot < 1) %>% pull(ORF)
 BIOPHYSICS$belle2006.shortlived_prot = df.HLprot %>% dplyr::filter(belle2006.HL_prot < 5) %>% pull(ORF)
+
+BIOPHYSICS$christiano2014.slow_turnover = df.HLprot %>% dplyr::filter(get.d10(christiano2014.deg_rate)) %>% pull(ORF)
+BIOPHYSICS$christiano2014.fast_turnover = df.HLprot %>% dplyr::filter(get.d90(christiano2014.deg_rate)) %>% pull(ORF)
 
 df.biophysics = PROTEOME %>% 
                 left_join(df.aa,by=c('ORF'='id')) %>%
@@ -722,13 +662,13 @@ check_chunk(df.biophysics,BIOPHYSICS)
 
 ```
 
-### Interactions 
+### Interactions
 
-  - Physical interactions
-  
-  - Functional interactions
-  
-  - Protein complexes
+-   Physical interactions
+
+-   Functional interactions
+
+-   Protein complexes
 
 ```{r interactions}
 INTERACTIONS=list()
@@ -777,16 +717,15 @@ check_chunk(df.interactions,INTERACTIONS)
 
 ```
 
+### Functions
 
-### Functions 
+-   Biological processes
 
-- Biological processes
+-   Molecular function
 
-- Molecular function
+-   Functional classes
 
-- Functional classes
-
-- Pathways and modules
+-   Pathways and modules
 
 ```{r function}
 FUNCTIONS=list()
@@ -830,21 +769,15 @@ check_chunk(df=NULL,FUNCTIONS)
 
 ```
 
-### Phenotypes 
+### Phenotypes
 
+-   Essentiality vs. Dispensability
 
-- Essentiality vs. Dispensability
+    As their name suggest, essential genes are required for the cell to be viable. Inherited or acquired mutations in those genes can lead to pathological outcomes. However, a synthetic rescue can happen when the phenotypic outcome created by primary mutation is alleviated by suppressor mutations. Hence, those genes are dubbed dispensable (essential until bypass suppression).
 
-    As their name suggest, essential genes are required for the cell to be viable.
-    Inherited or acquired mutations in those genes can lead to pathological outcomes.
-    However, a synthetic rescue can happen when the phenotypic outcome created by primary mutation is alleviated by suppressor mutations.
-    Hence, those genes are dubbed dispensable (essential until bypass suppression).
+-   Subcellular localizations
 
-
-- Subcellular localizations
-
-
-- Response signature to chemicals
+-   Response signature to chemicals
 
 ```{r phenotype}
 PHENOTYPES=list()
@@ -876,7 +809,6 @@ check_chunk(df=NULL,LIST=PHENOTYPES)
 
 ```
 
-
 # Integrated outputs
 
 ## Features (Quantitative output)
@@ -901,6 +833,7 @@ saveRDS(FEATURES,sprintf("output/proteome-features-%s.rds",when))
 ```
 
 ## Properties (Qualitative output)
+
 ```{r properties}
 # List all properties
 CATEGORIES = list(cat_genomics=GENOMICS,
@@ -996,31 +929,43 @@ plot(BP)
 ```
 
 <!-- ## Bins (Semi-quantitative output) -->
+
 <!-- ```{r bins} -->
+
 <!-- BINS=list() -->
+
 <!-- #### range of protein length --------------------------------------------------- -->
+
 <!-- PROTLEN = fivebins(x = FEATURES$len, applyto = FEATURES$ORF,  -->
+
 <!--                    binnames = c("shortest","shorter","average","longer","longest")) -->
+
 <!-- BINS = append(BINS,PROTLEN) -->
+
 <!-- #### range of GC content ------------------------------------------------------- -->
+
 <!-- GCPERC = fivebins(x = FEATURES$pGC, applyto = FEATURES$ORF) -->
+
 <!-- BINS = append(BINS,GCPERC) -->
+
 <!-- #### range of % disorder (IUP) ----------------------------------------------------- -->
+
 <!-- IUPPERC = fivebins(x = FEATURES$f.IUP20, applyto = FEATURES$ORF) -->
+
 <!-- BINS = append(BINS,IUPPERC) -->
+
 <!-- #### range of % disorder (D2P2) ----------------------------------------------------- -->
+
 <!-- D2P2PERC = fivebins(x = FEATURES$f.d2p2, applyto = FEATURES$ORF) -->
+
 <!-- BINS = append(BINS,D2P2PERC) -->
+
 <!-- ``` -->
 
 So far:
 
-**`r TOTAL_FEATURES`** protein features were gathered.</br>
-Here are the breakdown of features by categories:
-`r knitr::kable(FEATURE_BY_CATEGORIES)` 
+**`r TOTAL_FEATURES`** protein features were gathered.</br> Here are the breakdown of features by categories: `r knitr::kable(FEATURE_BY_CATEGORIES)`
 
-**`r TOTAL_PROPERTIES`** proteome properties were retrieved.
-Here are the breakdown of properties by categories:
+**`r TOTAL_PROPERTIES`** proteome properties were retrieved. Here are the breakdown of properties by categories:
 
-`r knitr::kable(PROPERTIES_BY_CATEGORIES)` 
-
+`r knitr::kable(PROPERTIES_BY_CATEGORIES)`
