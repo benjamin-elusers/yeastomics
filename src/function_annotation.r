@@ -87,6 +87,7 @@ get.uniprot.pmid = function(uniprot) {
 }
 
 get.uniprot.go = function(uniprot) {
+  library(DBI)
   library(AnnotationDbi)
   library(org.Sc.sgd.db)
   library(dplyr)
