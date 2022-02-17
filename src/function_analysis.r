@@ -105,66 +105,69 @@ network.centrality = function(fromTo,namenet=''){
   cat("\n\n")
   toc()
 
-  tic('    - Global centrality...')
-  message(" - Compute global network centralities (even if not fully connected)...\n")
+  message("Compute global network centralities (even if not fully connected)...")
+  tic('  - Global centrality...')
   node.centrality = tibble( ids = as_ids(V(fullnet)) )
-  tic("      * igraph centralities...")
+
+  tic("      * CINNA centralities...")
+  CINNA.centrality = node.centrality %>%
+    add_column(
+      cent_closeness_dangalchev = CINNA::dangalchev_closeness_centrality(fullnet),
+      #cent_wienerindex = CINNA::wiener_index_centrality(fullnet), # returns Inf for not connected graph
+      cent_group = CINNA::group_centrality(fullnet),
+      cent_harmonic = CINNA::harmonic_centrality(fullnet),
+      cent_localbridging = CINNA::local_bridging_centrality(fullnet)
+    )
+
+  tic("      * sna centralities...")
+  sna.centrality = node.centrality %>%
+    add_column(
+      cent_stress = sna::stresscent(full),
+      cent_load = sna::loadcent(full),
+      cent_flowbet = sna::flowbet(full),
+      cent_info = sna::infocent(full)
+    )
+  toc()
+
+  tic("     * igraph centralities...")
   igraph.centrality = node.centrality %>%
-                      add_column(
-                          cent_deg = igraph::degree(fullnet),
-                          cent_betweenness = igraph::betweenness(fullnet,normalized=T),
-                          cent_eccentricity = igraph::eccentricity(fullnet),
-                          cent_pagerank = igraph::page_rank(fullnet)$vector,
-                          cent_eigen = igraph::eigen_centrality(fullnet,scale = T)$vector,
-                          cent_authority = igraph::authority_score(fullnet,scale = T)$vector,
-                          cent_hub = igraph::hub_score(fullnet,scale = T)$vector,
-                          cent_subgraph= igraph::subgraph_centrality(fullnet,diag = F),
-                          cent_coreness = igraph::coreness(fullnet)
-                        )
+    add_column(
+      cent_deg = igraph::degree(fullnet),
+      cent_betweenness = igraph::betweenness(fullnet,normalized=T),
+      cent_eccentricity = igraph::eccentricity(fullnet),
+      cent_pagerank = igraph::page_rank(fullnet)$vector,
+      cent_eigen = igraph::eigen_centrality(fullnet,scale = T)$vector,
+      cent_authority = igraph::authority_score(fullnet,scale = T)$vector,
+      cent_hub = igraph::hub_score(fullnet,scale = T)$vector,
+      cent_subgraph= igraph::subgraph_centrality(fullnet,diag = F),
+      cent_coreness = igraph::coreness(fullnet)
+    )
   toc()
 
   tic("      * centiserve centralities...")
   centiserve.centrality = node.centrality %>%
-                          add_column(
-                              cent_topcoef = centiserve::topocoefficient(fullnet),
-                              cent_bottleneck = centiserve::bottleneck(fullnet),
-                              cent_clustrank  = centiserve::clusterrank(fullnet),
-                              cent_diffusion = centiserve::diffusion.degree(fullnet),
-                              cent_dmnc = centiserve::dmnc(fullnet),
-                              cent_mnc = centiserve::mnc(fullnet),
-                              cent_geodesic = centiserve::geokpath(fullnet),
-                              cent_katz = centiserve::katzcent(fullnet),
-                              cent_markov = centiserve::markovcent(fullnet),
-                              cent_laplacian = centiserve::laplacian(fullnet),
-                              cent_epc = centiserve::epc(fullnet),
-                              cent_leverage = centiserve::leverage(fullnet),
-                              cent_entropy = centiserve::entropy(fullnet),
-                              cent_crossclique = centiserve::crossclique(fullnet),
-                              cent_community = centiserve::communitycent(fullnet), # requires linkcomm package
-                              cent_closeness_latora =  centiserve::closeness.latora(fullnet,normalized = T),
-                              cent_closeness_resid  = centiserve::closeness.residual(fullnet),
-                              cent_semilocal = centiserve::semilocal(fullnet) # may be slow
-                          )
+    add_column(
+      cent_topcoef = centiserve::topocoefficient(fullnet),
+      cent_bottleneck = centiserve::bottleneck(fullnet),
+      cent_clustrank  = centiserve::clusterrank(fullnet),
+      cent_diffusion = centiserve::diffusion.degree(fullnet),
+      cent_dmnc = centiserve::dmnc(fullnet),
+      cent_mnc = centiserve::mnc(fullnet),
+      cent_geodesic = centiserve::geokpath(fullnet),
+      cent_katz = centiserve::katzcent(fullnet),
+      cent_markov = centiserve::markovcent(fullnet),
+      cent_laplacian = centiserve::laplacian(fullnet),
+      cent_epc = centiserve::epc(fullnet),
+      cent_leverage = centiserve::leverage(fullnet),
+      cent_entropy = centiserve::entropy(fullnet),
+      cent_crossclique = centiserve::crossclique(fullnet),
+      cent_community = centiserve::communitycent(fullnet), # requires linkcomm package
+      cent_closeness_latora =  centiserve::closeness.latora(fullnet,normalized = T),
+      cent_closeness_resid  = centiserve::closeness.residual(fullnet),
+      cent_semilocal = centiserve::semilocal(fullnet) # may be slow
+   )
   toc()
 
-  tic("      * CINNA centralities...")
-  CINNA.centrality = node.centrality %>%
-                     add_column(
-                        cent_closeness_dangalchev = CINNA::dangalchev_closeness_centrality(fullnet),
-                        #cent_wienerindex = CINNA::wiener_index_centrality(fullnet), # returns Inf for not connected graph
-                        cent_group = CINNA::group_centrality(fullnet),
-                        cent_harmonic = CINNA::harmonic_centrality(fullnet),
-                        cent_localbridging = CINNA::local_bridging_centrality(fullnet)
-                     )
-  tic("      * sna centralities...")
-  sna.centrality = node.centrality %>%
-                    add_column(
-                      cent_stress = sna::stresscent(full),
-                      cent_load = sna::loadcent(full),
-                      cent_flowbet = sna::flowbet(full),
-                      cent_info = sna::infocent(full)
-                    )
-  toc()
 
   global_centrality = node.centrality %>%
                       left_join(igraph.centrality) %>%
@@ -210,12 +213,12 @@ network.centrality = function(fromTo,namenet=''){
 }
 
 # Find the specific quantiles
-q25 = function(x){ quantile(x,0.25) }
-q75 = function(x){ quantile(x,0.75) }
-d10 = function(x){ quantile(x,0.1) }
-d40 = function(x){ quantile(x,0.4) }
-d60 = function(x){ quantile(x,0.6) }
-d90 = function(x){ quantile(x,0.9) }
+q25 = function(x){ quantile(x,0.25,na.rm=T) }
+q75 = function(x){ quantile(x,0.75,na.rm=T) }
+d10 = function(x){ quantile(x,0.1,na.rm=T) }
+d40 = function(x){ quantile(x,0.4,na.rm=T) }
+d60 = function(x){ quantile(x,0.6,na.rm=T) }
+d90 = function(x){ quantile(x,0.9,na.rm=T) }
 
 # Get the values below/above a specified quantile
 get.d10 = function(x,with_ties=T){ (with_ties & (x==d10(x)) + (x < d10(x)) ) }
