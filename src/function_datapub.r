@@ -688,11 +688,11 @@ load.dubreuil2021.data = function(d){
 # Resource databases with proteome data available ------------------------------
 
 check.alphafold = function(uniprot,extension=c('cif','pdb'),quiet=T,as.path=T){
+  URL_ALPHAFOLD = "https://alphafold.ebi.ac.uk/files"
   if(!file.exists(uniprot)){
     # Check whether a uniprot is associated to an alphafold model
-    url_alphafold="https://alphafold.ebi.ac.uk/files"
     ext=match.arg(extension,extension)
-    AF_uniprot=sprintf("%s/AF-%s-F1-model_v1.%s",url_alphafold,uniprot,ext)
+    AF_uniprot=sprintf("%s/AF-%s-F1-model_v1.%s",URL_ALPHAFOLD,uniprot,ext)
     found =  RCurl::url.exists(AF_uniprot)
   }else{ # for locally predicted alphafold files, use full path instead of uniprot accession number
     AF_uniprot=uniprot # provide full path to the predicted file
@@ -774,25 +774,26 @@ load.superfamily = function(tax='xs'){
   # xs = saccharomyces cerevisiae
   library(httr)
   library(readr)
-  download.request =  httr::GET(sprintf("http://supfam.org/SUPERFAMILY/cgi-bin/save.cgi?var=%s;type=ass",tax))
+  URL_SUPERFAMILY = "https://supfam.org/SUPERFAMILY"
+  download.request =  httr::GET(sprintf("%s/cgi-bin/save.cgi?var=%s;type=ass",URL_SUPERFAMILY,tax))
   superfamily.txt = httr::content(download.request,as = 'text')
-  superfamily.assignment = unlist(stringi::stri_split_lines(superfamily.txt,omit_empty = T))[-c(1:2)]
-  supfam = readr::read_delim(superfamily.assignment,comment = "#",delim="\t", escape_double = F) %>% janitor::clean_names()
+  #superfamily.assignment = unlist(stringi::stri_split_lines(superfamily.txt,omit_empty = T))[-c(1:2)]
+  supfam = readr::read_delim(file=superfamily.txt,comment = "#",delim="\t", escape_double = F) %>% janitor::clean_names()
   return(supfam)
 }
 
 load.pfam = function(tax='559292'){
   # Load domains assignments based of HMM profiles (PFAM)
   # 559292 = S.cerevisiae
+  URL_PFAM = "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release"
   library(readr)
-  .release = read.url("http://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam.version.gz") %>% paste0(sep="\n")
+  .release = read.url(paste0(URL_PFAM,"/Pfam.version.gz")) %>% paste0(sep="\n")
   message("CURRENT RELEASE")
   message("---------------")
   message(.release)
   message("---------------")
-
-  url.pfam = sprintf("http://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/proteomes/%s.tsv.gz",tax)
-  url.clan = sprintf("http://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.clans.tsv.gz")
+  url.pfam = sprintf("%s/proteomes/%s.tsv.gz",URL_PFAM,tax)
+  url.clan = sprintf("%s/Pfam-A.clans.tsv.gz",URL_PFAM)
   clans = readr::read_delim(url.clan,delim="\t",col_names=c("pfam_id",'clan_id','clan_name',"pfam_name","pfam_desc")) %>%
           mutate( clan_id = tidyr::replace_na(clan_id,replace = 'No_clan') )
 
@@ -811,15 +812,15 @@ load.pfam = function(tax='559292'){
   return(pfam)
 }
 
-load.string = function(tax="4932",phy=T,ful=T,min.score=700){
+load.string = function(tax="4932",phy=T,ful=T,min.score=700,vers="v11.0"){
   # Load protein links (physical PPI)
   # 4932 = S.cerevisiae
-  STRING_baseurl = "https://stringdb-static.org/download"
-  .version = "v11.0"
+  URL_STRING = "https://stringdb-static.org/download"
+  .version = vers
   .protein = ifelse(phy,"protein.physical","protein")
   .links = ifelse(ful,"links.full","links")
   STRING_dataset = sprintf("%s.%s.%s",.protein,.links,.version)
-  STRING_url = sprintf("%s/%s/%s.%s.%s",STRING_baseurl,STRING_dataset,tax,STRING_dataset,"txt.gz")
+  STRING_url = sprintf("%s/%s/%s.%s.%s",URL_STRING,STRING_dataset,tax,STRING_dataset,"txt.gz")
 
   message("STRING VERSION: ", .version)
   message("STRING DATASET: ",STRING_dataset)
@@ -842,8 +843,9 @@ load.pombe.orthologs = function() {
   bracket.before = "(?<=\\()"
   bracket.after = "(?=\\))"
   regex_fusion = paste0( bracket.before, "(FUSION-)?(N|C)?", bracket.after)
+  URL_POMBASE = "https://www.pombase.org/data/" #"ftp://ftp.pombase.org/pombe/"
 
-  url.orthologs = "ftp://ftp.pombase.org/pombe/orthologs/cerevisiae-orthologs.txt"
+  url.orthologs = paste0(URL_POMBASE,"orthologs/cerevisiae-orthologs.txt")
   sp.sc = readr::read_delim(url.orthologs, delim="\t", col_names=c('PombaseID','ORFS'), comment="#", trim_ws=T) %>%
     mutate(grp = sprintf("OG_%04d",row_number())) %>%
     separate_rows(ORFS,sep = "\\|") %>%
@@ -860,15 +862,24 @@ load.pombe.orthologs = function() {
 }
 
 load.paxdb.orthologs = function(node,show.nodes=F) {
-  # get table of orthologs proteins from paxdb
-  paxdb_ortho="https://pax-db.org/downloads/latest/paxdb-orthologs.zip"
   library(rio)
   library(RCurl)
   library(hablar)
+  # get table of orthologs proteins from paxdb
+  URL_PAXDB = "https://pax-db.org/downloads/latest/"
+  paxdb_files = rvest::read_html(URL_PAXDB) %>%
+                rvest::html_nodes("a") %>%
+                rvest::html_text(trim = T) %>%
+                str_subset(pattern = "/$",negate = T)
+  .version = str_extract(pattern="[0-9]\\.[0-9]",string = paxdb_files) %>% gtools::mixedsort(na.last = F) %>% last
+  cat(sprintf("PAXDB VERSION: %s\n",.version))
+  paxdb_ortho=grep("paxdb-orthologs",paxdb_files,v=T) %>% str_subset(pattern=.version) %>% paste0(URL_PAXDB,.)
   # download the archive
   temp<-tempfile()
   download.file(paxdb_ortho,temp)
   # Find the list of files in the archive (taxonomic nodes)
+  paxdb_orthologs_dir = unzip(temp,list = T)$Name[1]
+
   paxdb_nodes = unzip(temp,list = T)$Name %>%
            str_subset("\\.txt") %>%
            basename %>%
@@ -897,11 +908,12 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
     numnode = menu(paxdb_nodes, title = "Pick a taxonomic node from the list below",graphics = T)
   }
 
-  node = paxdb_nodes[numnode]
-  paxdb_node = sprintf("paxdb-orthologs-4.1/%s.orthgroups.consistent.txt",node)
+  node_file = paxdb_nodes[numnode]
+  paxdb_node = basename(paxdb_orthologs_dir) %>% file.path(.,node_file)
+
   # Read orthogroups at a specific taxonomic level
   message("Retrieving orthologs for node [",node,"]...")
-  node_ortho <- readr::read_delim(unz(temp, paxdb_node),col_names = c("NOG", "orthologs"), delim="\t",progress=T) %>%
+  node_ortho <- readr::read_delim(file = unz(temp, paxdb_node),col_names = c("NOG", "orthologs"), delim="\t",progress=T) %>%
     separate_rows(orthologs,sep=" ") %>%
     extract(orthologs,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
     group_by(NOG,taxid) %>% mutate(is_1to1=n()==1)
@@ -910,12 +922,19 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
 }
 
 load.paxdb = function(taxon=4932){
-
-  paxdb_dataset ="https://pax-db.org/downloads/latest/datasets/"
+  URL_PAXDB = "https://pax-db.org/downloads/latest/"
+  paxdb_dataset =paste0(URL_PAXDB,"datasets/")
   taxon_dir=file.path(paxdb_dataset,taxon,"/")
-  taxon_data <- RCurl::getURL(taxon_dir,dirlistonly = TRUE) %>%
-    stringr::str_extract_all('(?<=\\<a href\\=\\")(.+\\.txt)(?=\\">)') %>%
-    unlist
+
+  taxon_data <- rvest::read_html(taxon_dir) %>%
+                rvest::html_nodes("a") %>%
+                rvest::html_attr(name='href') %>%
+                stringr::str_subset(pattern = "/$",negate = T) %>%
+                stringr::str_subset("\\.txt")
+
+  # taxon_data <- RCurl::getURL(taxon_dir,dirlistonly = TRUE) %>%
+  #               stringr::str_extract_all('(?<=\\<a href\\=\\")(.+\\.txt)(?=\\">)') %>%
+  #               unlist
 
   Ndata = length(taxon_data)
   message(Ndata," paxDB datasets for taxon [",taxon,"]")
@@ -1032,7 +1051,6 @@ get.paxdb = function(tax=4932, abundance='integrated'){
 
 get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated"){
   closeAllConnections() # Make sure to close all connections before downloading data
-
   # Retrive orthologs from node
   message("Selecting orthologs for [",node,"]")
   ortho = load.paxdb.orthologs(node)
