@@ -84,11 +84,17 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
 network.centrality = function(fromTo,namenet=''){
   if(missing(fromTo)){ stop("A from-to matrix is required to build the network!") }
   library(igraph)
+  #library(network)
+  #library(CINNA)
+  #library(centiserve)
+  #library(sna)
   library(tictoc)
   #library(tidygraph)
   #library(netrankr)
   tic(" - Build graph...")
   fullnet = graph_from_data_frame(fromTo,directed = F)
+  full = network::network(as_edgelist(fullnet))
+
   message("Number of nodes: ",length(V(fullnet)))
   comp = components(fullnet)
   message("Number of components: ",comp$no)
@@ -100,8 +106,43 @@ network.centrality = function(fromTo,namenet=''){
   toc()
 
   node.centrality = tibble( ids = as_ids(V(fullnet)),
-          cent_deg = igraph::degree(fullnet)
-         )
+          cent_deg = igraph::degree(fullnet),
+          cent_betweenness = igraph::betweenness(fullnet,normalized=T),
+          cent_eccentricity = igraph::eccentricity(fullnet),
+          cent_pagerank = igraph::page_rank(fullnet)$vector,
+          cent_eigen = igraph::eigen_centrality(fullnet,scale = T)$vector,
+          cent_authority = igraph::authority_score(fullnet,scale = T)$vector,
+          cent_hub = igraph::hub_score(fullnet,scale = T)$vector,
+          cent_subgraph= igraph::subgraph_centrality(fullnet,diag = F),
+          cent_topcoef = centiserve::topocoefficient(fullnet),
+          cent_bottleneck = centiserve::bottleneck(fullnet),
+          cent_clustrank  = centiserve::clusterrank(fullnet),
+          cent_diffusion = centiserve::diffusion.degree(fullnet),
+          cent_dmnc = centiserve::dmnc(fullnet),
+          cent_mnc = centiserve::mnc(fullnet),
+          cent_coreness = igraph::coreness(fullnet),
+          cent_geodesic = centiserve::geokpath(fullnet),
+          cent_katz = centiserve::katzcent(fullnet),
+          cent_markov = centiserve::markovcent(fullnet),
+          cent_laplacian = centiserve::laplacian(fullnet),
+          cent_epc = centiserve::epc(fullnet),
+          cent_leverage = centiserve::leverage(fullnet),
+          cent_entropy = centiserve::entropy(fullnet),
+          cent_crossclique = centiserve::crossclique(fullnet),
+          cent_community = centiserve::communitycent(fullnet), # requires linkcomm package
+          cent_closeness_latora =  centiserve::closeness.latora(fullnet,normalized = T),
+          cent_closeness_dangalchev = CINNA::dangalchev_closeness_centrality(fullnet),
+          cent_closeness_resid  = centiserve::closeness.residual(fullnet),
+          #cent_wienerindex = CINNA::wiener_index_centrality(fullnet), # returns Inf for not connected graph
+          cent_semilocal = centiserve::semilocal(fullnet), # may be slow
+          cent_group = CINNA::group_centrality(fullnet),
+          cent_harmonic = CINNA::harmonic_centrality(fullnet),
+          cent_localbridging = CINNA::local_bridging_centrality(fullnet),
+          cent_stress = sna::stresscent(full),
+          cent_load = sna::loadcent(full),
+          cent_flowbet = sna::flowbet(full),
+          cent_info = sna::infocent(full)
+         ) %>% dplyr::slice(gtools::mixedorder(ids))
 
   # Get the largest connected component
   tic(" - Find largest connected component...")
@@ -115,19 +156,19 @@ network.centrality = function(fromTo,namenet=''){
   path.centrality = tibble( ids = as_ids(V(connet)) ) %>%
     mutate(
       #cent_alpha = igraph::alpha_centrality(connet,loops = T),
-      cent_betweenness = igraph::betweenness(connet,normalized=T),
       cent_closeness = igraph::closeness(connet,normalized = T),
-      cent_eccentricity = igraph::eccentricity(connet),
-      cent_pagerank = igraph::page_rank(connet)$vector,
-      cent_eigen = igraph::eigen_centrality(connet,scale = T)$vector,
-      cent_authority = igraph::authority_score(connet,scale = T)$vector,
-      cent_hub = igraph::hub.score(connet,scale = T)$vector,
-      cent_subgraph= igraph::subgraph_centrality(connet,diag = F)
+      cent_closeness_current = centiserve::closeness.currentflow(connet),
+      #cent_closeness_vitality = centiserve::closeness.vitality(connet), # ERROR Subgraph of graph is not strongly connected
+      #cent_hubbell = centiserve::hubbell(connet), # ERROR Hubbell index centrality is not solvable for this graph
+      cent_avgdist = centiserve::averagedis(connet),
+      cent_barycenter = centiserve::barycenter(connet),
+      cent_centroid = centiserve::centroid(connet),
+      cent_decay = centiserve::decay(connet),
+      cent_radiality = centiserve::radiality(connet)
   )
   toc()
-
   centrality = left_join(node.centrality,path.centrality)
-
+  #p=proper_centralities(ZZ)
   # Benchmark correlation for the centrality measures
   tic(" - Find correlation between centrality measures...")
   corrplot::corrplot(cor(centrality[,-1],use = 'complete',method ='spearman'),
