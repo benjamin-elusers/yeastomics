@@ -105,6 +105,7 @@ network.centrality = function(fromTo,namenet=''){
   cat("\n\n")
   toc()
 
+  tic(" - Compute global network centralities (even if not fully connected)...")
   node.centrality = tibble( ids = as_ids(V(fullnet)),
           cent_deg = igraph::degree(fullnet),
           cent_betweenness = igraph::betweenness(fullnet,normalized=T),
@@ -143,6 +144,7 @@ network.centrality = function(fromTo,namenet=''){
           cent_flowbet = sna::flowbet(full),
           cent_info = sna::infocent(full)
          ) %>% dplyr::slice(gtools::mixedorder(ids))
+  toc()
 
   # Get the largest connected component
   tic(" - Find largest connected component...")
