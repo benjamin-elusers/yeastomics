@@ -124,7 +124,7 @@ load.belle2006.data = function(){
   return(halflives)
 }
 
-load.pu.2008.data = function(){
+load.pu2008.data = function(){
   # Load macromolecular protein complexes from yeast
   message("REF: S. Pu et al., 2008, Nucleic Acids Research")
   message("Up-to-date catalogues of yeast protein complexes")
@@ -281,7 +281,7 @@ load.geisberg2014.data = function(nodesc=T){
 load.dana2014.data = function(){
   # Load ribosome translation efficiency
   message("REF: A. Dana and T. Tuller, 2014, G3 (Genes|Gemomes|Genetics)")
-  message("Mean of the Typical Decoding Rates: A New Translation Efficiency Index Based on the Analysis of Ribosome Profiling Data ")
+  message("Mean of the Typical Decoding Rates: A New Translation Efficiency Index Based on the Analysis of Ribosome Profiling Data")
   message("see also -> The effect of tRNA levels on decoding times of mRNA codons (Nucleic Acids Res)")
   # https://doi.org/10.1534/g3.114.015099
   # S. cerevisiae data based on ribosome profiling data:
@@ -404,6 +404,31 @@ load.vanleeuwen2016.data = function(single_orf=F){
   return(vanleeuwen)
 }
 
+load.lahtvee2017.data = function(){
+  # Load protein and mRNA abundance and translation efficiency
+  message("REF: P-J Lahtvee et al., 2017, Cell Systems")
+  message("Absolute Quantification of Protein and mRNA Abundances Demonstrate Variability in Gene-Specific Translation Efficiency in Yeast")
+
+  # transcript level
+  S2.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217300881-mmc2.xlsx"
+  header_s2 = rio::import(S2.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames
+  transcript_level = rio::import(S2.url,skip=4,col_names=header_s2) %>% as_tibble %>% type_convert
+
+  # protein abundance
+  S3.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217300881-mmc3.xlsx"
+  header_s3 = rio::import(S3.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames
+  protein_level = rio::import(S3.url,skip=4,col_names=header_s3) %>% as_tibble %>% type_convert
+
+  # protein-mRNA ratio (translation rate)
+  S4.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217300881-mmc4.xlsx"
+  header_s4 = rio::import(S4.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames
+  translation_rate = rio::import(S4.url,skip=4,col_names=header_s4) %>% as_tibble %>% type_convert
+
+  # turnover
+  S5.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217300881-mmc5.xlsx"
+  protein_turnover = rio::import(S5.url,skip=1) %>% janitor::clean_names() %>% as_tibble
+
+}
 load.villen2017.data = function(){
   library(openxlsx)
 
@@ -462,6 +487,14 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
   #          "is.disordered", "T.90..Unfolded")
 
   return(peptides)
+}
+
+load.mittal2017.data=function(){
+  message("REF: N. Mittal et al., 2017, Nature Communications")
+  message("The Gcn4 transcription factor reduces protein synthesis capacity and extends yeast lifespan")
+  S1.url="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5587724/bin/41467_2017_539_MOESM2_ESM.xlsx"
+  protein_synthesis = rio::import(S1.url,skip=1) %>% janitor::clean_names() %>% type_convert()
+  return(protein_synthesis)
 }
 
 load.peter2018.data =function(d){
@@ -658,6 +691,29 @@ load.dubreuil2019.data = function(d){
     res = readr::read_delim(file = read.url(data.url), col_names = T, delim = '\t',  progress = T,guess_max=50000)
   }
   return(res)
+}
+
+load.hausser2019.data=function(){
+  message("REF: J. Hausser et al., 2019, Nature Communications")
+  message("Central dogma rates and the trade-off between precision and economy in gene expression")
+  S1.url="https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-018-07391-8/MediaObjects/41467_2018_7391_MOESM4_ESM.xlsx"
+  rio::import(S1)
+}
+
+
+load.szavitsnossan2020.data = function(){
+
+  message("REF: J. Szavits-Nossan et al., 2020, Nucleic Acids Research")
+  message("Inferring efficiency of translation initiation and elongation from ribosome profiling")
+  zip.url = "https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/nar/48/17/10.1093_nar_gkaa678/1/gkaa678_supplemental_files.zip?Expires=1648233481&Signature=SPpuRD-C9Hl8cQYD5qtQnTXvPpPHpoqQCorupykk62Ix5jhnIe5JMiaVO3-rpTToxETOAe56z8BhVKVd5n6FBFvl0ovfvCoTeAsEquMZdzoBzUhSErDkllLunIXilFhF17L1Upv7wZFjPmTc3J1rK~Ckmm8EFqnnoJu5LvQBHcMN~HT8cpj3koYuBEnh1GFJ8pb17bILkNcB6qCwHnvtoW8g9e7S0fHZ2hsjYM9AlRCdwheSadSHQZgTyIJI44xHI2X51t5VC4v9LP~gGDlb8EcuYkDiRLcpQSbQkoI5Yt~BDOvymQY4AOna6UFVb1qN4Ll0j4J3Yv55ZjeXmXSm4g__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA"
+  temp<-tempfile()
+  download.file(zip.url,temp)
+  data_files = unzip(temp,list = T)$Name[1:3]
+
+  weinberg <- readr::read_delim(file = unz(temp, data_files[1]), skip=3) %>% janitor::clean_names()
+  pop <- readr::read_delim(file = unz(temp, data_files[2]), skip=3) %>% janitor::clean_names()
+  guydosh <- readr::read_delim(file = unz(temp, data_files[3]), skip=3) %>% janitor::clean_names()
+
 }
 
 load.vanleeuwen2020.data = function(){
