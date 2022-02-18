@@ -995,7 +995,7 @@ load.paxdb = function(taxon=4932){
 }
 
 get.paxdb = function(tax=4932, abundance='integrated'){
-  closeAllConnections() # Make sure to closse connections
+  #closeAllConnections() # Make sure to close connections
   paxdb = load.paxdb(tax)
   # if nothing selected return the integrated values
   # (if there is a single dataset, it is considered as integrated)
@@ -1065,7 +1065,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
 #                    number.cex = 0.7,number.digits=2,number.font=1)
 
 get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated"){
-  closeAllConnections() # Make sure to close all connections before downloading data
+  #closeAllConnections() # Make sure to close all connections before downloading data
   # Retrive orthologs from node
   message("Selecting orthologs for [",node,"]")
   ortho = load.paxdb.orthologs(node)
