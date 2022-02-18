@@ -455,7 +455,9 @@ check_chunk(df.genomics,GENOMICS)
 ```{r transcriptomics}
 TRANSCRIPTOMICS=list()
 ### Codon adaptation
-df.tai=load.trna.adaptation(inputseq=CDS) %>% dplyr::rename(codonr.tAI = tAI)
+df.tai=load.trna.adaptation(inputseq=CDS, 
+                            trnas = here::here('data','GtRNA-counts.rds')) %>% 
+  dplyr::rename(codonr.tAI = tAI)
 df.CU=load.codon.usage(cds=CDS,with.counts=F) %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
 df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3), len.cds=lengths(CDS)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
  
@@ -828,7 +830,7 @@ FEATURES = PROTEOME %>%
 
 TOTAL_FEATURES= length(setdiff(colnames(FEATURES),colnames(PROTEOME)))
 FEATURE_BY_CATEGORIES = table(str_extract(pattern = "(^[^\\.]+)\\.", names(FEATURES)))
-saveRDS(FEATURES,sprintf("output/proteome-features-%s.rds",when))
+saveRDS(FEATURES,here::here("output", sprintf("proteome-features-%s.rds",when)))
 
 ```
 
@@ -856,8 +858,8 @@ for( C in names(PROPERTIES)){
   PROP[,C] = (PROP$UNIPROTKB %in% PROPERTIES[[C]]) | (PROP$ORF %in% PROPERTIES[[C]]) | (PROP$GNAME %in% PROPERTIES[[C]])
 }
 
-saveRDS(PROP,sprintf("output/proteome-properties-%s.rds",when))
-save.image(sprintf("output/loaded-datasets-%s.rds",when))
+saveRDS(PROP,here::here("output",sprintf("proteome-properties-%s.rds",when)))
+save.image(here::here("output",sprintf("loaded-datasets-%s.rds",when)))
 #load("output/loaded-datasets-04_05_2021.rds")
 ```
 
@@ -899,7 +901,7 @@ library(ggnewscale)
 library(ggpubr)
 library(ggfittext)
 theme_set(cowplot::theme_minimal_grid())
-source("src/theme_black.r")
+source(here::here("src","theme_black.r"))
 
 
 bp0 = ggplot(nprop %>% dplyr::select(categories.f,N) %>% distinct(), aes(x=categories.f, y=N, fill=categories.f)) + 
@@ -918,9 +920,9 @@ BP = ggplot(count.cat, aes(x=categories.f, y=N, label=N, fill=categories.f)) +
   scale_fill_tableau() + theme_black(base_size = 20) + theme(legend.pos='none') + coord_flip() + ylab('') + xlab("Categories")
 
 bp = plot_grid(plotlist = list(bp0,bp1),nrow = 1)
-save_plot(plot = BP, filename = "output/S0.prop-feat-count.png", base_height = 8, base_width = 8)
-save_plot(plot = bp0, filename = "output/S0_1.prop-count.png", base_height = 8, base_width = 8)
-save_plot(plot = bp1, filename = "output/S0_2.feat-count.png", base_height = 8, base_width = 8)
+save_plot(plot = BP, filename = here::here("output","S0.prop-feat-count.png"), base_height = 8, base_width = 8)
+save_plot(plot = bp0, filename = here::here("output","S0_1.prop-count.png"), base_height = 8, base_width = 8)
+save_plot(plot = bp1, filename = here::here("output","S0_2.feat-count.png"), base_height = 8, base_width = 8)
 
 plot(bp0)
 plot(bp1)
