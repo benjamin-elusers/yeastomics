@@ -428,7 +428,13 @@ load.lahtvee2017.data = function(){
   S5.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217300881-mmc5.xlsx"
   protein_turnover = rio::import(S5.url,skip=1) %>% janitor::clean_names() %>% as_tibble
 
+  protquant = left_join(transcript_level,protein_level,by=c('geneId'),suffix=c('_mrna_wt','_prot_wt')) %>%
+    left_join(translation_rate,by=c('geneId'),suffix=c('','_trans_rate')) %>%
+    left_join(protein_turnover,by=c('geneId'='associated_gene_id'))
+  return(protquant)
 }
+
+
 load.villen2017.data = function(){
   library(openxlsx)
 
@@ -701,6 +707,38 @@ load.hausser2019.data=function(){
 }
 
 
+load.jarzab2020.data = function(org='S.cerevisiae'){
+  message("REF: A. Jarzab et al., 2020, Nature Methods")
+  message("Meltome atlas—thermal proteome stability across the tree of life")
+  #https://static-content.springer.com/esm/art%3A10.1038%2Fs41592-020-0801-4/MediaObjects/41592_2020_801_MOESM7_ESM.xlsx
+  F2_url = "https://figshare.com/ndownloader/files/21653313"
+  species = c("T.thermophilus", "P.torridus", "G.stearothermophilus",
+              "E.coli", "B.subtilis",
+              "S.cerevisiae", "M.musculus",  "H.sapiens", "C.elegans", "D.melanogaster", "D.rerio",
+              "A.thaliana", "O.antarctica")
+  organisms = match.arg(org,species,several.ok = T)
+
+  F2a = rio::import(F2_url,col_names = TRUE,skip=1,sheet=1) %>%
+        as_tibble %>%
+        dplyr::filter(Species %in% organisms) %>%
+        janitor::clean_names()
+
+  F2b = rio::import(F2_url,col_names = TRUE,skip=1,sheet=2) %>%
+    as_tibble %>%
+    mutate(Species = str_replace_all(Dataset," +","") ) %>%
+    dplyr::select(-Dataset) %>%
+    dplyr::filter(Species %in% organisms) %>%
+    janitor::clean_names()
+
+  F2=left_join(F2a,F2b) %>%
+     separate(col = protein_id, sep = '_',into = c('UNIPROT','GENENAME')) %>%
+     dplyr::select(species,UNIPROT,GENENAME,
+                   Tm_celsius=melting_point_c,
+                   Tm_type=protein_classification,
+                   AUC=area_under_the_melting_curve)
+  return(F2)
+}
+
 load.szavitsnossan2020.data = function(){
 
   message("REF: J. Szavits-Nossan et al., 2020, Nucleic Acids Research")
@@ -710,10 +748,44 @@ load.szavitsnossan2020.data = function(){
   download.file(zip.url,temp)
   data_files = unzip(temp,list = T)$Name[1:3]
 
+  ## ribosome profiling experiments
+
+  #Weinberg D.E. et al., 2016, Cell Reports
+  #Improved ribosome-footprint and mRNA measurements provide insights into dynamics and regulation of yeast translation
   weinberg <- readr::read_delim(file = unz(temp, data_files[1]), skip=3) %>% janitor::clean_names()
+  # Pop C. et al., 2014, Mol. Syst. Biol.
+  # Causal signals between codon bias, mRNA structure, and the efficiency of translation and elongation
   pop <- readr::read_delim(file = unz(temp, data_files[2]), skip=3) %>% janitor::clean_names()
+  # Guydosh N. et al., 2014, Cell
+  # Dom34 rescues ribosomes in 3′ untranslated regions
   guydosh <- readr::read_delim(file = unz(temp, data_files[3]), skip=3) %>% janitor::clean_names()
 
+  # TIE = Translation Initiation Efficiency
+  # TEE = Translation Elongation Efficiency
+
+  # Symbol	Meaning
+  # L 	length of the mRNA (in codons, including START)
+  # ℓ 	length of the ribosome (in codons)
+  # α 	initiation rate [s−1]
+  # ki 	elongation rate [s−1] of codon i
+  # kL (or β) 	termination rate [s−1]
+  # {ki} 	speed profile (elongation) of a given transcript
+  # κi = ki/α 	relative (to initiation) elongation rate at codon i
+  # {κi} 	relative (to initiation) elongation profile
+  # ri 	experimental (normalized) density of codon i
+  # {ri} 	experimental (normalized) density profile
+  # r=∑Li=2ri/(L−1) 	mean density of a given gene
+  # ρi 	theoretical (normalized) density of codon i
+  # ρILAi 	theoretical (normalized) density of codon i in the initiation-limited approximation
+  # {ρi} 	theoretical (normalized) density profile
+  # ρsimi 	simulated (normalized) density of codon i
+  # {ρsimi} 	simulated (normalized) density profile
+
+  translation = weinberg %>%
+                dplyr::select(orf=x1, tie, mean_tee, mean_kappa,
+                              s,s_mf,s_opt,
+                              mean_experimental_density, mean_th_density)
+  return(translation)
 }
 
 load.vanleeuwen2020.data = function(){

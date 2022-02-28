@@ -269,6 +269,9 @@ DELTAG = load.leuenberger2017.data() %>%
    add_count(protein_id,name='npep') %>%
    distinct() %>%
    mutate( nres = round(0.01*protein_coverage*length))
+
+TM = load.jarzab2020.data()
+
 ## MRNA HALFLIFE  --------------------------------------------------------------
 MRNA.HL = load.geisberg2014.data() 
 ## PROTEIN HALFLIFE ------------------------------------------------------------
@@ -276,6 +279,8 @@ PROT.HL = load.belle2006.data() %>%
           left_join( load.villen2017.data(), by = c('ORF')) %>%
           left_join( load.christiano2014.data(), by=c('ORF'='ensg'))
 
+
+load.szavitsnossan2020.data()
 # PROTEIN-PROTEIN INTERACTIONS  ------------------------------------------------
 ## STRING functional protein association networks ------------------------------
 STRING = load.string(tax="4932",phy=F, ful=T, min.score = 900) %>% 
@@ -294,7 +299,7 @@ INTACT = preload(saved.file = file.intact,
 # PROTEIN COMPLEXES  -----------------------------------------------------------
 nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca'),"mer")
 ## CYC = Catalogue of Yeast Complexes ------------------------------------------
-CYC = load.pu.2008.data() %>% # BASED ON ORF
+CYC = load.pu2008.data() %>% # BASED ON ORF
       mutate(oligomers = cut(n_members, breaks = c(1:10,20,81), 
                              labels =  paste0("pu2008.CYC_",c(nmers[2:10],'high_oligomer','molecular_machine'))) )
 ## COMPLEXTAB = Complex Portal from EBI ----------------------------------------
@@ -454,6 +459,9 @@ check_chunk(df.genomics,GENOMICS)
 
 ```{r transcriptomics}
 TRANSCRIPTOMICS=list()
+### Translation initiation
+df.tie = load.szavitsnossan2020.data() %>% 
+  rename_with(.fn=Pxx, px='szavitsnossan2020.TIE',s='_',.cols=-orf)
 ### Codon adaptation
 df.tai=load.trna.adaptation(inputseq=CDS, 
                             trnas = here::here('data','GtRNA-counts.rds')) %>% 
@@ -461,6 +469,10 @@ df.tai=load.trna.adaptation(inputseq=CDS,
 df.CU=load.codon.usage(cds=CDS,with.counts=F) %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
 df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3), len.cds=lengths(CDS)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
  
+### Expression in different conditions
+df.cond_exp = load.lahtvee2017.data()%>%  dplyr::select(orf=geneId) %>%
+              rename_with(.fn=Pxx, px='lahtvee2017.exp',s='_',.cols=-orf)
+
 ### Amino-acid biosynthetic cost
 df.protinfo = UNIPROT %>%  dplyr::select(c(UNIPROTKB,REVIEWED,EXISTENCE,SCORE,qual))
 df.aa_mw = DUB %>% 
@@ -504,7 +516,8 @@ df.orthoexp =  PPM.ORTHO.4932 %>%
                          paxdb.ortho_ppm_n= sum.na(c_across(starts_with('paxdb.ppm_')),notNA = T) ) %>%
                   filter(paxdb.ortho_ppm_n > 1) %>%  dplyr::rename(paxdb.ppm_4932=ppm_4932)
 
-df.transcriptomics = PROTEOME %>% 
+df.transcriptomics = PROTEOME %>%
+                    left_join(df.tie,by=c('ORF'='orf')) %>%
                     left_join(df.tai,by=c('ORF'='prot')) %>% 
                     left_join(df.CU,by=c('ORF'='ID')) %>%
                     left_join(df.codons,by=c('ORF'='sgd.orf')) %>%
@@ -512,7 +525,8 @@ df.transcriptomics = PROTEOME %>%
                     left_join(df.cost,by=c('ORF'='name')) %>% 
                     left_join(df.HLmrna,by=c('ORF'='ORF')) %>%
                     left_join(df.riboeff,by=c('ORF'='orf')) %>%
-                    left_join(df.orthoexp,by=c('ORF'='orf'))
+                    left_join(df.orthoexp,by=c('ORF'='orf')) %>%
+                    left_join(df.cond_exp,by=c('ORF'='orf'))
 
 check_chunk(df.transcriptomics,TRANSCRIPTOMICS)
 
@@ -630,7 +644,13 @@ df.dg= DELTAG %>%
 BIOPHYSICS$leuenberger2017.Tm_stable = DELTAG %>% dplyr::filter( protinfo == "Stable") %>% pull(protein_id)
 BIOPHYSICS$leuenberger2017.Tm_medium = DELTAG %>% dplyr::filter( protinfo == "Medium") %>% pull(protein_id)
 BIOPHYSICS$leuenberger2017.Tm_unstable = DELTAG %>% dplyr::filter( protinfo == "Unstable") %>% pull(protein_id)
-
+df.tm = TM %>% 
+        dplyr::select(UNIPROT,GENENAME,Tm_celsius,Tm_type,AUC) %>% 
+        rename_with(.fn=Pxx, px='jarzab2020.TPP',s='_',.cols=-protein_id)
+BIOPHYSICS$jarzab2020.Tm_low = TM %>% dplyr::filter( Tm_type == 'Low-Tm' ) %>% pull(UNIPROT)
+BIOPHYSICS$jarzab2020.Tm_med = TM %>% dplyr::filter( Tm_type == 'Medium-Tm' ) %>% pull(UNIPROT)
+BIOPHYSICS$jarzab2020.Tm_hi = TM %>% dplyr::filter( Tm_type == 'High-Tm' ) %>% pull(UNIPROT)
+BIOPHYSICS$jarzab2020.Tm_nomelt = TM %>% dplyr::filter( Tm_type == 'Non-melter' ) %>% pull(UNIPROT)
 
 df.HLprot = PROT.HL %>%
             dplyr::select(ORF,halflife.avg,halflife_mn_corrected,degradation_rates_min_1,t1_2_min) %>%
@@ -658,7 +678,9 @@ df.biophysics = PROTEOME %>%
                 left_join(df.iup,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.aascales,by=c('UNIPROTKB'='UNIPROT')) %>%
                 left_join(df.HLprot,by=c('ORF'='ORF')) %>%
-                left_join(df.dg,by=c('UNIPROTKB'='protein_id'))
+                left_join(df.dg,by=c('UNIPROTKB'='protein_id'),
+                left_join(df.tm,by=c('UNIPROTKB'='UNIPROT'))
+)
 
 check_chunk(df.biophysics,BIOPHYSICS)
 
