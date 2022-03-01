@@ -112,7 +112,13 @@ load.belle2006.data = function(){
   message("REF: A. Belle, A. Tanay, L. Bitincka, R. Shamir, E.K. O’Shea, 2006, PNAS")
   message("Quantification of protein half-lives in the budding yeast proteome")
   #https://doi.org/10.1073/pnas.0605420103
-  Sdat1.url = "https://www.pnas.org/highwire/filestream/591690/field_highwire_adjunct_files/0/SuppDataSet.txt"
+
+  #EDIT URL NOT WORKING
+  # OLD "https://www.pnas.org/highwire/filestream/591690/field_highwire_adjunct_files/0/SuppDataSet.txt"
+  # NEW "https://www.pnas.org/doi/suppl/10.1073/pnas.0605420103/suppl_file/suppdataset.txt"
+  # THIS IS NEW ADDRESS REDIRECTS TO ANOTHER LINK
+
+  Sdat1.url = "https://www.pnas.org/action/downloadSupplement?doi=10.1073%2Fpnas.0605420103&file=suppdataset.txt"
   #download.file(Sdat1.url, destfile = "SuppDataSet.txt")
   halflives = read.delim(Sdat1.url,
                          header = T, skip = 10,
