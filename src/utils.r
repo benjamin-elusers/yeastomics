@@ -300,7 +300,7 @@ seq2fasta <- function(seq, maxline=70, as.string=F){
   return( paste0(fasta.seq,collapse='\n') )
 }
 
-# Colors -----------------------------------------------------------------------
+# Graphics/Colors --------------------------------------------------------------
 set.contrast.text <- function(color){
   ifelse( mean(col2rgb(color)) > 127, "black", "white")
 }
@@ -318,6 +318,12 @@ desat <- function(cols, sat=0.5) {
 gg_color_hue <- function(n) {
   hues = seq(15, 375, length = n + 1)
   hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+nice_par = function(mar = c(3, 3, 2, 1), mgp = c(2, 0.4, 0), tck = -0.01,
+                    cex.axis = 0.9, las = 1, mfrow = c(1, 1), ...) {
+  par(mar = mar, mgp = mgp, tck = tck, cex.axis = cex.axis, las = las,
+      mfrow = mfrow, ...)
 }
 
 # Environment ------------------------------------------------------------------
@@ -404,6 +410,10 @@ get_os <- function(){
 lsos <- function(..., n=10) { # checks top10 memory consumption from R objects
   ls.objects(..., order.by="Size", decreasing=TRUE, head=TRUE, n=n)
 }
+
+
+ht = function(d, n = 6){ rbind(head(d, n), tail(d, n)) }  # ht == headtail
+hh = function(d){ d[1:5, 1:5] } # show the first 5 rows & first 5 columns of a data frame
 
 paste.paired <- function(x,s='-'){ # join by pair (last value remains alone if odd number of values)
   if( is.even(length(x)) ){ return(paste.even(x,s)) }
