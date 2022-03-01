@@ -1,3 +1,8 @@
 *.png
-figure-html
-figure-html/*.png
+*/figure-html
+*/figure-html/*.png
+count-prop-feat-1.png
+count-prop-feat-2.png
+count-prop-feat-3.png
+interactions-1.png
+interactions-2.png
