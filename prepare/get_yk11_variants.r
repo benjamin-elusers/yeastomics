@@ -47,3 +47,6 @@ snp_count_per_orf %>% arrange(n_snp)
 
 write_rds(PROT_SNP,here("data",'YK11-SNP.rds'))
 write_rds(snp_count_per_orf,here("data",'YK11-ORF-VAR.rds'))
+
+PROT_SNP=read_rds(here("data",'YK11-SNP.rds'))
+snp_count_per_orf=read_rds(here("data",'YK11-ORF-VAR.rds'))
