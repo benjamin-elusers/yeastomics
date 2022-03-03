@@ -9,7 +9,7 @@ WT = get.positions(S288C) %>%
 
 yk11_seq_file = here("data","proteome-1011-strains.rds")
 if( file.exists(yk11_seq_file) ){
-  YK11 = readRDS()  # 1011 strains proteomes sequences
+  YK11 = readRDS(yk11_seq_file)  # 1011 strains proteomes sequences
 }else{
   yk11_seq_dir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/"
   YK11 = load.1011.strains(seqdir = yk11_seq_dir)
@@ -22,7 +22,7 @@ P = tibble( orf=names(YK11),
 
 yk11_var_file = here("data","YK11_VAR.rds")
 if( file.exists(yk11_var_file) ){
-  VAR = readRDS(var.file)
+  VAR = readRDS(yk11_var_file)
 }else{
   VAR = purrr::map_df(YK11, get.variants,verbose=F)
 }
@@ -41,7 +41,7 @@ PROT_SNP = left_join(SNP,WT, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len
          dSTI.wt=get.score.mutation(wt_aa,alt_aa))
 
 snp_count_per_orf = PROT_SNP %>%
-  group_by(id,len.s288c) %>%
+  group_by(id,len,len.s288c,n_strains) %>%
   summarize(n_snp=sum(nvar),n_var=n_distinct(ref_pos))
 snp_count_per_orf %>% arrange(n_snp)
 
