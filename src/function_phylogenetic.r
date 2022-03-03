@@ -309,8 +309,13 @@ find.common.ancestor= function(lineage){
 
 read.R4S = function(r4s, id=NULL,verbose=T){
   library(tidyverse)
-  if(is.null(id)){ id = basename(r4s) }
-  if(verbose){ message(sprintf('reading r4s results %s\n',basename(r4s))) }
+  if(is.null(id)){
+    id = basename(r4s)
+    is_orf = str_detect(id,SGD.nomenclature())
+    if ( is_orf ){ id = str_extract(id,SGD.nomenclature()) }
+  }
+
+  if(verbose){ message(sprintf('reading r4s results %s\n',id)) }
   #Rates were calculated using the expectation of the posterior rate distribution
   #Prior distribution is Gamma with 16 discrete categories
 
@@ -329,7 +334,11 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   #3     L 0.0004615   [9.65e-19,4.613e-05] 0.002097 1011/1011
   #4     T 0.006544   [0.0004101,0.01779] 0.006853 1011/1011
   #5     I 0.0002452   [9.65e-19,3.989e-06] 0.001131 1011/1011
-  r4s.col = c('POS','SEQ','SCORE','QQ_INTERVAL','STD','MSA')
+  r4s.col = c('POS','SEQ','SCORE','QQ-INTERVAL','STD','MSA')
+  r4s.header = grep(x=readLines(r4s),pattern="^#POS",v=T) %>% # read the lines that contains the header
+                str_sub(start = 2) %>% # remove the '#' symbol
+                str_split(pattern="\\s+") %>% unlist
+  r4s_col_in_file = intersect(r4s.col,r4s.header)
 
   # Make sure QQ-INTERVAL does not have any space in between brackets
   # LOOKBEHIND AND LOOKAHEAD library perl regex engine
@@ -338,17 +347,24 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   # test="  131     L    2.02   [0.4701,  2.02]       0 1011/1011"
   # test="   34     I 0.005863   [0.0001698, 0.004] 0.00562 1011/1011"
 
-  clean_r4s =readLines(r4s) %>% str_replace_all(string = ., pattern = "\\s+(?=[^\\[\\]]*\\])", replacement="")
+  if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
+    clean_r4s =readLines(r4s) %>% str_replace_all(string = ., pattern = "\\s+(?=[^\\[\\]]*\\])", replacement="")
+  }else{
+    clean_r4s =readLines(r4s)
+  }
   #gsub(x = .,  pattern = "(?<=\\[)([^\\]]*)( +)([^\\]]*)(?=\\])","\\1\\3",perl = T)
     #gsub("(?<=\\[)(\\s+)","",x = .,perl = T) # Remove spaces after bracket
     #gsub("(\\s+)(?=\\])","",x = .,perl = T) # Remove spaces before bracket
-  df.r4s = readr::read_table2(file = clean_r4s, comment = '#', col_names = r4s.col) %>%
-           mutate(
-             ID = id,
-             QQ = str_remove_all(QQ_INTERVAL, pattern = "\\[|\\]"),
-             QQ1 = as.double(str_split_fixed(QQ,',',n=2)[,1]),
-             QQ2 = as.double(str_split_fixed(QQ,',',n=2)[,2])
-           ) %>% select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
+  df.r4s = readr::read_table(file = clean_r4s, comment = '#', col_names = r4s_col_in_file) %>%
+           mutate( ID = id ) %>%
+           select(ID,POS,SEQ,SCORE,MSA) %>% janitor::make_clean_names(case='screaming_snake')
+  if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
+    df.r4s = df.r4s %>%
+             mutate( QQ = str_remove_all(vars("QQ-INTERVAL"), pattern = "\\[|\\]"),
+                     QQ1 = as.double(str_split_fixed(QQ,',',n=2)[,1]),
+                     QQ2 = as.double(str_split_fixed(QQ,',',n=2)[,2])) %>%
+             select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
+  }
 
   return(df.r4s)
 }
