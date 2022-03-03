@@ -357,7 +357,9 @@ read.R4S = function(r4s, id=NULL,verbose=T){
     #gsub("(\\s+)(?=\\])","",x = .,perl = T) # Remove spaces before bracket
   df.r4s = readr::read_table(file = clean_r4s, comment = '#', col_names = r4s_col_in_file) %>%
            mutate( ID = id ) %>%
-           select(ID,POS,SEQ,SCORE,MSA) %>% janitor::make_clean_names(case='screaming_snake')
+           select(ID,POS,SEQ,SCORE,MSA) %>%
+           as_tibble() %>%
+          janitor::clean_names('screaming_snake')
   if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
     df.r4s = df.r4s %>%
              mutate( QQ = str_remove_all(vars("QQ-INTERVAL"), pattern = "\\[|\\]"),
