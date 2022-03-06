@@ -4,6 +4,10 @@ library(stringr)
 library(hutils)
 library(hablar)
 
+PATTERN = c(
+  'orf'    = "(([Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?)|(Q[0-9]{4})|(R[0-9]{4}[WC]))",
+  'strain' = "^(SACE_[A-Z]{3}|[A-C][A-V][A-V])_"
+)
 ### Strains --------------------------------------------------------------------
 
 # Get strains with identical residues at a certain position in sequences
@@ -24,9 +28,15 @@ get.strain_orf= function(x,what=c('orf','strains','both')){
   nms = x
   if ( is(x, "XStringSet")) { nms <- names(x) }
 
-  genericName = hutils::longest_suffix(nms)
+
   orf = stringr::str_extract( string=genericName, pattern="([Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?)|(Q[0-9]{4})|(R[0-9]{4}[WC])")
-  strains = stringr::str_replace(string = nms, pattern = stringr::fixed(genericName), replacement = "")
+  #genericName = hutils::longest_suffix(nms)
+  #if( str_detect(genericName,PATTERN['strain']) ){
+  #  strains = stringr::str_replace(string = nms, pattern = stringr::fixed(genericName), replacement = "")
+  #}else{
+  # The strain name should always be in front and correspond to a specific pattern:
+  # ^(SACE_[A-Z]{3}|[A-C][A-V][A-V])_
+  strains = stringr::str_extract(string = nms, pattern = PATTERN['strain'])
   res = data.frame( strain_orf = orf, strain_name = strains, stringsAsFactors = F)
 
   what = match.arg(arg=tolower(what),choices = c('orf','strains','both'), several.ok = F)
@@ -291,3 +301,5 @@ get_snp_pos_plot =function(psnp=PROT_SNP,FREQMIN=c(0.0001,1e-3,1e-2,5e-2,1e-1,2e
     return(P)
 }
 
+#YK11_REF=map(names(S288C), function(orf){ append(YK11[[orf]],S288C[orf]) })
+#orf='YFL057C'
