@@ -29,19 +29,20 @@ get.strain_orf= function(x,what=c('orf','strains','both')){
   if ( is(x, "XStringSet")) { nms <- names(x) }
 
 
-  orf = stringr::str_extract( string=genericName, pattern="([Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?)|(Q[0-9]{4})|(R[0-9]{4}[WC])")
+  #orf = stringr::str_extract( string=genericName, pattern="([Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?)|(Q[0-9]{4})|(R[0-9]{4}[WC])")
   #genericName = hutils::longest_suffix(nms)
   #if( str_detect(genericName,PATTERN['strain']) ){
   #  strains = stringr::str_replace(string = nms, pattern = stringr::fixed(genericName), replacement = "")
   #}else{
   # The strain name should always be in front and correspond to a specific pattern:
   # ^(SACE_[A-Z]{3}|[A-C][A-V][A-V])_
+  orf = unique( stringr::str_extract( string=nms, pattern=PATTERN['orf']) )
   strains = stringr::str_extract(string = nms, pattern = PATTERN['strain'])
   res = data.frame( strain_orf = orf, strain_name = strains, stringsAsFactors = F)
 
   what = match.arg(arg=tolower(what),choices = c('orf','strains','both'), several.ok = F)
 
-  if(what == 'orf'){ return(unique(res$strain_orf)) }
+  if(what == 'orf'){ return(res$strain_orf) }
   else if(what == 'strains'){ return(res$strain_name)}
   return(res)
 }
