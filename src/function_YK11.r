@@ -36,13 +36,13 @@ get.strain_orf= function(x,what=c('orf','strains','both')){
   #}else{
   # The strain name should always be in front and correspond to a specific pattern:
   # ^(SACE_[A-Z]{3}|[A-C][A-V][A-V])_
-  orf = unique( stringr::str_extract( string=nms, pattern=PATTERN['orf']) )
+  orf = stringr::str_extract( string=nms, pattern=PATTERN['orf'])
   strains = stringr::str_extract(string = nms, pattern = PATTERN['strain']) %>% str_sub(end=-2L) # remove the last underscore
   res = data.frame( strain_orf = orf, strain_name = strains, stringsAsFactors = F)
 
   what = match.arg(arg=tolower(what),choices = c('orf','strains','both'), several.ok = F)
 
-  if(what == 'orf'){ return(res$strain_orf) }
+  if(what == 'orf'){ return(unique(res$strain_orf)) }
   else if(what == 'strains'){ return(res$strain_name)}
   return(res)
 }
