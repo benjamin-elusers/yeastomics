@@ -50,3 +50,87 @@ write_rds(snp_count_per_orf,here("data",'YK11-ORF-VAR.rds'))
 
 PROT_SNP=read_rds(here("data",'YK11-SNP.rds'))
 snp_count_per_orf=read_rds(here("data",'YK11-ORF-VAR.rds'))
+
+
+align_pair  = function(p1,p2,mat = "BLOSUM62",tomatrix=F, opening=10, extend=4 ){
+  ali = pairwiseAlignment(p1, p2, substitutionMatrix = mat, gapOpening=opening, gapExtension=extend)
+  if(tomatrix){
+    return( pairwise.alignment.to.df(ali) )
+  }else{
+    return(ali)
+  }
+}
+
+orfs = names(S288C)
+orf='YAL001C'
+align_s288c_strains = function(orf){
+  refseq = S288C[orf]
+  strain_seq = YK11[[ orfs[2] ]]
+  strain_names = get.strain_orf(names(strainseq),what = 'strains')
+
+  df_ali = lapply(names(strainseq), function(x){ align_pair(refseq,strain_seq[[x]],tomatrix = T) })
+}
+
+tmp = align_s288c_strains('YAL001C')
+
+length(tmp)
+tmp[[1]]
+
+function(p1,p2, mat="BLOSUM62", opening=10, extend=4){
+
+  ali = pairwiseAlignment(p1, p2, substitutionMatrix = mat, gapOpening=opening, gapExtension=extend)
+
+  get_pid = function(ali){
+    sapply(paste0("PID",1:4),function(x){ pid(ali,x) })
+  }
+
+  get_ol = function(ali){
+    p=unaligned(pattern(ali))
+    s=unaligned(subject(ali))
+    L1 = width(p)
+    L2 = width(s)
+    OL1 = L1/L2
+    OL2 = L2/L1
+    OL  = min(L1,L2) / max(L2,L1)
+    return(c("OL1"=OL1,"OL2"=OL2,"OL"=OL))
+  }
+
+  get_char = function(seq){
+    return( unlist(strsplit(as.character(seq),"")) )
+  }
+
+  get_matches = function(ali){
+    S1 = get_char(alignedPattern(ali))
+    S2 = get_char(alignedSubject(ali))
+    L=nchar(ali)
+    N=nmatch(ali)
+    NS=nmismatch(ali)
+    GAP = sum((S1=="-" & S2=="-"))
+    INDEL = sum(xor(S1!='-',S2!='-'))
+    IN = sum(S1!="-" & S2=="-")
+    DEL = sum(S1=="-" & S2!="-")
+    return(c('S'=N,'NS'=NS,'G'=INDEL,"I"=IN,"D"=DEL,'L'=L,"gapped"=GAP))
+  }
+
+  PID = get_pid(ali)
+  OL = get_ol(ali)
+  SCORE = score(ali)
+  MATCH = get_matches(ali)
+  names(p1)
+  get.strain_orf(names(p2),"strain")
+
+  resi = seq_along(S2)
+  tibble(G=,S=nmatch(A),NS= nid =, pid= pid(), ol =
+
+                s1 = names(P), s2 = names(S),
+                aa.s1 = S1, gap.s1 = (aa.s1=='-'),
+                aa.s2= S2, gap.s2 = (aa.s2=='-'),
+                l.s1 = width(p), l.s2 = width(s), l=width(P),
+                ol.12 = l.s1/l.s2, ol.21 = l.s2/l.s1,
+                pid.aligned = pid(A,type = "PID2" ),
+                pid.short = pid(A,type = "PID3" ),
+                pid.long  = 100* (nid / max(l.s1,l.s2)) ) %>%
+  group_by(gap.s2) %>% mutate( pos.s2 = ifelse(gap.s2, NA, no=row_number() ) ) %>%
+  group_by(gap.s1) %>% mutate( pos.s1 = ifelse(gap.s1, NA, no=row_number() ) ) %>%
+  ungroup() %>% distinct()
+ali.list[[i]] = m.ali
