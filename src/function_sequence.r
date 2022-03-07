@@ -184,8 +184,12 @@ get.orf.fasta = function(fastafile){
 widths = function(BS){
   if(is.list(BS)){
     return( sapply(BS,width) )
+  }else if( class(BS) == "AAStringSet" ){
+    return(width(BS))
+  }else if( class(BS) == "AAStringSetList"){
+    return( sapply(nchar(BS),unique) )
   }else{
-    width(BS)
+    stop('function not defined for unknown class of input')
   }
 }
 

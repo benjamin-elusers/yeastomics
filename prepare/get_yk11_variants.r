@@ -16,7 +16,7 @@ if( file.exists(yk11_seq_file) ){
 }
 P = tibble( orf=names(YK11),
             n_strains=lengths(YK11),
-            len = sapply(widths(YK11),unique)) %>%
+            len = widths(YK11)) %>%
     left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
     mutate( match_wt = len == len.s288c )
 

@@ -378,23 +378,22 @@ wt.file = here("data","YK11_WT.rds")
 var.file = here("data","YK11_VAR.rds")
 snppos.file = here("data","YK11_SNP_pos.rds")
 
-P = tibble( orf=names(YK11), 
+P = tibble( orf=names(YK11),
             n_strains=lengths(YK11),
-            len = sapply(widths(YK11),unique)
-    ) %>% left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
+            len = widths(YK11)) %>%
+    left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
     mutate( match_wt = len == len.s288c )
-
 
 P8 = tibble( orf=names(Y8), 
             n_strains=lengths(Y8),
-            len = sapply(widths(Y8),unique)
+            len = widths(Y8)
     ) %>% left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
     mutate( match_wt = len == len.s288c )
 sum_(!P8$match_wt)
 
 P2 = tibble( orf=names(Y2), 
             n_strains=lengths(Y2),
-            len = sapply(widths(Y2),unique)
+            len = widths(Y2)
     ) %>% left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
     mutate( match_wt = len == len.s288c )
 sum_(!P2$match_wt)
