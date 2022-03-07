@@ -147,15 +147,15 @@ read.proteomes = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
   }
 
   if (require('pbmcapply')) {
-    cat(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
+    message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus\n",ncores))
     P = pbmcapply::pbmcmapply(FUN=readProteome,  seqfiles, MoreArgs = list(.pb=pb, .pb.toprint=task),
                           mc.cores=ncores, mc.silent=F, mc.cleanup = T)
   }else if( require('parallel') ){
-    cat(sprintf("using 'parallel' package across %s cpus (no progress bar)",ncores))
+    message(sprintf("using 'parallel' package across %s cpus (no progress bar)\n",ncores))
     P = parallel::mcmapply( FUN=readProteome,  seqfiles, MoreArgs = list(.pb=pb, .pb.toprint=task),
                             mc.cores=ncores, mc.silent=F, mc.cleanup = T)
   }else{
-    cat("sequential computation with progress bar")
+    message("sequential computation with progress bar\n")
     P = mapply(FUN=readProteome,  seqfiles, MoreArgs = list(.pb=pb, .pb.toprint=task))
   }
 
