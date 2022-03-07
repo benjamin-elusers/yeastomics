@@ -127,3 +127,4 @@ score_ali = function(p1,p2,s1,s2, mat="BLOSUM62", opening=10, extend=4){
 }
 
 
+
