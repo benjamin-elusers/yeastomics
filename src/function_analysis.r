@@ -241,7 +241,7 @@ get.iqr = function(x,lower,upper,with_ties=T){
     }
 }
 
-# Slice tibble data for specicic quantiles or interquantile range
+# Slice tibble data for specific quantile or interquantile range
 slice.d10  = function(x,...){ dplyr::slice_min(x,prop=0.1,with_ties = T,...) }
 slice.d90  = function(x,...){ dplyr::slice_max(x,prop=0.1,with_ties = T,...) }
 slice.q25  = function(x,...){ dplyr::slice_min(x,prop=0.25,with_ties = T,...) }
@@ -270,14 +270,6 @@ fivebins = function(x, applyto=NULL,
       BINS = lapply(BINS,function(B){ applyto[ B ]})
   }
   return(BINS)
-}
-
-slice_min_max <- function(df, order_by = value, n = 1) {
-  order_by = enquo(order_by)
-  min <- slice_min(df, !!order_by, n = n) %>% mutate(type = "min")
-  max <- slice_max(df, !!order_by, n = n) %>% mutate(type = "max")
-  df <- bind_rows(min, max) %>% as_tibble()
-  return(df)
 }
 
 slice_min_max <- function(df, order_by = value, n = 1) {
@@ -352,9 +344,9 @@ AACOUNT2SCORE = function(COUNT,SCORE, opposite=F){
 }
 
 find_na_rows = function(df,as.indices=F){
-  NA_codon = rowsNA(df) > 0
-  if(as.indices){ return(which(NA_codon)) }
-  return(df[which(NA_codon),])
+  row_with_NA = rowsNA(df) > 0
+  if(as.indices){ return(which(row_with_NA)) }
+  return(df[which(row_with_NA),])
 }
 
 coalesce_join <- function(x, y,

@@ -12,17 +12,35 @@ Yeastomics gather a set of tools and functions I use to analyze yeast proteome d
 
 ## ## Sequence
 
--   read proteomes from list of files
+-   read proteomes from list of files (with parallel and/or progress bar)
 -   read nucleic sequence
 -   read protein sequence
 
+## ## Annotations
+
+-   retrieve annotations from controlled vocabulary (MI)
+
+-   get annotations from Uniprot description (localizations,complex,roles,functions...)
+
+-   get GeneOntology annotations (localizations)
+
 ## ## Alignment
 
-make pairwise alignment
+-   make pairwise alignment
+
+-   compute summary statistics about alignment (overlap, %ID, mis/matches...)
+
+-   convert alignment to residues table
 
 ## ## Phylogenetic
 
-read Rate4site (R4S) output
+-   read Rate4site (R4S) output
+
+-   get tabular data about YGOB yeast ohnologs
+
+-   get eggnog data about a particular taxonomic level
+
+-   find common ancestors between lineages written as strings
 
 ## ## Resource databases *(remote access via URL)*
 
@@ -71,13 +89,42 @@ read Rate4site (R4S) output
 
 ## ## Analysis
 
-make equal bins (1st and last bin manual) compute network centrality discretize variables according to quantiles
+-   make equally sized/distributed bins (1st and last can be set manually)
+
+-   get values at decile x (`d*()` where \* = 10,40,60,90)
+
+-   get values at quantile y (`q*()` where \* = 25,75)
+
+-   filter data based on deciles/quantile values at x (with/out ties)
+
+-   get values in interquantile range (`get.iqr()`)
+
+-   slice tibble data for specific quantile or interquantile range (`slice_d*()` and `slice_q*()`)
+
+-   compute network centrality measures (`network.centrality()`)
+
+-   discretize variables into 5 custom bins (`fivebins()`)
+
+-   get extreme (outliers) values/index/boundaries from a vector (`get_extremes()` ,`get_outliers`,`get_outliers_index`,`get_outliers_boundary()`)
+
+-   compute protein amino acid scores from residues count (`AACOUNT2SCORE()`)
+
+-   detect rows with NAs (`find_na_rows()`)
+
+-   coalesce-join between dataframe (NA are replaced in shared columns for which one of the value is defined `coalesce_join()`)
+
+-   find closest value in vector (`nearest()`)
+
+-   Toolbox for regression and unidimensional analysis...
 
 ## ## Utilities
 
 -   String manipulations
--   Shorthands
+-   Shorthands and wrappers to useful functions
 -   Environment and memory
--   Counting
--   Filtering/Subsetting
--   Precomputed-data
+-   Counting elements
+-   Filtering/Subsetting objects
+-   Testing/Checking values
+-   I/O
+-   Values formatting
+-   Precomputed-data (Sequences/Amino-acids/AA scores)
