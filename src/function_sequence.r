@@ -148,7 +148,7 @@ read.proteomes = function(seqfiles,strip.fname=F){
     names(P) = get.orf.filename(seqfiles)
   }
   toc()
-  return(P)
+  return(AAStringSetList(P))
 }
 
 get.orf.filename = function(seqfile){
