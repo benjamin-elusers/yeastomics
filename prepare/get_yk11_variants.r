@@ -75,15 +75,15 @@ get_s288c_strain = function(orf){
 }
 
 
-align_s288c_strains = function(s288c,strains){
-
+align_s288c_strains = function(orf){
   #tic('future_map_dfr')
   #future::plan(future::multisession(workers = 14))
   #df_strain = furrr::future_map_dfr(strains, .f = ~score_ali(p1=refseq, p2=strain_seq[.x], mat='BLOSUM100'), .progress = T )
   #cat("\n")
   #toc()
   #tic('map_dfr')
-  df_strain = map_dfr(strains, ~score_ali(p1=s288c, p2=strains[1], mat='BLOSUM100'))
+  SEQ = get_s288c_strain(orf)
+  df_strain = sapply(SEQ, function(x){ print(x); score_ali(p1=SEQ[[1]], p2=x, mat='BLOSUM100') })
   #toc()
   #identical(df_strain,df_strain2)
   df_closest = df_strain %>%
@@ -96,6 +96,7 @@ align_s288c_strains = function(s288c,strains){
 future::plan(future::multisession(workers = 14))
 orfs = intersect(names(S288C),names(YK11))
 
+pbmcapply::pbmcmapply(align_s288c_strains, orfs)
 for( O in orfs){
   SEQ = get_s288c_strain(O)
   align_s288c_strains(SEQ[[1]],SEQ[[2]])
