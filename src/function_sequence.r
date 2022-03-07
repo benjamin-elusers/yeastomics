@@ -139,12 +139,26 @@ read.proteomes = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
   pb = progress::progress_bar$new(total = length(seqfiles), width = 100, clear=T,
                          format = " (:spin) :what [:bar] :percent (:current/:total # :elapsed eta: ~:eta)")
 
-  readProteome = function(file, format = "fasta", obj.type = "Biostrings", .pb=NULL, ...){
-    if(!.pb$finished){ .pb$tick(tokens=list(what=task)) }
+  readProteome = function(file, .pb=NULL, .pb.toprint=task){
+    # format = "fasta", obj.type = "Biostrings"
+    if(!.pb$finished){ .pb$tick(tokens=list(what=.pb.toprint)) }
     #return( biomartr::read_proteome(file,format,obj.type,...) )
     return(Biostrings::readAAStringSet(file, format = 'fasta' ))
   }
-  P = parallel::mcmapply( X=seqfiles, FUN=readProteome,  MoreArgs = list(.pb=pb), mc.cores=ncores)
+
+  if (require('pbmcapply')) {
+    cat("using pbmcapply to track progress in parallel")
+    pbmcapply::pbmcmapply(FUN=readProteome,  seqfiles, MoreArgs = list(.pb=pb, .pb.toprint=task),
+                          mc.cores=ncores, mc.silent=F, mc.cleanup = T)
+  }else if( require('parallel') ){
+    cat("using parallel package (no progress bar)")
+    P = parallel::mcmapply( FUN=readProteome,  seqfiles, MoreArgs = list(.pb=pb, .pb.toprint=task),
+                            mc.cores=ncores, mc.silent=F, mc.cleanup = T)
+  }else{
+    cat("sequential computation with progress bar")
+    P = mapply(FUN=readProteome,  seqfiles, MoreArgs = list(.pb=pb, .pb.toprint=task))
+  }
+
   if(strip.fname){
     warning("filename will be used as the proteome identifier")
     names(P) = get.orf.filename(seqfiles)
