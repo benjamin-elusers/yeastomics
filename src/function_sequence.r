@@ -124,12 +124,12 @@ load.uniprot.proteome = function(species='yeast') {
   return(UNI)
 }
 
-read.proteomes = function(seqfiles,strip.fname=F){
+read.proteomes = function(seqfiles,strip.fname=F,ncores=parallelly::availableCores(which='max')-2){
   library(Biostrings)
   library(tictoc)
   library(progress)
-  #library(biomartr) # NOT libraryD
-  #library(purrr)    # NOT libraryD
+  #library(biomartr) # NOT library
+  #library(purrr)    # NOT library
 
   task="Reading proteomes from fasta sequences..."
   tic(msg = task)
@@ -142,7 +142,7 @@ read.proteomes = function(seqfiles,strip.fname=F){
     #return( biomartr::read_proteome(file,format,obj.type,...) )
     return(Biostrings::readAAStringSet(file, format = 'fasta' ))
   }
-  P = mapply( seqfiles, FUN=readProteome,  MoreArgs = list(.pb=pb))
+  P = mcmapply( X=seqfiles, FUN=readProteome,  MoreArgs = list(.pb=pb), mc.cores=ncores)
   if(strip.fname){
     warning("filename will be used as the proteome identifier")
     names(P) = get.orf.filename(seqfiles)
