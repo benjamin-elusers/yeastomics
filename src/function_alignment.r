@@ -1,5 +1,6 @@
 #source("src/utils.r",local = T)
 library(tidyverse)
+library(Biostrings)
 # Pairwise alignment -----------------------------------------------------------
 get.pair.prot = function(prot, pair){
   seq.1 = prot[pair[[1]]]
@@ -121,7 +122,7 @@ score_ali = function(p1,p2,s1,s2, mat="BLOSUM62", opening=10, extend=4){
   # Best way to create a one-row dataframe from a list of named vectors
   row_data = tibble::lst(IDS,PID,OL,SCORE,MATCH) %>%
     purrr::flatten() %>%
-    as_tibble()
+    tibble::as_tibble()
   return(row_data)
 }
 
