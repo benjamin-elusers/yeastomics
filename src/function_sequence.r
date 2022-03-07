@@ -128,6 +128,8 @@ read.proteomes = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
   library(Biostrings)
   library(tictoc)
   library(progress)
+  library(parallel)
+  library(parallelly)
   #library(biomartr) # NOT library
   #library(purrr)    # NOT library
 
@@ -142,7 +144,7 @@ read.proteomes = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
     #return( biomartr::read_proteome(file,format,obj.type,...) )
     return(Biostrings::readAAStringSet(file, format = 'fasta' ))
   }
-  P = mcmapply( X=seqfiles, FUN=readProteome,  MoreArgs = list(.pb=pb), mc.cores=ncores)
+  P = parallel::mcmapply( X=seqfiles, FUN=readProteome,  MoreArgs = list(.pb=pb), mc.cores=ncores)
   if(strip.fname){
     warning("filename will be used as the proteome identifier")
     names(P) = get.orf.filename(seqfiles)
