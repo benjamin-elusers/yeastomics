@@ -25,9 +25,7 @@
 ## ## Alignment
 
 -   make pairwise alignment
-
 -   compute summary statistics about alignment (overlap, %ID, mis/matches...)
-
 -   convert alignment to residues table
 
 ## ## Phylogenetic
