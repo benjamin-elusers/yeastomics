@@ -70,4 +70,59 @@ compute.aascore.ali = function(df.ali,aascores=sticky){
     left_join(df.score, by=c('s2'='aa')) %>% rename(sti.2 = sti )
 }
 
+get_identity = function(ali){
+  sapply(paste0("PID",1:4),function(x){ pid(ali,x) })
+}
+
+get_overlap = function(ali){
+  p=unaligned(pattern(ali))
+  s=unaligned(subject(ali))
+  L1 = width(p)
+  L2 = width(s)
+  OL1 = L1/L2
+  OL2 = L2/L1
+  OL  = min(L1,L2) / max(L2,L1)
+
+  overlap = as.double( c(OL,OL1,OL2)*100.0 )
+
+  return(setNames(overlap,c("OL","OL1","OL2")))
+}
+
+seq2char = function(seq){
+  return( unlist(strsplit(as.character(seq),"")) )
+}
+
+count_matches = function(ali){
+  S1 = seq2char(alignedPattern(ali))
+  S2 = seq2char(alignedSubject(ali))
+  L=nchar(ali)
+  N=nmatch(ali)
+  NS=nmismatch(ali)
+  GAP = sum((S1=="-" & S2=="-"))
+  INDEL = sum(xor(S1!='-',S2!='-'))
+  IN = sum(S1!="-" & S2=="-")
+  DEL = sum(S1=="-" & S2!="-")
+  return(c('S'=N,'NS'=NS,'G'=INDEL,"I"=IN,"D"=DEL,'L'=L,"gapped"=GAP))
+}
+
+score_ali = function(p1,p2,s1,s2, mat="BLOSUM62", opening=10, extend=4){
+
+  ali = pairwiseAlignment(p1, p2, substitutionMatrix = mat, gapOpening=opening, gapExtension=extend)
+
+  if(missing(s1)){ s1=get.strain_orf(names(p1),'both') }
+  if(missing(s2)){ s2=get.strain_orf(names(p2),'strain') }
+
+  IDS=c(ID1=names(p1),ID2=names(p2))
+  PID = get_identity(ali)
+  OL = get_overlap(ali)
+  SCORE = setNames(nm=paste0("SCORE.",mat),score(ali))
+  MATCH = count_matches(ali)
+
+  # Best way to create a one-row dataframe from a list of named vectors
+  row_data = tibble::lst(IDS,PID,OL,SCORE,MATCH) %>%
+    purrr::flatten() %>%
+    as_tibble()
+  return(row_data)
+}
+
 
