@@ -1,7 +1,7 @@
 source(here::here("src","__setup_yeastomics__.r"))
 
 ### LOAD PAXDB DATASETS
-hs.ppm = get.paxdb(tax = 9606, abundance=c('integrated','median'))
+hs.ppm = get.paxdb(tax = 9606, abundance=c('integrated','median','mean'))
 # write_rds(hs.ppm,"data/paxdb-human-integrated.rds")
 
 ### MAPPING OF ENSEMBL TO UNIPROT IDENTIFIERS
