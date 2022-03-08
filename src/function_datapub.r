@@ -1140,7 +1140,8 @@ get.paxdb = function(tax=4932, abundance='integrated'){
   if( "integrated" %in% targets ){
     RES$INT = paxdb %>%
       dplyr::group_by(taxid,organ,protid) %>%
-      mutate(ppm_n = ndata-sum(is_integrated)) %>%
+      #mutate(ppm_n = ndata-sum(is_integrated)) %>%
+      count(ndata,wt=protid, name='ppm_n') %>%
       filter(is_integrated) %>%
       dplyr::select(taxid,organ,protid, ppm_int = ppm,ppm_n)
   }

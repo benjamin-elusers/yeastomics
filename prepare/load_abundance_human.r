@@ -1,14 +1,7 @@
-yeastomics="https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/"
-source(file.path(yeastomics,"src/utils.r"))
-source(file.path(yeastomics,"src/function_annotation.r"))
-source(file.path(yeastomics,"src/function_sequence.r"))
-source(file.path(yeastomics,"src/function_phylogenetic.r"))
-source(file.path(yeastomics,"src/function_analysis.r"))
-source(file.path(yeastomics,"src/function_datalocal.r"))
-source(file.path(yeastomics,"src/function_datapub.r"))
+source(here::here("src","__setup_yeastomics__.r"))
 
 ### LOAD PAXDB DATASETS
-hs.ppm = get.paxdb(tax = 9606, abundance='integrated')
+hs.ppm = get.paxdb(tax = 9606, abundance=c('integrated','median'))
 # write_rds(hs.ppm,"data/paxdb-human-integrated.rds")
 
 ### MAPPING OF ENSEMBL TO UNIPROT IDENTIFIERS
@@ -27,7 +20,7 @@ hs.pax2uni = get.hs.ens2uni(transcript = F, ids.ens = unique(hs.ppm$protid)) %>%
 
 ### MERGE UNIPROT/ENSEMBL/PAXDB DATA
 # selected.features = c("UNIPROTKB","REVIEWED","EXISTENCE","SCORE","FAMILIES","PATHWAY","PNAME","L")
-hs.ppm.uni = left_join(hs.ppm, hs.pax2uni, by=c('protid'='PROTEINID')) %>%
+hs.ppm.uni = left_join(hs.ppm, hs.pax2uni, by=c('protid'='PROTEINID')) #%>%
              #left_join(pax.feat %>% dplyr::select(all_of(selected.features)), by=c("uniprot"='UNIPROTKB'))
 # write_rds(hs.ppm.uni,"data/paxdb_integrated-human_uniprot_features.rds")
 

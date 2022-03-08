@@ -385,18 +385,35 @@ get.KEGG = function(sp='sce',type=c('pathway','module'),as.df=F){
 #                     author = "J Rainer")
 
 
-get.hs.ens2uni = function(transcript=T,ids.ens){
+get.hs.ens2uni = function(transcript=T,ids.ens,choose_version=F){
   # WARNING! BUG WITH R version <4.0 (dplyr and AnnotationDbi conflict)
+  # REQUIRES MANY PACKAGES:
+  # BiocManager::install(c("Rhtslib","GenomicAlignments","rtracklayer","GenomicFeatures","ensembldb"))
+
   if(missing(ids.ens)){ stop("requires an input vector Ensembl Protein ids... (e.g. ENSP00000194214)") }
+  library(ensembldb)
   library(AnnotationHub)
   ah <- AnnotationHub()
-  ensdb <- query(ah, pattern = c("Homo sapiens", "EnsDb",103))[[1]]
+  ensdb <- query(ah, pattern = c("Homo sapiens", "EnsDb"))
+
+  if(choose_version){
+    all_vers = cbind(mcols(ensdb)[,c('title','rdatadateadded','genome','taxonomyid')], id=names(ensdb))
+    choice = menu(as.vector(all_vers[,1]),graphics = interactive())
+    version = rownames(all_vers)[choice]
+    ens = ensdb[[version]]
+  }else{
+    library(lubridate)
+    df = all_vers %>%
+          as_tibble %>%
+          arrange(desc(ymd(as.Date(rdatadateadded))))
+    ens = ensdb[[df$id[1]]]
+  }
   #library(ensembldb)
   #library(EnsDb.Hsapiens.v86)
   #library(org.Hs.eg.db)
   query = c("GENENAME","GENEBIOTYPE","UNIPROTID","SYMBOL")
   if(transcript){ query = append(query, values=c("EXONID","EXONIDX","TXID","TXBIOTYPE"), after=0) }
-  ens2uni = AnnotationDbi::select(ensdb, keys=ids.ens, keytype = 'PROTEINID', columns = query )
+  ens2uni = AnnotationDbi::select(ens, keys=ids.ens, keytype = 'PROTEINID', columns = query )
   return(ens2uni)
 }
 
