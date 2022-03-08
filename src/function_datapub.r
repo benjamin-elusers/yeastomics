@@ -1000,7 +1000,7 @@ load.pombe.orthologs = function() {
     separate_rows(ORFS,sep = "\\|") %>%
     mutate(orf= dplyr::na_if(str_extract(ORFS,"^[^\\(]+"),"NONE"),  # get the orf,
            fused_side=str_sub(start=-1,str_extract(ORFS,regex_fusion)) )%>%  # get the parentheses content
-    filter(!is.na(orf)) %>%
+    dplyr::filter(!is.na(orf)) %>%
     group_by(PombaseID) %>% mutate(sp1 = n() ==1 ) %>%
     group_by(orf) %>% mutate(sc1= n() == 1) %>%
     rowwise %>% mutate( is_1to1 = sp1 & sc1,
@@ -1095,7 +1095,7 @@ load.paxdb = function(taxon=4932){
       as_tibble %>%
       extract(col=value,into=c('info',"value"), regex="^#([^\\:]+)\\:(.+)$") %>%
       mutate(info=str_trim(info),value=str_trim(value)) %>%
-      filter( !is.na(info) ) %>%
+      dplyr::filter( !is.na(info) ) %>%
       pivot_wider(names_from='info',values_from=c(value)) %>%
       mutate(taxid=as.character(taxon))
   }
@@ -1142,7 +1142,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
       dplyr::group_by(taxid,organ,protid) %>%
       #mutate(ppm_n = ndata-sum(is_integrated)) %>%
       count(ndata,wt=protid, name='ppm_n') %>%
-      filter(is_integrated) %>%
+      dplyr::filter(is_integrated) %>%
       dplyr::select(taxid,organ,protid, ppm_int = ppm,ppm_n)
   }
 
