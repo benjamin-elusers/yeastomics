@@ -133,7 +133,7 @@ find.uniprot_refprot = function(search,all=T){
   }
 }
 
-get.uniprot.proteome = function(taxid,DNA=F) {
+get.uniprot.proteome = function(taxid,DNA=F,fulldesc=F) {
 
   if(missing(taxid)){  stop("Need an uniprot taxon id") }
   UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
@@ -148,8 +148,10 @@ get.uniprot.proteome = function(taxid,DNA=F) {
   proteome_url = sprintf("%s/%s/%s/%s_%s%s",UNIPROT_URL,TAX,UPID,UPID,taxid,SEQTYPE)
 
   UNI = load.proteome(proteome_url)
-  regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
-  names(UNI) = str_extract(names(UNI), regexUNIPROTAC)
+  if(!fulldesc){
+    regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
+    names(UNI) = str_extract(names(UNI), regexUNIPROTAC)
+  }
   return(UNI)
 }
 
