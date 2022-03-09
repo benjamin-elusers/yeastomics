@@ -2,7 +2,7 @@
 source(here::here("src","__setup_yeastomics__.r"))
 source(here::here("src","function_YK11.r"))
 
-S288C = load.sgd.proteome(withORF=T,rm.stop=T) # Reference SGD protein sequences
+S288C = load.sgd.proteome(withORF=T,rm.stop=F) # Reference SGD protein sequences
 WT = get.positions(S288C) %>%
   group_by(orf) %>%
   mutate(bin.pos=dplyr::ntile(wt_pos,100))
@@ -74,6 +74,7 @@ get_s288c_strain = function(orf){
   }
   cat(orf,"\n")
   yk11  = load.proteome(yk11_orf,nostop = F)
+
 
   return( c(S288C[orf],yk11) )
 }
@@ -151,15 +152,6 @@ top10 = peter2018 %>% slice_max(order_by=-total_number_of_sn_ps,n=10) %>%
 best_strain %>% slice_max(order_by=pid.total,n=10)
 top10
 
-#
-# for( O in orfs){
-#   SEQ = get_s288c_strain(O)
-#   align_s288c_strains(SEQ[[1]],SEQ[[2]])
-# }
-#
-# df =  furrr::future_map2( S288C, function(x){ orf=names(x)})
-
-
 add_missing_strains = function(BS,all_strains){
   this_orf = get.strain_orf(what='orf',x=names(BS))
   these_strains = get.strain_orf(what='strains',x=names(BS))
@@ -170,7 +162,7 @@ add_missing_strains = function(BS,all_strains){
     return(BS)
   }else{
     cat(sprintf('%10s: %3s missing strains\r',this_orf,n))
-    L = max(unique(width(BS)))
+    L = max(width(BS))
     unknown_seq = paste0(rep("-",L),collapse="")
     missing_seq = setNames(rep(AAStringSet(x=unknown_seq),n),missing_strains)
     return( c(BS,missing_seq) )
@@ -183,9 +175,10 @@ yk11 = sapply(orfs, function(x){ add_missing_strains( BS=get_s288c_strain(x),all
 LL  = sapply(yk11,function(x){ unique(nchar(x))})
 weird = names( LL[ lengths(LL) > 1] )
 # Aligned those where the reference sequence has a different size from the strain sequences
+s288c_alidir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/strains_s288c_not_aligned"
 for( w in weird){
-  tofasta = sprintf("~/Desktop/%s.fasta",w)
-  toaln = sprintf("~/Desktop/%s_aligned.fa",w)
+  tofasta = sprintf("%s/%s.fasta",s288c_alidir,w)
+  toaln = sprintf("%s/%s_aligned.fa",s288c_alidir,w)
   Biostrings::writeXStringSet(yk11[[w]],filepath=tofasta)
   tmp  = bio3d::read.fasta(tofasta)
   aln  = bio3d::seqaln(tmp,outfile = toaln)
@@ -196,8 +189,8 @@ for( w in weird){
 
 # Following should give empty results
 
-LL  = sapply(yk11,function(x){ unique(nchar(x))})
-weird = names( LL[ lengths(LL) > 1] )
+LL_ali  = sapply(yk11,function(x){ unique(nchar(x))})
+weird_ali = names( LL[ lengths(LL) > 1] )
 
 final_dir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain_with_s288c/"
 for( o in names(yk11) ){
