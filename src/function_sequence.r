@@ -109,7 +109,7 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
   return(Pombase)
 }
 
-show.uniprot_refprot = function(search){
+find.uniprot_refprot = function(search,all=T){
   library(stringr)
   library(readr)
   UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/"
@@ -121,20 +121,37 @@ show.uniprot_refprot = function(search){
   row_content = str_subset(README, pattern = "^UP[0-9]+\\t[0-9]+\\t")
   refprot = readr::read_tsv(file=I(row_content), col_names = row_header) %>%
             janitor::clean_names()
-  if(!missing(search)){
+  if(!missing(search) & !all){
     matched = refprot %>% dplyr::filter_all(any_vars(str_detect(., search)))
     return(matched)
-  }else{
+  }else if(!all){
     name = sprintf("(%s) %s",refprot$species_name,refprot$tax_id)
     which_prot = menu(name, graphics=interactive())
     return(refprot[which_prot,])
+  }else{
+    return(refprot)
   }
 }
 
-get.uniprot.proteome = function(up_id) {
+get.uniprot.proteome = function(taxid,DNA=F) {
 
-  if(missing(up_id)){show.uniprot_refprot()}
+  if(missing(taxid)){  stop("Need an uniprot taxon id") }
+  UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
+  SEQTYPE = ".fasta.gz"
 
+  refprot = find.uniprot_refprot(all=T)
+  found = refprot$tax_id %in% taxid
+  if(!any(found)){ stop(sprintf("%s not found in the reference proteome!",taxid)) }
+  TAX = str_to_title(refprot$superregnum[which(found)])
+  UPID = refprot$proteome_id[which(found)]
+  if(DNA){ seqtype = "_DNA.fasta.gz" }
+  proteome_url = sprintf("%s/%s/%s/%s_%s",UNIPROT_URL,TAX,UPID,UPID,taxid,SEQTYPE)
+
+  UNI = load.proteome(proteome_url)
+  regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
+  names(UNI) = str_extract(names(UNI), regexUNIPROTAC)
+  return(UNI)
+}
 
 load.uniprot.proteome = function(species='yeast') {
   library(stringr)
@@ -145,7 +162,7 @@ load.uniprot.proteome = function(species='yeast') {
   taxon=match.arg(species, choices = c('yeast','human'), several.ok = F)
   proteomes=c(human="UP000005640_9606.fasta.gz",yeast="UP000002311_559292.fasta.gz")
   UP=word(proteomes[taxon],1,sep = "_")
-  uniprot.url = sprintf("%s/%s/%s",uniprot.url,UP,proteomes[taxon])
+  uniprot.url = sprintf("%s/%s/%s",eukaryotes,UP,proteomes[taxon])
 
   UNI = load.proteome(uniprot.url)
   regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
