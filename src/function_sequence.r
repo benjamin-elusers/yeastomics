@@ -109,9 +109,38 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
   return(Pombase)
 }
 
+show.uniprot_refprot = function(search){
+  library(stringr)
+  library(readr)
+  UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/"
+  URL_README = paste0(UNIPROT_URL,"knowledgebase/reference_proteomes/README")
+  README = readr::read_lines(URL_README)
+  row_header = str_subset(README, pattern = '^Proteome_ID\\tTax_ID\\t') %>%
+               str_split('\t') %>% unlist()
+
+  row_content = str_subset(README, pattern = "^UP[0-9]+\\t[0-9]+\\t")
+  refprot = readr::read_tsv(file=I(row_content), col_names = row_header) %>%
+            janitor::clean_names()
+  if(!missing(search)){
+    matched = refprot %>% dplyr::filter_all(any_vars(str_detect(., search)))
+    return(matched)
+  }else{
+    name = sprintf("(%s) %s",refprot$species_name,refprot$tax_id)
+    which_prot = menu(name, graphics=interactive())
+    return(refprot[which_prot,])
+  }
+}
+
+get.uniprot.proteome = function(up_id) {
+
+  if(missing(up_id)){show.uniprot_refprot()}
+
+
 load.uniprot.proteome = function(species='yeast') {
   library(stringr)
-  uniprot.url = "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota"
+  UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/"
+  eukaryotes = sprintf("%s/knowledgebase/reference_proteomes/Eukaryota",UNIPROT_URL)
+
   ## CHANGE ON FEB 2021 - Added a subdirectory per each proteome
   taxon=match.arg(species, choices = c('yeast','human'), several.ok = F)
   proteomes=c(human="UP000005640_9606.fasta.gz",yeast="UP000002311_559292.fasta.gz")
