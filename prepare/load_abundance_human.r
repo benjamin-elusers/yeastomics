@@ -40,6 +40,7 @@ hs_ppm_uni = left_join(hs_ppm, hs_pax2uni, by=c('protid'='PROTEINID')) %>%
 
 write_rds(hs_ppm_uni,"data/paxdb_integrated_human.rds")
 
+read_rds("data/paxdb_integrated_human.rds")
 #hs.ppm = get.paxdb(tax = 9606, abundance=c('median','mean'))
 
 test = hs_abundance %>%

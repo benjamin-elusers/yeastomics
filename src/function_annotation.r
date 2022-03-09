@@ -395,9 +395,9 @@ get.hs.ens2uni = function(transcript=T,ids.ens,choose_version=F){
   library(AnnotationHub)
   ah <- AnnotationHub()
   ensdb <- query(ah, pattern = c("Homo sapiens", "EnsDb"))
+  all_vers = cbind(mcols(ensdb)[,c('title','rdatadateadded','genome','taxonomyid')], id=names(ensdb))
 
   if(choose_version){
-    all_vers = cbind(mcols(ensdb)[,c('title','rdatadateadded','genome','taxonomyid')], id=names(ensdb))
     choice = menu(as.vector(all_vers[,1]),graphics = interactive())
     version = rownames(all_vers)[choice]
     ens = ensdb[[version]]
