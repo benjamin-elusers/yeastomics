@@ -145,7 +145,7 @@ get.uniprot.proteome = function(taxid,DNA=F) {
   TAX = str_to_title(refprot$superregnum[which(found)])
   UPID = refprot$proteome_id[which(found)]
   if(DNA){ seqtype = "_DNA.fasta.gz" }
-  proteome_url = sprintf("%s/%s/%s/%s_%s",UNIPROT_URL,TAX,UPID,UPID,taxid,SEQTYPE)
+  proteome_url = sprintf("%s/%s/%s/%s_%s%s",UNIPROT_URL,TAX,UPID,UPID,taxid,SEQTYPE)
 
   UNI = load.proteome(proteome_url)
   regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
