@@ -346,23 +346,22 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   # gsub(x = "  131     L    2.02   [0.4701,  2.02]       0 1011/1011",  pattern = "(?<=\\[)([^\\]]*)(\\s\\s?)([^\\s\\]]*)(?=\\])","\\1\\3",perl = T)
   # test="  131     L    2.02   [0.4701,  2.02]       0 1011/1011"
   # test="   34     I 0.005863   [0.0001698, 0.004] 0.00562 1011/1011"
-
+  r4s_content =readLines(r4s)
+  clean_r4s = r4s_content %>%  str_replace_all(string = ., pattern = "^([0-9]{5,})([A-Z])", replacement='\\1\t\\2')
   if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
-    clean_r4s =readLines(r4s) %>% str_replace_all(string = ., pattern = "\\s+(?=[^\\[\\]]*\\])", replacement="")
-  }else{
-    clean_r4s =readLines(r4s)
+        clean_r4s = clean_r4s %>% str_replace_all(string = ., pattern = "\\s+(?=[^\\[\\]]*\\])", replacement="")
   }
   #gsub(x = .,  pattern = "(?<=\\[)([^\\]]*)( +)([^\\]]*)(?=\\])","\\1\\3",perl = T)
     #gsub("(?<=\\[)(\\s+)","",x = .,perl = T) # Remove spaces after bracket
     #gsub("(\\s+)(?=\\])","",x = .,perl = T) # Remove spaces before bracket
   df.r4s = readr::read_table(file = clean_r4s, comment = '#', col_names = r4s_col_in_file) %>%
            mutate( ID = id ) %>%
-           select(ID,POS,SEQ,SCORE,MSA) %>%
+           dplyr::relocate(ID,POS,SEQ,SCORE) %>%
            as_tibble() %>%
           janitor::clean_names('screaming_snake')
   if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
     df.r4s = df.r4s %>%
-             mutate( QQ = str_remove_all(vars("QQ-INTERVAL"), pattern = "\\[|\\]"),
+             mutate( QQ = str_remove_all(QQ_INTERVAL, pattern = "\\[|\\]"),
                      QQ1 = as.double(str_split_fixed(QQ,',',n=2)[,1]),
                      QQ2 = as.double(str_split_fixed(QQ,',',n=2)[,2])) %>%
              select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
