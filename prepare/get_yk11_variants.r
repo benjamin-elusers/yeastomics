@@ -72,11 +72,12 @@ get_s288c_strain = function(orf){
     message(sprintf("missing orf %s (S288C %s YK11 %s)",orf,in_s288c,in_yk11))
     return(NA)
   }
-  cat(orf,"\n")
+  #cat(orf,"\n")
   yk11  = load.proteome(yk11_orf,nostop = F)
+  wt = S288C[orf]
+  names(wt) = paste0('S288C_',names(wt))
 
-
-  return( c(S288C[orf],yk11) )
+  return( c(wt,yk11) )
 }
 
 
@@ -161,10 +162,11 @@ add_missing_strains = function(BS,all_strains){
     #message('no missing strains')
     return(BS)
   }else{
-    cat(sprintf('%10s: %3s missing strains\r',this_orf,n))
+    suffix=hutils::longest_suffix(x = names(BS)[-1])
+    cat(sprintf('%10s: %3s missing strains (%s)\r',this_orf,n,suffix))
     L = max(width(BS))
     unknown_seq = paste0(rep("-",L),collapse="")
-    missing_seq = setNames(rep(AAStringSet(x=unknown_seq),n),missing_strains)
+    missing_seq = setNames(rep(AAStringSet(x=unknown_seq),n),paste0(missing_strains,suffix))
     return( c(BS,missing_seq) )
   }
 }
@@ -176,27 +178,62 @@ LL  = sapply(yk11,function(x){ unique(nchar(x))})
 weird = names( LL[ lengths(LL) > 1] )
 # Aligned those where the reference sequence has a different size from the strain sequences
 s288c_alidir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/strains_s288c_not_aligned"
+realigned=list()
 for( w in weird){
   tofasta = sprintf("%s/%s.fasta",s288c_alidir,w)
   toaln = sprintf("%s/%s_aligned.fa",s288c_alidir,w)
   Biostrings::writeXStringSet(yk11[[w]],filepath=tofasta)
   tmp  = bio3d::read.fasta(tofasta)
-  aln  = bio3d::seqaln(tmp,outfile = toaln)
+  aln  = bio3d::seqaln(tmp,outfile = toaln )
   unlink(tofasta)
   tmp = Biostrings::readAAMultipleAlignment(toaln,format='fasta')
-  yk11[[w]] = tmp
+  realigned[[w]] = tmp
 }
 
 # Following should give empty results
 
 LL_ali  = sapply(yk11,function(x){ unique(nchar(x))})
-weird_ali = names( LL[ lengths(LL) > 1] )
+weird_ali = names( LL_ali[ lengths(LL_ali) > 1] )
+
+check_realigned = c()
+for( orf in names(realigned) ){
+  BS = as(realigned[[orf]],'AAStringSet')
+  same_length = length(unique(widths(BS))) == 1
+  internal_gaps = as.character(BS[[orf]]) %>% str_extract_all(pattern = "[A-Z]-{1,}[A-Z]") %>% unlist
+  len_indel = nchar(internal_gaps) - 2
+  check_realigned[orf] = same_length & sum(len_indel>1) < 1
+}
 
 final_dir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain_with_s288c/"
 for( o in names(yk11) ){
-  tofasta = sprintf("%s/%s.fasta",final_dir,o)
-  print(tofasta)
-  as(yk11[[o]], "AAStringSet")
-  Biostrings::writeXStringSet(,filepath=tofasta,format = 'fasta')
+  if( o %in% names(realigned) ){
+    # WEIRD ORF (NOT UNIQUE LENGTH)
+    if( check_realigned[o] ){
+      # REALIGNED SEEMS FINE (SAME LENGTH, NOT TOO MANY (LONG) INDELS)
+      tofasta = sprintf("%s/%s_realigned.fasta",final_dir,o)
+      final_ali = add_missing_strains(as(realigned[[o]],'AAStringSet'),all_strains=yk11_strains)
+    }else{
+      print(sprintf("AVOIDING WEIRD ALIGNED ORF %s",o))
+    }
+  }else{
+    # NORMAL ORFS
+    tofasta = sprintf("%s/%s.fasta",final_dir,o)
+    final_ali = stripR(yk11[[o]])
+  }
+    # final_ali = as(yk11[[o]], "AAStringSet")
+    # realigned = c(realigned, as(yk11[[o]], "AAStringSet"))
+
+    #print(basename(tofasta))
+    Biostrings::writeXStringSet(final_ali,filepath=tofasta,format = 'fasta')
 }
 
+test = read.proteomes(seqfiles = list.files(final_dir,pattern='.fasta',full.names = T))
+tmp = lapply(test, function(x){ unique(widths(x)) })
+test[ lengths(test) <1012 ]
+
+dir1011="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/"
+bigali.idx=read_tsv(file.path(dir1011,'superalignment.idx'))
+bigali.seq=load.proteome(file.path(dir1011,'superalignment.fa'))
+
+
+test = read.proteomes(seqfiles = list.files("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/test_fasta/",pattern='.fasta',full.names = T))
