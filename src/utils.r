@@ -9,9 +9,18 @@
 # Retrieve text content from URL
 open.url <- function(file_url) {
   con <- gzcon(url(file_url))
-  txt <- readLines(con)
+  txt <- readLines(con,skipNul=T)
   #closeAllConnections()
+  close.connection(con)
   return(textConnection(txt))
+}
+
+read.url <- function(file_url) {
+  con <- gzcon(url(file_url))
+  txt <- readLines(con,skipNul=T)
+  #closeAllConnections()
+  close.connection(con)
+  return(txt)
 }
 
 # Execute loading call and save data unless saved data already exists
@@ -35,6 +44,17 @@ get.last.file = function(path,pattern){
     file.info %>%
     dplyr::slice(which.max(mtime)) %>%
     rownames
+}
+
+fallback = function(url,archived){
+  # if current download is dead/blocked use the latest archive
+  if( httr::http_error(url) ){
+    warning(sprintf("falling back to last release archived (%s)...",archived),immediate. = T)
+    url = archived
+  }else{
+    message("URL...OK")
+  }
+  return(url)
 }
 
 # Testing/Subsetting -----------------------------------------------------------
@@ -129,7 +149,6 @@ getmode <- function(v) { # returns the mode (most frequent value)
 }
 
 
-
 # Strings ----------------------------------------------------------------------
 str2chr  <- function(x){ return( unlist(strsplit(x,split='')) ) } # split string by character
 concat   <- function(x){ return( paste(x,collapse='') ) }        # concatenate characters to string
@@ -166,13 +185,21 @@ subname=function(name,sep="\\.",lc=F){ # extracts substring until first separato
   return(part1)
 }
 
+get.longest = function(S, s='\\.'){
+  # get the longest string in a list of splitted string
+  library(stringr)
+  L = str_split(string = S, pattern = s)
+  long=sapply(L,function(x){ nc=nchar(x); which.max(nc)})
+  sapply(1:length(L),function(i){ L[[i]][long[i]] })
+}
+
 strfind = function(strings, patterns, index=F){ # search multiple patterns in character vectors
   sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = !index) })
 }
 
 file_ext <- function (fn) {
   # remove a path
-  splitted    <- strsplit(x=fn, split='/')[[1]]
+  splitted    <- strsplit(x=fn, split=.Platform$file.sep)[[1]]
   # or use .Platform$file.sep in stead of '/'
   fn          <- splitted [length(splitted)]
   ext         <- ''
@@ -183,9 +210,7 @@ file_ext <- function (fn) {
   ext
 }
 
-catn = function(x, ...){
-cat(x,"\n",...)
-}
+catn = function(x, ...){ cat(x,"\n",...) }
 
 # Format values ----------------------------------------------------------------
 
