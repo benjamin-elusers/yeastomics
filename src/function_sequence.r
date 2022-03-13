@@ -1,5 +1,6 @@
 #source("src/utils.r",local = T)
 library(stringr)
+library(Biostrings)
 
 # Sequence identifiers ---------------------------------------------------------
 SGD.nomenclature = function(coding=T,rna=F){
