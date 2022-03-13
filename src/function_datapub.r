@@ -2,44 +2,37 @@
 #source("src/function_sequence.r",local = T)
 #source('src/function_alignment.r',local = T)
 #source('src/function_phylogenetic.r',local = T)
+yeastomics_url = "https://raw.githubusercontent.com/benjamin-elusers/yeastomics"
+source(file.path(yeastomics_url,"main/src/utils.r"))
 
 # TO REMOVE DEPENDENCIES, THOSE FUNCTIONS WERE COPIED FROM OTHER SCRIPTS
 # Utils --------------------------------------------------------------------
-
 library(openxlsx)
-open.url <- function(file_url) {
-  con <- gzcon(url(file_url))
-  txt <- readLines(con,skipNul=T)
-  #closeAllConnections()
-  close.connection(con)
-  return(textConnection(txt))
-}
+# open.url <- function(file_url) {
+#   con <- gzcon(url(file_url))
+#   txt <- readLines(con,skipNul=T)
+#   #closeAllConnections()
+#   close.connection(con)
+#   return(textConnection(txt))
+# }
+#
+# read.url <- function(file_url) {
+#   con <- gzcon(url(file_url))
+#   txt <- readLines(con,skipNul=T)
+#   #closeAllConnections()
+#   close.connection(con)
+#   return(txt)
+# }
 
-read.url <- function(file_url) {
-  con <- gzcon(url(file_url))
-  txt <- readLines(con,skipNul=T)
-  #closeAllConnections()
-  close.connection(con)
-  return(txt)
-}
+# strfind = function(strings, patterns){
+#   # Find several patterns in set of strings
+#   sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
+# }
 
 
-strfind = function(strings, patterns){
-  # Find several patterns in set of strings
-  sapply(patterns,  function(p){ grep(x = strings, pattern = p, value = T) })
-}
-
-get.longest = function(S, s='\\.'){
-  # get the longest string in a list of splitted string
-  library(stringr)
-  L = str_split(string = S, pattern = s)
-  long=sapply(L,function(x){ nc=nchar(x); which.max(nc)})
-  sapply(1:length(L),function(i){ L[[i]][long[i]] })
-}
-
-# geometric mean and standard deviation
-geomean = function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) }
-geosd = function(x) {  exp(sd(log(x[x != 0 & !is.na(x)]))) }
+# # geometric mean and standard deviation
+# geomean = function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) }
+# geosd = function(x) {  exp(sd(log(x[x != 0 & !is.na(x)]))) }
 
 # SGD ORF regular expression
 SGD.nomenclature = function(coding=T,rna=F){
@@ -1266,4 +1259,130 @@ get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated")
 get.eggnogg.node=function(node=4890){
   url_eggnog = "http://eggnog5.embl.de/download/latest/per_tax_level/"
   #paste0(url_eggnog,node)
+}
+
+
+
+# Reference sequences ----------------------------------------------------------
+
+load.sgd.CDS = function(withORF=T,orf.dna="sequence/S288C_reference/orf_dna") {
+  library(stringr)
+  sgd.url = "http://sgd-archive.yeastgenome.org"
+  cds= file.path(sgd.url,orf.dna,"orf_coding_all.fasta.gz")
+  cds_archived = file.path(dirname(cds),"archive/orf_coding_all_R64-3-1_20210421.fasta.gz")
+  SGD = load.genome(fallback(cds,cds_archived))
+  regexSGD = "(S[0-9]{9})"
+  if(withORF){
+    # ORF identifier
+    names(SGD) = str_extract(names(SGD), SGD.nomenclature() )
+  }else{
+    # SGD ID
+    names(SGD) = str_extract(names(SGD), regexSGD)
+  }
+  #names(SGD) = subname(names(SGD),sep=" ",lc=F)
+  return(SGD)
+}
+
+load.sgd.proteome = function(withORF=T,rm.stop=T, orf_protein="sequence/S288C_reference/orf_protein") {
+  library(stringr)
+  sgd.url = "http://sgd-archive.yeastgenome.org"
+  prot= file.path(sgd.url,orf_protein,"orf_trans_all.fasta.gz")
+  prot_archived = file.path(dirname(prot),"archive/orf_trans_all_R64-3-1_20210421.fasta.gz")
+  SGD = load.proteome(fallback(prot,prot_archived),nostop = rm.stop)
+  regexSGD = "(S[0-9]{9})"
+  if(withORF){
+    # ORF identifier
+    names(SGD) = str_extract(names(SGD), SGD.nomenclature() )
+  }else{
+    # SGD ID
+    names(SGD) = str_extract(names(SGD), regexSGD)
+  }
+  #names(SGD) = subname(names(SGD),sep=" ",lc=F)
+  return(SGD)
+}
+
+load.pombase.proteome = function(withORF=T,rm.version=T) {
+  library(stringr)
+  pombase.url = "ftp://ftp.pombase.org/pombe/genome_sequence_and_features/feature_sequences/peptide.fa.gz"
+  Pombase = load.proteome(pombase.url)
+  regexPombaseID = "(SP[^ ]+)(?=:pep)"
+  regexPombase = "(?<=:pep )(.+)(?=\\|)"
+
+  orf = str_extract(names(Pombase), regexPombaseID) # ORF identifier
+  if(rm.version){ orf = str_remove(orf, "(\\.[0-9]+$)") }
+
+  gname = str_extract(names(Pombase), regexPombase) # Pombase standard name
+  has_noname = is.na(gname)
+  gname[has_noname] = orf[has_noname]
+
+  if(withORF){
+    names(Pombase) = orf
+  }else{
+    names(Pombase) = gname
+  }
+
+  return(Pombase)
+}
+
+find.uniprot_refprot = function(search,all=T){
+  library(stringr)
+  library(readr)
+  UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/"
+  URL_README = paste0(UNIPROT_URL,"knowledgebase/reference_proteomes/README")
+  README = readr::read_lines(URL_README)
+  row_header = str_subset(README, pattern = '^Proteome_ID\\tTax_ID\\t') %>%
+    str_split('\t') %>% unlist()
+
+  row_content = str_subset(README, pattern = "^UP[0-9]+\\t[0-9]+\\t")
+  refprot = readr::read_tsv(file=I(row_content), col_names = row_header) %>%
+    janitor::clean_names()
+  if(!missing(search) & !all){
+    matched = refprot %>% dplyr::filter_all(any_vars(str_detect(., search)))
+    return(matched)
+  }else if(!all){
+    name = sprintf("(%s) %s",refprot$species_name,refprot$tax_id)
+    which_prot = menu(name, graphics=interactive())
+    return(refprot[which_prot,])
+  }else{
+    return(refprot)
+  }
+}
+
+get.uniprot.proteome = function(taxid,DNA=F,fulldesc=F) {
+
+  if(missing(taxid)){  stop("Need an uniprot taxon id") }
+  UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
+  SEQTYPE = ".fasta.gz"
+
+  refprot = find.uniprot_refprot(all=T)
+  found = refprot$tax_id %in% taxid
+  if(!any(found)){ stop(sprintf("%s not found in the reference proteome!",taxid)) }
+  TAX = str_to_title(refprot$superregnum[which(found)])
+  UPID = refprot$proteome_id[which(found)]
+  if(DNA){ seqtype = "_DNA.fasta.gz" }
+  proteome_url = sprintf("%s/%s/%s/%s_%s%s",UNIPROT_URL,TAX,UPID,UPID,taxid,SEQTYPE)
+
+  UNI = load.proteome(proteome_url)
+  if(!fulldesc){
+    regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
+    names(UNI) = str_extract(names(UNI), regexUNIPROTAC)
+  }
+  return(UNI)
+}
+
+load.uniprot.proteome = function(species='yeast') { # Older version of get.uniprot.proteome
+  library(stringr)
+  UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/"
+  eukaryotes = sprintf("%s/knowledgebase/reference_proteomes/Eukaryota",UNIPROT_URL)
+
+  ## CHANGE ON FEB 2021 - Added a subdirectory per each proteome
+  taxon=match.arg(species, choices = c('yeast','human'), several.ok = F)
+  proteomes=c(human="UP000005640_9606.fasta.gz",yeast="UP000002311_559292.fasta.gz")
+  UP=word(proteomes[taxon],1,sep = "_")
+  uniprot.url = sprintf("%s/%s/%s",eukaryotes,UP,proteomes[taxon])
+
+  UNI = load.proteome(uniprot.url)
+  regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
+  names(UNI) = str_extract(names(UNI), regexUNIPROTAC)
+  return(UNI)
 }
