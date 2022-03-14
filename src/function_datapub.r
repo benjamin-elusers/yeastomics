@@ -1182,7 +1182,6 @@ get.paxdb = function(tax=4932, abundance='integrated'){
   return(purrr::reduce(.x=RES,.f=left_join, by = c("taxid","organ","protid")) )
 }
 
-
 summarise_paxdb_abundance = function(paxdb_data){
 
   protein_ppm = paxdb_data %>%
@@ -1191,7 +1190,7 @@ summarise_paxdb_abundance = function(paxdb_data){
     ppm_md      = median_(ppm),
     ppm_avg     = mean_(ppm),
     ppm_gmean   = geomean(ppm),
-    ppm_wholeorg= ppm[ organ == 'WHOLE_ORGANISM' & is_integrated],
+    ppm_wholeorg= ppm[ (!is.na(organ) && organ == 'WHOLE_ORGANISM') & is_integrated],
 
     ppm_sd      = sd_(ppm),
     ppm_se      = sd_(ppm)/n(),
