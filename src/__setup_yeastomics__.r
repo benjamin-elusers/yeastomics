@@ -12,8 +12,9 @@ for( script in scripts){ source(script) }
 library(xfun)
 dep.pkg = c("BiocManager","parallel","stats4","hutils","RCurl")
 xfun::pkg_attach2(dep.pkg)
+# Bioconductor package may be installed once (in particular BiocGenerics seems to reinstall everytime)
 bioc.pkg = c("BiocGenerics","Biobase","S4Vectors","XVector","AnnotationDbi","IRanges")
-BiocManager::install(bioc.pkg,update=F)
+#BiocManager::install(bioc.pkg,update=F)
 # Load visualization packages ----------------------------------------------------
 viz.pkg = c("cowplot","ggplot2","ggtext","ggpubr","ggrepel","gridExtra","plotly")
 xfun::pkg_attach2(viz.pkg)
