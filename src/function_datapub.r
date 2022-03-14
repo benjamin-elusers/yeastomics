@@ -1003,19 +1003,32 @@ load.pombe.orthologs = function() {
   return(sp.sc)
 }
 
+
+find_paxdb_downloads = function(){
+  URL_PAXDB = "https://pax-db.org/downloads/latest/"
+  paxdb_files = rvest::read_html(URL_PAXDB) %>%
+  rvest::html_nodes("a") %>%
+  rvest::html_text(trim = T) %>%
+  str_subset(pattern = "/$",negate = T)
+  return(paxdb_files)
+}
+
+get_paxdb_version = function(){
+  paxdb_files=find_paxdb_downloads()
+  .version = str_extract(pattern="[0-9]\\.[0-9]",string = paxdb_files) %>% gtools::mixedsort(na.last = F) %>% last
+  return(.version)
+}
+
 load.paxdb.orthologs = function(node,show.nodes=F) {
   library(rio)
   library(RCurl)
   library(hablar)
   # get table of orthologs proteins from paxdb
   URL_PAXDB = "https://pax-db.org/downloads/latest/"
-  paxdb_files = rvest::read_html(URL_PAXDB) %>%
-                rvest::html_nodes("a") %>%
-                rvest::html_text(trim = T) %>%
-                str_subset(pattern = "/$",negate = T)
-  .version = str_extract(pattern="[0-9]\\.[0-9]",string = paxdb_files) %>% gtools::mixedsort(na.last = F) %>% last
+  .version= get_paxdb_version()
+
   cat(sprintf("PAXDB VERSION: %s\n",.version))
-  paxdb_ortho=grep("paxdb-orthologs",paxdb_files,v=T) %>% str_subset(pattern=.version) %>% paste0(URL_PAXDB,.)
+  paxdb_ortho=grep("paxdb-orthologs",find_paxdb_downloads(),v=T) %>% str_subset(pattern=.version) %>% paste0(URL_PAXDB,.)
   # download the archive
   temp<-tempfile()
   download.file(paxdb_ortho,temp)
@@ -1027,7 +1040,6 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
            basename %>%
            str_remove(".orthgroups.consistent.txt") %>%
            gtools::mixedsort()
-
   if(show.nodes){ return(paxdb_nodes) }
   # Check the taxonomic node selected
   node_exists= !purrr::is_empty(node)
@@ -1059,7 +1071,7 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
     separate_rows(orthologs,sep=" ") %>%
     extract(orthologs,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
     group_by(NOG,taxid) %>% mutate(is_1to1=n()==1)
-
+  unlink(temp)
   return(node_ortho)
 }
 
@@ -1067,6 +1079,12 @@ load.paxdb = function(taxon=4932){
   URL_PAXDB = "https://pax-db.org/downloads/latest/"
   paxdb_dataset =paste0(URL_PAXDB,"datasets/")
   taxon_dir=file.path(paxdb_dataset,taxon,"/")
+
+  .version= get_paxdb_version()
+  cat(sprintf("PAXDB VERSION: %s\n",.version))
+
+  mapping_uniprot=paste0(URL_PAXDB,sprintf("paxdb-uniprot-links-v%s/paxdb-uniprot-links-v%s.tsv",.version,.version))
+  map2uniprot = readr::read_delim(mapping_uniprot,delim="\t",col_names = c('id_string','id_uniprot'))
 
   taxon_data <- rvest::read_html(taxon_dir) %>%
                 rvest::html_nodes("a") %>%
@@ -1112,12 +1130,13 @@ load.paxdb = function(taxon=4932){
                            rbind = TRUE,rbind_label = "dataurl",rbind_fill = T) %>%
       dplyr::rename(paxid="#internal_id", string="string_external_id", ppm="abundance") %>%
       mutate(dataset = basename(path = dataurl)) %>% dplyr::select(-dataurl) %>%
-      extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)') %>%
+      extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)',remove = F) %>%
       distinct()
   #}#
 
   taxon_ppm = left_join(ppm,infodata, by=c('dataset'='filename','taxid')) %>%
-    arrange(protid,ppm)
+              left_join(map2uniprot, by=c('string'='id_string')) %>%
+              arrange(protid,id_uniprot,ppm)
   return(taxon_ppm)
 }
 
@@ -1132,7 +1151,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
 
   if( "integrated" %in% targets ){
     RES$INT = paxdb %>%
-      dplyr::group_by(taxid,protid) %>%
+      dplyr::group_by(taxid,protid,id_uniprot) %>%
       mutate(ppm_n = n_distinct(id)) %>%
       dplyr::group_by(taxid,organ,protid) %>%
       dplyr::filter(is_integrated) %>%
@@ -1142,7 +1161,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
   if( "median" %in% targets ){
     RES$MED = paxdb %>%
       dplyr::filter(!is_integrated) %>%
-      group_by(taxid,organ,protid) %>%
+      group_by(taxid,organ,protid,id_uniprot) %>%
       summarise(
         # range
         ppm_max = hablar::max_(ppm),
@@ -1155,7 +1174,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
   if( "mean" %in% targets ){
     RES$AVG = paxdb %>%
       dplyr::filter(!is_integrated) %>%
-      group_by(taxid,organ,protid) %>%
+      group_by(taxid,organ,protid,id_uniprot) %>%
       summarise(
         # regular average
         ppm_avg = mean_(ppm),
@@ -1167,7 +1186,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
   if( "weigthed" %in% targets ){
     RES$WT = paxdb %>%
       dplyr::filter(!is_integrated) %>%
-      group_by(taxid,organ,protid) %>%
+      group_by(taxid,organ,protid,id_uniprot) %>%
       summarise(
         # weighted average/median
         wppm_sum = sum_(ppm*w),
@@ -1179,15 +1198,15 @@ get.paxdb = function(tax=4932, abundance='integrated'){
         wppm_cv  = wppm_sd/wppm_avg,
       )
   }
-  return(purrr::reduce(.x=RES,.f=left_join, by = c("taxid","organ","protid")) )
+  return(purrr::reduce(.x=RES,.f=left_join, by = c("taxid","organ","protid","id_uniprot")) )
 }
 
-summarise_paxdb_abundance = function(paxdb_data){
-
+summarise_paxdb_abundance = function(taxon=4932){
+  paxdb_data = load.paxdb(taxon)
   multicellular = n_distinct(na.omit(paxdb_data$organ)) > 1
   whole_org = paxdb_data %>%
               dplyr::filter(is_integrated & organ == 'WHOLE_ORGANISM') %>%
-              group_by(taxid,organ,protid) %>%
+              group_by(taxid,organ,protid,id_uniprot) %>%
               summarize( ppm_wholeorg = ppm) %>%
               group_by(taxid,organ) %>%
               mutate( pc_wholeorg = 100*percent_rank(-ppm_wholeorg) )
@@ -1196,7 +1215,7 @@ summarise_paxdb_abundance = function(paxdb_data){
               dplyr::filter(is_integrated) %>%
               group_by(taxid,organ) %>%
               mutate( pc_organ = 100*percent_rank(-ppm), nprot_organ = n_distinct(protid))%>%
-              group_by(taxid,protid) %>%
+              group_by(taxid,protid,id_uniprot) %>%
               summarize(
                 n_organs = paste0(sprintf("%s:%s",sort(organ),nprot_organ[order(organ)]),collapse="/"),
                 ppm_organs = paste0(sprintf("%s:%.2f",sort(organ),ppm[order(organ)]),collapse="/"),
@@ -1204,7 +1223,7 @@ summarise_paxdb_abundance = function(paxdb_data){
               )
 
   protein_ppm = paxdb_data %>%
-    group_by(taxid,protid) %>%
+    group_by(taxid,protid,id_uniprot) %>%
     summarize(
       ppm_md      = median_(ppm),
       ppm_avg     = mean_(ppm),
@@ -1268,8 +1287,8 @@ get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated")
     ppms = map_dfr(taxons, get.paxdb,which.abundance)
   }
 
-  ortho_ppms = inner_join(ortho,ppms, by=c('taxid','protid')) %>%
-      arrange(NOG,taxid,protid)
+  ortho_ppms = inner_join(ortho,ppms, by=c('taxid','protid','id_uniprot')) %>%
+      arrange(NOG,taxid,protid,id_uniprot)
 
   return (ortho_ppms)
 }
