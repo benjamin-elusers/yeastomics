@@ -1191,7 +1191,7 @@ summarise_paxdb_abundance = function(paxdb_data){
     ppm_md      = median_(ppm),
     ppm_avg     = mean_(ppm),
     ppm_gmean   = geomean(ppm),
-    ppm_wholeorg= ppm[ organ == 'WHOLE_ORGANISM' ],
+    ppm_wholeorg= ppm[ organ == 'WHOLE_ORGANISM' & is_integrated],
 
     ppm_sd      = sd_(ppm),
     ppm_se      = sd_(ppm)/n(),
