@@ -1335,9 +1335,35 @@ get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated")
 #   }
 # }
 
-get.eggnogg.node=function(node=4890){
-  url_eggnog = "http://eggnog5.embl.de/download/latest/per_tax_level/"
-  #paste0(url_eggnog,node)
+get.eggnogg.node=function(node=4890,GUI=F){
+  URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
+  taxlevels = rvest::read_html(paste0(URL_EGGNOG,"per_tax_level/")) %>%
+    rvest::html_nodes("a") %>% # Retrieve hyperlink corresponding to taxonomic level
+    rvest::html_text(trim = T) %>% # Taxonomic level id is each hyperlink text
+    str_subset(pattern = "/$") %>% # Retrieve the taxonomic level (directories)
+    str_sub(end=-2L) # Remove the "/" of the directories
+
+  eggnog_tax_info = paste0(URL_EGGNOG,"e5.taxid_info.tsv")
+  egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccfcc',progress = F) %>%
+            janitor::clean_names()
+
+  XX = egg_tax$taxid_lineage %>% str_split(pattern=',')
+  YY = egg_tax$named_lineage %>% str_split(pattern=',')
+  ok = sapply(XX,length) == sapply(YY,length)
+
+  taxlevel= tibble(id = as.integer(unlist(XX[ok])), name = unlist(YY[ok])) %>%
+            distinct %>% arrange(id) %>% dplyr::filter(id %in% taxlevels)
+
+  tax_nodes = sprintf("%-s (%-s) ",taxlevel$id, taxlevel$name)
+  if(missing(node)){
+    chosen_node =  menu(tax_nodes, graphics = GUI, title = 'choose a taxonomic node...')
+    return(taxlevel[chosen_node,])
+  }else if(node %in% taxlevel$id){
+    return(taxlevel[ taxlevel$id == node, ])
+  }else if(!(node %in% taxlevel$id)){
+   warning(sprintf("Node %s not found!",node))
+    return(NA)
+  }
 }
 
 
