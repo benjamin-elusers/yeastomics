@@ -1184,39 +1184,62 @@ get.paxdb = function(tax=4932, abundance='integrated'){
 
 summarise_paxdb_abundance = function(paxdb_data){
 
+  multicellular = n_distinct(na.omit(paxdb_data$organ)) > 1
+  whole_org = paxdb_data %>%
+              dplyr::filter(is_integrated & organ == 'WHOLE_ORGANISM') %>%
+              group_by(taxid,organ,protid) %>%
+              summarize( ppm_wholeorg = ppm) %>%
+              group_by(taxid,organ) %>%
+              mutate( pc_wholeorg = 100*percent_rank(-ppm_wholeorg) )
+
+  organ_ppm = paxdb_data %>%
+              dplyr::filter(is_integrated) %>%
+              group_by(taxid,organ) %>%
+              mutate( pc_organ = 100*percent_rank(-ppm), nprot_organ = n_distinct(protid))%>%
+              group_by(taxid,protid) %>%
+              summarize(
+                n_organs = paste0(sprintf("%s:%s",sort(organ),nprot_organ[order(organ)]),collapse="/"),
+                ppm_organs = paste0(sprintf("%s:%.2f",sort(organ),ppm[order(organ)]),collapse="/"),
+                pc_organs = paste0(sprintf("%s:%.2f",sort(organ),pc_organ[order(organ)]),collapse="/")
+              )
+
   protein_ppm = paxdb_data %>%
-  group_by(taxid,protid) %>%
-  summarize(
-    ppm_md      = median_(ppm),
-    ppm_avg     = mean_(ppm),
-    ppm_gmean   = geomean(ppm),
-    ppm_wholeorg= ppm[ (!is.na(organ) && organ == 'WHOLE_ORGANISM') & is_integrated],
+    group_by(taxid,protid) %>%
+    summarize(
+      ppm_md      = median_(ppm),
+      ppm_avg     = mean_(ppm),
+      ppm_gmean   = geomean(ppm),
 
-    ppm_sd      = sd_(ppm),
-    ppm_se      = sd_(ppm)/n(),
-    ppm_int     = median_(ppm[is_integrated]),
+      ppm_sd      = sd_(ppm),
+      ppm_se      = sd_(ppm)/n(),
+      ppm_int     = median_(ppm[is_integrated]),
 
-    n_int       = sum_(is_integrated),
-    norgan      = n_distinct(organ),
-    norgan_int  = n_distinct(organ[is_integrated]),
-    ndata       = n_distinct(dataset),
+      n_int       = sum_(is_integrated),
+      norgan      = n_distinct(organ),
+      norgan_int  = n_distinct(organ[is_integrated]),
+      ndata       = n_distinct(dataset),
 
-    ppm_max     = max_(ppm),
-    ppm_int_max = max_(ppm[is_integrated]),
+      ppm_max     = max_(ppm),
+      ppm_int_max = max_(ppm[is_integrated]),
+    ) %>%
+    group_by(taxid) %>%
+    mutate(
+      pc_md       = 100*percent_rank(-ppm_md),
+      pc_avg      = 100*percent_rank(-ppm_avg),
+      pc_gmean    = 100*percent_rank(-ppm_gmean),
+      pc_se       = 100*percent_rank(-ppm_se),
+      pc_int      = 100*percent_rank(-ppm_int),
+
+      pc_max      = 100*percent_rank(-ppm_max),
+      pc_int_max  = 100*percent_rank(-ppm_int_max),
   ) %>%
-  group_by(taxid) %>%
-  mutate(
-    pc_md       = 100*percent_rank(-ppm_md),
-    pc_avg      = 100*percent_rank(-ppm_avg),
-    pc_gmean    = 100*percent_rank(-ppm_gmean),
-    pc_wholeorg = 100*percent_rank(-ppm_wholeorg),
-    pc_se       = 100*percent_rank(-ppm_se),
-    pc_int      = 100*percent_rank(-ppm_int),
+  distinct %>%
+  left_join(whole_org)
 
-    pc_max      = 100*percent_rank(-ppm_max),
-    pc_int_max  = 100*percent_rank(-ppm_int_max),
-  ) %>%
-  distinct
+  if(multicellular){
+    message('Multicelllular organim -> return integrated abundance in organs')
+    return( protein_ppm %>% left_join(organ_ppm) )
+  }
   return(protein_ppm)
 }
 
