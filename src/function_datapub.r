@@ -1183,6 +1183,44 @@ get.paxdb = function(tax=4932, abundance='integrated'){
 }
 
 
+summarise_paxdb_abundance = function(paxdb_data){
+
+  protein_ppm = paxdb_data %>%
+  group_by(taxid,protid) %>%
+  summarize(
+    ppm_md      = median_(ppm),
+    ppm_avg     = mean_(ppm),
+    ppm_gmean   = geomean(ppm),
+    ppm_wholeorg= ppm[ organ == 'WHOLE_ORGANISM' ],
+
+    ppm_sd      = sd_(ppm),
+    ppm_se      = sd_(ppm)/n(),
+    ppm_int     = median_(ppm[is_integrated]),
+
+    n_int       = sum_(is_integrated),
+    norgan      = n_distinct(organ),
+    norgan_int  = n_distinct(organ[is_integrated]),
+    ndata       = n_distinct(dataset),
+
+    ppm_max     = max_(ppm),
+    ppm_int_max = max_(ppm[is_integrated]),
+  ) %>%
+  group_by(taxid) %>%
+  mutate(
+    pc_md       = 100*percent_rank(-ppm_md),
+    pc_avg      = 100*percent_rank(-ppm_avg),
+    pc_gmean    = 100*percent_rank(-ppm_gmean),
+    pc_wholeorg = 100*percent_rank(-ppm_wholeorg),
+    pc_se       = 100*percent_rank(-ppm_se),
+    pc_int      = 100*percent_rank(-ppm_int),
+
+    pc_max      = 100*percent_rank(-ppm_max),
+    pc_int_max  = 100*percent_rank(-ppm_int_max),
+  ) %>%
+  distinct
+  return(protein_ppm)
+}
+
 #test = get.paxdb(4932,abundance = 'integrated')
 # test.num = test %>% ungroup() %>% dplyr::select(-c(taxid,organ,protid)) %>% as.matrix
 # C=cor(test.num,use='pairwise.complete',met='spearman')
