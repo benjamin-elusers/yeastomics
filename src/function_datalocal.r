@@ -99,7 +99,7 @@ load.1011.strains= function(seqdir="/media/elusers/users/benjamin/A-PROJECTS/01_
                              .recursive=F){
   if( !dir.exists(seqdir) ) stop("Directory of proteome sequences not found!")
   fastas =list.files(path=seqdir, pattern = "fasta", full.names = T, ignore.case = T, include.dirs = F,recursive = .recursive)
-  return(read.proteomes(seqfiles = fastas,strip.fname=T))
+  return(read.sequences(seqfiles = fastas,strip.fname=T))
 }
 
 # Evolution Sequence/Structure -------------------------------------------------
