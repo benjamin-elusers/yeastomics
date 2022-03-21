@@ -246,5 +246,6 @@ bigali.idx=read_tsv(file.path(dir1011,'superalignment.idx'))
 bigali.seq=load.proteome(file.path(dir1011,'superalignment.fa'))
 
 CDS = load.sgd.CDS()
-cds = read.sequences(seqfiles = list.files("/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/transfer_1638744_files_c25fb55c/CDS_withAmbiguityRes/",pattern='.fasta',full.names = F))
-
+yk11_cds = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/transfer_1638744_files_c25fb55c/CDS_withAmbiguityRes/"
+cds = read.sequences(seqfiles = list.files(yk11_cds,pattern='.fasta',full.names = F)[1],type='DNA')
+read.sequences
