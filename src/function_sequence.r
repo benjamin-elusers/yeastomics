@@ -128,7 +128,7 @@ read.sequences = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
     if(seqtype == 'AA'){
       return(Biostrings::readAAStringSet(file, format = 'fasta' ))
     }else if(seqtype == 'DNA'){
-      return(Biostrings::readDNAStringSett(file, format = 'fasta' ))
+      return(Biostrings::readDNAStringSet(file, format = 'fasta' ))
     }
   }
   .arg.ReadSequence =  list(.pb=pb, .pb.toprint=task,.seqtype=seqtype)
@@ -147,7 +147,7 @@ read.sequences = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
 
   if(strip.fname){
     warning("filename will be used as the proteome identifier")
-    names(P) = get.orf.filename(seqfiles)
+    names(S) = get.orf.filename(seqfiles)
   }
   toc()
   if(seqtype == 'AA'){
