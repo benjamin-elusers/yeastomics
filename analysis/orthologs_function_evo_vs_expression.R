@@ -10,7 +10,6 @@ EVOLUTION = full_join(STRAINS,CLADE,by=c('ORF'='orf')) # EVOLUTION DATA
 # ANNOTATION DATA
 ANNOTATION=load.annotation()
 
-
 orthologs = EVOLUTION %>% filter(IS_FUNGI & !is.na(PPM) & !is.na(log10.EVO.FULL))
 orf_evolution = EVOLUTION %>% pull(ORF) %>% unique
 orf_orthologs = orthologs %>% pull(ORF) %>% unique
@@ -44,19 +43,27 @@ table(outliers$protexp)
 table(outliers$evospeed)
 
 lo_hi <- compareCluster(ORF~protexp+evospeed, data=outliers,
+                        universe = orthologs$ORF,
                         fun="enrichGO",
                         ont           = 'ALL',
                         keyType       = "ORF",
                         OrgDb         = org.Sc.sgd.db,
-                        minGSSize	    = 5,
+                        minGSSize     = 5,
                         pAdjustMethod = "BH",
                         pvalueCutoff  = 0.01,
                         qvalueCutoff  = 0.05,
-                        pool=T)
-enrichplot::dotplot(lo_hi)
-dotplot(lo_hi, x="protexp",showCategory=1,split='ONTOLOGY',group=T) +  facet_grid(~evospeed)
+                        pool=F)
+#enrichplot::dotplot(lo_hi)
+#cnetplot(lo_hi,node_label='category')
+F1_func = dotplot(lo_hi,x='protexp',showCategory=3, by='Count',label_format=20,font.size=8) +
+          facet_grid(evospeed~protexp,scales = 'free') + theme(legend.position = 'left') + guides("none")
+ggsave(F1_func,
+       filename = "F1_functional_enrichment.png",
+       path="/media/elusers/users/benjamin/A-PROJECTS/03_PostDoc/EvoRate-paper/",
+       device = 'png',scale=1.5)
 
-
+mutate(lo_hi, qscore = -log(p.adjust, base=10)) %>%
+  enrichplot::barplot(x="qscore")
 
 kk <- enrichKEGG(gene         = outliers$ORF,organism     = 'sce',pvalueCutoff = 0.05)
 mkk <- enrichMKEGG(gene = outliers$ORF,
