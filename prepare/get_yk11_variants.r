@@ -174,12 +174,21 @@ add_missing_strains = function(BS,all_strains){
 library(bio3d)
 yk11 = sapply(orfs, function(x){ add_missing_strains( BS=get_s288c_strain(x),all_strains=yk11_strains) })
 
+most_var = snp_count_per_orf %>% ungroup() %>%
+    dplyr::mutate( f_var = n_var/len,
+                   rk_var = dense_rank(-f_var),
+                   pc_var = percent_rank(-f_var)) %>%
+    arrange(rk_var) %>% dplyr::filter(rk_var<=1000) %>%
+    mutate(total_nvar = sum(n_var), total_len = sum(len),total_fvar =100*total_nvar/total_len)
+
+orf_var = sort(unique(most_var$id))
+
 LL  = sapply(yk11,function(x){ unique(nchar(x))})
 weird = names( LL[ lengths(LL) > 1] )
 # Aligned those where the reference sequence has a different size from the strain sequences
 s288c_alidir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/strains_s288c_not_aligned"
 realigned=list()
-for( w in weird){
+for( w in intersect(weird,orf_var) ){
   tofasta = sprintf("%s/%s.fasta",s288c_alidir,w)
   toaln = sprintf("%s/%s_aligned.fa",s288c_alidir,w)
   Biostrings::writeXStringSet(yk11[[w]],filepath=tofasta)
@@ -204,8 +213,9 @@ for( orf in names(realigned) ){
   check_realigned[orf] = same_length & sum(len_indel>1) < 1
 }
 
-final_dir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain_with_s288c/"
-for( o in names(yk11) ){
+final_dir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/top1000_strain_with_s288c/"
+dir.create(final_dir)
+for( o in orf_var ){
   if( o %in% names(realigned) ){
     # WEIRD ORF (NOT UNIQUE LENGTH)
     if( check_realigned[o] ){
@@ -227,7 +237,7 @@ for( o in names(yk11) ){
     Biostrings::writeXStringSet(final_ali,filepath=tofasta,format = 'fasta')
 }
 
-test = read.proteomes(seqfiles = list.files(final_dir,pattern='.fasta',full.names = T))
+test = read.sequences(seqfiles = list.files(final_dir,pattern='.fasta',full.names = T))
 tmp = lapply(test, function(x){ unique(widths(x)) })
 test[ lengths(test) <1012 ]
 
@@ -235,5 +245,6 @@ dir1011="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/"
 bigali.idx=read_tsv(file.path(dir1011,'superalignment.idx'))
 bigali.seq=load.proteome(file.path(dir1011,'superalignment.fa'))
 
+CDS = load.sgd.CDS()
+cds = read.sequences(seqfiles = list.files("/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/transfer_1638744_files_c25fb55c/CDS_withAmbiguityRes/",pattern='.fasta',full.names = F))
 
-test = read.proteomes(seqfiles = list.files("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/test_fasta/",pattern='.fasta',full.names = T))
