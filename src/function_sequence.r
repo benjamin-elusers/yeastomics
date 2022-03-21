@@ -105,7 +105,7 @@ get.positions = function(BS){
   return(df.pos)
 }
 
-read.proteomes = function(seqfiles,strip.fname=F,ncores=parallelly::availableCores(which='max')-2){
+read.sequences = function(seqfiles,strip.fname=F,ncores=parallelly::availableCores(which='max')-2,type="AA"){
   library(Biostrings)
   library(tictoc)
   library(progress)
@@ -113,31 +113,36 @@ read.proteomes = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
   library(parallelly)
   #library(biomartr) # NOT library
   #library(purrr)    # NOT library
+  seqtype = match.arg(type, choices=c('AA','DNA'),several.ok = F)
 
-  task="Reading proteomes from fasta sequences..."
+  task="Reading fasta sequences..."
   tic(msg = task)
   message(task)
   pb = progress::progress_bar$new(total = length(seqfiles), width = 100, clear=T,
                                   format = " (:spin) :what [:bar] :percent (:current/:total # :elapsed eta: ~:eta)")
 
-  readProteome = function(file, .pb=NULL, .pb.toprint=task){
+  readSequence = function(file, .pb=NULL, .pb.toprint=task,.seqtype='AA'){
     # format = "fasta", obj.type = "Biostrings"
     if(!.pb$finished){ .pb$tick(tokens=list(what=.pb.toprint)) }
     #return( biomartr::read_proteome(file,format,obj.type,...) )
-    return(Biostrings::readAAStringSet(file, format = 'fasta' ))
+    if(seqtype == 'AA'){
+      return(Biostrings::readAAStringSet(file, format = 'fasta' ))
+    }else if(seqtype == 'DNA'){
+      return(Biostrings::readDNAStringSett(file, format = 'fasta' ))
+    }
   }
-
+  .arg.ReadSequence =  list(.pb=pb, .pb.toprint=task,.seqtype=seqtype)
   if (require('pbmcapply')) {
     message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
-    P = pbmcapply::pbmcmapply(FUN=readProteome,  seqfiles, MoreArgs = list(.pb=pb, .pb.toprint=task),
+    S = pbmcapply::pbmcmapply(FUN=readSequence,  seqfiles, MoreArgs = .arg.ReadSequence,
                               mc.cores=ncores, mc.silent=F, mc.cleanup = T)
   }else if( require('parallel') ){
     message(sprintf("using 'parallel' package across %s cpus (no progress bar)",ncores))
-    P = parallel::mcmapply( FUN=readProteome,  seqfiles, MoreArgs = list(.pb=pb, .pb.toprint=task),
+    S = parallel::mcmapply( FUN=readSequence,  seqfiles, MoreArgs = .arg.ReadSequence,
                             mc.cores=ncores, mc.silent=F, mc.cleanup = T)
   }else{
     message("sequential computation with progress bar")
-    P = mapply(FUN=readProteome,  seqfiles, MoreArgs = list(.pb=pb, .pb.toprint=task))
+    S = mapply(FUN=readSequence,  seqfiles, MoreArgs = .arg.ReadSequence)
   }
 
   if(strip.fname){
@@ -145,5 +150,9 @@ read.proteomes = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
     names(P) = get.orf.filename(seqfiles)
   }
   toc()
-  return(AAStringSetList(P))
+  if(seqtype == 'AA'){
+    return(AAStringSetList(S))
+  }else if(seqtype == 'DNA'){
+    return(DNAStringSetList(S))
+  }
 }
