@@ -1334,11 +1334,12 @@ get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated")
 #     numnode = menu(paxdb_nodes, title = "Pick a taxonomic node from the list below",graphics = T)
 #   }
 # }
-find_eggnog_version = function(){
+find_eggnog_version = function(.print=T){
   eggnog_files=find_eggnog_downloads()
   .version = str_extract(pattern="^(e[0-9](\\.[0-9])?)\\.",string = eggnog_files) %>%
              gtools::mixedsort(na.last = F) %>%
              last %>% str_sub(end=-2L) #remove the '.' after the version number
+  if(.print){ cat(sprintf("EggNOG VERSION: %s\n",.version)) }
   return(.version)
 }
 
@@ -1352,7 +1353,7 @@ find_eggnog_downloads = function(){
 }
 
 
-find_eggnogg_node=function(node=4890,GUI=F){
+find_eggnogg_node=function(node,GUI=F){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   taxlevels = rvest::read_html(paste0(URL_EGGNOG,"per_tax_level/")) %>%
     rvest::html_nodes("a") %>% # Retrieve hyperlink corresponding to taxonomic level
@@ -1360,10 +1361,7 @@ find_eggnogg_node=function(node=4890,GUI=F){
     str_subset(pattern = "/$") %>% # Retrieve the taxonomic level (directories)
     str_sub(end=-2L) # Remove the "/" of the directories
 
-  .vers = find_eggnog_version()
-  cat(sprintf("EggNOG VERSION: %s\n",.vers))
-
-  eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG,.vers)
+  eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG, find_eggnog_version(.print=F))
   egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccfcc',progress = F) %>%
             janitor::clean_names()
 
@@ -1375,10 +1373,12 @@ find_eggnogg_node=function(node=4890,GUI=F){
             distinct %>% arrange(id) %>% dplyr::filter(id %in% taxlevels)
 
   tax_nodes = sprintf("%-s (%-s) ",taxlevel$id, taxlevel$name)
+
+
   if(missing(node)){
     chosen_node =  menu(tax_nodes, graphics = GUI, title = 'choose a taxonomic node...')
     return(taxlevel[chosen_node,])
-  }else if(node %in% taxlevel$id){
+  }else if(any(node == taxlevel$id)){
     return(taxlevel[ taxlevel$id == node, ])
   }else if(any(grepl(node,taxlevel$name,ignore.case = T))){
     return(taxlevel[ grep(node,taxlevel$name,ignore.case = T), ])
@@ -1388,61 +1388,105 @@ find_eggnogg_node=function(node=4890,GUI=F){
   }
 }
 
-get_eggnogg_node = function(node,reftax){
+get_eggnogg_species = function(node){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
-
   eggnog_node = find_eggnogg_node(node)
-  invalid_node = all(is.na(eggnog_node))
-  ambiguous_node = length(eggnog_node$id)>1
+  eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG,find_eggnog_version(.print=F))
+  sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccfcc',progress = F) %>%
+            janitor::clean_names() %>%
+            dplyr::filter(grepl(eggnog_node$name,named_lineage)) # find species with node in their lineage
+  return(sp_info)
+}
 
-  if(ambiguous_node){ stop(sprintf("Ambiguous node (%s): matches multiple taxonomic levels (%s)!",node,toString(eggnog_node$name))) }
-  if(invalid_node){ stop(sprintf("No eggnog data for unknown taxonomic level (%s)!",node)) }
+get_eggnogg_node = function(node){
 
-  .vers = find_eggnog_version()
-  cat(sprintf("EggNOG VERSION: %s\n",.vers))
-
-  eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG,.vers)
-  egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccfcc',progress = F) %>%
-            janitor::clean_names()
-
-
-  library(rotl)
+  URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
+  eggnog_node = find_eggnogg_node(node)
+  find_eggnog_version()
+  #library(rotl)
   url_node_info = paste0(URL_EGGNOG,"per_tax_level/",eggnog_node$id,"/")
   eggnog_node_files = rvest::read_html(url_node_info) %>%
                       rvest::html_nodes("a") %>% # Retrieve hyperlink corresponding to taxonomic level
                       rvest::html_text(trim = T) # Taxonomic level id is each hyperlink text
 
   members_file = paste0(url_node_info,grep("_members.tsv.gz",eggnog_node_files,v=T))
-  members = readr::read_delim(members_file,delim = '\t',
+  trees_file = paste0(url_node_info,grep("_trees.tsv.gz",eggnog_node_files,v=T))
+  library(ape)
+  node_trees = readr::read_delim(trees_file,delim='\t',
+                                 col_names=c('node','OG','algo','tree'),
+                                 col_types='fffc')
+
+  node_members = readr::read_delim(members_file,delim = '\t',
                     col_names = c('node','OG','nprot','nsp','string_ids','taxon_ids'),
                     col_types = 'ffiicc') %>%
-            mutate(one2one = (nprot == nsp) )
+                 mutate(one2one = (nprot == nsp) ) %>%
+                 left_join(node_trees, by=c('node','OG'))
 
-  SP = str_split(members$taxon_ids,',')
-  all_taxons = unlist(SP) %>% unique()
-  sp_info = egg_tax %>% filter(number_taxid %in% all_taxons)
-  if( reftax %in% sp_info$number_taxid ){
-    sp_ref = sp_info[sp_info$number_taxid %in% reftax,]
-  }else if(all(grepl(reftax,sp_info$sci_name,ignore.case = T)) ){
-    sp_ref = sp_info[grep(reftax,sp_info$sci_name,ignore.case = T),]
-  }else{
-    warning(sprintf('reference species (%s) not found!',reftax))
+  return(node_members)
+}
+
+count_eggnogg_node = function(node,ref_species,use_sciname=T){
+
+  taxlevel = find_eggnogg_node(node)
+  node_species = get_eggnogg_species(taxlevel$id)
+  node_members = get_eggnogg_node(taxlevel$id)
+
+  if(missing(ref_species)){
+    taxlist = sprintf("(%s) %s",node_species$number_taxid,node_species$sci_name)
+    selected = menu(taxlist,graphics=interactive(),title=sprintf("reference taxon(s) in node '%s' (%s)",taxlevel$name,taxlevel$id))
+    refsp = node_species[selected,]
   }
-  print(sp_ref)
+
+  # if(all(is_number(ref_species))){
+  #   valid_taxid = match.arg(as.character(ref_species), choices = node_species$number_taxid, several.ok = T)
+  #   refsp = node_species[ node_species$number_taxid %in% valid_taxid]
+  #
+  # }else{
+  #   warning('Names of reference species must match exactly! (otherwise use taxon id')
+  #   refsp = strfind(patterns = ref_species, strings = node_species$sci_name)
+  # }
+  #
+  # if( all(is_number(reftax)) ){
+  #   ref = sp_info$number_taxid %in% reftax
+  # }else{
+  #   ref = sp_info$sci_name %in% strfind(sp_info$sci_name,reftax) %>% unlist()
+  # }
+  #
+  # if(!any(ref)){ stop(sprintf('reference species (%s) not found!',reftax)) }
+  # print(sp_ref)
 
   #members[[paste0("n_",sp_ref$number_taxid)]] = str_count(members$taxon_ids, sp_ref$number_taxid)
   #PROT = str_split(members$string_ids,',')
+  #newick_trees = ape::read.tree(text=node_trees$tree)
 
-  test = sapply(all_taxons, function(sp){ str_count(members$taxon_ids,sp) })
-  colMeans(test)
+  sp_count = sapply(node_species$number_taxid, function(sp){ str_count(node_members$taxon_ids,sp) })
+  # filter orthogroups incomplete/not containing ref species
+  small_og = rowMeans(sp_count>=1) < 0.3
+  yeast_og = sp_count[,'4932'] == 1
+  pombe_og = sp_count[,'4896'] == 1
 
-  #node = read.delim(node_info,header=F,stringsAsFactors = F, col.names = c('taxid','sciname','rank','ancestors','lineage'))
-  LCA = Reduce(intersect,strsplit(sp_info$named_lineage,","))
-  LCA.taxid = Reduce(intersect,strsplit(sp_info$taxid_lineage,","))
-  sp_info$MRCA = paste0(tail(LCA.taxid,1),"_",tail(LCA,1))
-  sp_info
-  #node.info = merge(node,sp.4891, by='taxid')
-  return(node.info)
+  # filter orthogroups with at least 30% of all species in the taxonomic level
+  # should contain one protein from each reference species (e.g. yeast and pombe)
+  orthogroups = node_members %>% dplyr::filter(yeast_og & pombe_og & !small_og)
+  return(orthogroups)
+
+  # freq_sp = colSums(sp_count==1) / n_distinct(node_species$number_taxid)
+  # barplot(sort(freq_sp),las=2)
+  #
+  # LCA_name = Reduce(intersect,strsplit(node_species$named_lineage,","))
+  # MRCA_name = tail(LCA_name,1)
+  #
+  # LCA_taxid = Reduce(intersect,strsplit(node_species$taxid_lineage,","))
+  # MRCA_taxid = tail(LCA_taxid,1)
+  # node_species$MRCA = paste0(MRCA_taxid,"_",MRCA_name)
+  #
+  # max_lineage = max( str_count(node_species$taxid_lineage,",") )
+  #
+  # lineages_id =  str_split_fixed(node_species$taxid_lineage,',',n=max_lineage)
+  # lineages_name =  str_split_fixed(node_species$named_lineage,',',n=max_lineage)
+  #
+  # sapply(1:max_lineage, function(x){ table(lineages_name[,x]) })
+
 }
 
 find.common.ancestor= function(lineage){
