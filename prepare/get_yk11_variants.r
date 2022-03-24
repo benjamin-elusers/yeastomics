@@ -51,74 +51,7 @@ write_rds(snp_count_per_orf,here("data",'YK11-ORF-VAR.rds'))
 PROT_SNP=read_rds(here("data",'YK11-SNP.rds'))
 snp_count_per_orf=read_rds(here("data",'YK11-ORF-VAR.rds'))
 
-
-align_pair  = function(p1,p2,mat = "BLOSUM62",tomatrix=F, opening=10, extend=4 ){
-  ali = pairwiseAlignment(p1, p2, substitutionMatrix = mat, gapOpening=opening, gapExtension=extend)
-  if(tomatrix){
-    return( pairwise.alignment.to.df(ali) )
-  }else{
-    return(ali)
-  }
-}
-
-get_s288c_strain = function(orf){
-
-  yk11_seq_dir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/"
-  yk11_orf = file.path(yk11_seq_dir,paste0(orf,'.fasta'))
-  in_s288c = orf %in% names(S288C)
-  in_yk11 = file.exists(yk11_orf)
-  has_orf  = in_s288c && in_yk11
-  if(!has_orf){
-    message(sprintf("missing orf %s (S288C %s YK11 %s)",orf,in_s288c,in_yk11))
-    return(NA)
-  }
-  #cat(orf,"\n")
-  yk11  = load.proteome(yk11_orf,nostop = F)
-  wt = S288C[orf]
-  names(wt) = paste0('S288C_',names(wt))
-
-  return( c(wt,yk11) )
-}
-
-
-align_s288c_strains = function(orf){
-  #tic('future_map_dfr')
-  #future::plan(future::multisession(workers = 14))
-  #df_strain = furrr::future_map_dfr(strains, .f = ~score_ali(p1=refseq, p2=strain_seq[.x], mat='BLOSUM100'), .progress = T )
-  #cat("\n")
-  #toc()
-  #tic('map_dfr')
-  SEQ = get_s288c_strain(orf)
-  tic(sprintf('align %s from s288c against 1011 strains',orf))
-  df_strain = map_dfr(2:length(SEQ), function(x){ score_ali(p1=SEQ[1], p2=SEQ[x], mat='BLOSUM100') })
-  toc()
-  #identical(df_strain,df_strain2)
-  # df_closest = df_strain %>%
-  #              group_by(ID1) %>%
-  #              dplyr::filter( SCORE.BLOSUM100== max(SCORE.BLOSUM100))
-  return(df_strain)
-}
-
-
-yk11_seq_dir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/"
-yk11_strains = load.peter2018.data(1) %>% pull(standardized_name) %>% sort
-yk11_orfs = get.orf.filename(list.files(path=yk11_seq_dir,pattern='.fasta'))
-
-orfs = intersect(names(S288C),yk11_orfs)
-#orfs_same_length = orfs[ widths(S288C[orfs]) == widths(YK11[orfs]) ]
-
-# Compare aligned proteome from s288c vs from 1011 strains with key statistics
-#res1file=here::here("prepare","s288c_vs_strains_0001-2000.rds")
-#if(!file.exists(res1file)){
-  # res1 = pbmcapply::pbmcmapply(align_s288c_strains, orfs[0001:2000], mc.cores = 14)
-  # write_rds(res1,res1file)
-#}
-# Each column is stored as a list
-#tmp1 = t(read_rds(res1file)) %>% as_tibble() %>% unnest(cols=everything())
-# df_strains_s288c = bind_rows(tmp1,tmp2,tmp3,tmp4) %>%
-#                   mutate( strain = get.strain_orf(ID2,'strains') )
-# write_rds(df_strains_s288c, here("prepare","proteome_aligned_s288c_vs_1011strains.rds"))
-
+### Must have run align_s288c_to_1011strains.r !!!
 # Filter orf with best match to s288c from all strains
 df_strains_s288c = read_rds(here("prepare","proteome_aligned_s288c_vs_1011strains.rds"))
 #df_best = df_strains_s288c %>% group_by(ID1) %>% filter(SCORE.BLOSUM100 == max(SCORE.BLOSUM100))
@@ -138,113 +71,15 @@ best_strain = df_strains_s288c %>%
   arrange(nsnp,desc(pid_proteome),desc(norf))%>%
   left_join(load.peter2018.data(1), by=c('strain'='standardized_name'))
 
+write_rds(best_strain, here("prepare","best_strain_aligned_to_s288c_proteome.rds"))
+
+# Show
 median_snp = median(best_strain$nsnp)
 ggplot(best_strain,aes(fill=is_proteomics)) +
   geom_col(aes(y=reorder(strain,pid_proteome),x=nsnp),orientation='y') +
   geom_vline(xintercept=median_snp,linetype='dashed') +
   facet_wrap(~ecological_origins, scales = 'free_y') + xlab('# of SNP') +
-  theme(legend.position = 'none')
+  scale_y_discrete(guide=guide_axis(n.dodge=2))+
+  scale_fill_manual(values=c("TRUE"='red',"FALSE"='gray50')) +
+  theme(legend.position = 'none', axis.text =  element_text(size = 5))
 
-top10 = peter2018 %>% slice_max(order_by=-total_number_of_sn_ps,n=10) %>%
-        select(isolate_name,,isolation,ecological_origins,geographical_origins,total_number_of_sn_ps,clades)
-
-best_strain %>% slice_max(order_by=pid.total,n=10)
-top10
-
-write_rds(df_best, here("prepare","best_strain_protome_aligned_to_s288c.rds"))
-
-add_missing_strains = function(BS,all_strains){
-  this_orf = get.strain_orf(what='orf',x=names(BS))
-  these_strains = get.strain_orf(what='strains',x=names(BS))
-  missing_strains = setdiff(all_strains,these_strains)
-  n = length(missing_strains)
-  if(n==0){
-    #message('no missing strains')
-    return(BS)
-  }else{
-    suffix=hutils::longest_suffix(x = names(BS)[-1])
-    cat(sprintf('%10s: %3s missing strains (%s)\r',this_orf,n,suffix))
-    L = max(width(BS))
-    unknown_seq = paste0(rep("-",L),collapse="")
-    missing_seq = setNames(rep(AAStringSet(x=unknown_seq),n),paste0(missing_strains,suffix))
-    return( c(BS,missing_seq) )
-  }
-}
-
-library(bio3d)
-yk11 = sapply(orfs, function(x){ add_missing_strains( BS=get_s288c_strain(x),all_strains=yk11_strains) })
-
-most_var = snp_count_per_orf %>% ungroup() %>%
-    dplyr::mutate( f_var = n_var/len,
-                   rk_var = dense_rank(-f_var),
-                   pc_var = percent_rank(-f_var)) %>%
-    arrange(rk_var) %>% dplyr::filter(rk_var<=1000) %>%
-    mutate(total_nvar = sum(n_var), total_len = sum(len),total_fvar =100*total_nvar/total_len)
-
-orf_var = sort(unique(most_var$id))
-
-LL  = sapply(yk11,function(x){ unique(nchar(x))})
-weird = names( LL[ lengths(LL) > 1] )
-# Aligned those where the reference sequence has a different size from the strain sequences
-s288c_alidir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/strains_s288c_not_aligned"
-realigned=list()
-for( w in intersect(weird,orf_var) ){
-  tofasta = sprintf("%s/%s.fasta",s288c_alidir,w)
-  toaln = sprintf("%s/%s_aligned.fa",s288c_alidir,w)
-  Biostrings::writeXStringSet(yk11[[w]],filepath=tofasta)
-  tmp  = bio3d::read.fasta(tofasta)
-  aln  = bio3d::seqaln(tmp,outfile = toaln )
-  unlink(tofasta)
-  tmp = Biostrings::readAAMultipleAlignment(toaln,format='fasta')
-  realigned[[w]] = tmp
-}
-
-# Following should give empty results
-
-LL_ali  = sapply(yk11,function(x){ unique(nchar(x))})
-weird_ali = names( LL_ali[ lengths(LL_ali) > 1] )
-
-check_realigned = c()
-for( orf in names(realigned) ){
-  BS = as(realigned[[orf]],'AAStringSet')
-  same_length = length(unique(widths(BS))) == 1
-  internal_gaps = as.character(BS[[orf]]) %>% str_extract_all(pattern = "[A-Z]-{1,}[A-Z]") %>% unlist
-  len_indel = nchar(internal_gaps) - 2
-  check_realigned[orf] = same_length & sum(len_indel>1) < 1
-}
-
-final_dir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/top1000_strain_with_s288c/"
-dir.create(final_dir)
-for( o in orf_var ){
-  if( o %in% names(realigned) ){
-    # WEIRD ORF (NOT UNIQUE LENGTH)
-    if( check_realigned[o] ){
-      # REALIGNED SEEMS FINE (SAME LENGTH, NOT TOO MANY (LONG) INDELS)
-      tofasta = sprintf("%s/%s_realigned.fasta",final_dir,o)
-      final_ali = add_missing_strains(as(realigned[[o]],'AAStringSet'),all_strains=yk11_strains)
-    }else{
-      print(sprintf("AVOIDING WEIRD ALIGNED ORF %s",o))
-    }
-  }else{
-    # NORMAL ORFS
-    tofasta = sprintf("%s/%s.fasta",final_dir,o)
-    final_ali = stripR(yk11[[o]])
-  }
-    # final_ali = as(yk11[[o]], "AAStringSet")
-    # realigned = c(realigned, as(yk11[[o]], "AAStringSet"))
-
-    #print(basename(tofasta))
-    Biostrings::writeXStringSet(final_ali,filepath=tofasta,format = 'fasta')
-}
-
-test = read.sequences(seqfiles = list.files(final_dir,pattern='.fasta',full.names = T))
-tmp = lapply(test, function(x){ unique(widths(x)) })
-test[ lengths(test) <1012 ]
-
-dir1011="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/"
-bigali.idx=read_tsv(file.path(dir1011,'superalignment.idx'))
-bigali.seq=load.proteome(file.path(dir1011,'superalignment.fa'))
-
-CDS = load.sgd.CDS()
-yk11_cds = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/transfer_1638744_files_c25fb55c/CDS_withAmbiguityRes/"
-cds = read.sequences(seqfiles = list.files(yk11_cds,pattern='.fasta',full.names = T),type='DNA',strip.fname = T)
