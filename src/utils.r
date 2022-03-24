@@ -66,6 +66,7 @@ is_num_bin <- function(x){ is.numeric(x) && length(unique(na.omit(x))) == 2 } # 
 is_fac_bin <- function(x){ is.factor(x) && nlevels(na.omit(x)) == 2 }         # checks if a factor vector has only 2 levels
 # checks if a value is binary (2 unique outcomes -- by default numeric values must be either 0 and 1)
 is.binary  <- function(x,xvals=c(0,1)){ is_num_bin(x) && range(na.omit(x)) == xvals[1:2] || is_fac_bin(x) || is.logical(x) }
+is_number <- function(x){ grepl("^[0-9]+$",x) } # checks if it contains only number
 
 is.even   <- function(x){ as.integer(x) %% 2 == 0 } # checks if a value is even
 is.odd    <- function(x){ as.integer(x) %% 2 != 0 } # checks if a value is odd
@@ -432,6 +433,24 @@ get_os <- function(){
 }
 
 # shorthands -------------------------------------------------------------------
+load.package <- function(name) { # Quietly Load Libraries
+  if(length(name)>1){
+    for(i in 1:length(name)){ load.package(name[i]) }
+  }else if(length(name)==1){
+    suppressMessages(suppressWarnings(library(name, quietly = T, warn.conflicts = F, character.only = T)))
+  }else{
+    warning('no package to load...')
+  }
+}
+
+load.package = function(x){
+  if(length(x)>1){
+
+  }else{
+
+  }
+}
+
 lsos <- function(..., n=10) { # checks top10 memory consumption from R objects
   ls.objects(..., order.by="Size", decreasing=TRUE, head=TRUE, n=n)
 }
