@@ -3,3 +3,4 @@ sc_alphafold.rds
 alphafold-uniprot-yeast.rds
 checkpoint_test-leisr-r4s.rdata
 test-leisr-r4s.r
+proteome_aligned_s288c_vs_1011strains.rds

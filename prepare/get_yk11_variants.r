@@ -107,51 +107,51 @@ yk11_orfs = get.orf.filename(list.files(path=yk11_seq_dir,pattern='.fasta'))
 orfs = intersect(names(S288C),yk11_orfs)
 #orfs_same_length = orfs[ widths(S288C[orfs]) == widths(YK11[orfs]) ]
 
-res1file=here::here("prepare","s288c_vs_strains_0001-2000.rds")
-res2file=here::here("prepare","s288c_vs_strains_2001-4000.rds")
-res3file=here::here("prepare","s288c_vs_strains_4001-6000.rds")
-res4file=here::here("prepare","s288c_vs_strains_6001-6574.rds")
-
-if(!file.exists(res1file)){
-  res1 = pbmcapply::pbmcmapply(align_s288c_strains, orfs[0001:2000], mc.cores = 14)
-  write_rds(res1,res1file)
-}
-if(!file.exists(res2file)){
-  res2 = pbmcapply::pbmcmapply(align_s288c_strains, orfs[2001:4000], mc.cores = 14)
-  write_rds(res2,res2file)
-}
-if(!file.exists(res3file)){
-  res3 = pbmcapply::pbmcmapply(align_s288c_strains, orfs[4001:6000], mc.cores = 14)
-  write_rds(res3,res3file)
-}
-if(!file.exists(res4file)){
-  res4 = pbmcapply::pbmcmapply(align_s288c_strains, orfs[6001:6574], mc.cores = 14)
-  write_rds(res4,res4file)
-}
-
+# Compare aligned proteome from s288c vs from 1011 strains with key statistics
+#res1file=here::here("prepare","s288c_vs_strains_0001-2000.rds")
+#if(!file.exists(res1file)){
+  # res1 = pbmcapply::pbmcmapply(align_s288c_strains, orfs[0001:2000], mc.cores = 14)
+  # write_rds(res1,res1file)
+#}
 # Each column is stored as a list
+#tmp1 = t(read_rds(res1file)) %>% as_tibble() %>% unnest(cols=everything())
+# df_strains_s288c = bind_rows(tmp1,tmp2,tmp3,tmp4) %>%
+#                   mutate( strain = get.strain_orf(ID2,'strains') )
+# write_rds(df_strains_s288c, here("prepare","proteome_aligned_s288c_vs_1011strains.rds"))
 
-tmp1 = t(read_rds(res1file)) %>% as_tibble() %>% unnest(cols=everything())
-tmp2 = t(read_rds(res2file)) %>% as_tibble() %>% unnest(cols=everything())
-tmp3 = t(read_rds(res3file)) %>% as_tibble() %>% unnest(cols=everything())
-tmp4 = t(read_rds(res4file)) %>% as_tibble() %>% unnest(cols=everything())
+# Filter orf with best match to s288c from all strains
+df_strains_s288c = read_rds(here("prepare","proteome_aligned_s288c_vs_1011strains.rds"))
+#df_best = df_strains_s288c %>% group_by(ID1) %>% filter(SCORE.BLOSUM100 == max(SCORE.BLOSUM100))
 
-df_strains_s288c = bind_rows(tmp1,tmp2,tmp3,tmp4) %>%
-                  mutate( strain = get.strain_orf(ID2,'strains') )
-
-df_best = df_strains_s288c %>% group_by(ID1) %>% filter(SCORE.BLOSUM100 == max(SCORE.BLOSUM100))
-
+proteomics_strains = c('AMH','CQC','BTT','CPI','BED','BAN','BPL','CMP')
 best_strain = df_strains_s288c %>%
   group_by(strain) %>%
-  summarize(aligned = sum(S),pid.total = mean_(PID1), nsnp = sum(NS), norf = n_distinct(ID1)) %>%
-  arrange(desc(pid.total),desc(norf))
+  summarize(aligned = sum(S),
+            norf = n_distinct(ID1),
+            proteome_len = sum(L),
+            pid_proteome = 100*(aligned/proteome_len),
+            nsnp = sum(NS),
+            orf_with_snv = sum(NS != 0 & (I+D) == 0),
+            orf_with_indel = sum((I+D) > 0)
+            ) %>%
+  mutate(is_proteomics = strain %in% proteomics_strains) %>%
+  arrange(nsnp,desc(pid_proteome),desc(norf))%>%
+  left_join(load.peter2018.data(1), by=c('strain'='standardized_name'))
 
-peter2018 = load.peter2018.data(1) %>% arrange(total_number_of_sn_ps)
+median_snp = median(best_strain$nsnp)
+ggplot(best_strain,aes(fill=is_proteomics)) +
+  geom_col(aes(y=reorder(strain,pid_proteome),x=nsnp),orientation='y') +
+  geom_vline(xintercept=median_snp,linetype='dashed') +
+  facet_wrap(~ecological_origins, scales = 'free_y') + xlab('# of SNP') +
+  theme(legend.position = 'none')
+
 top10 = peter2018 %>% slice_max(order_by=-total_number_of_sn_ps,n=10) %>%
-        select(isolate_name,standardized_name,isolation,ecological_origins,geographical_origins,total_number_of_sn_ps,clades)
+        select(isolate_name,,isolation,ecological_origins,geographical_origins,total_number_of_sn_ps,clades)
 
 best_strain %>% slice_max(order_by=pid.total,n=10)
 top10
+
+write_rds(df_best, here("prepare","best_strain_protome_aligned_to_s288c.rds"))
 
 add_missing_strains = function(BS,all_strains){
   this_orf = get.strain_orf(what='orf',x=names(BS))
