@@ -279,8 +279,6 @@ PROT.HL = load.belle2006.data() %>%
           left_join( load.villen2017.data(), by = c('ORF')) %>%
           left_join( load.christiano2014.data(), by=c('ORF'='ensg'))
 
-
-load.szavitsnossan2020.data()
 # PROTEIN-PROTEIN INTERACTIONS  ------------------------------------------------
 ## STRING functional protein association networks ------------------------------
 STRING = load.string(tax="4932",phy=F, ful=T, min.score = 900) %>% 
@@ -347,14 +345,10 @@ NMINI = 1
 -   Genome arrangement
 
         * Chromosomes
-
-
             Genes are distributed along the genomic DNA which is itself organized
             between separate chromosomal structures.
 
         * Gene duplications
-
-
             The genome must be duplicated at every generation to give rise to a new
             cell. Yet, copied genomes may incorporate unidentical version of their
             template. Single genes may be lost or duplicated in the process or
@@ -362,27 +356,22 @@ NMINI = 1
             subsequently increasing the number of duplicated genes.
 
         * Pangenome
-
-
             Genome may be decomposed in two sets: core and cloud genes. Core genes
             are present in all strains of a species, while the presence of cloud
             genes may vary across strains.
 
         * Protein-coding genes
-
-
             Protein coding genes may be splitted in translated and untranslated
             segments (e.g. exons and introns). In yeast, very few genes contains
             introns meaning that there is an exact correspondence between genomic and
             proteomic sequences.
 
-    -   DNA composition
+-   DNA composition
 
-        -   GC content
-
+        *   GC content
             The genomic sequence made of DNA molecules is composed of 2 pairs of complementary nucleic acids called bases (AT & CG). Variations in usage of both pairs exist.
 
-        -   Coding length
+        *   Coding length
 
 ```{r genomic}
 GENOMICS=list()

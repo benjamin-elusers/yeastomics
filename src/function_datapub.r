@@ -698,13 +698,16 @@ load.dubreuil2019.data = function(d){
   return(res)
 }
 
-load.hausser2019.data=function(){
+load.hausser2019.data=function(show_desc=F){
   message("REF: J. Hausser et al., 2019, Nature Communications")
   message("Central dogma rates and the trade-off between precision and economy in gene expression")
-  S1.url="https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-018-07391-8/MediaObjects/41467_2018_7391_MOESM4_ESM.xlsx"
-  rio::import(S1)
+  yeast_data = "https://data.mendeley.com/public-files/datasets/2vbrg3w4p3/files/9a834480-1da3-4e36-9f89-9cdd79d03382/file_downloaded"
+  var_desc = rio::import(yeast_data, sheet=1) %>% as_tibble()
+  if(show_desc){ print(var_desc) }
+  yeast_rates = rio::import(yeast_data, sheet=2)
+  colnames(yeast_rates) =c('gene','lm','lp','wRPF','wmRNA','bmEser','amEser','bm','m','bp','cv','apExp','am','isEssential','hasTATA','YEPDFit','pEst')
+  return(yeast_rates %>% as_tibble)
 }
-
 
 load.jarzab2020.data = function(org='S.cerevisiae'){
   message("REF: A. Jarzab et al., 2020, Nature Methods")
