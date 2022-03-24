@@ -443,14 +443,6 @@ load.package <- function(name) { # Quietly Load Libraries
   }
 }
 
-load.package = function(x){
-  if(length(x)>1){
-
-  }else{
-
-  }
-}
-
 lsos <- function(..., n=10) { # checks top10 memory consumption from R objects
   ls.objects(..., order.by="Size", decreasing=TRUE, head=TRUE, n=n)
 }
