@@ -69,7 +69,6 @@ get.uniprot.proteome = function(taxid,DNA=F,fulldesc=F) {
   return(UNI)
 }
 
-
 load.pfam = function(tax='559292'){
   library(magrittr) # for using pipe operator (%>%)
   #library(readr)
@@ -105,7 +104,7 @@ load.pfam = function(tax='559292'){
 }
 
 get.superfamily.species = function(){
-
+  library(magrittr)
   URL_SUPERFAMILY = "https://supfam.org/SUPERFAMILY"
   url_gen_list = paste0(URL_SUPERFAMILY,"/cgi-bin/gen_list.cgi")
   superfamily_gen_list  = rvest::read_html(url_gen_list)
@@ -120,7 +119,7 @@ get.superfamily.species = function(){
     stringr::str_replace(stringr::fixed("gen_list.cgi?genome="),"")
 
   get_genome_info_taxon_id = function(x){
-    tryCatch(
+    taxonid = tryCatch(
       rvest::read_html(x) %>%
         rvest::html_elements("table") %>%
         .[[4]] %>%
@@ -129,6 +128,8 @@ get.superfamily.species = function(){
         .[ which(stringr::str_detect(string=.,pattern="NCBI Taxon ID:")) + 1 ]
       #finally=print(paste0("get ncbi taxon id for: ",g))
     )
+    if(length(taxonid)){ return(taxonid) }
+    return(NA)
   }
   url_genomes = paste0(URL_SUPERFAMILY,"/cgi-bin/info.cgi?genome=",genomes_abbr)
 
@@ -144,13 +145,14 @@ get.superfamily.species = function(){
   }
   tictoc::toc()
 
+  #tibble( taxid = unlist(genome_ncbi_taxid), genome=genomes_abbr )
   supfam_genomes = superfamily_gen_list %>%
     rvest::html_elements("table.small_table_text") %>%
     rvest::html_table() %>%
     stats::setNames(janitor::make_clean_names(supfam_taxlevels)) %>%
     dplyr::bind_rows(.id = 'taxlevel') %>%
     janitor::clean_names() %>%
-    dplyr::mutate(genome=genomes_abbr,ncbi_taxid=genome_ncbi_taxid) %>%
+    dplyr::mutate(genome=genomes_abbr,ncbi_taxid=unlist(genome_ncbi_taxid)) %>%
     dplyr::relocate(taxlevel,ncbi_taxid,genome)
 
   return(supfam_genomes)
@@ -170,52 +172,50 @@ load.superfamily = function(tax='xs'){
   return(supfam)
 }
 
+seq2char = function(seq){ return( unlist(strsplit(as.character(seq),"")) ) }
+
 seq2df = function(BS){
   is_string_set = class(BS) == 'AAStringSet'
-  has_one_seq = length(BS)
-  if( !is_string_set ) { stop("requires a 'AAStringSet' object!") }
-  if( !has_one_seq   ) { stop("must contain 1 sequence at most!") }
-  return(
-    tibble(
-      id = names(BS),
-      resi = 1:width(BS),
-      resn = unlist(strsplit( toString(BS), "" ))
-    )
-  )
-}
-# MAIN --------------------------------------------------------------------
-id = id_pfam_uni[8664]
-uniprot = hs_uni[ id ]
+  is_string = class(BS) == 'AAString'
+  if( !is_string_set & !is_string ) { stop("requires a 'AAStringSet' or 'AAString' object!") }
 
+  if(is_string_set & length(BS)==1){
+    tibble::tibble(id = names(BS), resi = 1:Biostrings::width(BS), resn = seq2char(BS) )
+  }else if(is_string_set & length(BS)>1){
+    lapply(BS,seq2df) %>% dplyr::bind_rows(.id='id')
+  }else if(is_string){
+    tibble::tibble(resi = 1:length(BS), resn = seq2char(BS) )
+  }else{
+    NA
+  }
+}
 
 assign_pfam_uniprot = function(taxid=9606){
-  find.uniprot_refprot(keyword='homo',all=F)
+  # get uniprot proteome to dataframe
   uni_seq = get.uniprot.proteome(taxid)
+  df_uni = seq2df(uni_seq)
+
+  # get pfam data for reference proteome identifiers
   pfam_data = load.pfam(taxid)
-  id_pfam_uni = intersect(pfam_data$seq_id,names(uni_seq)) %>% unique
-  cat(sprintf("%s"))
+  pfam_uni_data = pfam_data %>% dplyr::filter( seq_id %in% names(uni_seq))
+  message(sprintf("filtered Pfam (%s rows) for uniprot reference proteome [%s]",nrow(pfam_uni_data),taxid))
 
-  df_uni = seq2df(hs_uni[uniprot])
-  pfam_uni = hs_pfam %>% dplyr::filter(seq_id == id)
+  # extend pfam data to residue level
+  pfam_res = pfam_uni_data %>%
+    dplyr::group_by(seq_id,alignment_start,alignment_end) %>%
+    dplyr::mutate(pfam_pos=min(alignment_start)) %>%
+    tidyr::complete(pfam_pos = seq(alignment_start, alignment_end, by = 1)) %>%
+    tidyr::fill(everything(),.direction = "down")
 
-  pfam = tibble()
-  for(d in 1:nrow(pfam_uni)){
-    tmp = pfam_uni[d,]
-    l=tmp$hmm_length-1
-    pfam_dom =
-      tibble( pos_pfam = tmp$alignment_start:tmp$alignment_end,
-            pfam_id = tmp$hmm_acc,
-            pfam_type = tmp$type,
-            pfam_name = tmp$hmm_name,
-            pfam_score = tmp$bit_score,
-            pfam_Evalue = tmp$E_value,
-            pfam_clan = tmp$clan,
-            pfam_clan_name = tmp$clan_name,
-            pfam_desc = tmp$pfam_desc
-      )
-    pfam = bind_rows(pfam,pfam_dom)
-  }
-
-
-
+  # merge uniprot reference proteome and pfam data at residue level
+  uni_pfam_assigned = dplyr::left_join(df_uni,pfam_res, by=c('id'='seq_id','resi'='pfam_pos'))
+  return(uni_pfam_assigned)
 }
+
+# MAIN --------------------------------------------------------------------
+
+hs_pfam_uni = assign_pfam_uniprot(9606)
+
+supfam_genomes = get.superfamily.species()
+
+supfam_genomes %>% dplyr::filter(genome=='xs')
