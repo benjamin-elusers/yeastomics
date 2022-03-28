@@ -89,9 +89,6 @@ get_overlap = function(ali){
   return(setNames(overlap,c("OL","OL1","OL2")))
 }
 
-seq2char = function(seq){
-  return( unlist(strsplit(as.character(seq),"")) )
-}
 
 seq2df = function(BS){
   is_string_set = class(BS) == 'AAStringSet'
