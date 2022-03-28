@@ -274,34 +274,46 @@ assign_superfamily_uniprot = function(taxid="9606",supfam_sp){
   # superfamily does not use uniprot (e.g. human is ensembl)
   supfam_data = load.superfamily(tax) %>%
     tidyr::separate_rows(region_of_assignment,sep = ",") %>%
-    tidyr::separate(col=region_of_assignment, into = c('start','end'), sep = '\\-')
+    tidyr::separate(col=region_of_assignment, into = c('scop_start','scop_end'), sep = '\\-',convert = T) %>%
+    tidyr::separate(col=sequence_id, into = c('db','id'), sep = '\\|',remove=F)
 
-  id_mapped_uni = uni2acc %>% dplyr::filter(extid %in% supfam_data$sequence_id)
-  supfam_uni_data =  dplyr::inner_join(supfam_data,id_mapped_uni,by=c('sequence_id'='extid'))
+
+  if(any(uni2acc$extid %in% supfam_data$sequence_id)){
+    id_mapped_uni = uni2acc %>% dplyr::filter(extid %in% supfam_data$sequence_id)
+    supfam_uni_data =  dplyr::inner_join(supfam_data,id_mapped_uni,by=c('sequence_id'='extid'))
+
+  }else{ # superfamily sequence id is not identical to uniprot mapped identifier
+    id_mapped_uni = uni2acc %>% dplyr::filter(extid %in% supfam_data$id)
+    supfam_uni_data =  dplyr::inner_join(supfam_data,id_mapped_uni,by=c('id'='extid'))
+  }
   uniref_matched =supfam_uni_data$uni %in% names(uni_seq)
   message(sprintf("filtered Pfam (%s rows) for uniprot reference proteome [%s]",sum(uniref_matched),taxid))
 
   # extend superamily data to residue level
   supfam_res = supfam_uni_data %>%
-    dplyr::group_by(sequence_id,uni,region_of_assignment) %>%
-    dplyr::mutate(supfam_pos=min(start)) %>%
-    tidyr::complete(supfam_pos = seq(start, end, by = 1)) %>%
+    dplyr::group_by(sequence_id,uni,scop_start,scop_end) %>%
+    dplyr::mutate(supfam_pos=min(scop_start)) %>%
+    tidyr::complete(supfam_pos = seq(min(scop_start), max(scop_end), by = 1)) %>%
     tidyr::fill(everything(),.direction = "down")
 
   # get uniprot proteome to dataframe
   df_uni = seq2df(uni_seq)
 
   # merge uniprot reference proteome and pfam data at residue level
-  uni_pfam_assigned = dplyr::left_join(df_uni,supfam_res, by=c('id'='seq_id','resi'='pfam_pos'))
-  return(uni_pfam_assigned)
+  uni_supfam_assigned = dplyr::left_join(df_uni,supfam_res, by=c('id'='uni','resi'='supfam_pos'))
+  return(uni_supfam_assigned)
 }
 
 # MAIN --------------------------------------------------------------------
+supfam_genomes= get.superfamily.species()
 
 hs_pfam_uni = assign_pfam_uniprot(9606)
-supfam_genomes= get.superfamily.species()
-hs_supfam_uni = assign_superfamily_uniprot(9606,supfam_genomes)
-
-
+sc_pfam_uni = assign_pfam_uniprot(4932)
 ec_pfam_uni = assign_pfam_uniprot(83333)
-ec_supfam_uni = assign_superfamily_uniprot('coli',supfam_genomes)
+
+
+hs_supfam_uni = assign_superfamily_uniprot(9606,supfam_genomes)
+sc_supfam_uni = assign_superfamily_uniprot(4932,supfam_genomes)
+ec_supfam_uni = assign_superfamily_uniprot('coli',supfam_genomes) # for K12 select 10 and then 63
+
+
