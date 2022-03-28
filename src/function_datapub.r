@@ -914,11 +914,37 @@ get.alphafold.proteome = function(id_uniprot){
   }
 }
 
+get.superfamily.species = function(){
+
+  URL_SUPERFAMILY = "https://supfam.org/SUPERFAMILY"
+  superfamily_gen_list  = rvest::read_html( paste0(URL_SUPERFAMILY,"/cgi-bin/gen_list.cgi") )
+  supfam_taxlevels = superfamily_gen_list %>%
+    rvest::html_elements(xpath = '//table/preceding-sibling::strong') %>%
+    rvest::html_text()
+
+  # Retrieve hyperlinks on genome names (contain abbreviaiotns in href)
+  genomes_abbr = superfamily_gen_list %>%
+    rvest::html_elements("a[href*='gen_list.cgi?genome=']") %>%
+    rvest::html_attr('href')
+
+  supfam_genomes = superfamily_gen_list %>%
+    rvest::html_elements("table.small_table_text") %>%
+    rvest::html_table() %>%
+    stats::setNames(janitor::make_clean_names(supfam_taxlevels)) %>%
+    dplyr::bind_rows(.id = 'taxlevel') %>%
+    janitor::clean_names() %>%
+    dplyr::mutate(genome=stringr::str_replace(genomes_abbr,stringr::fixed("gen_list.cgi?genome="),"")) %>%
+    dplyr::relocate(taxlevel,genome)
+
+  return(supfam_genomes)
+}
+
 load.superfamily = function(tax='xs'){
   # Load domain assignments from superfamily SCOP level (SUPFAM.org)
   # xs = saccharomyces cerevisiae
-  library(httr)
-  library(readr)
+  #library(httr)
+  #library(readr)
+  #library(janitor)
   URL_SUPERFAMILY = "https://supfam.org/SUPERFAMILY"
   download.request =  httr::GET(sprintf("%s/cgi-bin/save.cgi?var=%s;type=ass",URL_SUPERFAMILY,tax))
   superfamily.txt = httr::content(download.request,as = 'text')
@@ -1560,24 +1586,30 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
   return(Pombase)
 }
 
-find.uniprot_refprot = function(search,all=T){
-  library(stringr)
-  library(readr)
+find.uniprot_refprot = function(keyword,all=T,GUI=interactive()){
+  #library(stringr)
+  #library(readr)
+  #library(janitor)
+  library(magrittr) # for using pipe operator (%>%)
   UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/"
   URL_README = paste0(UNIPROT_URL,"knowledgebase/reference_proteomes/README")
   README = readr::read_lines(URL_README)
-  row_header = str_subset(README, pattern = '^Proteome_ID\\tTax_ID\\t') %>%
-    str_split('\t') %>% unlist()
+  row_header = stringr::str_subset(README, pattern = '^Proteome_ID\\tTax_ID\\t') %>%
+    stringr::str_split('\t') %>% unlist() %>%
+    stringr::str_replace(stringr::fixed('#(1)'),'n_canonical') %>%
+    stringr::str_replace(stringr::fixed('#(2)'),'n_isoforms') %>%
+    stringr::str_replace(stringr::fixed('#(3)'),'n_gene2acc')
 
-  row_content = str_subset(README, pattern = "^UP[0-9]+\\t[0-9]+\\t")
+  row_content = stringr::str_subset(README, pattern = "^UP[0-9]+\\t[0-9]+\\t")
   refprot = readr::read_tsv(file=I(row_content), col_names = row_header) %>%
-    janitor::clean_names()
-  if(!missing(search) & !all){
-    matched = refprot %>% dplyr::filter_all(any_vars(str_detect(., search)))
+    janitor::clean_names() %>% dplyr::arrange(tax_id)
+  if(!missing(keyword)){
+    matched = refprot %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, keyword))
+    message(sprintf('%s entries matched keyword "%s"',nrow(matched),keyword))
     return(matched)
   }else if(!all){
-    name = sprintf("(%s) %s",refprot$species_name,refprot$tax_id)
-    which_prot = menu(name, graphics=interactive())
+    name = sprintf("%s (taxid %s)",refprot$species_name,refprot$tax_id)
+    which_prot = menu(name, graphics=GUI,title = 'pick an organism below...(sorted by tax_id)')
     return(refprot[which_prot,])
   }else{
     return(refprot)
