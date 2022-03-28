@@ -19,6 +19,22 @@ load.proteome = function(url,nostop=T) {
   return(p)
 }
 
+get.uniprot.mapping = function(taxid) {
+  if(missing(taxid)){  stop("Need an uniprot taxon id") }
+  UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
+  EXTENSION = ".idmapping.gz"
+  refprot = find.uniprot_refprot(all=T)
+  found = refprot$tax_id %in% taxid
+  if(!any(found)){ stop(sprintf("%s not found in the reference proteome!",taxid)) }
+  TAX = stringr::str_to_title(refprot$superregnum[which(found)])
+  UPID = refprot$proteome_id[which(found)]
+
+  gene2acc_url = sprintf("%s/%s/%s/%s_%s%s",UNIPROT_URL,TAX,UPID,UPID,taxid,EXTENSION)
+  mapped = readr::read_delim(gene2acc_url,delim='\t',col_names=c('uni','extdb','extid')) %>%
+    dplyr::mutate(sp=taxid,upid=UPID)
+  return(mapped)
+}
+
 find.uniprot_refprot = function(keyword,all=T,GUI=interactive()){
   #library(stringr)
   #library(readr)
@@ -37,9 +53,15 @@ find.uniprot_refprot = function(keyword,all=T,GUI=interactive()){
   refprot = readr::read_tsv(file=I(row_content), col_names = row_header) %>%
     janitor::clean_names() %>% dplyr::arrange(tax_id)
   if(!missing(keyword)){
-    matched = refprot %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, keyword))
+    matched = refprot %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, as.character(keyword)))
     message(sprintf('%s entries matched keyword "%s"',nrow(matched),keyword))
-    return(matched)
+    if(all){
+      return(matched)
+    }else{
+      species = sprintf("%s (%s)",matched$species_name,matched$tax_id)
+      selection = menu(species,title = 'pick a species below...')
+      return(matched[selection,])
+    }
   }else if(!all){
     name = sprintf("%s (taxid %s)",refprot$species_name,refprot$tax_id)
     which_prot = menu(name, graphics=GUI,title = 'pick an organism below...(sorted by tax_id)')
@@ -214,10 +236,11 @@ assign_pfam_uniprot = function(taxid=9606){
   return(uni_pfam_assigned)
 }
 
-assign_superfamily_uniprot = function(taxid=9606,supfam_sp){
-  # get uniprot proteome to dataframe
-  uni_seq = get.uniprot.proteome(taxid)
-  df_uni = seq2df(uni_seq)
+assign_superfamily_uniprot = function(taxid="9606",supfam_sp){
+
+  uni_tax = find.uniprot_refprot(taxid,all = F)
+  uni2acc = get.uniprot.mapping(uni_tax$tax_id)
+  uni_seq = get.uniprot.proteome(uni_tax$tax_id)
 
   # superfamily uses their own abbrevation to designate a genome (takes 5mn to be matched to NCBI taxid)
   is_number_taxid = grepl("^[0-9]+$",taxid)
@@ -226,30 +249,50 @@ assign_superfamily_uniprot = function(taxid=9606,supfam_sp){
     sp_taxid = supfam_sp %>% dplyr::filter(taxid == ncbi_taxid)
     if(nrow(sp_taxid)>1){
       which_sp = sprintf('%s -> %s (%s=%s)',sp_taxid$taxlevel,sp_taxid$genome_name,sp_taxid$ncbi_taxid,sp_taxid$genome)
-      selection=menu(which_sp,title = 'pick')
+      selection=menu(which_sp,title = 'pick one species below...')
       tax = sp_taxid$genome[selection]
     }else if(nrow(sp_taxid)==1){
       tax = sp_taxid$genome
     }else{
       stop(sprintf('no superfamily data for taxon %s!',taxid))
     }
+  }else{
+    matched = supfam_sp %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, taxid))
+    message(sprintf('%s entries matched keyword "%s"',nrow(matched),keyword))
+    if( nrow(matched)>1 ){
+      which_sp = sprintf('%s -> %s (%s=%s)',matched$taxlevel,matched$genome_name,matched$ncbi_taxid,matched$genome)
+      selection=menu(which_sp,title = 'pick one species below...')
+      tax = matched$genome[selection]
+    }else if(nrow(matched)==1){
+      tax = matched$genome
+    }else{
+      stop(sprintf('no superfamily data for keyword "%s"!',taxid))
+    }
   }
 
   # get superfamily data for reference proteome identifiers
   # superfamily does not use uniprot (e.g. human is ensembl)
-  supfam_data = load.superfamily(tax)
-  supfam_uni_data = supfam_data %>% dplyr::filter( sequence_id %in% names(uni_seq))
-  message(sprintf("filtered Pfam (%s rows) for uniprot reference proteome [%s]",nrow(pfam_uni_data),taxid))
+  supfam_data = load.superfamily(tax) %>%
+    tidyr::separate_rows(region_of_assignment,sep = ",") %>%
+    tidyr::separate(col=region_of_assignment, into = c('start','end'), sep = '\\-')
+
+  id_mapped_uni = uni2acc %>% dplyr::filter(extid %in% supfam_data$sequence_id)
+  supfam_uni_data =  dplyr::inner_join(supfam_data,id_mapped_uni,by=c('sequence_id'='extid'))
+  uniref_matched =supfam_uni_data$uni %in% names(uni_seq)
+  message(sprintf("filtered Pfam (%s rows) for uniprot reference proteome [%s]",sum(uniref_matched),taxid))
 
   # extend superamily data to residue level
-  suppfam_res = supfam_uni_data %>%
-    dplyr::group_by(sequence_id,region_of_assignment) %>%
-    dplyr::mutate(suppfam_pos=stringr::str_split(region_of_assignment,'-')) %>%
-    tidyr::complete(pfam_pos = seq(alignment_start, alignment_end, by = 1)) %>%
+  supfam_res = supfam_uni_data %>%
+    dplyr::group_by(sequence_id,uni,region_of_assignment) %>%
+    dplyr::mutate(supfam_pos=min(start)) %>%
+    tidyr::complete(supfam_pos = seq(start, end, by = 1)) %>%
     tidyr::fill(everything(),.direction = "down")
 
+  # get uniprot proteome to dataframe
+  df_uni = seq2df(uni_seq)
+
   # merge uniprot reference proteome and pfam data at residue level
-  uni_pfam_assigned = dplyr::left_join(df_uni,pfam_res, by=c('id'='seq_id','resi'='pfam_pos'))
+  uni_pfam_assigned = dplyr::left_join(df_uni,supfam_res, by=c('id'='seq_id','resi'='pfam_pos'))
   return(uni_pfam_assigned)
 }
 
@@ -258,3 +301,7 @@ assign_superfamily_uniprot = function(taxid=9606,supfam_sp){
 hs_pfam_uni = assign_pfam_uniprot(9606)
 supfam_genomes= get.superfamily.species()
 hs_supfam_uni = assign_superfamily_uniprot(9606,supfam_genomes)
+
+
+ec_pfam_uni = assign_pfam_uniprot(83333)
+ec_supfam_uni = assign_superfamily_uniprot('coli',supfam_genomes)
