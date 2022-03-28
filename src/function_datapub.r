@@ -1613,6 +1613,22 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
   return(Pombase)
 }
 
+get.uniprot.mapping = function(taxid) {
+  if(missing(taxid)){  stop("Need an uniprot taxon id") }
+  UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
+  EXTENSION = ".idmapping.gz"
+  refprot = find.uniprot_refprot(all=T)
+  found = refprot$tax_id %in% taxid
+  if(!any(found)){ stop(sprintf("%s not found in the reference proteome!",taxid)) }
+  TAX = stringr::str_to_title(refprot$superregnum[which(found)])
+  UPID = refprot$proteome_id[which(found)]
+
+  gene2acc_url = sprintf("%s/%s/%s/%s_%s%s",UNIPROT_URL,TAX,UPID,UPID,taxid,EXTENSION)
+  mapped = readr::read_delim(gene2acc_url,delim='\t',col_names=c('uni','extdb','extid')) %>%
+    dplyr::mutate(sp=taxid,upid=UPID)
+  return(mapped)
+}
+
 find.uniprot_refprot = function(keyword,all=T,GUI=interactive()){
   #library(stringr)
   #library(readr)
@@ -1631,9 +1647,15 @@ find.uniprot_refprot = function(keyword,all=T,GUI=interactive()){
   refprot = readr::read_tsv(file=I(row_content), col_names = row_header) %>%
     janitor::clean_names() %>% dplyr::arrange(tax_id)
   if(!missing(keyword)){
-    matched = refprot %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, keyword))
+    matched = refprot %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, as.character(keyword)))
     message(sprintf('%s entries matched keyword "%s"',nrow(matched),keyword))
-    return(matched)
+    if(all){
+      return(matched)
+    }else{
+      species = sprintf("%s (%s)",matched$species_name,matched$tax_id)
+      selection = menu(species,title = 'pick a species below...')
+      return(matched[selection,])
+    }
   }else if(!all){
     name = sprintf("%s (taxid %s)",refprot$species_name,refprot$tax_id)
     which_prot = menu(name, graphics=GUI,title = 'pick an organism below...(sorted by tax_id)')
