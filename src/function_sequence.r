@@ -156,3 +156,21 @@ read.sequences = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
     return(DNAStringSetList(S))
   }
 }
+
+seq2char = function(seq){ return( unlist(strsplit(as.character(seq),"")) ) }
+
+seq2df = function(BS){
+  is_string_set = class(BS) == 'AAStringSet'
+  is_string = class(BS) == 'AAString'
+  if( !is_string_set & !is_string ) { stop("requires a 'AAStringSet' or 'AAString' object!") }
+
+  if(is_string_set & length(BS)==1){
+    tibble::tibble(id = names(BS), resi = 1:Biostrings::width(BS), resn = seq2char(BS) )
+  }else if(is_string_set & length(BS)>1){
+    lapply(BS,seq2df) %>% dplyr::bind_rows(.id='id')
+  }else if(is_string){
+    tibble::tibble(resi = 1:length(BS), resn = seq2char(BS) )
+  }else{
+    NA
+  }
+}
