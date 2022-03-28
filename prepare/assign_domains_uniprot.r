@@ -110,8 +110,8 @@ get.superfamily.species = function(){
   url_gen_list = paste0(URL_SUPERFAMILY,"/cgi-bin/gen_list.cgi")
   superfamily_gen_list  = rvest::read_html(url_gen_list)
   supfam_taxlevels = superfamily_gen_list %>%
-                     rvest::html_elements(xpath = '//table/preceding-sibling::strong') %>%
-                     rvest::html_text()
+    rvest::html_elements(xpath = '//table/preceding-sibling::strong') %>%
+    rvest::html_text()
 
   # Retrieve hyperlinks on genome names (contain abbreviaiotns in href)
   genomes_abbr = superfamily_gen_list %>%
@@ -133,10 +133,10 @@ get.superfamily.species = function(){
   url_genomes = paste0(URL_SUPERFAMILY,"/cgi-bin/info.cgi?genome=",genomes_abbr)
 
   tictoc::tic()
-  message("retrieving ncbi taxon id from genome information...")
+  message("Retrieving ncbi taxon id from genome information...")
   if (require('pbmcapply')) {
-    message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
     ncores=parallelly::availableCores(which='max')-1
+    message(sprintf("using 'pbmcapply' in parallel with %s cpus (~3mn on 10 cpus)",ncores))
     genome_ncbi_taxid = pbmcapply::pbmcmapply(FUN=get_genome_info_taxon_id,  url_genomes, mc.cores=ncores, mc.silent=F, mc.cleanup = T)
   }else{
     message("NOT PARALLEL! This may take a while (>20mn)")
@@ -145,13 +145,13 @@ get.superfamily.species = function(){
   tictoc::toc()
 
   supfam_genomes = superfamily_gen_list %>%
-                  rvest::html_elements("table.small_table_text") %>%
-                  rvest::html_table() %>%
-                  stats::setNames(janitor::make_clean_names(supfam_taxlevels)) %>%
-                  dplyr::bind_rows(.id = 'taxlevel') %>%
-                  janitor::clean_names() %>%
-                  dplyr::mutate(genome=genomes_abbr) %>%
-                  dplyr::relocate(taxlevel,genome)
+    rvest::html_elements("table.small_table_text") %>%
+    rvest::html_table() %>%
+    stats::setNames(janitor::make_clean_names(supfam_taxlevels)) %>%
+    dplyr::bind_rows(.id = 'taxlevel') %>%
+    janitor::clean_names() %>%
+    dplyr::mutate(genome=genomes_abbr,ncbi_taxid=genome_ncbi_taxid) %>%
+    dplyr::relocate(taxlevel,ncbi_taxid,genome)
 
   return(supfam_genomes)
 }
