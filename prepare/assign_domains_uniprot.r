@@ -55,7 +55,7 @@ find.uniprot_refprot = function(keyword,all=T,GUI=interactive()){
   if(!missing(keyword)){
     matched = refprot %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, as.character(keyword)))
     message(sprintf('%s entries matched keyword "%s"',nrow(matched),keyword))
-    if(all){
+    if(all || nrow(matched)==1){
       return(matched)
     }else{
       species = sprintf("%s (%s)",matched$species_name,matched$tax_id)
@@ -277,7 +277,6 @@ assign_superfamily_uniprot = function(taxid="9606",supfam_sp){
     tidyr::separate(col=region_of_assignment, into = c('scop_start','scop_end'), sep = '\\-',convert = T) %>%
     tidyr::separate(col=sequence_id, into = c('db','id'), sep = '\\|',remove=F)
 
-
   if(any(uni2acc$extid %in% supfam_data$sequence_id)){
     id_mapped_uni = uni2acc %>% dplyr::filter(extid %in% supfam_data$sequence_id)
     supfam_uni_data =  dplyr::inner_join(supfam_data,id_mapped_uni,by=c('sequence_id'='extid'))
@@ -308,12 +307,13 @@ assign_superfamily_uniprot = function(taxid="9606",supfam_sp){
 supfam_genomes= get.superfamily.species()
 
 hs_pfam_uni = assign_pfam_uniprot(9606)
-sc_pfam_uni = assign_pfam_uniprot(4932)
+sc_pfam_uni = assign_pfam_uniprot(559292)
 ec_pfam_uni = assign_pfam_uniprot(83333)
 
 
+# Must validate selection
 hs_supfam_uni = assign_superfamily_uniprot(9606,supfam_genomes)
-sc_supfam_uni = assign_superfamily_uniprot(4932,supfam_genomes)
+sc_supfam_uni = assign_superfamily_uniprot('cerevisiae',supfam_genomes) # for S288c select 5 and then 1
 ec_supfam_uni = assign_superfamily_uniprot('coli',supfam_genomes) # for K12 select 10 and then 63
 
 
