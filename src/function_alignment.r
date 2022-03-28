@@ -93,6 +93,20 @@ seq2char = function(seq){
   return( unlist(strsplit(as.character(seq),"")) )
 }
 
+seq2df = function(BS){
+  is_string_set = class(BS) == 'AAStringSet'
+  has_one_seq = length(BS)
+  if( !is_string_set ) { stop("requires a 'AAStringSet' object!") }
+  if( !has_one_seq   ) { stop("must contain 1 sequence at most!") }
+  return(
+    tibble(
+      id = names(BS),
+      resi = 1:width(BS),
+      resn = unlist(strsplit( toString(BS), "" ))
+    )
+  )
+}
+
 count_matches = function(ali){
   S1 = seq2char(alignedPattern(ali))
   S2 = seq2char(alignedSubject(ali))
