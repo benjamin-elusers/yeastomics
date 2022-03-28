@@ -107,7 +107,8 @@ load.pfam = function(tax='559292'){
 get.superfamily.species = function(){
 
   URL_SUPERFAMILY = "https://supfam.org/SUPERFAMILY"
-  superfamily_gen_list  = rvest::read_html( paste0(URL_SUPERFAMILY,"/cgi-bin/gen_list.cgi") )
+  url_gen_list = paste0(URL_SUPERFAMILY,"/cgi-bin/gen_list.cgi")
+  superfamily_gen_list  = rvest::read_html(url_gen_list)
   supfam_taxlevels = superfamily_gen_list %>%
                      rvest::html_elements(xpath = '//table/preceding-sibling::strong') %>%
                      rvest::html_text()
@@ -115,7 +116,33 @@ get.superfamily.species = function(){
   # Retrieve hyperlinks on genome names (contain abbreviaiotns in href)
   genomes_abbr = superfamily_gen_list %>%
     rvest::html_elements("a[href*='gen_list.cgi?genome=']") %>%
-    rvest::html_attr('href')
+    rvest::html_attr('href') %>%
+    stringr::str_replace(stringr::fixed("gen_list.cgi?genome="),"")
+
+  get_genome_info_taxon_id = function(x){
+    tryCatch(
+      rvest::read_html(x) %>%
+        rvest::html_elements("table") %>%
+        .[[4]] %>%
+        rvest::html_elements("td") %>%
+        rvest::html_text() %>%
+        .[ which(stringr::str_detect(string=.,pattern="NCBI Taxon ID:")) + 1 ]
+      #finally=print(paste0("get ncbi taxon id for: ",g))
+    )
+  }
+  url_genomes = paste0(URL_SUPERFAMILY,"/cgi-bin/info.cgi?genome=",genomes_abbr)
+
+  tictoc::tic()
+  message("retrieving ncbi taxon id from genome information...")
+  if (require('pbmcapply')) {
+    message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
+    ncores=parallelly::availableCores(which='max')-1
+    genome_ncbi_taxid = pbmcapply::pbmcmapply(FUN=get_genome_info_taxon_id,  url_genomes, mc.cores=ncores, mc.silent=F, mc.cleanup = T)
+  }else{
+    message("NOT PARALLEL! This may take a while (>20mn)")
+    genome_ncbi_taxid = furrr::future_map_chr(url_genomes,get_genome_info_taxon_id)
+  }
+  tictoc::toc()
 
   supfam_genomes = superfamily_gen_list %>%
                   rvest::html_elements("table.small_table_text") %>%
@@ -123,7 +150,7 @@ get.superfamily.species = function(){
                   stats::setNames(janitor::make_clean_names(supfam_taxlevels)) %>%
                   dplyr::bind_rows(.id = 'taxlevel') %>%
                   janitor::clean_names() %>%
-                  dplyr::mutate(genome=stringr::str_replace(genomes_abbr,stringr::fixed("gen_list.cgi?genome="),"")) %>%
+                  dplyr::mutate(genome=genomes_abbr) %>%
                   dplyr::relocate(taxlevel,genome)
 
   return(supfam_genomes)
