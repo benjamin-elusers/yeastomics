@@ -1,3 +1,5 @@
+options(dplyr.width=Inf)
+
 # FUNCTIONS ---------------------------------------------------------------
 read.url <- function(file_url) {
   con <- gzcon(url(file_url))
@@ -212,10 +214,47 @@ assign_pfam_uniprot = function(taxid=9606){
   return(uni_pfam_assigned)
 }
 
+assign_superfamily_uniprot = function(taxid=9606,supfam_sp){
+  # get uniprot proteome to dataframe
+  uni_seq = get.uniprot.proteome(taxid)
+  df_uni = seq2df(uni_seq)
+
+  # superfamily uses their own abbrevation to designate a genome (takes 5mn to be matched to NCBI taxid)
+  is_number_taxid = grepl("^[0-9]+$",taxid)
+  if(is_number_taxid){
+    if(missing(supfam_sp)){ supfam_sp=get.superfamily.species() }
+    sp_taxid = supfam_sp %>% dplyr::filter(taxid == ncbi_taxid)
+    if(nrow(sp_taxid)>1){
+      which_sp = sprintf('%s -> %s (%s=%s)',sp_taxid$taxlevel,sp_taxid$genome_name,sp_taxid$ncbi_taxid,sp_taxid$genome)
+      selection=menu(which_sp,title = 'pick')
+      tax = sp_taxid$genome[selection]
+    }else if(nrow(sp_taxid)==1){
+      tax = sp_taxid$genome
+    }else{
+      stop(sprintf('no superfamily data for taxon %s!',taxid))
+    }
+  }
+
+  # get superfamily data for reference proteome identifiers
+  # superfamily does not use uniprot (e.g. human is ensembl)
+  supfam_data = load.superfamily(tax)
+  supfam_uni_data = supfam_data %>% dplyr::filter( sequence_id %in% names(uni_seq))
+  message(sprintf("filtered Pfam (%s rows) for uniprot reference proteome [%s]",nrow(pfam_uni_data),taxid))
+
+  # extend superamily data to residue level
+  suppfam_res = supfam_uni_data %>%
+    dplyr::group_by(sequence_id,region_of_assignment) %>%
+    dplyr::mutate(suppfam_pos=stringr::str_split(region_of_assignment,'-')) %>%
+    tidyr::complete(pfam_pos = seq(alignment_start, alignment_end, by = 1)) %>%
+    tidyr::fill(everything(),.direction = "down")
+
+  # merge uniprot reference proteome and pfam data at residue level
+  uni_pfam_assigned = dplyr::left_join(df_uni,pfam_res, by=c('id'='seq_id','resi'='pfam_pos'))
+  return(uni_pfam_assigned)
+}
+
 # MAIN --------------------------------------------------------------------
 
 hs_pfam_uni = assign_pfam_uniprot(9606)
-
-supfam_genomes = get.superfamily.species()
-
-supfam_genomes %>% dplyr::filter(genome=='xs')
+supfam_genomes= get.superfamily.species()
+hs_supfam_uni = assign_superfamily_uniprot(9606,supfam_genomes)
