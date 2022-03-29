@@ -2,54 +2,124 @@
 source(here::here("src","__setup_yeastomics__.r"))
 source(here::here("src","function_YK11.r"))
 
+# Find Single Amino Acid Polymorphisms (SAAP) ----------------------------------
 S288C = load.sgd.proteome(withORF=T,rm.stop=F) # Reference SGD protein sequences
+
+# PROTEOME SEQUENCES
 WT = get.positions(S288C) %>%
   group_by(orf) %>%
   mutate(bin.pos=dplyr::ntile(wt_pos,100))
 
-yk11_seq_file = here("data","proteome-1011-strains.rds")
-if( file.exists(yk11_seq_file) ){
-  YK11 = readRDS(yk11_seq_file)  # 1011 strains proteomes sequences
+# PROTEOME 1011 STRAINS SEQUENCES
+YK11_prot = here("data","proteome-1011-strains.rds")
+if( file.exists(YK11_prot) ){
+  YK11 = readRDS(YK11_prot)  # 1011 strains proteomes sequences
 }else{
-  yk11_seq_dir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/"
-  YK11 = load.1011.strains(seqdir = yk11_seq_dir)
+  YK11_fastadir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/"
+  YK11 = load.1011.strains(seqdir = YK11_fastadir)
+  #write_rds(YK11,YK11_prot)
 }
+
+# PROTEOME DATAFRAME
 P = tibble( orf=names(YK11),
             n_strains=lengths(YK11),
             len = widths(YK11)) %>%
-    left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
-    mutate( match_wt = len == len.s288c )
+  left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
+  mutate( match_wt = len == len.s288c )
 
-yk11_var_file = here("data","YK11_VAR.rds")
-if( file.exists(yk11_var_file) ){
-  VAR = readRDS(yk11_var_file)
+# FIND AMINO ACID VARIANTS
+YK11_aavar = here("data","YK11_VAR_AA.rds")
+if( file.exists(YK11_aavar) ){
+  AAVAR = readRDS(YK11_aavar)
 }else{
-  VAR = purrr::map_df(YK11, get.variants,verbose=F)
+  AAVAR = lapply(YK11, get.variants,verbose=F) %>% bind_rows()
+  #write_rds(AAVAR,YK11_aavar)
 }
 
-SNP = get.variants.to.SNP(VAR) %>%
+# GET AMINO ACID POLYMORPHISMS
+SAAP = get.variants.to.SNP(AAVAR) %>%
   add_count(id,ref_pos,name='nvar') %>%
   group_by(id,ref_pos) %>%
   mutate( alt_cumfr=sum(alt_fr)) %>%
   left_join(P,by=c('id'='orf'))
 
-PROT_SNP = left_join(SNP,WT, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
+# GET PROTEOME AMINO ACID POLYMORPHISMS
+PROT_SAAP = left_join(SAAP,WT, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
   mutate(wt_low = alt_aa == wt_aa,
          wt_missing=is.na(wt_aa),
          early_stop = (alt_aa == "*" & ref_pos != len),
          dSTI.ref=get.score.mutation(ref_aa,alt_aa),
          dSTI.wt=get.score.mutation(wt_aa,alt_aa))
 
-snp_count_per_orf = PROT_SNP %>%
+# Counting amino acid polymorphisms per protein
+saap_count_per_orf = PROT_SAAP %>%
+  group_by(id,len,len.s288c,n_strains) %>%
+  summarize(n_snp=sum(nvar),n_var=n_distinct(ref_pos))
+saap_count_per_orf %>% arrange(n_snp)
+
+# Save amino acid polymorphism
+write_rds(PROT_SAAP,here("data",'YK11-SAAP.rds'))
+write_rds(saap_count_per_orf,here("data",'YK11-ORF-VAR-AA.rds'))
+# Reload saved amino acid polymorphism
+PROT_SAAP=read_rds(here("data",'YK11-SAAP.rds'))
+saap_count_per_orf=read_rds(here("data",'YK11-ORF-VAR-AA.rds'))
+
+# Find Single Nucleotide Polymorphisms (SNP) -----------------------------------
+CDS = load.sgd.CDS(withORF=T) # Reference SGD DNA coding sequences
+
+# CDS GENOME SEQUENCES
+wt = get.positions(CDS) %>%
+  group_by(orf) %>%
+  mutate(bin.pos=dplyr::ntile(wt_pos,100))
+
+# CDS GENOME 1011 STRAINS
+yk11_cds = here("data","cds-1011-strains.rds")
+if( file.exists(yk11_cds) ){
+  yk11 = readRDS(yk11_cds)  # 1011 strains cds genome sequences
+}else{
+  yk11_fastadir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/transfer_1638744_files_c25fb55c/CDS_withAmbiguityRes"
+  yk11 = load.1011.strains(seqdir = yk11_fastadir)
+  #write_rds(yk11,here("data","cds-1011-strains.rds"))
+}
+
+# GENOME DATAFRAME
+G = tibble( orf=names(yk11),
+            n_strains=lengths(yk11),
+            len = widths(yk11)) %>%
+  left_join(get.width(yk11), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
+  mutate( match_wt = len == len.s288c )
+
+# FIND NUCLEOTIDE VARIANTS
+yk11_var = here("data","YK11_VAR_NT.rds")
+if( file.exists(yk11_var) ){
+  ntvar = readRDS(yk11_var)
+}else{
+  ntvar = purrr::map_df(yk11, get.variants,verbose=F)
+}
+
+snp = get.variants.to.SNP(ntvar) %>%
+  add_count(id,ref_pos,name='nvar') %>%
+  group_by(id,ref_pos) %>%
+  mutate( alt_cumfr=sum(alt_fr)) %>%
+  left_join(G,by=c('id'='orf'))
+
+cds_snp = left_join(snp,wt, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
+  mutate(wt_low = alt_aa == wt_aa,
+         wt_missing=is.na(wt_aa))
+
+# Counting amino acid polymorphisms per protein
+saap_count_per_orf = PROT_SAAP %>%
   group_by(id,len,len.s288c,n_strains) %>%
   summarize(n_snp=sum(nvar),n_var=n_distinct(ref_pos))
 snp_count_per_orf %>% arrange(n_snp)
 
-write_rds(PROT_SNP,here("data",'YK11-SNP.rds'))
-write_rds(snp_count_per_orf,here("data",'YK11-ORF-VAR.rds'))
+# Save nucleotide polymorphism
+write_rds(cds_snp,here("data",'YK11-SNP-CDS.rds'))
+write_rds(saap_count_per_orf,here("data",'YK11-ORF-VAR-NT.rds'))
+# Reload saved nucleotide polymorphism
+cds_snp=read_rds(here("data",'YK11-SNP-CDS.rds'))
+saap_count_per_orf=read_rds(here("data",'YK11-ORF-VAR-NT.rds'))
 
-PROT_SNP=read_rds(here("data",'YK11-SNP.rds'))
-snp_count_per_orf=read_rds(here("data",'YK11-ORF-VAR.rds'))
 
 ### Must have run align_s288c_to_1011strains.r !!!
 # Filter orf with best match to s288c from all strains
