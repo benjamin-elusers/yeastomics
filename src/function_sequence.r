@@ -62,12 +62,12 @@ rm.stop = function(BS){
 widths = function(BS){
   if(is.list(BS)){
     return( sapply(BS,width) )
-  }else if( class(BS) == "AAStringSet" ){
+  }else if( class(BS) %in% c("AAStringSet","DNAStringSet") ){
     return(width(BS))
-  }else if( class(BS) == "AAStringSetList"){
+  }else if( class(BS) %in% c("AAStringSetList","DNAStringSetList") ){
     return( sapply(nchar(BS),unique) )
   }else{
-    stop('function not defined for unknown class of input')
+    stop(sprintf('function not defined for unknown class of input [%s]',class(BS)))
   }
 }
 
