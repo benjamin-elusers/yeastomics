@@ -98,8 +98,10 @@ load.emmanuel.data = function(toolbox="/data/elevy/70_R_Data/bin/RToolBox_yeast_
 load.1011.strains= function(seqdir="/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/",
                              .recursive=F){
   if( !dir.exists(seqdir) ) stop("Directory of proteome sequences not found!")
-  fastas =list.files(path=seqdir, pattern = "fasta", full.names = T, ignore.case = T, include.dirs = F,recursive = .recursive)
-  return(read.sequences(seqfiles = fastas,strip.fname=T))
+  fastas =list.files(path=seqdir, pattern = "fasta",
+                     full.names = T, ignore.case = T, include.dirs = F,recursive = .recursive)
+  empty_files = file.size(fastas) == 0
+  return(read.sequences(seqfiles = fastas[!empty_files],strip.fname=T))
 }
 
 # Evolution Sequence/Structure -------------------------------------------------
