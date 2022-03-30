@@ -18,8 +18,8 @@ if( file.exists(YK11_SNP_AA.rds) ){
 
   # PROTEOME 1011 STRAINS SEQUENCES
   YK11_fastadir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/sequences/Proteome_1011/"
-  YK11_prot = here("data","YK11-proteome-strains.rds")
-  YK11 = preload(YK11_prot,{load.1011.strains(seqdir = YK11_fastadir)},"loading proteome from 1011 strains...")
+  YK11_prot = here("data","YK11-PROT.rds")
+  YK11 = preload(YK11_prot,{load.1011.strains(seqdir = YK11_fastadir,seqtype='AA')},"loading proteome from 1011 strains...")
 
   # PROTEOME DATAFRAME
   P = tibble( orf=names(YK11),
@@ -69,8 +69,8 @@ if( file.exists(cds_snp_nt.rds) ){
 
   # CDS GENOME 1011 STRAINS
   yk11_fastadir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/transfer_1638744_files_c25fb55c/CDS_withAmbiguityRes/"
-  yk11_cds = here("data","YK11-cds-strains.rds")
-  yk11 = preload(yk11_cds,{load.1011.strains(seqdir = yk11_fastadir)},"loading genome cds from 1011 strains...")
+  yk11_cds = here("data","YK11-CDS.rds")
+  yk11 = preload(yk11_cds,{load.1011.strains(seqdir = yk11_fastadir,seqtype='DNA')},"loading genome cds from 1011 strains...")
   #zero_len = sapply(yk11,length) == 0
   #yk11= yk11[!zero_len]
 
