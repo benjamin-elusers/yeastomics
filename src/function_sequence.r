@@ -65,7 +65,7 @@ widths = function(BS){
   }else if( class(BS) %in% c("AAStringSet","DNAStringSet") ){
     return(width(BS))
   }else if( class(BS) %in% c("AAStringSetList","DNAStringSetList") ){
-    return( sapply(nchar(BS),unique) )
+    return( unlist( lapply(nchar(BS),unique) )  )
   }else{
     stop(sprintf('function not defined for unknown class of input [%s]',class(BS)))
   }
