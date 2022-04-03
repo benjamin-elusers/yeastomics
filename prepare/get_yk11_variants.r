@@ -99,6 +99,7 @@ if( file.exists(cds_snp_nt.rds) ){
     mutate(wt_low = alt_aa == wt_aa, wt_missing=is.na(wt_aa)) %>%
     mutate(alt_codon =stringi::stri_sub_replace(codon,from=codon_pos,to=codon_pos,replacement=alt_aa)) %>%
     mutate(alt_codon_aa = Biostrings::GENETIC_CODE[alt_codon], synonymous = (codon_aa == alt_codon_aa) ) %>%
+    mutate(ambiguous= !(alt_aa %in% Biostrings::DNA_BASES)) %>%
     # replace aa by nt in column names
     dplyr::rename(ref_nt=ref_aa,alt_nt=alt_aa,wt_nt=wt_aa,cds_pos=ref_pos, cds_fr=ref_fr)
 
@@ -115,6 +116,8 @@ write_rds(snp_nt_per_orf,here("data",'YK11-ORF-VAR_NT.rds'))
 
 head(cds_snp_nt)
 head(PROT_SNP_AA)
+
+all_snp = left_join(cds_snp_nt,PROT_SNP_AA, by=c('id', "aa_pos"='ref_pos', 'alt_codon_aa' = 'alt_aa'), suffix = c("_nt", "_aa"), )
 
 ### Must have run align_s288c_to_1011strains.r !!!
 # Filter orf with best match to s288c from all strains
