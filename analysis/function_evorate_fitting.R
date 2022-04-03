@@ -313,7 +313,7 @@ fix_missing_centrality = function(df,col_prefix='cat_interactions.string.',NA_de
 
 ### WORKFLOW PROCESSING MISSING VALUES
 PROCESS_MISSING_VALUES = function(MAT, IDS){
-  check_missing_var(MAT)
+  miss.0=check_missing_var(MAT)
   # Predictors with missing values must be corrected
   #  I. Fix missing observations for certain genes (rows):
   #     A) missing codons counts
@@ -325,6 +325,8 @@ PROCESS_MISSING_VALUES = function(MAT, IDS){
                                            col_mw_avg='cat_transcriptomics.pepstats.mean_MW',
                                            col_charge='cat_biophysics.pepstats.netcharge',
                                            col_pi='cat_biophysics.pepstats.pI')
+  miss.2=check_missing_var(PREDICTORS.2)
+
   #     C) missing centrality values (STRING and INTACT network are treated individually)
   PREDICTORS.3 = fix_missing_centrality(PREDICTORS.2,col_prefix="cat_interactions.string.")
   PREDICTORS.4 = fix_missing_centrality(PREDICTORS.3,col_prefix="cat_interactions.intact.")
