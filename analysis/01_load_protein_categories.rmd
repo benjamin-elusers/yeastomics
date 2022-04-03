@@ -448,6 +448,8 @@ check_chunk(df.genomics,GENOMICS)
 
 ```{r transcriptomics}
 TRANSCRIPTOMICS=list()
+
+df.rates = load.hausser2019.data()
 ### Translation initiation
 df.tie = load.szavitsnossan2020.data() %>% 
   rename_with(.fn=Pxx, px='szavitsnossan2020.TIE',s='_',.cols=-orf)
