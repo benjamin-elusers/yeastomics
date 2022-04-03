@@ -1409,7 +1409,7 @@ find_eggnog_downloads = function(){
 }
 
 
-find_eggnogg_node=function(node,GUI=F){
+find_eggnog_node=function(node,GUI=F){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   taxlevels = rvest::read_html(paste0(URL_EGGNOG,"per_tax_level/")) %>%
     rvest::html_nodes("a") %>% # Retrieve hyperlink corresponding to taxonomic level
@@ -1444,9 +1444,9 @@ find_eggnogg_node=function(node,GUI=F){
   }
 }
 
-get_eggnogg_species = function(node){
+get_eggnog_species = function(node){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
-  eggnog_node = find_eggnogg_node(node)
+  eggnog_node = find_eggnog_node(node)
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG,find_eggnog_version(.print=F))
   sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccfcc',progress = F) %>%
             janitor::clean_names() %>%
@@ -1454,10 +1454,10 @@ get_eggnogg_species = function(node){
   return(sp_info)
 }
 
-get_eggnogg_node = function(node){
+get_eggnog_node = function(node){
 
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
-  eggnog_node = find_eggnogg_node(node)
+  eggnog_node = find_eggnog_node(node)
   find_eggnog_version()
   #library(rotl)
   url_node_info = paste0(URL_EGGNOG,"per_tax_level/",eggnog_node$id,"/")
@@ -1481,68 +1481,20 @@ get_eggnogg_node = function(node){
   return(node_members)
 }
 
-count_eggnogg_node = function(node,ref_species,use_sciname=T){
+count_taxons_eggnog_node = function(node){
 
-  taxlevel = find_eggnogg_node(node)
-  node_species = get_eggnogg_species(taxlevel$id)
-  node_members = get_eggnogg_node(taxlevel$id)
+  taxlevel = find_eggnog_node(node)
+  node_species = get_eggnog_species(taxlevel$id)
+  node_members = get_eggnog_node(taxlevel$id)
 
-  if(missing(ref_species)){
-    taxlist = sprintf("(%s) %s",node_species$number_taxid,node_species$sci_name)
-    selected = menu(taxlist,graphics=interactive(),title=sprintf("reference taxon(s) in node '%s' (%s)",taxlevel$name,taxlevel$id))
-    refsp = node_species[selected,]
-  }
+  s_count = sapply(node_species$number_taxid, function(sp){ str_count(node_members$taxon_ids,pattern=sp) })
+  colnames(s_count) = paste0('ns_',colnames(s_count))
+  p_count = sapply(node_species$number_taxid, function(sp){ str_count(node_members$string_ids,pattern = paste0(sp,"\\.")) })
+  colnames(p_count) = paste0('np_',colnames(p_count))
 
-  # if(all(is_number(ref_species))){
-  #   valid_taxid = match.arg(as.character(ref_species), choices = node_species$number_taxid, several.ok = T)
-  #   refsp = node_species[ node_species$number_taxid %in% valid_taxid]
-  #
-  # }else{
-  #   warning('Names of reference species must match exactly! (otherwise use taxon id')
-  #   refsp = strfind(patterns = ref_species, strings = node_species$sci_name)
-  # }
-  #
-  # if( all(is_number(reftax)) ){
-  #   ref = sp_info$number_taxid %in% reftax
-  # }else{
-  #   ref = sp_info$sci_name %in% strfind(sp_info$sci_name,reftax) %>% unlist()
-  # }
-  #
-  # if(!any(ref)){ stop(sprintf('reference species (%s) not found!',reftax)) }
-  # print(sp_ref)
-
-  #members[[paste0("n_",sp_ref$number_taxid)]] = str_count(members$taxon_ids, sp_ref$number_taxid)
-  #PROT = str_split(members$string_ids,',')
-  #newick_trees = ape::read.tree(text=node_trees$tree)
-
-  sp_count = sapply(node_species$number_taxid, function(sp){ str_count(node_members$taxon_ids,sp) })
-  # filter orthogroups incomplete/not containing ref species
-  small_og = rowMeans(sp_count>=1) < 0.3
-  yeast_og = sp_count[,'4932'] == 1
-  pombe_og = sp_count[,'4896'] == 1
-
-  # filter orthogroups with at least 30% of all species in the taxonomic level
-  # should contain one protein from each reference species (e.g. yeast and pombe)
-  orthogroups = node_members %>% dplyr::filter(yeast_og & pombe_og & !small_og)
-  return(orthogroups)
-
-  # freq_sp = colSums(sp_count==1) / n_distinct(node_species$number_taxid)
-  # barplot(sort(freq_sp),las=2)
-  #
-  # LCA_name = Reduce(intersect,strsplit(node_species$named_lineage,","))
-  # MRCA_name = tail(LCA_name,1)
-  #
-  # LCA_taxid = Reduce(intersect,strsplit(node_species$taxid_lineage,","))
-  # MRCA_taxid = tail(LCA_taxid,1)
-  # node_species$MRCA = paste0(MRCA_taxid,"_",MRCA_name)
-  #
-  # max_lineage = max( str_count(node_species$taxid_lineage,",") )
-  #
-  # lineages_id =  str_split_fixed(node_species$taxid_lineage,',',n=max_lineage)
-  # lineages_name =  str_split_fixed(node_species$named_lineage,',',n=max_lineage)
-  #
-  # sapply(1:max_lineage, function(x){ table(lineages_name[,x]) })
-
+  # add column counting the number of times a protein from a taxon is seen
+  node = bind_cols(node_members,p_count %>% as_tibble)
+  return(node)
 }
 
 find.common.ancestor= function(lineage){
