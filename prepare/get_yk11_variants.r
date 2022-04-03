@@ -64,8 +64,12 @@ if( file.exists(cds_snp_nt.rds) ){
 }else{
   # CDS GENOME SEQUENCES
   wt = get.positions(CDS) %>%
-    group_by(orf) %>%
-    mutate(bin.pos=dplyr::ntile(wt_pos,100))
+       group_by(orf) %>%
+       mutate(bin.pos=dplyr::ntile(wt_pos,100)) %>%
+       mutate(aa_pos = ceiling(wt_pos/3), codon_pos = (wt_pos%%3 + (wt_pos%%3==0)*3) ) %>%
+       mutate(codon = ifelse(codon_pos==2, paste0(lag(wt_aa),wt_aa,lead(wt_aa)), NA)) %>%
+       group_by(orf,aa_pos) %>% fill(codon,.direction = 'updown') %>%
+       mutate(codon_aa = Biostrings::GENETIC_CODE[codon])
 
   # CDS GENOME 1011 STRAINS
   yk11_fastadir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/transfer_1638744_files_c25fb55c/CDS_withAmbiguityRes/"
@@ -92,8 +96,12 @@ if( file.exists(cds_snp_nt.rds) ){
     left_join(G,by=c('id'='orf'))
 
   cds_snp_nt = left_join(snp_nt,wt, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
-    mutate(wt_low = alt_aa == wt_aa,
-           wt_missing=is.na(wt_aa))
+    mutate(wt_low = alt_aa == wt_aa, wt_missing=is.na(wt_aa)) %>%
+    mutate(alt_codon =stringi::stri_sub_replace(codon,from=codon_pos,to=codon_pos,replacement=alt_aa)) %>%
+    mutate(alt_codon_aa = Biostrings::GENETIC_CODE[alt_codon], synonymous = (codon_aa == alt_codon_aa) ) %>%
+    # replace aa by nt in column names
+    dplyr::rename(ref_nt=ref_aa,alt_nt=alt_aa,wt_nt=wt_aa,cds_pos=ref_pos, cds_fr=ref_fr)
+
   # Save nucleotide polymorphism
   write_rds(cds_snp_nt,cds_snp_nt.rds)
 }
@@ -101,12 +109,9 @@ if( file.exists(cds_snp_nt.rds) ){
 # Counting amino acid polymorphisms per protein
 snp_nt_per_orf = cds_snp_nt %>%
   group_by(id,len,len.s288c,n_strains) %>%
-  summarize(n_snp=sum(nvar),n_var=n_distinct(ref_pos))
+  summarize(n_snp=sum(nvar),n_var=n_distinct(cds_pos))
 snp_nt_per_orf %>% arrange(n_snp)
 write_rds(snp_nt_per_orf,here("data",'YK11-ORF-VAR_NT.rds'))
-
-
-
 
 head(cds_snp_nt)
 head(PROT_SNP_AA)
