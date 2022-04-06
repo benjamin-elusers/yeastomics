@@ -296,7 +296,8 @@ load.genome = function(url) {
   g = Biostrings::readDNAStringSet(filepath = url)
   return(g)
 }
-
+SGD.nomenclature = function(){ return("([Y][A-P][LR][0-9]{3}[WC](?:-[A-Z])?)|(Q[0-9]{4})|(R[0-9]{4}[WC])") }
+get.orf = function(x){ stringr::str_extract(x,SGD.nomenclature()) }
 # Amino acids ------------------------------------------------------------------
 # SEQ must be a character vector
 is.pos  <- function(SEQ){ SEQ == "K" | SEQ == "R" }
