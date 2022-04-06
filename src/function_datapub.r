@@ -1343,7 +1343,7 @@ get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated")
     ppms = map_dfr(taxons, get.paxdb,which.abundance)
   }
 
-  ortho_ppms = inner_join(ortho,ppms, by=c('taxid','protid','id_uniprot')) %>%
+  ortho_ppms = inner_join(ortho,ppms, by=c('taxid','protid')) %>%
       arrange(NOG,taxid,protid,id_uniprot)
 
   return (ortho_ppms)
