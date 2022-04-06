@@ -1211,7 +1211,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
       mutate(ppm_n = n_distinct(id)) %>%
       dplyr::group_by(taxid,organ,protid) %>%
       dplyr::filter(is_integrated) %>%
-      dplyr::select(taxid,organ,protid, ppm_int = ppm,ppm_n)
+      dplyr::select(taxid,organ,protid,id_uniprot, ppm_int = ppm,ppm_n)
   }
 
   if( "median" %in% targets ){
