@@ -361,10 +361,10 @@ read.R4S = function(r4s, id=NULL,verbose=T){
           janitor::clean_names('screaming_snake')
   if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
     df.r4s = df.r4s %>%
-             mutate( QQ = str_remove_all(QQ_INTERVAL, pattern = "\\[|\\]"),
+             dplyr::mutate( QQ = str_remove_all(QQ_INTERVAL, pattern = "\\[|\\]"),
                      QQ1 = as.double(str_split_fixed(QQ,',',n=2)[,1]),
                      QQ2 = as.double(str_split_fixed(QQ,',',n=2)[,2])) %>%
-             select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
+             dplyr::select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
   }
 
   return(df.r4s)
