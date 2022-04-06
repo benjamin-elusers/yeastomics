@@ -104,7 +104,7 @@ seq2df = function(BS){
   )
 }
 
-count_matches = function(ali){
+count_pair_ali = function(ali){
   S1 = seq2char(alignedPattern(ali))
   S2 = seq2char(alignedSubject(ali))
   L=nchar(ali)
@@ -117,6 +117,38 @@ count_matches = function(ali){
   return(c('S'=N,'NS'=NS,'G'=INDEL,"I"=IN,"D"=DEL,'L'=L,"gapped"=GAP))
 }
 
+
+msa2df = function(MSA_SEQ,REF_NAME,ID){
+
+  if(is(MSA_SEQ,"AAStringSet")){ MSA_SEQ = AAMultipleAlignment(MSA_SEQ)}
+  L = nchar(MSA_SEQ)
+  N = length(unmasked(MSA_SEQ))
+  IREF = which(rownames(MSA_SEQ) %in% REF_NAME)
+
+  MSA = as.matrix(MSA_SEQ)
+  REF = MSA[IREF,]
+  REFMAT = matrix(REF,nrow = N-1, ncol=L,byrow=T)
+
+  CONSENSUS =  consensusMatrix(MSA_SEQ)
+  iref_aa=match(REF,rownames(CONSENSUS))
+
+  df_msa = tibble( id = ID,
+                   ref_aa  = REF,
+                   ref_gap = REF == "-",
+                   msa_pos = 1:L,
+                   matched = CONSENSUS[iref_aa + (seq_along(REF)-1) * nrow(CONSENSUS)],
+                   mismatched = colSums(REFMAT != MSA[-IREF,] & MSA[-IREF,]!="-" & REFMAT!="-"),
+                   indel = colSums( xor(MSA[-IREF,]=='-',REFMAT=="-") ),
+                   ins = colSums(REFMAT=="-" & MSA[-IREF,]!="-"),
+                   del  = colSums(REFMAT!="-" & MSA[-IREF,]=="-")
+    ) %>%
+    group_by(ref_gap) %>% mutate(ref_pos = ifelse(ref_gap, NA, row_number() ) ) %>%
+    rowwise() %>% mutate( total = sum(c_across(cols = c(indel,matched,mismatched))) )
+
+  return(df_msa)
+}
+
+
 score_ali = function(p1,p2,s1,s2, mat="BLOSUM62", opening=10, extend=4){
 
   ali = pairwiseAlignment(p1, p2, substitutionMatrix = mat, gapOpening=opening, gapExtension=extend)
@@ -128,7 +160,7 @@ score_ali = function(p1,p2,s1,s2, mat="BLOSUM62", opening=10, extend=4){
   PID = get_identity(ali)
   OL = get_overlap(ali)
   SCORE = setNames(nm=paste0("SCORE.",mat),score(ali))
-  MATCH = count_matches(ali)
+  MATCH = count_pair_ali(ali)
 
   # Best way to create a one-row dataframe from a list of named vectors
   row_data = tibble::lst(IDS,PID,OL,SCORE,MATCH) %>%
@@ -136,6 +168,5 @@ score_ali = function(p1,p2,s1,s2, mat="BLOSUM62", opening=10, extend=4){
     tibble::as_tibble()
   return(row_data)
 }
-
 
 
