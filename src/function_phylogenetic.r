@@ -391,6 +391,10 @@ get_r4s = function(r4s_resdir="/media/elusers/users/benjamin/A-PROJECTS/03_PostD
                    filetype = "raw.r4s",
                    as_df=T){
 
+  progress_r4s_res = function(file,.pb=NULL){
+    if(!.pb$finished){ .pb$tick() }
+    return(read.R4S(file,verbose = F))
+  }
   r4s_type = match.arg(arg=filetype, choices = c("raw.r4s","norm.r4s"),several.ok = F)
   r4s_files = list.files(path=r4s_resdir,pattern = r4s_type,full.names = T)
   nfiles = length(r4s_files)
@@ -419,11 +423,19 @@ read_leisr = function(json){
   return(df)
 }
 
-
 get_leisr = function(leisr_resdir="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain/",
                      filetype = "LEISR.json",
                      as_df=T){
 
+  progress_leisr_tsv = function(file,.pb=NULL){
+    if(!.pb$finished){ .pb$tick() }
+    return(read_delim(file, progress=F,show_col_types=F))
+  }
+
+  progress_leisr_json = function(file,.pb=NULL){
+    if(!.pb$finished){ .pb$tick() }
+    return(read_leisr(RJSONIO::fromJSON(file)))
+  }
   leisr_type = match.arg(arg=filetype, choices = c("LEISR.json",".leisr"),several.ok = F)
   leisr_files = list.files(path=leisr_resdir,pattern = leisr_type,full.names = T)
   nfiles = length(leisr_files)
@@ -447,6 +459,13 @@ get_leisr = function(leisr_resdir="/data/benjamin/NonSpecific_Interaction/Data/E
 get_iqtree = function(iqtree_resdir="/media/WEXAC_data/FUNGI/IQTREE/",
                       filetype = ".rate",
                       as_df=T){
+  progress_iqtree_tsv = function(file,.pb=NULL){
+    if(!.pb$finished){ .pb$tick() }
+    res = read_delim(file, progress=F,show_col_types=F,delim='\t',comment="#")
+    orf = str_extract(file,SGD.nomenclature())
+    res$orf = orf
+    return(res)
+  }
 
   iqtree_type = match.arg(arg=filetype, choices = c(".mlrate",".rate"),several.ok = F)
   iqtree_files = list.files(path=iqtree_resdir,pattern = paste0('\\',iqtree_type),full.names = T)
@@ -468,6 +487,18 @@ get_iqtree = function(iqtree_resdir="/media/WEXAC_data/FUNGI/IQTREE/",
   }
 }
 
+
+
+
+read_leisr = function(json){
+  content = do.call(rbind,json$MLE$content[[1]])
+  header = sapply(json$MLE$header,'[[',1)
+  df = as_tibble(content) %>% rename_with(~header) %>% janitor::clean_names()
+  df$pos = 1:nrow(df)
+  ID = str_extract(json$input$`file name`, pattern = SGD.nomenclature())
+  df$id = ID
+  return(df)
+}
 
 get_fungi_clades = function(){
   fungi.clades = tibble::lst(
