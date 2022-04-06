@@ -70,7 +70,9 @@ orfs = intersect(names(S288C),yk11_orfs)
 #orfs_same_length = orfs[ widths(S288C[orfs]) == widths(YK11[orfs]) ]
 
 ## Add S288C and gapped sequence for missing strains ##
-yk11 = sapply(orfs, function(x){ add_missing_strains( BS=get_s288c_strain(x),all_strains=yk11_strains) })
+yk11raw = sapply(orfs, function(x){ get_s288c_strain(x) })
+#yk11 = sapply(orfs, function(x){ add_missing_strains( BS=get_s288c_strain(x),all_strains=yk11_strains) })
+yk11=yk11raw
 
 # Remove the stop codon at the end of the sequences (keep the same length for all sequences)
 yk11_nostop = sapply(yk11,stripR)
@@ -94,7 +96,12 @@ s288c_alidir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/101
 realigned=list()
 for( w in intersect(weird,orf_var) ){
   tofasta = sprintf("%s/%s.fasta",s288c_alidir,w)
-  toaln = sprintf("%s/%s_aligned.fa",s288c_alidir,w)
+  ns = length(yk11[[w]])
+  if(ns < 1012){
+    toaln = sprintf("%s/%s_aligned_missing.fa",s288c_alidir,w)
+  }else{
+    toaln = sprintf("%s/%s_aligned.fa",s288c_alidir,w)
+  }
   Biostrings::writeXStringSet(yk11[[w]],filepath=tofasta)
   tmp  = bio3d::read.fasta(tofasta)
   aln  = bio3d::seqaln(tmp,outfile = toaln )
@@ -117,10 +124,13 @@ for( orf in names(realigned) ){
   check_realigned[orf] = same_length & sum(len_indel>1) < 1
 }
 
+
+
 ## Output the fasta files with s288c and all the 1011 strains
 # Gapped sequence == missing ORF in strains
 #final_dir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/top1000_strain_with_s288c/"
-final_dir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain_with_s288c/"
+#final_dir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain_with_s288c/"
+final_dir = "/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain_with_s288c_raw/"
 dir.create(final_dir)
 for( o in names(yk11) ){
 
@@ -131,19 +141,20 @@ for( o in names(yk11) ){
     # WEIRD ORF (NOT UNIQUE LENGTH)
     if( check_realigned[o] ){
       # REALIGNED SEEMS FINE (SAME LENGTH, NOT TOO MANY (LONG) INDELS)
-      tofasta = sprintf("%s/%s_realigned.fasta",final_dir,o)
-      final_ali = add_missing_strains(as(realigned[[o]],'AAStringSet'),all_strains=yk11_strains)
+      tofasta = sprintf("%s/%s.fasta",final_dir,o)
+      #final_ali = add_missing_strains(as(realigned[[o]],'AAStringSet'),all_strains=yk11_strains)
+      final_ali = as(realigned[[o]],'AAStringSet')
       #print(unique(widths(final_ali)))
     }else{
       print(sprintf("AVOIDING WEIRD ALIGNED ORF %s",o))
     }
   }else{
     # NORMAL ORFS
-    tofasta = sprintf("%s/%s_strains_only.fasta",final_dir,o)
+    tofasta = sprintf("%s/%s.fasta",final_dir,o)
     final_ali = yk11[[o]]
   }
 
-  names(final_ali) = strains
+  #names(final_ali) = strains
 
   Biostrings::writeXStringSet(final_ali,filepath=tofasta,format = 'fasta')
 }
@@ -168,3 +179,39 @@ for( o in names(yk11) ){
 # df_strains_s288c = bind_rows(tmp1,tmp2,tmp3,tmp4) %>%
 #                   mutate( strain = get.strain_orf(ID2,'strains') )
 # write_rds(df_strains_s288c, here("prepare","proteome_aligned_s288c_vs_1011strains.rds"))
+
+
+### 1011 STRAINS
+wexac_1011 = "/media/WEXAC_data/1011G/fasta/"
+wexac_1011_r4s="/media/WEXAC_data/1011G/R4S/"
+r4s_1011_wexac = list.files(wexac_1011_r4s,pattern='raw.r4s$',full.names = F)
+r4s_1011_orf = stringr::str_split_fixed(r4s_1011_wexac,"_",n=2)[,1]
+
+yk11_wexac = read.sequences(seqfiles = list.files(wexac_1011,pattern='.fasta',full.names = T),type='AA',strip.fname = T)
+yk11_orf = stringr::str_split_fixed(names(yk11_wexac),"_",n=2)[,1]
+
+yk11_failed = setdiff(yk11_orf,r4s_1011_orf)
+yk11_succeed = intersect(yk11_orf,r4s_1011_orf)
+
+test= yk11_wexac[ unlist(strfind(names(yk11_wexac), yk11_failed)) ]
+lapply( test, function(x){ sum(alphabetFrequency(x)[,'-']) })
+
+### FUNGI
+wexac_fungi = "/media/WEXAC_data/FUNGI/fasta/"
+wexac_fungi_r4s ="/media/WEXAC_data/FUNGI/R4S/"
+r4s_fungi_wexac = list.files(wexac_fungi_r4s,pattern='raw.r4s$',full.names = F)
+r4s_fungi_orf = stringr::str_split_fixed(r4s_fungi_wexac,"_",n=2)[,1]
+
+fungi_wexac = read.sequences(seqfiles = list.files(wexac_fungi,pattern='.fasta',full.names = T),type='AA',strip.fname = T)
+fungi_orf = stringr::str_split_fixed(names(fungi_wexac),"_",n=2)[,1]
+
+fungi_failed = setdiff(fungi_orf,r4s_fungi_orf)
+fungi_succeed = intersect(fungi_orf,r4s_fungi_orf)
+
+fungi_wexac[ unlist(strfind(names(fungi_wexac), fungi_failed)) ]
+lapply( test, function(x){ sum(alphabetFrequency(x)[,'-']) })
+
+
+
+length( intersect(fungi_succeed,yk11_succeed) )
+
