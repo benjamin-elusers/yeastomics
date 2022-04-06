@@ -49,10 +49,6 @@ knitr::opts_chunk$set(echo = TRUE,
                       cache.lazy = FALSE,
                       autodep = TRUE,
                       warning = FALSE)
-if('utils' %in% search()){ detach('utils') }
-utils = attach(NULL,name = 'utils')
-if('funcs' %in% search()){ detach('funcs') }
-funcs = attach(NULL,name = 'funcs')
 
 suppressPackageStartupMessages({
   library(tictoc)
@@ -61,14 +57,6 @@ suppressPackageStartupMessages({
   library(hablar)
   library(here)
   source(here("src","__setup_yeastomics__.r"))
-  # source(here("src","utils.r"))
-  # source(here("src","function_annotation.r"))
-  # source(here("src","function_sequence.r"))
-  # source(here("src","function_phylogenetic.r"))
-  # source(here("src","function_analysis.r"))
-  # source(here("src","function_datalocal.r"))
-  # source(here("src","function_datapub.r"))
-
 })
 
 
@@ -106,7 +94,7 @@ options(dplyr.summarise.inform = FALSE,dplyr.width=Inf)
 
 # Introduction to "yeast-omics"
 
-Yeast is a model unicellular organism belonging to the fungi kingdom, within the eukaryotes ("true nucleus") domain of life. The yeast genome of 12Mbp seems tiny when compared to higher eukaryotes, which is at least one order of magnitude more compact in size. Nonetheless, the yeast proteome contains \~6000 protein-coding genes, making it only 3 to 4 times smaller than eukaryotes. Strictly quantitatively, the yeast genome/proteome would be comparable to the largest bacteria, similar to those of E.coli (4.5Mbp/4300) or B.subtilis (4.3Mbp/4800).
+Yeast is a model unicellular organism belonging to the fungi kingdom, within the eukaryotes ("true nucleus") domain of life. The yeast genome of 12Mbp seems tiny when compared to higher eukaryotes, which is at least one order of magnitude more compact in size. Nonetheless, the yeast proteome contains \~6000 protein-coding genes, making it only 3 to 4 times smaller than eukaryotes. Strictly quantitatively, the yeast genome/proteome would be comparable to the largest bacteria, similar to those of E. coli (4.5Mbp/4300) or B. subtilis (4.3Mbp/4800).
 
 The yeast cellular volume is estimated around 50um\^3 for haploid cells which is occupied at 80% by the cellular proteome (42 Millions of expressed macromolecules). The cell interior is incredibly crowded with a protein density of around 3-4 millions of molecules per femtoliter. Despite the crowdedness, proteins are freely diffusing within the cell at an admirably fast pace of around 0.2us from one extremity to another.
 
@@ -142,9 +130,9 @@ Finally, a protein category correspond to a list of features or properties (Sequ
 
 ## Reference proteome sequence
 
-SGD and Uniprot are the most reliable database gathering information about genes and proteins sequences. SGD is the main provider for the assembled genome of S. cerevisiae as well as annotations about the genes.
+SGD and UniProt are the most reliable database gathering information about genes and proteins sequences. SGD is the main provider for the assembled genome of S. cerevisiae as well as annotations about the genes.
 
-Uniprot is a primary resource for protein information aggregating data from multiple specialized databases (structure, interactions, evolution, expression ...)
+UniProt is a primary resource for protein information aggregating data from multiple specialized databases (structure, interactions, evolution, expression ...)
 
 ```{r reference}
 # REFERENCE PROTEIN DATABASE ---------------------------------------------------
@@ -189,8 +177,9 @@ DUB = load.dubreuil2019.data(4)
 OHNO = get.sc.ohno(myseq=S288C)
 
 # CONSERVED GENES (ORTHOLOGS)  -------------------------------------------------
-ORTHO=load.eggnog.node('4751',to.matrix = T)
-df.ortho = load.eggnog.node('4751')
+#ORTHO=load.eggnog.node('4751',to.matrix = T)
+#df.ortho = load.eggnog.node('4751')
+#ortho_stat = count_taxons_eggnog_node(node = 4751)
 PPM.ORTHO=get.ppm.ortho(node = '4751', raw=F, which.abundance = 'integrated')
 # PPM.ORTHO.ALL = get.ppm.ortho(node = '4751', raw=T) # All abundance values
 
@@ -368,10 +357,10 @@ NMINI = 1
 
 -   DNA composition
 
-        *   GC content
+        * GC content
             The genomic sequence made of DNA molecules is composed of 2 pairs of complementary nucleic acids called bases (AT & CG). Variations in usage of both pairs exist.
 
-        *   Coding length
+        * Coding length
 
 ```{r genomic}
 GENOMICS=list()
@@ -428,23 +417,19 @@ check_chunk(df.genomics,GENOMICS)
 
 -   Codon Usage
 
-    -   tRNA adapation
+        * tRNA adapation
+            Some codons are faster to translate than others, even when both code for the same amino acid, i.e. synonymous codons. The copy number of tRNA genes determine how fast tRNA can load the amino acid corresponding to a particular codon. Genes optimized for translation are likely to use codons for which tRNA genes have high copy number.
 
-        Some codons are faster to translate than others, even when both code for the same amino acid, i.e. synonymous codons. The copy number of tRNA genes determine how fast tRNA can load the amino acid corresponding to a particular codon. Genes optimized for translation are likely to use codons for which tRNA genes have high copy number.
-
-    -   codon usage measures
-
-        Other measures of codon usage are commonly used but they often require to compare to a set of optimized genes. Generally, ribosomal genes are used as the set of reference to.
+        * codon usage
+            Other measures of codon usage are commonly used but they often require to compare to a set of optimized genes. Generally, ribosomal genes are used as the set of reference to.
 
 -   Amino acid biosynthetic cost
 
-    -   Molecular weight per AA
+        * Molecular weight per AA
+            The average amino acid molecular weight of a particular protein sequence informs on how cost-effective is its production.
 
-        The average amino acid molecular weight of a particular protein sequence informs on how cost-effective is its production.
-
-    -   Consumption of ATP per AA
-
-        Other measure of biosynthetic cost of amino acid are often used. For example, by measuring how many ATP molecules are required to synthetize each amino acid.
+        * Consumption of ATP per AA
+            Other measure of biosynthetic cost of amino acid are often used. For example, by measuring how many ATP molecules are required to synthetize each amino acid.
 
 ```{r transcriptomics}
 TRANSCRIPTOMICS=list()
