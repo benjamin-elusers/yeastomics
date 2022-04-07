@@ -1158,10 +1158,10 @@ load.paxdb = function(taxon=4932){
   taxon_url = paste0(taxon_dir,taxon_data)
   get.paxdb_header = function(urldata){
     read.url(urldata) %>%
-      str_subset(pattern="^#") %>%
+      stringr::str_subset(pattern="^#") %>%
       as_tibble %>%
-      extract(col=value,into=c('info',"value"), regex="^#([^\\:]+)\\:(.+)$") %>%
-      mutate(info=str_trim(info),value=str_trim(value)) %>%
+      tidyr::extract(col=value,into=c('info',"value"), regex="^#([^\\:]+)\\:(.+)$") %>%
+      dplyr::mutate(info=str_trim(info),value=str_trim(value)) %>%
       dplyr::filter( !is.na(info) ) %>%
       pivot_wider(names_from='info',values_from=c(value)) %>%
       mutate(taxid=as.character(taxon))
@@ -1185,8 +1185,8 @@ load.paxdb = function(taxon=4932){
                            setclass="tibble",
                            rbind = TRUE,rbind_label = "dataurl",rbind_fill = T) %>%
       dplyr::rename(paxid="#internal_id", string="string_external_id", ppm="abundance") %>%
-      mutate(dataset = basename(path = dataurl)) %>% dplyr::select(-dataurl) %>%
-      extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)',remove = F) %>%
+      dplyr::mutate(dataset = basename(path = dataurl)) %>% dplyr::select(-dataurl) %>%
+      tidyr::extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)',remove = F) %>%
       distinct()
   #}#
 
