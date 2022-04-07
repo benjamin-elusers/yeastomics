@@ -630,7 +630,7 @@ get_phylo_data = function(data, include.wgd=T,  include.ali=T,
 
 
 load.evorate = function(resdir="/media/WEXAC_data/1011G/",ref='S288C',ID="ORF", ncores=parallelly::availableCores(which='max')-2){
-  tictoc::tic("load evoluitionary rate...")
+  tictoc::tic("load evolutionary rate...")
   sequences = read.sequences(seqfiles = list.files(file.path(resdir,'fasta'),pattern='.fasta$',full.names = T),type='AA',strip.fname = T)
 
   if(ID == "ORF" ){
@@ -638,20 +638,12 @@ load.evorate = function(resdir="/media/WEXAC_data/1011G/",ref='S288C',ID="ORF", 
     names(sequences) = orf
   }
 
-  library(future)
-  library(progressr)
-  handlers(global = TRUE)
-
-  future::plan(multisession, workers = ncores)
-  message(sprintf("using 'furrr' to track progress in parallel across %s cpus",ncores))
   tictoc::tic("convert sequences to dataframe... (with multithreads)")
-  with_progress({
-    p <- progressor(steps = length(sequences))
-    list_df_seq = furrr::future_map(names(sequences),function(x,p){ p(); msa2df(sequence[[x]],REF_NAME=ref, ID=x)}, p = p)
-  })
-  df_seq = list_df_seq %>% bind_rows() %>%   dplyr::filter(!is.na(ref_pos))
+  message(sprintf("using 'furrr' to track progress in parallel across %s cpus",ncores))
+  id_msa2df = function(x, SEQLIST=sequences){ msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x) }
+  list_df_seq = pbmcapply::pbmclapply(mc.cores = ncores, FUN = id_msa2df, SEQLIST=sequences, X = names(sequences), mc.silent=F, mc.cleanup = T)
+  df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
   tictoc::toc()
-
 
   r4s = get_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = 'raw.r4s',as_df = T)
   iqtree = get_iqtree(iqtree_resdir = file.path(resdir,"IQTREE/"),filetype = '.mlrate', as_df = T)
