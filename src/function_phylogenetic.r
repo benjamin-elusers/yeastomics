@@ -624,11 +624,6 @@ get_phylo_data = function(data, include.wgd=T,  include.ali=T,
   return(res)
 }
 
-
-
-
-
-
 load.evorate = function(resdir="/media/WEXAC_data/1011G/",ref='S288C',ID="ORF", ncores=parallelly::availableCores(which='max')-2){
   tictoc::tic("load evolutionary rate...")
   sequences = read.sequences(seqfiles = list.files(file.path(resdir,'fasta'),pattern='.fasta$',full.names = T),type='AA',strip.fname = T)
@@ -639,7 +634,7 @@ load.evorate = function(resdir="/media/WEXAC_data/1011G/",ref='S288C',ID="ORF", 
   }
 
   tictoc::tic("convert sequences to dataframe... (with multithreads)")
-  message(sprintf("using 'furrr' to track progress in parallel across %s cpus",ncores))
+  message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
   id_msa2df = function(x, SEQLIST=sequences){ msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x) }
   list_df_seq = pbmcapply::pbmclapply(mc.cores = ncores, FUN = id_msa2df, SEQLIST=sequences, X = names(sequences), mc.silent=F, mc.cleanup = T)
   df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
