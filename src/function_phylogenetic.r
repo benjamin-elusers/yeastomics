@@ -629,21 +629,36 @@ get_phylo_data = function(data, include.wgd=T,  include.ali=T,
 
 
 
-load.evorate = function(resdir="/media/WEXAC_data/1011G/",ref='S288C'){
+load.evorate = function(resdir="/media/WEXAC_data/1011G/",ref='S288C',ID="ORF", ncores=parallelly::availableCores(which='max')-2){
   tictoc::tic("load evoluitionary rate...")
   sequences = read.sequences(seqfiles = list.files(file.path(resdir,'fasta'),pattern='.fasta$',full.names = T),type='AA',strip.fname = T)
 
-  cat('convert sequences to dataframe...')
-  df_seq = lapply(names(sequences),function(X){ msa2df(sequences[[X]],ref,ID=X) }) %>%
-    bind_rows() %>%
-    dplyr::filter(!is.na(ref_pos))
+  if(ID == "ORF" ){
+    orf = get.orf(names(sequences))
+    names(sequences) = orf
+  }
+
+  library(future)
+  library(progressr)
+  handlers(global = TRUE)
+
+  future::plan(multisession, workers = ncores)
+  message(sprintf("using 'furrr' to track progress in parallel across %s cpus",ncores))
+  tictoc::tic("convert sequences to dataframe... (with multithreads)")
+  with_progress({
+    p <- progressor(steps = length(sequences))
+    list_df_seq = furrr::future_map(names(sequences),function(x,p){ p(); msa2df(sequence[[x]],REF_NAME=ref, ID=x)}, p = p)
+  })
+  df_seq = list_df_seq %>% bind_rows() %>%   dplyr::filter(!is.na(ref_pos))
+  tictoc::toc()
+
 
   r4s = get_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = 'raw.r4s',as_df = T)
   iqtree = get_iqtree(iqtree_resdir = file.path(resdir,"IQTREE/"),filetype = '.mlrate', as_df = T)
   iqtree2 = get_iqtree(iqtree_resdir = file.path(resdir,"IQTREE/"),filetype = '.rate', as_df = T)
   leisr = get_leisr(leisr_resdir = file.path(resdir,"LEISR/"),filetype = 'LEISR.json', as_df = T)
 
-  evorates = left_join(df_seq,r4s, by=c('id'='ID','msa_pos'='POS')) %>%
+  evorates = left_join(df_seq,r4s, by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
     left_join(iqtree,by=c('id'='orf','msa_pos'='Site')) %>%
     left_join(iqtree2,by=c('id'='orf','msa_pos'='Site')) %>%
     left_join(leisr,by=c('id','msa_pos'='pos')) %>%
@@ -651,7 +666,7 @@ load.evorate = function(resdir="/media/WEXAC_data/1011G/",ref='S288C'){
     dplyr::rename(r4s_rate=SCORE,
                   iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate,
                   leisr_mle = mle, leisr_up=upper, leisr_low=lower, leisr_global= log_l_global, leisr_local= log_l_local  ) %>%
-    dplyr::select(-c('QQ1','QQ2','STD','MSA','SEQ'))
+    dplyr::select(-c('QQ1','QQ2','STD','MSA'))
   tictoc::toc()
   return(evorates)
 }
