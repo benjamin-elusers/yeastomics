@@ -693,7 +693,7 @@ load.dubreuil2019.data = function(d){
   } else if( dubreuil$format[d] == 'TSV'){
     res = readr::read_delim(file = data.url, col_names = T, delim = '\t',  progress = T,guess_max=50000)
   } else if( dubreuil$format[d] == 'TSV.GZ' ){
-    res = readr::read_delim(file = read.url(data.url), col_names = T, delim = '\t',  progress = T,guess_max=50000)
+    res = readr::read_delim(file = I(read.url(data.url)), col_names = T, delim = '\t',  progress = T,guess_max=50000)
   }
   return(res)
 }
