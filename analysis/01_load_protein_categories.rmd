@@ -264,9 +264,19 @@ TM = load.jarzab2020.data()
 ## MRNA HALFLIFE  --------------------------------------------------------------
 MRNA.HL = load.geisberg2014.data() 
 ## PROTEIN HALFLIFE ------------------------------------------------------------
+christiano2014 =  load.christiano2014.data() %>% 
+                    separate_rows('ensg',sep=';') %>% 
+                    filter(ensg %in% PROTEOME$ORF & uniprot %in% PROTEOME$UNIPROTKB ) %>% 
+                    distinct() %>% arrange(uniprot,ensg) %>% 
+                    group_by(ensg) %>% mutate(degrate_mn=mean_(degradation_rates_min_1),
+                                              t_half_min = mean_(t1_2_min),
+                                              t1_2_hr = mean_(t1_2_hours )) %>%
+                    dplyr::select(-c(degradation_rates_min_1,t1_2_min, t1_2_hours,
+                                     r2_quality_of_curve_fitting, cv_of_slope))
+
 PROT.HL = load.belle2006.data() %>% 
           left_join( load.villen2017.data(), by = c('ORF')) %>%
-          left_join( load.christiano2014.data(), by=c('ORF'='ensg'))
+          left_join( christiano2014, by=c('ORF'='ensg'))
 
 # PROTEIN-PROTEIN INTERACTIONS  ------------------------------------------------
 ## STRING functional protein association networks ------------------------------
@@ -444,7 +454,7 @@ df.tai=load.trna.adaptation(inputseq=CDS,
                             trnas = here::here('data','GtRNA-counts.rds')) %>% 
   dplyr::rename(codonr.tAI = tAI)
 df.CU=load.codon.usage(cds=CDS,with.counts=F) %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
-df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3), len.cds=lengths(CDS)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
+df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3), len_cds=lengths(CDS)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
  
 ### Expression in different conditions
 df.cond_exp = load.lahtvee2017.data()%>%  dplyr::select(orf=geneId) %>%
@@ -630,11 +640,11 @@ BIOPHYSICS$jarzab2020.Tm_hi = TM %>% dplyr::filter( Tm_type == 'High-Tm' ) %>% p
 BIOPHYSICS$jarzab2020.Tm_nomelt = TM %>% dplyr::filter( Tm_type == 'Non-melter' ) %>% pull(UNIPROT)
 
 df.HLprot = PROT.HL %>%
-            dplyr::select(ORF,halflife.avg,halflife_mn_corrected,degradation_rates_min_1,t1_2_min) %>%
+            dplyr::select(ORF,halflife.avg,halflife_mn_corrected,t_half_min,degrate_mn) %>%
             dplyr::rename(villen2017.HL_prot=halflife.avg,
                           belle2006.HL_prot=halflife_mn_corrected,
-                          christiano2014.HL_prot = t1_2_min,
-                          christiano2014.deg_rate = degradation_rates_min_1)
+                          christiano2014.HL_prot = t_half_min,
+                          christiano2014.deg_rate = degrate_mn)
 
 BIOPHYSICS$villen2017.longlived_prot = df.HLprot %>% dplyr::filter(villen2017.HL_prot > 5) %>% pull(ORF)
 BIOPHYSICS$belle2006.longlived_prot = df.HLprot %>% dplyr::filter(belle2006.HL_prot > 300) %>% pull(ORF)
