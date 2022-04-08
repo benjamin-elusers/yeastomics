@@ -187,9 +187,10 @@ load.barton2010.data = function(by=c("aa","prot")){
     # raw_cost %>% arrange(name,environment,cost_type) %>% print(n=100)
     # trna.var = raw_cost %>% group_by(name,dilution) %>% summarise(vtrna=var(transcript_level))
     biosynth_cost = raw_cost %>%
-      pivot_wider(names_from=cost_type,
+      pivot_wider(id_cols = c(name,trna,cai,transcript_level),
+                  names_from=cost_type,
                   names_glue = "{.value}_{cost_type}",
-                  values_from=cost) %>%
+                  values_from=cost, values_fn = unique) %>%
       rename_with(.cols=contains("-"),.fn=str_replace_all,pattern="-",replacement="_")
 
   }
