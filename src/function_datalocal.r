@@ -281,19 +281,27 @@ load.d2p2 = function(ids,saved,autosave=T){ # Get the d2p2 predictions for multi
 
   library(tools)
   library(tictoc)
-
-  N=length(ids)
-  doing =sprintf("Loading d2p2 predictions for %s protein identifiers\n",N)
-  tic(doing)
-  message(doing)
-  d2p2 = list()
-  for( i in 1:N ){
-    ID = ids[i]
-    prg = sprintf("%.1f %% [%5s/%5s]        \r", 100*(i/N), i,N)
-    d2p2[[ID]] = fetch.d2p2(ID,quiet=T)
-    cat(prg)
+  if(require('pbmcapply')){
+    tic('fetching d2p2 disorder predictions...')
+    ncores=parallelly::availableCores(which='max')-2
+    message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
+    d2p2 = pbmcapply::pbmclapply(mc.cores = ncores, FUN = fetch.d2p2, quiet=T, X = ids, mc.silent=F, mc.cleanup = T)
+    toc()
+  }else{
+    N=length(ids)
+    doing =sprintf("Loading d2p2 predictions for %s protein identifiers\n",N)
+    tic(doing)
+    message(doing)
+    d2p2 = list()
+    for( i in 1:N ){
+      ID = ids[i]
+      prg = sprintf("%.1f %% [%5s/%5s]        \r", 100*(i/N), i,N)
+      d2p2[[ID]] = fetch.d2p2(ID,quiet=T)
+      cat(prg)
+    }
+    toc()
   }
-  toc()
+
   if(autosave){
     if(saved=="" | tools::file_ext(saved) != "rds"){
       saved=tempfile(pattern = "d2p2-pred-",tmpdir = getwd(), fileext = '.rds')
@@ -655,13 +663,13 @@ load.intact = function(tax=559292){
 
 
 # Quaternary structures (3d-complex) -------------------------------------------
-load.3dcomplex.yeast = function(limit = F, n = 1000) {
+load.3dcomplex.yeast = function(limit = F, n = 1000,V='V6') {
   library(tictoc)
   library(RMySQL)
   doing="Get 3d complex yeast protein structures by residues..."
   message(doing)
   ## Establish a connection with mySQL database
-  V6 = dbConnect( MySQL(), user = "elevy", password = "Mysql1!", dbname = "3dcomplexV6", host = "mata")
+  dbV = dbConnect( MySQL(), user = "elevy", password = "Mysql1!", dbname = paste0("3dcomplex",V), host = "mata")
   ## Prepare mySQL query
   # A) SELECT = combine vector of fields for each table
   chain = sprintf( "CH.%s",
@@ -688,12 +696,12 @@ load.3dcomplex.yeast = function(limit = F, n = 1000) {
   query = sprintf("SELECT\n%s\nFROM\n%s\nWHERE\n%s\n", select.fields, from.tables, cond)
 
   ## Run mySQL query if test on 1000 rows is successfully passed
-  Qtest = dbGetQuery(V6, paste0(query, " LIMIT ", n))
+  Qtest = dbGetQuery(dbV, paste0(query, " LIMIT ", n))
   if (limit) { return(Qtest) }
 
   if (exists("Qtest") && nrow(Qtest) > 0) {
     tic(doing)
-    Q = dbGetQuery(V6, query)
+    Q = dbGetQuery(dbV, query)
     toc()
   } else{
     stop(sprintf("Something went wrong with your query!\n\n%s\n", query))
