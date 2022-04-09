@@ -454,11 +454,34 @@ df.tai=load.trna.adaptation(inputseq=CDS,
                             trnas = here::here('data','GtRNA-counts.rds')) %>% 
   dplyr::rename(codonr.tAI = tAI)
 df.CU=load.codon.usage(cds=CDS,with.counts=F) %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
-df.codons = bind_cols(orf=names(CDS), Biostrings::trinucleotideFrequency(CDS,step = 3), len_cds=lengths(CDS)) %>% dplyr::rename_with(.fn=Pxx,px="sgd")
+
+codon_table = seqinr::SEQINR.UTIL$CODON.AA %>% 
+              as_tibble() %>% 
+              mutate(CODON=toupper(CODON), AA=str_to_title(AA),
+                     L=str_replace(string = L, "\\*", "STOP"),
+                     codon_aa = paste0(CODON,"_",AA,"_",L))
+codon_count = Biostrings::trinucleotideFrequency(CDS,step = 3) %>% as_tibble
+col_codons=codon_table$codon_aa[codon_table$CODON == colnames(codon_count)]
+names(codon_count) = col_codons
+
+df.codons = bind_cols(orf=names(CDS), codon_count, len_cds=lengths(CDS)) %>%             
+            dplyr::rename_with(.fn=Pxx,px="sgd")
  
 ### Expression in different conditions
-df.cond_exp = load.lahtvee2017.data()%>%  dplyr::select(orf=geneId) %>%
+df.cond_exp = load.lahtvee2017.data()%>%  dplyr::rename(orf=mrna_geneId) %>%
               rename_with(.fn=Pxx, px='lahtvee2017.exp',s='_',.cols=-orf)
+
+exp_var = df.cond_exp %>% group_by(orf) %>% 
+  summarise(var_mrna= var_(c_across(contains("log10.pg_mrna"))),
+            var_prot= var_(c_across(contains("log10.pg_prot")))) %>% 
+
+TRANSCRIPTOMICS$lahtvee2017.mrna_hivar = exp_var %>% slice.d90(var_mrna) %>% pull(orf)
+TRANSCRIPTOMICS$lahtvee2017.mrna_lovar = exp_var %>% slice.d10(var_mrna) %>% pull(orf)
+TRANSCRIPTOMICS$lahtvee2017.prot_hivar = exp_var %>% slice.d90(var_prot) %>% pull(orf)
+TRANSCRIPTOMICS$lahtvee2017.prot_lovar = exp_var %>% slice.d10(var_prot) %>% pull(orf)
+TRANSCRIPTOMICS$lahtvee2017.prot_hivar = exp_var %>% slice.d90(var_prot) %>% pull(orf)
+TRANSCRIPTOMICS$lahtvee2017.prot_lovar = exp_var %>% slice.d10(var_prot) %>% pull(orf)
+
 
 ### Amino-acid biosynthetic cost
 df.protinfo = UNIPROT %>%  dplyr::select(c(UNIPROTKB,REVIEWED,EXISTENCE,SCORE,qual))
