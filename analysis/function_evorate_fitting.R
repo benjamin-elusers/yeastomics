@@ -213,16 +213,15 @@ retrieve_missing_codons = function(orf_missing){
 fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
   # Replace orf with missing values with retrieved codons counts from CDS
   orf_missing = df %>% column_to_rownames('ORF') %>% get_codons_col(col_prefix) %>% find_na_rows() %>% rownames()
-  if( length(orf_missing) > 0){
-    .warn$log("Replace columns of codons counts with missing values...\n")
-    df_na_codon = retrieve_missing_codons(orf_missing) %>%
-      dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
-    df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
-    return(df_fixed)
-  }else{
+  if( length(orf_missing) == 0){
     .warn$log("No missing values found for any codons count columns!")
     return(df)
   }
+  .warn$log("Replace columns of codons counts with missing values...\n")
+  df_na_codon = retrieve_missing_codons(orf_missing) %>%
+                dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
+                df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
+    return(df_fixed)
 }
 
 #### 2. protein length / Average Molecular Weight ####
@@ -236,33 +235,32 @@ fix_missing_peptide_stats = function(df,
   col_pep = c(col_len,col_mw,col_mw_avg,col_charge,col_pi)
   # Replace orf with missing values for average molecular weight
   orf_missing = df %>% column_to_rownames('ORF') %>% dplyr::select(all_of(col_pep)) %>% find_na_rows() %>% rownames()
-  if(length(orf_missing)>0){
-    .warn$log("Replace columns with missing values for protein length / average molecular weight...\n")
-    prot_missing = load.sgd.proteome()[orf_missing] %>% as.character
-
-    library(Peptides)
-    df_na_pep = tibble(orf_missing,
-                      missing_len = Peptides::lengthpep(prot_missing),
-                      missing_mw  = Peptides::mw(prot_missing),
-                      missing_mw_avg = missing_mw / missing_len,
-                      missing_charge = Peptides::charge(prot_missing),
-                      missing_pi = Peptides::pI(prot_missing),
-                      cat_transcriptomics.pepstats.AA_costly = missing_mw_avg > 118,
-                      cat_transcriptomics.pepstats.AA_cheap = missing_mw_avg <= 105) %>%
-      dplyr::rename(ORF := orf_missing,
-                    !!col_len:=missing_len,
-                    !!col_mw:=missing_mw,
-                    !!col_mw_avg:=missing_mw_avg,
-                    !!col_charge:=missing_charge,
-                    !!col_pi:=missing_pi
-                    )
-
-    df_fixed = coalesce_join(x = df, y=df_na_pep, by = "ORF")
-    return(df_fixed)
-  }else{
+  if(length(orf_missing)==0){
     .warn$log("No missing values found for any of the peptide stats columns!")
     return(df)
   }
+  .warn$log("Replace columns with missing values for protein length / average molecular weight...\n")
+  prot_missing = load.sgd.proteome()[orf_missing] %>% as.character
+
+  library(Peptides)
+  df_na_pep = tibble(orf_missing,
+                    missing_len = Peptides::lengthpep(prot_missing),
+                    missing_mw  = Peptides::mw(prot_missing),
+                    missing_mw_avg = missing_mw / missing_len,
+                    missing_charge = Peptides::charge(prot_missing),
+                    missing_pi = Peptides::pI(prot_missing),
+                    cat_transcriptomics.pepstats.AA_costly = missing_mw_avg > 118,
+                    cat_transcriptomics.pepstats.AA_cheap = missing_mw_avg <= 105) %>%
+    dplyr::rename(ORF := orf_missing,
+                  !!col_len:=missing_len,
+                  !!col_mw:=missing_mw,
+                  !!col_mw_avg:=missing_mw_avg,
+                  !!col_charge:=missing_charge,
+                  !!col_pi:=missing_pi
+                  )
+
+  df_fixed = coalesce_join(x = df, y=df_na_pep, by = "ORF")
+  return(df_fixed)
 }
 
 #### 3. network centrality ####
@@ -594,6 +592,7 @@ eval_results <- function(true, predicted, df) {
 # 4. PLOTS FIT ----------------------------------------------------------------
 make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                         ANNOT=ANNOTATION, id=c('ORF','UNIPROT'),
+                        col_points='black',
                         add_outliers=10,noplot=F){
   dat_annot = left_join(dat,ANNOT,by=id)
   OUTY = get_extremes(dat_annot,X,n=add_outliers)
@@ -610,7 +609,7 @@ make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
 
   F1A = F1A +
     ggiraph::geom_point_interactive(aes(tooltip=FUNCTION, data_id=ORF),size=2,shape=19,alpha=0.5,color='gray70',stroke=0) +
-    stat_density2d(size=0.5,color='gray20') +
+    stat_density2d(size=0.5,color=col_points) +
     yavg_line
     if(add_outliers>0){
       F1A  = F1A +
