@@ -26,17 +26,18 @@ load.annotation = function(){
       dplyr::select(-c(REVIEWED,COMMENTS,SUBLOC))
   sgd_desc = read_rds(here('data','uniprot-sgd-annotation.rds'))
   biofunc = load.vanleeuwen2016.data(single_orf=T)
-  enog_annot = eggnog_annotations_species(4891,4932) %>% dplyr::rename(enog_annot = annotation)
+  enog_annot = eggnog_annotations_species(4891,4932)
 
   annotation = full_join(sgd_desc,uni_feat,by=c("SGD","UNIPROT"='UNIPROTKB')) %>%
                full_join(biofunc,by='ORF')  %>%
-               full_join(enog_annot, by =c('ORF'='protid')) %>%
+               full_join(enog_annot, by =c('ORF'='string')) %>%
                filter(!is.na(ORF) | is.na(UNIPROT)) %>%
                mutate(GENENAME = ifelse(is.na(GENENAME),ORF,GENENAME)) %>%
+               mutate(letter = fct_drop(letter)) %>%
                relocate(SGD,GENENAME,ORF,UNIPROT,PNAME,
-                        L,FAMILIES,FUNCTION,ROLE,BIOPROCESS_all, enog_annot
+                        L,FAMILIES,FUNCTION,ROLE,BIOPROCESS_all,enog_annot,
                         LOC,COMPLEX,ORTHO,OTHER,KEYWORDS,
-                        EXISTENCE,SCORE) %>%
+                        EXISTENCE,SCORE)
 
 
   return(annotation)
