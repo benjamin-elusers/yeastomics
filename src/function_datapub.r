@@ -1410,6 +1410,27 @@ find_eggnog_downloads = function(){
 }
 
 
+eggnog_function_node=function(node,species){
+  URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
+  eggnog_node = find_eggnog_node(node)
+  .ver=find_eggnog_version(.print = T)
+  #library(rotl)
+  eggnog_annotation_file = sprintf("%s/%s.og_annotations.tsv",URL_EGGNOG,.ver)
+  eggnog_annotations_node = readr::read_delim(eggnog_annotation_file,"\t",
+                                              col_types = 'fffc',
+                                              col_names = c('node','og','letter','annotation')) %>%
+                            dplyr::filter(node == node)
+
+  members_node = get_eggnog_node(node) %>%
+        separate_rows(string_ids,sep = ',') %>%
+        separate(col=string_ids, into=c('taxon','protid'), sep='\\.') %>%
+        dplyr::select( -c(algo,tree,taxon_ids) )
+
+  annotation_sp = left_join(members_node,eggnog_annotations_node, by=c('node','OG'='og')) %>%
+                    dplyr::filter(taxon == species)
+  return(annotation_sp)
+}
+
 find_eggnog_node=function(node,GUI=F){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   taxlevels = rvest::read_html(paste0(URL_EGGNOG,"per_tax_level/")) %>%
