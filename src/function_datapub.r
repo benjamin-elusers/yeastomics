@@ -1413,18 +1413,20 @@ find_eggnog_downloads = function(){
 eggnog_annotations_species=function(node,species){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   eggnog_node = find_eggnog_node(node)
-  .ver=find_eggnog_version(.print = T)
+  .ver=find_eggnog_version(.print = F)
   #library(rotl)
   eggnog_annotation_file = sprintf("%s/%s.og_annotations.tsv",URL_EGGNOG,.ver)
   eggnog_annotations_node = readr::read_delim(eggnog_annotation_file,"\t",
                                               col_types = 'fffc',
-                                              col_names = c('node','og','letter','annotation')) %>%
+                                              col_names = c('node','og','letter','enog_annot')) %>%
                             dplyr::filter(node == node)
 
   members_node = get_eggnog_node(node) %>%
         separate_rows(string_ids,sep = ',') %>%
-        separate(col=string_ids, into=c('taxon','protid'), sep='\\.') %>%
-        dplyr::select( -c(algo,tree,taxon_ids) )
+        mutate(taxon = str_extract(string = string_ids, '^[0-9]+\\.') %>% str_sub(end=-2)) %>%
+        mutate(string=str_replace_all(string = string_ids, '^[0-9]+\\.', "")) %>%
+        dplyr::select( -c(algo,tree,taxon_ids,string_ids) ) %>%
+        distinct()
 
   annotation_sp = left_join(members_node,eggnog_annotations_node, by=c('node','OG'='og')) %>%
                     dplyr::filter(taxon == species)
