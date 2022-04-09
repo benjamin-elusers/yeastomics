@@ -418,8 +418,6 @@ df.genomics = PROTEOME %>%
               left_join(df.wgd, by=c('ORF'='byrne2005.orf')) %>%
               left_join(df.pangenome, by=c('ORF'='orf.s288c')) %>% 
               left_join(df.snp, by=c('ORF'='orf'))
-
-
 check_chunk(df.genomics,GENOMICS)
 
 ```
@@ -445,7 +443,9 @@ check_chunk(df.genomics,GENOMICS)
 ```{r transcriptomics}
 TRANSCRIPTOMICS=list()
 
-df.rates = load.hausser2019.data()
+df.rates = load.hausser2019.data() %>% 
+  dplyr::rename_with(.fn=Pxx,px='hausse2019.rates',s='_',.cols=-gene)
+
 ### Translation initiation
 #df.tie = load.szavitsnossan2020.data() %>% 
 #  rename_with(.fn=Pxx, px='szavitsnossan2020.TIE',s='_',.cols=-orf)
@@ -455,6 +455,7 @@ df.tai=load.trna.adaptation(inputseq=CDS,
   dplyr::rename(codonr.tAI = tAI)
 df.CU=load.codon.usage(cds=CDS,with.counts=F) %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
 
+# Add amino acid with its associated codons
 codon_table = seqinr::SEQINR.UTIL$CODON.AA %>% 
               as_tibble() %>% 
               mutate(CODON=toupper(CODON), AA=str_to_title(AA),
@@ -468,20 +469,22 @@ df.codons = bind_cols(orf=names(CDS), codon_count, len_cds=lengths(CDS)) %>%
             dplyr::rename_with(.fn=Pxx,px="sgd")
  
 ### Expression in different conditions
-df.cond_exp = load.lahtvee2017.data()%>%  dplyr::rename(orf=mrna_geneId) %>%
+df.cond_exp = load.lahtvee2017.data() %>%  dplyr::rename(orf=mrna_geneId) %>%
               rename_with(.fn=Pxx, px='lahtvee2017.exp',s='_',.cols=-orf)
 
 exp_var = df.cond_exp %>% group_by(orf) %>% 
-  summarise(var_mrna= var_(c_across(contains("log10.pg_mrna"))),
-            var_prot= var_(c_across(contains("log10.pg_prot")))) %>% 
+  summarise(var_mrna= var_(c_across(contains("pg_mrna"))),
+            var_prot= var_(c_across(contains("log10.pg_prot"))),
+            var_trans = var_(c_across(contains("log10.trans_")))) %>%
+  dplyr::filter(!is.na(var_mrna) | !is.na(var_prot) | !is.na(var_trans))
+  
 
 TRANSCRIPTOMICS$lahtvee2017.mrna_hivar = exp_var %>% slice.d90(var_mrna) %>% pull(orf)
 TRANSCRIPTOMICS$lahtvee2017.mrna_lovar = exp_var %>% slice.d10(var_mrna) %>% pull(orf)
 TRANSCRIPTOMICS$lahtvee2017.prot_hivar = exp_var %>% slice.d90(var_prot) %>% pull(orf)
 TRANSCRIPTOMICS$lahtvee2017.prot_lovar = exp_var %>% slice.d10(var_prot) %>% pull(orf)
-TRANSCRIPTOMICS$lahtvee2017.prot_hivar = exp_var %>% slice.d90(var_prot) %>% pull(orf)
-TRANSCRIPTOMICS$lahtvee2017.prot_lovar = exp_var %>% slice.d10(var_prot) %>% pull(orf)
-
+TRANSCRIPTOMICS$lahtvee2017.trans_hivar = exp_var %>% slice.d90(var_trans) %>% pull(orf)
+TRANSCRIPTOMICS$lahtvee2017.trans_lovar = exp_var %>% slice.d10(var_trans) %>% pull(orf)
 
 ### Amino-acid biosynthetic cost
 df.protinfo = UNIPROT %>%  dplyr::select(c(UNIPROTKB,REVIEWED,EXISTENCE,SCORE,qual))
@@ -518,15 +521,18 @@ df.riboeff = load.dana2014.data()
 # ORTHOLOGS EXPRESSION (against yeast, integrated abundance, average of orthologs)
 df.orthoexp =  PPM.ORTHO.4932 %>%
                  group_by(NOG,orf) %>%
-                 mutate( paxdb.ortho_ppm_avg = mean_(c_across(starts_with('paxdb.ppm_'))),
-                         paxdb.ortho_ppm_sd  = sd_(c_across(starts_with('paxdb.ppm_'))),
-                         paxdb.ortho_ppm_cv  = paxdb.ortho_ppm_sd/paxdb.ortho_ppm_avg,
-                         paxdb.ortho_ppm_max  = max_(c_across(starts_with('paxdb.ppm_'))),
-                         paxdb.ortho_ppm_min  = min_(c_across(starts_with('paxdb.ppm_'))),
+                 mutate( paxdb.ortho_avg_log10 = mean_(log10(c_across(starts_with('paxdb.ppm_')))),
+                         paxdb.ortho_sd_log10  = sd_(log10(c_across(starts_with('paxdb.ppm_')))),
+                         paxdb.ortho_cv_log10  = paxdb.ortho_sd_log10/paxdb.ortho_avg_log10,
+                         paxdb.ortho_max_log10  = max_(log10(c_across(starts_with('paxdb.ppm_')))),
+                         paxdb.ortho_min_log10  = min_(log10(c_across(starts_with('paxdb.ppm_')))),
                          paxdb.ortho_ppm_n= sum.na(c_across(starts_with('paxdb.ppm_')),notNA = T) ) %>%
-                  filter(paxdb.ortho_ppm_n > 1) %>%  dplyr::rename(paxdb.ppm_4932=ppm_4932)
-
+                  filter(paxdb.ortho_ppm_n > 1) %>%  dplyr::select(-ppm_4932) %>% 
+                  mutate(across(starts_with("paxdb.ppm_"),log10,.names="{.col}_log10")) %>%
+                  dplyr::select(-c(paxdb.ppm_4896,paxdb.ppm_5476,paxdb.ppm_214684,paxdb.ppm_5061))
+    
 df.transcriptomics = PROTEOME %>%
+                    left_join(df.rates,by=c('GNAME'='gene')) %>%
                     #left_join(df.tie,by=c('ORF'='orf')) %>%
                     left_join(df.tai,by=c('ORF'='prot')) %>% 
                     left_join(df.CU,by=c('ORF'='ID')) %>%
