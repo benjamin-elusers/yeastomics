@@ -1410,7 +1410,7 @@ find_eggnog_downloads = function(){
 }
 
 
-eggnog_function_node=function(node,species){
+eggnog_annotations_species=function(node,species){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   eggnog_node = find_eggnog_node(node)
   .ver=find_eggnog_version(.print = T)
