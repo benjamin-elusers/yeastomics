@@ -425,7 +425,7 @@ load.lahtvee2017.data = function(){
   header_s3 = rio::import(S3.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames %>%
     paste0(paste0(measurements,"prot_"),.)  %>% str_replace_all("Ref[0-9]+","Ref")
   protein_level = rio::import(S3.url,skip=4,col_names=header_s3) %>% as_tibble %>% type_convert %>%
-    mutate(across(starts_with("pg_prot"), log10,.names = "log10.{.col}")) %>%
+    mutate(across(starts_with("pg_prot"), log10,.names = "log10_{.col}")) %>%
     dplyr::select(-starts_with(c("pv_","pg_prot")))
 
 
@@ -434,7 +434,7 @@ load.lahtvee2017.data = function(){
   header_s4 = rio::import(S4.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames
   translation_rate = rio::import(S4.url,skip=4,col_names=header_s4) %>% as_tibble %>% type_convert %>%
     rename_with(.fn=Pxx, px='trans',s='_',.cols=-geneId) %>%
-    mutate(across(starts_with("trans_"), log10,.names = "log10.{.col}")) %>%
+    mutate(across(starts_with("trans_"), log10,.names = "log10_{.col}")) %>%
     dplyr::select(-starts_with(c("trans")))
 
 
