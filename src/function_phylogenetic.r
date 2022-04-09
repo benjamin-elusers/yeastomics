@@ -138,18 +138,23 @@ get.sc.ohno = function(myseq) {
 }
 
 # get sequence identifier from STRING ID (without the prefix taxon)
-get.id.STRING = function(id,noprint=FALSE){
+get.id.STRING = function(id,what=c('id','tax'),noprint=FALSE){
 
   if(!is.character(id)){
     warning("input is not a character")
     return(NA)
   }
+  to_return = match.arg(what,c('id','tax'),several.ok = F)
 
   if( str_detect(id,pattern='^([0-9]+)\\.(\\w+)') ){
     taxon = str_extract(id,pattern='^([0-9]+)')
     string = str_split_fixed(id,pattern = '^([0-9]+)\\.',2)[,2]
     if(!noprint){ cat(sprintf("taxon %s id %s\n",taxon,string)) }
-    return(string)
+    if(to_return=='id'){
+      return(string)
+    }else if(to_return == 'tax'){
+      return(taxon)
+    }
   }else{
     warning("Unrecognized input format (should be taxon.id)")
     return(id)
