@@ -165,6 +165,12 @@ normalize_features=function(feat){
                     "cat_biophysics.dubreuil2019.IUP20_L","cat_biophysics.dubreuil2019.IUP30_L","cat_biophysics.dubreuil2019.IUP40_L")
   feat_norm[,col_doublings] =  log2(feat[,col_doublings]+1)
 
+  n=length(feat)
+  a=length(A); b=length(B); c=length(C); d=length(D); e=length(E)
+
+  z = setdiff(colnames(feat), c(A,B,C,D,E))
+  summary(feat[,z])
+
   return(feat_norm)
 }
 
