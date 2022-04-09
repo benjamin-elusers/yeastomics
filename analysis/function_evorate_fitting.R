@@ -79,7 +79,7 @@ load.strains.evo = function(){
   ### STRAINS CONTAIN ALL DATA ABOUT THE FUNGI LINEAGE EVOLUTIONARY RATE AND THE S.CEREVISIAE POPULATION
   strains = readRDS(here("data","PROTEIN-EVO-FUNGI-SNP.rds")) %>%
     dplyr::select(c(starts_with(c('EVO.','SNP.')),'PPM','ORF','UNIPROT','IS_FUNGI','IS_STRAINS')) %>%
-    filter(!(is.dup(UNIPROT) & is.na(EVO.FULL) & is.na(PPM))) %>%
+    filter(!(is.dup(UNIPROT) & is.na(EVO.FULL_R4S) & is.na(PPM))) %>%
     #dplyr::mutate(across(starts_with(c("EVO.","SNP.")),function(x){ x/mean_(x) },.names="norm.{.col}")) %>% # scale and center all EVO/SNP rate
     dplyr::mutate(across(starts_with(c("EVO.","SNP.")),log10,.names = "log10.{.col}")) %>% # apply log10 to SNP rate4site
     relocate(ORF,UNIPROT,PPM,IS_FUNGI,IS_STRAINS) %>%
@@ -126,34 +126,34 @@ normalize_features=function(feat){
   feat_norm = feat
 
   # a. Normalize codons counts (0-100) => 64 COLUMNS ---------------------------
-  col_codons = grep("cat_transcriptomics.sgd.[ATCG]{3}",colnames(feat))
+  A=col_codons = grep("cat_transcriptomics.sgd.[ATCG]{3}",colnames(feat),v=T)
   feat_norm[,col_codons] =  100 * feat[,col_codons] / (feat$cat_transcriptomics.sgd.prot_size+1)
 
   # b. Normalize amino acid frequencies (0-100) => 31 COLUMNS  -----------------
   # 04.01.22 changed to use sgd sequences instead of uniprot
-  col_f_aa = grep("cat_biophysics.sgd.f_",colnames(feat))
+  B=col_f_aa = grep("cat_biophysics.sgd.f_",colnames(feat),v=T)
   feat_norm[,col_f_aa] =  100 * feat[,col_f_aa]
 
   # c. Normalize all other fraction (0-100) => 4 COLUMNS  ----------------------
-  col_frac = c("cat_genomics.sgd.pGC","cat_genomics.byrne2005.RLEN","cat_transcriptomics.coRdon.CU_fop",
+  C=col_frac = c("cat_genomics.sgd.pGC","cat_genomics.byrne2005.RLEN","cat_transcriptomics.coRdon.CU_fop",
                "cat_biophysics.d2p2.f")
   #"cat_biophysics.dubreuil2019.IUP20_f","cat_biophysics.dubreuil2019.IUP30_f","cat_biophysics.dubreuil2019.IUP40_f")
   feat_norm[,col_frac] =  100 * feat[,col_frac]
 
+
   # d. Normalize count variables => 19 COLUMNS ---------------------------------
-  col_count = c("cat_transcriptomics.paxdb.ppm_4932", "cat_transcriptomics.paxdb.ppm_214684","cat_transcriptomics.paxdb.ppm_4896","cat_transcriptomics.paxdb.ppm_5061",
-                "cat_transcriptomics.paxdb.ortho_ppm_avg","cat_transcriptomics.paxdb.ortho_ppm_sd",
-                "cat_transcriptomics.paxdb.ortho_ppm_max","cat_transcriptomics.paxdb.ortho_ppm_min",
-                "cat_interactions.string.cent_pagerank",
-                "cat_interactions.string.cent_eigen","cat_interactions.string.cent_authority",
-                "cat_interactions.string.cent_hub","cat_interactions.string.cent_subgraph","cat_interactions.intact.cent_deg",
-                "cat_interactions.intact.cent_pagerank","cat_interactions.intact.cent_eigen",
-                "cat_interactions.intact.cent_authority",
-                "cat_interactions.intact.cent_hub","cat_interactions.intact.cent_subgraph")
-  feat_norm[,col_count] =  log10(feat[,col_count]+1)
+  D=col_cent = feat %>% dplyr::select(contains('.cent_')) %>% colnames
+  cent.range =  feat %>% ungroup() %>%
+                summarise( across(all_of(col_cent),.fns = function(x){ max_(x) / min_(x[x>0]) }) )
+
+  log10_= function(x){ x[!is.na(x) & x>0] = log10(x[!is.na(x) & x>0]) ; return(x) }
+  log2_= function(x){ x[!is.na(x) & x>0] = log2(x[!is.na(x) & x>0]) ; return(x) }
+
+  col_cent_log10 = names(cent.range)[cent.range>100]
+  feat_norm[,col_cent_log10] = apply(feat[,col_cent_log10],2, log10_)
 
   # e. Normalize count variables => 13 COLUMNS ---------------------------------
-  col_doublings = c("cat_genomics.sgd.len","cat_transcriptomics.sgd.prot_size",
+  E=col_doublings = c("cat_genomics.sgd.len","cat_transcriptomics.sgd.prot_size",
                     "cat_genomics.byrne2005.S","cat_genomics.byrne2005.N","cat_genomics.byrne2005.G",
                     "cat_transcriptomics.geisberg2014.HL_mrna", "cat_biophysics.villen2017.HL_prot",
                     "cat_biophysics.d2p2.nseg","cat_biophysics.d2p2.L","cat_biophysics.d2p2.Lsegmax",
@@ -211,13 +211,18 @@ retrieve_missing_codons = function(orf_missing){
 }
 
 fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
-  .warn$log("Replace columns of codons counts with missing values...\n")
   # Replace orf with missing values with retrieved codons counts from CDS
   orf_missing = df %>% column_to_rownames('ORF') %>% get_codons_col(col_prefix) %>% find_na_rows() %>% rownames()
-  df_na_codon = retrieve_missing_codons(orf_missing) %>%
-    dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
-  df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
-  return(df_fixed)
+  if( length(orf_missing) > 0){
+    .warn$log("Replace columns of codons counts with missing values...\n")
+    df_na_codon = retrieve_missing_codons(orf_missing) %>%
+      dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
+    df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
+    return(df_fixed)
+  }else{
+    .warn$log("No missing values found for any codons count columns!")
+    return(df)
+  }
 }
 
 #### 2. protein length / Average Molecular Weight ####
@@ -231,7 +236,7 @@ fix_missing_peptide_stats = function(df,
   col_pep = c(col_len,col_mw,col_mw_avg,col_charge,col_pi)
   # Replace orf with missing values for average molecular weight
   orf_missing = df %>% column_to_rownames('ORF') %>% dplyr::select(all_of(col_pep)) %>% find_na_rows() %>% rownames()
-  if(length(orf_missing)>1){
+  if(length(orf_missing)>0){
     .warn$log("Replace columns with missing values for protein length / average molecular weight...\n")
     prot_missing = load.sgd.proteome()[orf_missing] %>% as.character
 
@@ -256,7 +261,6 @@ fix_missing_peptide_stats = function(df,
     return(df_fixed)
   }else{
     .warn$log("No missing values found for any of the peptide stats columns!")
-
     return(df)
   }
 }
@@ -278,10 +282,7 @@ retrieve_missing_centrality = function(orf_missing,type='string'){
   return(cent)
 }
 
-
-
-
-fix_missing_centrality = function(df,col_prefix='cat_interactions.string.',NA_default_val=0){
+fix_missing_centrality = function(df,col_prefix='cat_interactions.string.'){
   # Replace orf with missing values for centrality with 0's
   net_type = str_extract(col_prefix,'(string|intact)')
   if(net_type=='string'){
@@ -290,17 +291,20 @@ fix_missing_centrality = function(df,col_prefix='cat_interactions.string.',NA_de
     orf_missing = df %>% filter(!is.dup(UNIPROTKB)) %>% column_to_rownames('UNIPROTKB') %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
   }
 
+  if( length(orf_missing) == 0 ){
+    .warn$log("No missing values found for any of the networl centrality measures used!")
+    return(df)
+  }
   df_missing = tibble(ORF = orf_missing)
-
   df_na_centrality = retrieve_missing_centrality(orf_missing,net_type) %>%
                      dplyr::rename(ORF=ids) %>%
                      right_join(df_missing,by='ORF') %>%
                      dplyr::rename_with(.cols=starts_with('cent_'), Pxx, px=col_prefix, s='')
-  # Persistent NAs are modified to a predefined value (e.g. 0)
-  warning(sprintf("Remaining missing centrality measures are replaced by %s\n",NA_default_val))
-  df_na_centrality[is.na(df_na_centrality)] = NA_default_val
 
-  cat("Replace columns of network centrality with missing values...\n")
+  numVar = df_na_centrality %>% dplyr::select(where(is.numeric)) %>% as.matrix
+  .info$log("Remaining missing values are replaced by imputation with missForest!")
+  library(missForest)
+  df_na_centrality = missForest::missForest(numVar)$ximp %>% as_tibble() %>% mutate(ORF=orf_missing)
 
   if(net_type=='intact'){
     df_na_centrality = df_na_centrality %>% dplyr::rename(UNIPROTKB=ORF)
@@ -308,11 +312,24 @@ fix_missing_centrality = function(df,col_prefix='cat_interactions.string.',NA_de
   }else{
     df_fixed = coalesce_join(x = df, y=df_na_centrality, by = 'ORF')
   }
+
   return(df_fixed)
 }
 
+
+fix_missing_paxdb = function(df){
+  .warn$log("Replace columns with missing paxdb ortholog abundance values...\n")
+
+  paxdb = df %>% dplyr::select(contains('paxdb')) %>%
+    mutate(cat_transcriptomics.paxdb.ortho_ppm_n=replace_na(cat_transcriptomics.paxdb.ortho_ppm_n,0)) %>%
+    as.matrix()
+  df_na_paxdb = missForest::missForest(paxdb)$ximp %>% as_tibble() %>% mutate(ORF=df$ORF)
+  df_impute = coalesce_join(x = df, y=df_na_paxdb, by = 'ORF')
+  return(df_impute)
+}
 ### WORKFLOW PROCESSING MISSING VALUES
 PROCESS_MISSING_VALUES = function(MAT, IDS){
+
   miss.0=check_missing_var(MAT)
   # Predictors with missing values must be corrected
   #  I. Fix missing observations for certain genes (rows):
@@ -328,7 +345,7 @@ PROCESS_MISSING_VALUES = function(MAT, IDS){
   miss.2=check_missing_var(PREDICTORS.2)
 
   #     C) missing centrality values (STRING and INTACT network are treated individually)
-  PREDICTORS.3 = fix_missing_centrality(PREDICTORS.2,col_prefix="cat_interactions.string.")
+  PREDICTORS.3 = fix_missing_centrality(df=PREDICTORS.2,col_prefix="cat_interactions.string.")
   PREDICTORS.4 = fix_missing_centrality(PREDICTORS.3,col_prefix="cat_interactions.intact.")
   #     D) missing protein disorder (D2P2/IUP)
   #     E) missing transcriptomics in barton 2010
@@ -336,7 +353,12 @@ PROCESS_MISSING_VALUES = function(MAT, IDS){
   #  II.  Remove unnecessary variables (columns):
   #     A) rarely observed data (less than 2 observations)
   PREDICTORS.5 = PREDICTORS.4 %>% filter(ORF %in% IDS) %>% remove_rare_vars()
-  return(PREDICTORS.5)
+  miss.5 = check_missing_var(PREDICTORS.5)
+
+  PREDICTORS.6 = fix_missing_paxdb(PREDICTORS.5)
+  miss.6 = check_missing_var(PREDICTORS.6)
+
+  return(PREDICTORS.6)
 }
 
 # 3. LINEAR FIT ----------------------------------------------------------------
