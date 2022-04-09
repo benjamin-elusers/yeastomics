@@ -411,26 +411,42 @@ load.lahtvee2017.data = function(){
 
   # transcript level
   S2.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217300881-mmc2.xlsx"
-  header_s2 = rio::import(S2.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames
-  transcript_level = rio::import(S2.url,skip=4,col_names=header_s2) %>% as_tibble %>% type_convert
+  # 10 first columns = picog of Dry Weight, 11-19 log2 foldchange, 20-29 pvalue adjusted
+  measurements = c("",rep("pg_",10),rep("fc_",9),rep("pv_",9))
+  header_s2 = rio::import(S2.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames %>%
+    paste0(paste0(measurements,"mrna_"),.)  %>% str_replace_all("Ref[0-9]+","Ref")
+  transcript_level = rio::import(S2.url,skip=4,col_names=header_s2) %>% as_tibble %>% type_convert %>%
+    dplyr::select(-starts_with("pv_"))
+
 
   # protein abundance
   S3.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217300881-mmc3.xlsx"
-  header_s3 = rio::import(S3.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames
-  protein_level = rio::import(S3.url,skip=4,col_names=header_s3) %>% as_tibble %>% type_convert
+  # 10 first columns = picog of Dry Weight, 11-19 log2 foldchange, 20-29 pvalue adjusted
+  header_s3 = rio::import(S3.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames %>%
+    paste0(paste0(measurements,"prot_"),.)  %>% str_replace_all("Ref[0-9]+","Ref")
+  protein_level = rio::import(S3.url,skip=4,col_names=header_s3) %>% as_tibble %>% type_convert %>%
+    mutate(across(starts_with("pg_prot"), log10,.names = "log10.{.col}")) %>%
+    dplyr::select(-starts_with(c("pv_","pg_prot")))
+
 
   # protein-mRNA ratio (translation rate)
   S4.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217300881-mmc4.xlsx"
   header_s4 = rio::import(S4.url,skip=1,n_max=1) %>% janitor::clean_names("lower_camel") %>% colnames
-  translation_rate = rio::import(S4.url,skip=4,col_names=header_s4) %>% as_tibble %>% type_convert
+  translation_rate = rio::import(S4.url,skip=4,col_names=header_s4) %>% as_tibble %>% type_convert %>%
+    rename_with(.fn=Pxx, px='trans',s='_',.cols=-geneId) %>%
+    mutate(across(starts_with("trans_"), log10,.names = "log10.{.col}")) %>%
+    dplyr::select(-starts_with(c("trans")))
+
+
 
   # turnover
   S5.url = "https://ars.els-cdn.com/content/image/1-s2.0-S2405471217300881-mmc5.xlsx"
-  protein_turnover = rio::import(S5.url,skip=1) %>% janitor::clean_names() %>% as_tibble
+  protein_turnover = rio::import(S5.url,skip=1) %>% janitor::clean_names() %>% as_tibble %>%
+    dplyr::select(-adjusted_p_value)
 
-  protquant = left_join(transcript_level,protein_level,by=c('geneId'),suffix=c('_mrna_wt','_prot_wt')) %>%
-    left_join(translation_rate,by=c('geneId'),suffix=c('','_trans_rate')) %>%
-    left_join(protein_turnover,by=c('geneId'='associated_gene_id'))
+  protquant = left_join(transcript_level,protein_level,by=c('mrna_geneId'='prot_geneId')) %>%
+    left_join(translation_rate,by=c('mrna_geneId'='geneId')) %>%
+    left_join(protein_turnover,by=c('mrna_geneId'='associated_gene_id'))
   return(protquant)
 }
 
