@@ -447,8 +447,8 @@ TRANSCRIPTOMICS=list()
 
 df.rates = load.hausser2019.data()
 ### Translation initiation
-df.tie = load.szavitsnossan2020.data() %>% 
-  rename_with(.fn=Pxx, px='szavitsnossan2020.TIE',s='_',.cols=-orf)
+#df.tie = load.szavitsnossan2020.data() %>% 
+#  rename_with(.fn=Pxx, px='szavitsnossan2020.TIE',s='_',.cols=-orf)
 ### Codon adaptation
 df.tai=load.trna.adaptation(inputseq=CDS, 
                             trnas = here::here('data','GtRNA-counts.rds')) %>% 
@@ -504,7 +504,7 @@ df.orthoexp =  PPM.ORTHO.4932 %>%
                   filter(paxdb.ortho_ppm_n > 1) %>%  dplyr::rename(paxdb.ppm_4932=ppm_4932)
 
 df.transcriptomics = PROTEOME %>%
-                    left_join(df.tie,by=c('ORF'='orf')) %>%
+                    #left_join(df.tie,by=c('ORF'='orf')) %>%
                     left_join(df.tai,by=c('ORF'='prot')) %>% 
                     left_join(df.CU,by=c('ORF'='ID')) %>%
                     left_join(df.codons,by=c('ORF'='sgd.orf')) %>%
