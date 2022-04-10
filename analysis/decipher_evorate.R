@@ -26,36 +26,35 @@ ANNOTATION=load.annotation()
 
 # PROTEOME QUALITATIVE AND QUANTITATIVE VARIABLES
 PROP = load.properties()
-FEAT = load.features() %>% normalize_features() %>% distinct()
-
-#%>% normalize_features() %>% distinct()
+FEAT = load.features()
 PROP_FEAT = inner_join(PROP,FEAT) %>% filter(ORF %in% orf_evolution)
+
+# HANDLING MISSING VALUES (MANUALLY)
 PREDICTORS = PROCESS_MISSING_VALUES(MAT=PROP_FEAT, IDS=orf_orthologs)
 missing_var = check_missing_var(PREDICTORS)
+
+num_pred = PREDICTORS %>%
+  dplyr::select(where(is.numeric)) %>%
+  dplyr::select(-c("cat_transcriptomics.hausse2019.rates_am"),-contains("lahtvee2017.exp_log10_trans"))
+numvar_norm = normalize_features(num_pred)
+PREDICTORS[,names(num_pred)] = numvar_norm
+
+
 toc()
-
-# Add the amino acid next to the codon
-codons = sapply(seqinr::SEQINR.UTIL$CODON.AA,toupper) %>% as_tibble %>%
-  mutate(L = str_replace(L, pattern = "\\*", replacement = "STOP") )
-
-col_codons = strfind(paste0('sgd.',codons$CODON,"$"),strings = colnames(PREDICTORS))
-col_codons_aa = paste0(col_codons ,"_",str_to_title(codons$AA),"_",codons$L)
-PREDICTORS = PREDICTORS %>% dplyr::rename_with(.cols=all_of(col_codons), ~col_codons_aa)
 NPRED = PREDICTORS %>% dplyr::select(starts_with("cat_")) %>% colnames %>% n_distinct
 save_predictors = here::here("output",paste0("PREDICTORS-",NPRED,"vars-missing_processed.rds"))
 write_rds(PREDICTORS,save_predictors)
 # ANALYZE EVOLUTIONARY RATE (Y) vs. PROTEIN EXPRESSION (X) ---------------------
-
-
 XCOL="MPC"
 YCOL="EVO.FULL_R4S"
 ZCOL="SNP.FULL_R4S"
+IDCOLS = c("UNIPROTKB","SGD","ORF","GNAME","PNAME")
 
 ### _FIGURE 1A: EVOLUTION vs EXPRESSION -------------------------------------------
 cor_ER = spearman.toplot(orthologs[[XCOL]],orthologs[[YCOL]])
 F1A=make_plot_1A(dat=orthologs,X=XCOL,Y=YCOL,add_outliers = 5,ANNOT = ANNOTATION)
 
-F1A0 = make_plot_1A(dat=orthologs,X=XCOL,Y=YCOL,add_outliers = 0,ANNOT = ANNOTATION,noplot=T) + xlim(range(orthologs$PPM))
+F1A0 = make_plot_1A(dat=orthologs,X=XCOL,Y=YCOL,add_outliers = 0,ANNOT = ANNOTATION,noplot=T) + xlim(range(orthologs$MPC))
 
 F1A_lm=  make_plot_1A(dat=orthologs,X=XCOL,Y=YCOL,add_outliers = 0,ANNOT = ANNOTATION)  +
     geom_smooth(method='lm',color='limegreen') +
@@ -101,11 +100,15 @@ m0_vars = c(".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid",
 m0 = fit_linear_regression(INPUT=orthologs, X=XCOL,Y=YCOL, PREDVAR=PREDICTORS,
                            ADD.VARIABLES =ZCOL,
                            xcor_max = 0.6,ycor_max = 0.6, min_obs=1 ) %>% remove_rare_vars()
-
+#"brar2012.TE","paxdb","rna_exp","coRdon","barton2010"
 predictors = m0 %>%
   dplyr::select(all_of(c(id_vars,m0_vars)), starts_with('cat_'),
                 XCOL,YCOL, "SNP.FULL_R4S",
-               -contains(c("peter2018","byrne2005","brar2012.TE","paxdb","rna_exp","coRdon","barton2010")) )
+                -c("cat_transcriptomics.hausse2019.rates_am","cat_interactions.string.cent_barycenter",
+                   "cat_interactions.intact.cent_barycenter",
+                   "cat_biophysics.leuenberger2017.LIP_npep"),
+               -contains(c("peter2018","byrne2005","lahtvee2017.exp_log10_trans")) ) %>%
+  mutate(across(.cols = where(is.numeric), .fns=~na_if(., is.infinite(.))))
 
 # LINEAR MODEL M0
 formula_M0=reformulate(response = YCOL, termlabels = XCOL, intercept = T )
@@ -152,14 +155,18 @@ best = lm_single %>% ungroup() %>%
         dplyr::filter(pc_ess_var > 1)
 best_var = best$variable
 
+best_pred = predictors[,c(XCOL,YCOL,ZCOL,best_var)]
+na_count = best_pred %>% dplyr::select_if(~any(is.na(.)) )
+dim(na_count)
+#best_pred[is.na(best_pred)]=0
 #### STEPWISE REGRESSION ####
 # RESIDUAL LINEAR REGRESSION WITH NO PREDICTORS
 formula_null = reformulate(response=YCOL,termlabels = "1",intercept = T)
-LM1 = lm(data=predictors, formula_null)
+LM1 = lm(data=predictors[,c(XCOL,YCOL,ZCOL,best_var)], formula_null)
 decompose_variance(LM1)
 
 formula_best_pred=paste0(YCOL," ~ ", XCOL," + ",paste0(best_var,collapse=" + "))
-m_best = step(object=LM0, scope = as.formula(formula_best_pred), direction = 'both')
+m_best = step(object=LM1, scope = as.formula(formula_best_pred), direction = 'both')
 
 formula_best_pred_no_ppm=paste0(YCOL," ~ ",paste0(best_var,collapse=" + "))
 m_best_no_ppm = step(object=LM1, scope = as.formula(formula_best_pred_no_ppm), direction = 'both')
@@ -182,7 +189,7 @@ best_noppm = predictors[,best_var]
 best_var_ppm = predictors[,c(XCOL,best_var)]
 best_var_ppm_snp =predictors[,c(XCOL,ZCOL,best_var)]
 
-BEST=best_noppm
+BEST=predictors %>% dplyr::select(starts_with("cat_"))
 x.train = BEST[train_rows,]
 x.test = BEST[-train_rows,]
 
@@ -215,11 +222,20 @@ cor(y.train,y.trained)^2
 y.predicted = predict(best_alpha,s=best_alpha$lambda.1se,newx=as.matrix(x.test))
 cor(y.test,y.predicted)^2
 
-best_elastic <- glmnet(as.matrix(best_noppm), RESPONSE, alpha = alpha_lowest_mse, lambda = lambda_lowest_mse, standardize = TRUE)
+df.glmnet = tibble(nvar=best_alpha$glmnet.fit$df,
+       explained.var=best_alpha$glmnet.fit$dev.ratio,
+       l=best_alpha$glmnet.fit$lambda)
+
+ggplot(df.glmnet) + geom_line(aes(y=explained.var,x=nvar)) +
+  geom_hline(yintercept = c(0.6,0.65,0.7)) +
+  geom_vline(xintercept = c(20,30,40,50,60,70,80,100))
+
+
+best_elastic <- glmnet(as.matrix(BEST), RESPONSE, alpha = alpha_lowest_mse, lambda = lambda_lowest_mse, standardize = TRUE)
 deviance(best_elastic)
 explicative_var = best_elastic$beta[abs(best_elastic$beta[,1])>0,]
 npred_lowest_mse=length(explicative_var)
-ypred = predict(best_elastic,s=1e-2,newx=as.matrix(best_noppm))
+ypred = predict(best_elastic,s=1e-2,newx=as.matrix(BEST))
 R2_lowest_mse=cor(RESPONSE,ypred)^2
 
 var_final = str_split_fixed(pattern="(_|\\.)",rownames(best_elastic$beta),n=3)
@@ -241,7 +257,7 @@ res = expand.grid(A=seq(0,1,by=0.01),
 
 test = as_tibble(res) %>%
   rowwise() %>%
-  mutate( fit=list( glmnet(as.matrix(best_noppm), RESPONSE, alpha = A, lambda = L, standardize = TRUE) ),
+  mutate( fit=list( glmnet(as.matrix(BEST), RESPONSE, alpha = A, lambda = L, standardize = TRUE) ),
           ESS_rel = 100*fit$dev.ratio, nvar= fit$df)
 
 ESS_perc = ggplot(test %>% filter(L<10^2)) +
