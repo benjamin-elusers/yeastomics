@@ -444,7 +444,7 @@ check_chunk(df.genomics,GENOMICS)
 TRANSCRIPTOMICS=list()
 
 df.rates = load.hausser2019.data() %>% 
-  dplyr::rename_with(.fn=Pxx,px='hausse2019.rates',s='_',.cols=-gene)
+  dplyr::rename_with(.fn=Pxx,px='hausser2019.rates',s='_',.cols=-gene)
 
 ### Translation initiation
 #df.tie = load.szavitsnossan2020.data() %>% 
@@ -469,16 +469,15 @@ df.codons = bind_cols(orf=names(CDS), codon_count, len_cds=lengths(CDS)) %>%
             dplyr::rename_with(.fn=Pxx,px="sgd")
  
 ### Expression in different conditions
-df.cond_exp = load.lahtvee2017.data() %>%  dplyr::rename(orf=mrna_geneId) %>%
+df.cond_exp = load.lahtvee2017.data() %>%  dplyr::rename(orf=geneId) %>%
               rename_with(.fn=Pxx, px='lahtvee2017.exp',s='_',.cols=-orf)
 
 exp_var = df.cond_exp %>% group_by(orf) %>% 
-  summarise(var_mrna= var_(c_across(contains("pg_mrna"))),
-            var_prot= var_(c_across(contains("log10.pg_prot"))),
-            var_trans = var_(c_across(contains("log10.trans_")))) %>%
+  summarise(var_mrna= var_(c_across(contains("mrna"))),
+            var_prot= var_(c_across(contains("log10_prot"))),
+            var_trans = var_(c_across(contains("log10_trans")))) %>%
   dplyr::filter(!is.na(var_mrna) | !is.na(var_prot) | !is.na(var_trans))
   
-
 TRANSCRIPTOMICS$lahtvee2017.mrna_hivar = exp_var %>% slice.d90(var_mrna) %>% pull(orf)
 TRANSCRIPTOMICS$lahtvee2017.mrna_lovar = exp_var %>% slice.d10(var_mrna) %>% pull(orf)
 TRANSCRIPTOMICS$lahtvee2017.prot_hivar = exp_var %>% slice.d90(var_prot) %>% pull(orf)
