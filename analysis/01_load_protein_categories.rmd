@@ -752,8 +752,6 @@ df.interactions = PROTEOME %>%
                   left_join(df.INTACT_cent, by=c("UNIPROTKB"="uni"))
 
 check_chunk(df.interactions,INTERACTIONS)
-
-
 ```
 
 ### Functions
@@ -901,7 +899,6 @@ save.image(here::here("output",sprintf("loaded-datasets-%s.rds",when)))
 ```
 
 ```{r count-prop-feat}
-
 prop = PROP %>% 
         pivot_longer(cols = starts_with('cat_'),
                      names_to = c('categories','source','property'), 
