@@ -145,32 +145,57 @@ normalize_features=function(feat){
   #"cat_biophysics.dubreuil2019.IUP20_f","cat_biophysics.dubreuil2019.IUP30_f","cat_biophysics.dubreuil2019.IUP40_f")
   feat_norm[,col_frac] =  100 * feat[,col_frac]
 
-
-  # d. Normalize count variables => 19 COLUMNS ---------------------------------
+  # d. Normalize centrality measures variables => 44 COLUMNS ---------------------------------
+  #install.packages('bestNormalize')
+  library('bestNormalize')
   D=col_cent = feat %>% dplyr::select(contains('.cent_')) %>% colnames
-  cent.range =  feat %>% ungroup() %>%
-                summarise( across(all_of(col_cent),.fns = function(x){ max_(x) / min_(x[x>0]) }) )
 
-  log10_= function(x){ x[!is.na(x) & x>0] = log10(x[!is.na(x) & x>0]) ; return(x) }
-  log2_= function(x){ x[!is.na(x) & x>0] = log2(x[!is.na(x) & x>0]) ; return(x) }
+  message("Find best transformation using 'bestNormalize' on network centrality measures...")
+  icent=1
+  for(cent in col_cent){
+    cat(sprintf("%2s/%2s - [%30s]...\n",icent,length(col_cent),cent))
+    CENT = as.numeric(feat %>% pull(cent))
+    CENT_norm = predict(bestNormalize(CENT,quiet = T))
+    feat_norm[,col_cent] = CENT_norm
+    icent=icent+1
+  }
 
-  col_cent_log10 = names(cent.range)[cent.range>100]
-  feat_norm[,col_cent_log10] = apply(feat[,col_cent_log10],2, log10_)
+  # cent.range =  feat %>% ungroup() %>%
+  #               summarise( across(all_of(col_cent),.fns = function(x){ max_(x) / min_(x[x>0]) }) )
+  #
+  # log10_= function(x){ x[!is.na(x) & x>0] = log10(x[!is.na(x) & x>0]) ; return(x) }
+  #
+  # D=col_cent_log10 = names(cent.range)[cent.range>50]
+  # feat_norm[,col_cent_log10] = apply(feat[,col_cent_log10],2, log10_)
 
-  # e. Normalize count variables => 13 COLUMNS ---------------------------------
-  E=col_doublings = c("cat_genomics.sgd.len","cat_transcriptomics.sgd.prot_size",
+  # e. Normalize halflife proteins => 2 COLUMNS ---------------------------------
+  E=col_halflife_prot= c("cat_biophysics.belle2006.HL_prot","cat_biophysics.christiano2014.HL_prot","cat_transcriptomics.geisberg2014.HL_mrna", "cat_biophysics.villen2017.HL_prot")
+  feat_norm[,col_halflife_prot] =  feat[,col_halflife_prot]/3600
+
+  feat_norm[,"cat_biophysics.pepstats.mw"]  = feat[,"cat_biophysics.pepstats.mw"] / 1000
+  # f. Normalize count variables => 14 COLUMNS ---------------------------------
+  FF=col_doublings = c("cat_genomics.sgd.len","cat_transcriptomics.sgd.prot_size", "cat_transcriptomics.sgd.len_cds",
                     "cat_genomics.byrne2005.S","cat_genomics.byrne2005.N","cat_genomics.byrne2005.G",
-                    "cat_transcriptomics.geisberg2014.HL_mrna", "cat_biophysics.villen2017.HL_prot",
                     "cat_biophysics.d2p2.nseg","cat_biophysics.d2p2.L","cat_biophysics.d2p2.Lsegmax",
-                    "cat_biophysics.dubreuil2019.IUP20_L","cat_biophysics.dubreuil2019.IUP30_L","cat_biophysics.dubreuil2019.IUP40_L")
+                    "cat_genomics.peter2018.snp_count",
+                    "cat_biophysics.dubreuil2019.IUP20_L","cat_biophysics.dubreuil2019.IUP30_L",
+                    "cat_biophysics.dubreuil2019.IUP40_L")
   feat_norm[,col_doublings] =  log2(feat[,col_doublings]+1)
 
   n=length(feat)
-  a=length(A); b=length(B); c=length(C); d=length(D); e=length(E)
+  a=length(A); b=length(B); c=length(C); d=length(D); e=length(E); f=length(FF)
 
-  z = setdiff(colnames(feat), c(A,B,C,D,E))
-  summary(feat[,z])
-
+  z = setdiff(colnames(feat), c(A,B,C,D,E,FF))
+  #sapply(feat[,z],max_)
+  message("Find best transformation using 'bestNormalize' for all other variables...")
+  iother=1
+  for(other in z){
+    cat(sprintf("%2s/%2s - [%30s]...\n",iother,length(z),other))
+    OTHER = as.numeric(feat %>% pull(other))
+    OTHER_norm = predict(bestNormalize(OTHER,quiet = T))
+    feat_norm[,other] = OTHER_norm
+    iother=iother+1
+  }
   return(feat_norm)
 }
 
@@ -206,7 +231,7 @@ remove_rare_vars = function(df,min_obs=2){
 #### B. IN ROWS ####
 #### 1. codons counts ####
 get_codons_col = function(df,col_prefix='cat_transcriptomics.sgd.'){
-  regex_codons=paste0(col_prefix,get.codons4tai(),"$")
+  regex_codons=paste0(col_prefix,get.codons4tai())
   res = df %>% dplyr::select(matches(regex_codons,ignore.case = F))
   return(res)
 }
@@ -228,11 +253,19 @@ fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
     .warn$log("No missing values found for any codons count columns!")
     return(df)
   }
+
+  col_codons=get_codons_col(df,col_prefix) %>% colnames()
+
+  codon_table = seqinr::SEQINR.UTIL$CODON.AA %>% as_tibble() %>%
+                mutate(CODON=toupper(CODON), AA=str_to_title(AA),
+                       L=str_replace(string = L, "\\*", "STOP"),
+                       codon_aa = paste0(CODON,"_",AA,"_",L))
   .warn$log("Replace columns of codons counts with missing values...\n")
-  df_na_codon = retrieve_missing_codons(orf_missing) %>%
-                dplyr::rename_with(.cols=matches(get.codons4tai(),"$"),.fn=Pxx, px=col_prefix, s='')
-                df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
-    return(df_fixed)
+  df_na_codon = retrieve_missing_codons(orf_missing)
+  codon_aa=codon_table$codon_aa[codon_table$CODON %in% colnames(df_na_codon)]
+  df_na_codon = df_na_codon %>%  dplyr::rename_with(.cols=-ORF,~paste0(col_prefix,codon_aa))
+  df_fixed = coalesce_join(x = df, y=df_na_codon, by = "ORF")
+  return(df_fixed)
 }
 
 #### 2. protein length / Average Molecular Weight ####
@@ -344,6 +377,8 @@ PROCESS_MISSING_VALUES = function(MAT, IDS){
   #  I. Fix missing observations for certain genes (rows):
   #     A) missing codons counts
   PREDICTORS.1 = fix_missing_codons(MAT,col_prefix="cat_transcriptomics.sgd.")
+  miss.1=check_missing_var(PREDICTORS.1)
+
   #     B) missing protein length/MW
   PREDICTORS.2 = fix_missing_peptide_stats(PREDICTORS.1,
                                            col_len='cat_transcriptomics.sgd.prot_size',
@@ -367,7 +402,20 @@ PROCESS_MISSING_VALUES = function(MAT, IDS){
   PREDICTORS.6 = fix_missing_paxdb(PREDICTORS.5)
   miss.6 = check_missing_var(PREDICTORS.6)
 
-  return(PREDICTORS.6)
+  # HANDLING REMAINING MISSING VALUES (AUTOMATICALLY)
+  PREDICTORS.7 = PREDICTORS.6
+  var_has_na = PREDICTORS.6 %>% dplyr::select_if(~any(is.na(.)) )
+  .warn$log(sprintf("Imputation with 'missForest' to replace missing values in the remaining %s variables...\n",length(count_na)))
+  freq_na = apply(var_has_na,2,function(x){ mean_(is.na(x)) })
+
+  #na_count[,c(86,87,88,89,90,91,92,93,94)]
+  var_with_na = PREDICTORS.6 %>% dplyr::select(names(var_has_na)) %>% as.matrix
+  # .info$log("Remaining missing values are replaced !")
+  library(missForest)
+  var_without_na = missForest::missForest(var_with_na)$ximp %>% as_tibble()
+  PREDICTORS.7[,names(var_without_na)] = var_without_na
+
+  return(PREDICTORS.7)
 }
 
 # 3. LINEAR FIT ----------------------------------------------------------------
