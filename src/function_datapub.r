@@ -721,7 +721,7 @@ load.hausser2019.data=function(show_desc=F){
   if(show_desc){ print(var_desc) }
   yeast_rates = rio::import(yeast_data, sheet=2)
   colnames(yeast_rates) =c('gene','lm','lp','wRPF','wmRNA','bmEser','amEser','bm','m','bp','cv','apExp','am','isEssential','hasTATA','YEPDFit','pEst')
-  return(yeast_rates %>% as_tibble %>% dplyr::select(-c("am")))
+  return(yeast_rates %>% as_tibble %>% dplyr::select(-c("am"))) # am is constant
 }
 
 load.jarzab2020.data = function(org='S.cerevisiae'){
