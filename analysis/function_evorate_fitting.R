@@ -11,9 +11,9 @@ library(log)
 #remotes::install_version("Rttf2pt1", version = "1.3.8")
 #extrafont::font_import()
 #loadfonts()
-library(hrbrthemes)
-library(showtext)
-showtext::showtext_auto()
+# library(hrbrthemes)
+# library(showtext)
+# showtext::showtext_auto()
 # font_add_google("Roboto", "roboto")
 # font_add_google("Roboto Mono", "roboto-mono")
 # font_add_google("Roboto Condensed", "roboto-condensed")
@@ -44,7 +44,7 @@ AXIS_TITLE_SIZE=18
 AXIS_TEXT_SIZE=14
 TEXT_SIZE=4
 #AXIS_TEXT_FONT = 'Roboto'
-th_txt_size = hrbrthemes::theme_ipsum_tw(
+th_txt_size = hrbrthemes::theme_ipsum_rc(
   axis_title_just = 'm', axis = 'xy', axis_col = 'black',
   grid = F, base_family = 'titillium-web',
   axis_text_size = AXIS_TEXT_SIZE,
@@ -506,7 +506,7 @@ make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                         ymax,ymin){
 
   dat_annot = left_join(dat,ANNOT,by=id)
-  yavg = mean(dat_annot[[Y]])
+  yavg = mean_(dat_annot[[Y]])
   yavg_line = geom_hline(yintercept = yavg - (centerY*yavg), col='dodgerblue',linetype=2,size=0.5) # mean
   dat_annot[[Y]] = dat_annot[[Y]] - (yavg*centerY)
   OUTY = get_extremes(dat_annot,X,n=add_outliers)

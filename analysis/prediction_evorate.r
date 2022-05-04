@@ -5,6 +5,20 @@ source(here::here("analysis","function_evorate_fitting.R"))
 library(patchwork)
 library(scales)
 
+dom_col ="#3DAA35"
+diso_col="#5C99D3"
+laby = 'Orthologs Evolutionary Rate (log10)'
+labya = 'Disorder Evolutionary Rate (log10)'
+labyb= 'Domains Evolutionary Rate (log10)'
+F0A =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0,
+                    X=XCOL,Y=YCOL, XLAB=labx, YLAB=laby, x_as_exp10 = T,show_cor='left')
+F0B =  F0 + geom_point(aes(y=log10.EVO.DISORDER),col=diso_col) + ylab(labya)
+F0C =  F0 + geom_point(aes(y=log10.EVO.DOMAINS),col=dom_col) + ylab(labyb)
+F0 = (F0A|F0B|F0C)
+ggsave(F0, path = here::here('plots'),
+       scale=1.5, width = 12,height=12, bg = 'white',
+       filename = 'scatterplot-evo-full_diso_dom.pdf', device = 'pdf')
+
 
 #### VARIABLE SELECTION ####
 XCOL="MPC"
@@ -13,8 +27,8 @@ ZCOL="log10.SNP.FULL_R4S"
 IDCOLS = c("UNIPROTKB","SGD","ORF","GNAME","PNAME")
 Y_RESID = '.resid'
 
-laby = 'Evolutionary Rate\nOrthologs (log10)'
-labz = 'Evolutionary Rate\nSNP (log10)'
+laby = 'Orthologs Evolutionary Rate (log10)'
+labz = 'SNP Evolutionary Rate (log10)'
 labx= 'Protein Abundance\n(molecules per cell)'
 F1A =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0,
                       X=XCOL,Y=YCOL, XLAB=labx, YLAB=laby, x_as_exp10 = T,show_cor='left')
@@ -24,10 +38,12 @@ F1C =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0,
                    X=XCOL,Y=ZCOL, XLAB=labx, YLAB=labz, x_as_exp10 = T,show_cor='left')
 
 F1 = (F1A|F1B|F1C)
-ggsave(F1, path = here::here('plots'),
+ggsave(F1, path = here::here('plots'), family='Helvetica',
        scale=1.5, width = 12,height=12, bg = 'white',
-       filename = 'scatterplot-xyz.pdf')
-
+       filename = 'scatterplot-xyz.pdf', device = 'pdf')
+ggsave(F1, path = here::here('plots'), scale=1/3, family='Helvetica',
+       width = 20,height=8, bg = 'white',
+       filename = 'scatterplot-xyz.png', device = 'png')
 
 decompose_variance(LM_SNP)
 decompose_variance(LM0)
