@@ -1711,7 +1711,7 @@ load.uniprot.proteome = function(species='yeast') { # Older version of get.unipr
   return(UNI)
 }
 
-get.species.ensembl = function(){
+get.ensemble.species= function(){
   URL_ENSEMBL = "https://www.ensembl.org/info/data/ftp/index.html"
   library(rvest)
   ens_ftp <- URL_ENSEMBL %>% read_html()
@@ -1722,4 +1722,32 @@ get.species.ensembl = function(){
            spname  = str_replace(species,'^.+[a-z]([A-Z].+$)','\\1')) %>%
     dplyr::select(-x,-species) %>% relocate(org,spname)
   return(ss_table)
+}
+
+find_ensemble_sptree = function(){
+  URL_FTP_ENSEMBL="http://ftp.ensembl.org/pub/"
+  URL_SPTREE = paste0(URL_FTP_ENSEMBL,"current_compara/species_trees/")
+  httr::set_config(httr::config(ssl_verifypeer = FALSE))
+  httr::set_config(httr::config(ssl_cipher_list = "DEFAULT@SECLEVEL=1"))
+
+  sptrees = rvest::read_html(URL_SPTREE) %>%
+    rvest::html_nodes("a") %>%
+    rvest::html_text(trim = T) %>%
+    str_subset(pattern = "/$",negate = T)
+  return(paste0(URL_SPTREE,sptrees))
+}
+
+get_ensemble_sptree = function(treename){
+  url_sptrees = find_ensemble_sptree()
+  file_sptrees = basename(url_sptrees)
+  urltools::url_parse(url_sptrees)
+  if(missing(treename)){
+    sptree_choice =menu(title = 'choose an Ensembl species tree file...',graphics = F,choices = file_sptrees)
+    url_tree = url_sptrees[sptree_choice]
+  }else{
+    url_tree = str_subset(url_sptrees, pattern = treename)
+  }
+
+  sptree = ape::read.tree(url_tree)
+  return(sptree)
 }
