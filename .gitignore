@@ -43,8 +43,16 @@ packrat/src/AnnotationDbi/AnnotationDbi_1.48.0.tar.gz
 /*_files/
 misc/*
 
+*.dmp
+
+
 ### LARGE FILES >50MB
 # find . -size +50M | cat >> .gitignore
+
+data/ncbi/*
+output/css/*
+output/fonts/*
+
 data/d2p2-yeast-uniprotKB.rds
 data/d2p2-yeast-orf.rds
 output/proteome-features-04_01_2022.rds
