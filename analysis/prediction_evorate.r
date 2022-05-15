@@ -5,20 +5,9 @@ source(here::here("analysis","function_evorate_fitting.R"))
 library(patchwork)
 library(scales)
 
-dom_col ="#3DAA35"
-diso_col="#5C99D3"
-laby = 'Orthologs Evolutionary Rate (log10)'
-labya = 'Disorder Evolutionary Rate (log10)'
-labyb= 'Domains Evolutionary Rate (log10)'
-F0A =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0,
-                    X=XCOL,Y=YCOL, XLAB=labx, YLAB=laby, x_as_exp10 = T,show_cor='left')
-F0B =  F0 + geom_point(aes(y=log10.EVO.DISORDER),col=diso_col) + ylab(labya)
-F0C =  F0 + geom_point(aes(y=log10.EVO.DOMAINS),col=dom_col) + ylab(labyb)
-F0 = (F0A|F0B|F0C)
-ggsave(F0, path = here::here('plots'),
-       scale=1.5, width = 12,height=12, bg = 'white',
-       filename = 'scatterplot-evo-full_diso_dom.pdf', device = 'pdf')
-
+validation = EVOLUTION %>%
+             dplyr::filter( !(ORF %in% orf_orthologs) & !is.na(log10.EVO.FULL_R4S)) %>%
+             left_join(PREDICTORS,by='ORF')
 
 #### VARIABLE SELECTION ####
 XCOL="MPC"
@@ -27,33 +16,101 @@ ZCOL="log10.SNP.FULL_R4S"
 IDCOLS = c("UNIPROTKB","SGD","ORF","GNAME","PNAME")
 Y_RESID = '.resid'
 
+# SCATTERPLOT EVO RATE - STRUCTURE
+{
+dom_col ="#3DAA35"
+diso_col="#5C99D3"
+labx= 'Protein Abundance\n(molecules per cell)'
+laby = 'Orthologs Evolutionary Rate (log10)'
+labya = 'Disorder Evolutionary Rate (log10)'
+labyb= 'Domains Evolutionary Rate (log10)'
+F0A =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0, centerY=F,
+                    X=XCOL,Y=YCOL, XLAB=labx, YLAB=laby, x_as_exp10 = T,show_cor='left')
+
+F0B =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0, centerY = F,
+                    stroke_points=1, col_stat2d='royalblue',
+                    col_points = diso_col, col_lm=diso_col,
+                    X=XCOL,Y="log10.EVO.DISORDER", XLAB=labx, YLAB=labya, x_as_exp10 = T,show_cor='left')
+
+F0C =   make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0, centerY = F,
+                    stroke_points=1, col_stat2d='forestgreen',
+                    col_points = dom_col, col_lm=dom_col,
+                    X=XCOL,Y="log10.EVO.DOMAINS", XLAB=labx, YLAB=labyb, x_as_exp10 = T,show_cor='left')
+
+F0 = (F0B|F0A|F0C)
+ggsave(F0, path = here::here('plots'),
+       scale=1.5, width = 12,height=12, bg = 'white',
+       filename = 'scatterplot-evo-full_diso_dom.pdf', device = 'pdf')
+}
+
+# SCATTERPLOT EVO RATE - TIMESCALES
+{
+yvals = pretty( range(orthologs[[YCOL]]), n = 8)
+yscale = scale_y_continuous(limits=range(yvals), breaks = yvals, expand = c(0,0))
+
+zvals = pretty( range(orthologs[[ZCOL]]), n = 6)
+zscale1 = scale_y_continuous(limits=range(zvals), breaks = zvals, expand = c(0,0))
+zscale2 = scale_x_continuous(limits=range(zvals), breaks = zvals, expand = c(0,0))
+
 laby = 'Orthologs Evolutionary Rate (log10)'
 labz = 'SNP Evolutionary Rate (log10)'
-labx= 'Protein Abundance\n(molecules per cell)'
-F1A =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0,
-                      X=XCOL,Y=YCOL, XLAB=labx, YLAB=laby, x_as_exp10 = T,show_cor='left')
-F1B =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0,
-                        X=ZCOL,Y=YCOL, XLAB=labz, YLAB=laby, x_as_exp10 = F)
-F1C =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0,
-                   X=XCOL,Y=ZCOL, XLAB=labx, YLAB=labz, x_as_exp10 = T,show_cor='left')
+theme_xy = theme_ipsum(base_family = 'Helvetica',base_size=18, axis_text_size = 12) + theme(aspect.ratio = 1)
+add_stat_spectral = function(gg){
+  gg_2d = gg + stat_density_2d(aes(fill = ..level..), geom = "polygon", colour=NA,size=0.25,alpha=0.15,show.legend = F)+
+  scale_fill_distiller(palette = 'Spectral',direction = -1)
+  return(gg_2d)
+}
 
-F1 = (F1A|F1B|F1C)
+F1A =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0,
+                      X=XCOL,Y=YCOL, XLAB=labx, YLAB=laby, x_as_exp10 = T,show_cor='left') %>%
+  add_stat_spectral(.) + theme_xy + yscale
+
+
+F1B =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0, ymin=-2.5, centerY = F,
+                   X=XCOL,Y=ZCOL, XLAB=labx, YLAB=labz, x_as_exp10 = T,show_cor='left') %>%
+  add_stat_spectral(.) + theme_xy + zscale1
+
+F1C =  make_plot_1A(dat=orthologs,ANNOT = ANNOTATION, add_outliers = 0,
+                    X=ZCOL,Y=YCOL, XLAB=labz, YLAB='', x_as_exp10 = F)  %>%
+  add_stat_spectral(.) + theme_xy + yscale + zscale2
+
+c_orthologs = control_var(orthologs, YCOL, XCOL, '_y') %>% control_var(target=ZCOL, XCOL, '_x')
+
+.yvals = pretty( range(c_orthologs[['.resid_y']]), n = 8)
+.yscale = scale_y_continuous(limits=range(.yvals), breaks = .yvals, expand = c(0,0))
+
+.zvals = pretty( range(c_orthologs[['.resid_x']]), n = 6)
+.zscale = scale_x_continuous(limits=range(.zvals), breaks = .zvals, expand = c(0,0))
+
+F1D =  make_plot_1A(dat=c_orthologs, ANNOT = ANNOTATION, add_outliers = 0, centerY = F,
+                    X='.resid_x',Y='.resid_y', XLAB=paste('residual',labz), YLAB=paste('residual',laby),
+                    x_as_exp10 = F) %>% add_stat_spectral(.) +
+       theme_xy + .yscale + .zscale
+
+F1 = ( (F1A|F1C) / (F1B|F1D) )
 ggsave(F1, path = here::here('plots'), family='Helvetica',
        scale=1.5, width = 12,height=12, bg = 'white',
        filename = 'scatterplot-xyz.pdf', device = 'pdf')
-ggsave(F1, path = here::here('plots'), scale=1/3, family='Helvetica',
-       width = 20,height=8, bg = 'white',
+ggsave(F1, path = here::here('plots'), scale=1,
+       width = 12,height=12, bg = 'white',
        filename = 'scatterplot-xyz.png', device = 'png')
-
-decompose_variance(LM_SNP)
-decompose_variance(LM0)
-decompose_variance(LM0_SNP)
+}
 
 #### FILTERING PREDICTORS ####
+## TARGET = ER
 fit_ER = fit_m0(orthologs,XCOL,YCOL,PREDICTORS,ZCOL,IDCOLS)
-P_evo = select_variable(fit_ER,response = Y_RESID, min_ess = 2, min_ess_frac = 2)
-evo_pred = fit_ER$P[,c(XCOL, YCOL, y_resid, ZCOL, P_evo$variable)]
+P_evo_all = select_variable(fit_ER,response = Y_RESID, min_ess = 0, min_ess_frac = 0)
+#sum(P_evo$pc_ess_var > 1e-2 & P_evo$pc_ess0 > 1e-2)
+
+P_evo = P_evo_all %>% dplyr::filter(pc_ess  > 1 )
+evo_pred = fit_ER$P[,c(XCOL, YCOL, Y_RESID, ZCOL, P_evo$variable)]
 n_evo = n_distinct(P_evo$variable)
+
+## TARGET = MPC
+fit_EXP = fit_m0(orthologs,YCOL,XCOL,PREDICTORS,ZCOL,IDCOLS,MAX_YCOR = 0.6)
+P_mpc = select_variable(fit_EXP,response = XCOL, min_ess = 2, min_ess_frac = 2)
+mpc_pred = fit_EXP$P[,c(XCOL, YCOL, Y_RESID, ZCOL, P_mpc$variable)]
+n_mpc  = n_distinct(P_mpc$variable)
 
 #### CORRELATION BEST FEATURES
 cor_evo_pred = cor(PREDICTORS[,P_evo$variable])
@@ -62,64 +119,76 @@ image( cor_evo_pred > 0.7 )
 # Annotate group by theme
 pheatmap::pheatmap( cor_evo_pred  )
 
+cor_mpc_pred = cor(PREDICTORS[,P_mpc$variable])
+image( cor_mpc_pred > 0.7 )
+#hclust() -> single linkage -> pick best variable per group
+# Annotate group by theme
+pheatmap::pheatmap( cor_mpc_pred  )
+
 #set.seed(2022)
 set.seed(01052022)
 #### STEPWISE REGRESSION ####
-formula_null = reformulate(response=YCOL,termlabels = "1",intercept = T)
-LM1 = lm(data=evo_pred, formula_null)
-decompose_variance(LM1)
+formula_null_ER = reformulate(response=YCOL,termlabels = "1",intercept = T)
+LM1_ER = lm(data=evo_pred, formula_null)
+decompose_variance(LM1_ER)
 
-formula_best=paste0(YCOL," ~ ",paste0( P_evo$variable,collapse=" + "))
-m_best = step(object=LM1, scope = as.formula(formula_best), direction = 'both',k=log(n_best))
-formula_best_ppm=paste0(YCOL," ~ ", XCOL," + ",paste0(P_evo$variable,collapse=" + "))
-m_best_ppm = step(object=LM1, scope = as.formula(formula_best_ppm), direction = 'both', k=log(n_best))
-formula_best_snp=paste0(YCOL," ~ ",ZCOL," + ",paste0( P_evo$variable,collapse=" + "))
-m_best_snp = step(object=LM1, scope = as.formula(formula_best_snp), direction = 'both',k=log(n_best),na.action=na.omit)
+formula_best_ER=paste0(YCOL," ~ ",paste0( P_evo$variable,collapse=" + "))
+m_best_ER = step(object=LM1_ER, scope = as.formula(formula_best_ER), direction = 'forward',k=log(n_evo)*2,trace = -1)
+formula_best_ppm_ER=paste0(YCOL," ~ ", XCOL," + ",paste0(P_evo$variable,collapse=" + "))
+m_best_ppm_ER = step(object=LM1_ER, scope = as.formula(formula_best_ppm_ER), direction = 'forward', k=log(n_evo)*2,trace = -1)
+formula_best_snp_ER=paste0(YCOL," ~ ",ZCOL," + ",paste0( P_evo$variable,collapse=" + "))
+m_best_snp_ER = step(object=LM1_ER, scope = as.formula(formula_best_snp_ER), direction = 'forward',k=log(n_evo)*2,na.action=na.omit,trace = -1)
 
-decompose_variance(m_best)
-decompose_variance(m_best_ppm)
-decompose_variance(m_best_snp)
+decompose_variance(m_best_ER)
+decompose_variance(m_best_ppm_ER)
+decompose_variance(m_best_snp_ER)
 
 #### ELASTIC NET (LASSO/RIDGE) REGRESSION ####
 library(glmnet)
-elastic = fit_elastic(P=evo_pred, target = YCOL, add_var = NULL)
-elastic_ppm = fit_elastic(P=evo_pred, target = YCOL, add_var =XCOL)
-elastic_snp = fit_elastic(P=evo_pred, target = YCOL, add_var =ZCOL)
+elastic_ER = fit_elastic(P=evo_pred, target = YCOL, add_var = NULL)
+elastic_ppm_ER = fit_elastic(P=evo_pred, target = YCOL, add_var =XCOL)
+elastic_snp_ER = fit_elastic(P=evo_pred, target = YCOL, add_var =ZCOL)
 
 #### PARTIAL LEAST SQUARES REGRESSION ####
 library(pls)
-pls <- plsr(formula=as.formula(formula_best), data=evo_pred, scale=TRUE, validation='CV')
-pls_ppm <- plsr(formula=as.formula(formula_best_ppm), data=evo_pred, scale=TRUE, validation='CV')
-pls_snp <- plsr(formula=as.formula(formula_best_snp), data=evo_pred, scale=TRUE, validation='CV')
-decompose_variance(pls)
-decompose_variance(pls_ppm)
-decompose_variance(pls_snp)
+pls_ER <- plsr(formula=as.formula(formula_best_ER), data=evo_pred, scale=TRUE, validation='CV')
+pls_ppm_ER <- plsr(formula=as.formula(formula_best_ppm_ER), data=evo_pred, scale=TRUE, validation='CV')
+pls_snp_ER <- plsr(formula=as.formula(formula_best_snp_ER), data=evo_pred, scale=TRUE, validation='CV')
+decompose_variance(pls_ER)
+decompose_variance(pls_ppm_ER)
+decompose_variance(pls_snp_ER)
 
+ndims_ER = which.min( RMSEP(pls_ER)$val[estimate = "adjCV", , ]) - 1
+ndims_ppm_ER = which.min( RMSEP(pls_ppm_ER)$val[estimate = "adjCV", , ]) - 1
+ndims_snp_ER = which.min( RMSEP(pls_snp_ER)$val[estimate = "adjCV", , ]) - 1
 
-ndims = which.min( RMSEP(pls)$val[estimate = "adjCV", , ]) - 1
-ndims_ppm = which.min( RMSEP(pls_ppm)$val[estimate = "adjCV", , ]) - 1
-ndims_snp = which.min( RMSEP(pls_snp)$val[estimate = "adjCV", , ]) - 1
+pred_ER  = predict(pls_ER, fit_ER$P, ncomp = ndims_ER/6)
+pred_val_ER  = predict(pls_ER, validation, ncomp =ndims_ER/6)
+cor(fit_ER$P$log10.EVO.FULL_R4S, pred_ER, use='complete')
+cor(validation$log10.EVO.FULL_R4S, pred_val_ER, use='complete')
 
 #### SUM OF SQUARES PER VARIABLE ####
+
 library(broom)
 
+# STEPWISE
+q1=aov_plot(aov_model(m_best_ER,min_pv = 1e-3), name='best')
+q2=aov_plot(aov_model(m_best_ppm_ER), name='ppm')
+q3=aov_plot(aov_model(m_best_snp_ER), name='snp')
+STEP_PERF = (q1 | q2 | q3)
+ggsave(STEP_PERF, path = here::here('plots'),
+       scale=1.5, width = 12,height=12, bg = 'white',
+       filename = 'performance-stepwise-model.pdf')
+
 # PLS
-p1=aov_plot(aov_model(pls), name='best')
-p2=aov_plot(aov_model(pls_ppm), name='ppm')
-p3=aov_plot(aov_model(pls_snp), name='snp')
+p1=aov_plot(aov_model(pls_ER), name='best')
+p2=aov_plot(aov_model(pls_ppm_ER), name='ppm')
+p3=aov_plot(aov_model(pls_snp_ER), name='snp')
 PLS_PERF = (p1 / p2 / p3)
 ggsave(PLS_PERF, path = here::here('plots'),
        scale=1.5, width = 12,height=12, bg = 'white',
        filename = 'performance-pls-model.pdf')
 
-# STEPWISE
-q1=aov_plot(aov_model(m_best,min_pv = 1e-3), name='best')
-q2=aov_plot(aov_model(m_best_ppm), name='ppm')
-q3=aov_plot(aov_model(m_best_snp), name='snp')
-STEP_PERF = (q1 / q2 / q3)
-ggsave(STEP_PERF, path = here::here('plots'),
-       scale=1.5, width = 12,height=12, bg = 'white',
-       filename = 'performance-stepwise-model.pdf')
 
 # ELASTIC
 r1 = elastic_dev(elastic)
@@ -129,30 +198,36 @@ r1 = elastic_dev(elastic)
 # FIND VARIABLES PRESENT IN HUMAN AND PREDICT EVORATE IN HUMAN
 
 ### CHECK ABUNDANCE
-YCOL = "MPC"
-fit_EXP = fit_m0(orthologs,XCOL,YCOL,PREDICTORS,ZCOL,IDCOLS,MAX_YCOR = 0.6)
-P_mpc.0 = select_variable(fit0,response = YCOL, min_ess = 1, min_ess_frac = 1)
-P_mpc.1 = select_variable(fit0.1,response = YCOL, min_ess = 1, min_ess_frac = 1)
-
-mpc_pred = fit0.1$P[,c(XCOL, YCOL, ZCOL, P_mpc$variable)]
-n_mpc  = n_distinct(P_mpc$variable)
-
-formula_null = reformulate(response=YCOL,termlabels = "1",intercept = T)
+formula_null = reformulate(response=XCOL,termlabels = "1",intercept = T)
 LM1.1 = lm(data=mpc_pred, formula_null)
 decompose_variance(LM1.1)
 
-formula_MPC=paste0(YCOL," ~ ",paste0(P_mpc$variable,collapse=" + "))
-m_mpc = step(object=LM1.1, scope = as.formula(formula_MPC), direction = 'both',k=log(n_best))
+formula_MPC=paste0(XCOL," ~ ",paste0(P_mpc$variable,collapse=" + "))
+m_mpc = step(object=LM1.1, scope = as.formula(formula_MPC), direction = 'both',k=log(n_mpc))
 decompose_variance(m_mpc)
-
-elastic_mpc = fit_elastic(P=mpc_pred, target = YCOL, add_var = NULL)
 pls_mpc <- plsr(formula=as.formula(formula_MPC), data=mpc_pred, scale=TRUE, validation='CV')
 decompose_variance(pls_mpc)
+ndims_MPC = which.min( RMSEP(pls_mpc)$val[estimate = "adjCV", , ]) - 1
+
+elastic_mpc = fit_elastic(P=mpc_pred, target = XCOL, add_var = NULL)
+
+nosnp = validation %>% dplyr::filter(is.na(log10.SNP.FULL_R4S))
+cor(nosnp$log10.EVO.FULL_R4S,nosnp$MPC)
+
+
+pred_ER  = predict(m_best_ER, fit_EXP$P, ncomp=1)
+pred_val_MPC  = predict(object = LM0, newdata = nosnp)
+spearman(nosnp$log10.EVO.FULL_R4S,nosnp$MPC)
+
+pred_val_ER  = predict(object = m_best_ppm_ER, newdata = nosnp)
+cor(fit_ER$P$log10.EVO.FULL_R4S, pred_ER, use='complete')^2
+cor(nosnp$log10.EVO.FULL_R4S, pred_val_ER, use='complete')^2
 
 test = tidy(aov(pls_mpc)) %>% filter(p.value<1e-5)
+ndim_mpc = which.min( RMSEP(pls_mpc)$val[estimate = "adjCV", , ]) - 1
+
 dim(test)
 sum(test$sumsq) / decompose_variance(m_mpc,T)$TSS
-
 
 tidy(aov(m_mpc))
 
@@ -160,5 +235,45 @@ formula_null = reformulate(response=YCOL,termlabels = "1",intercept = T)
 LM1.0 = lm(data=evo_pred, formula_null)
 decompose_variance(LM1.0)
 formula_MPC=paste0(YCOL," ~ ",paste0(P_evo$variable,collapse=" + "))
-m_mpc = step(object=LM1, scope = as.formula(formula_MPC), direction = 'both',k=log(n_best))
-decompose_variance(m_mpc)
+m_mpc.0 = step(object=LM1.0, scope = as.formula(formula_MPC), direction = 'both',k=log(n_evo))
+decompose_variance(m_mpc.0)
+
+
+B=show_sample(input=input.byprop ,name='property',id='ORF',value=samples,var=Y, pop.mean=mu.y, pop.range=rg.y) + ylim(rg.y) + theme(aspect.ratio=1)
+samples = c('MF_nucleotide_binding','MF_molecular_function','essential_core','essential_dispensable')
+input=fit_ER$P
+pop.mean=mean_(fit_ER$P[[Y_RESID]])
+pop.range=range_(fit_ER$P[[Y_RESID]])
+
+samples_names = strfind(strings = colnames(input),samples)
+property = samples_names[1]
+which.sample = fit_ER$P[[property]]
+sample = input %>% dplyr::filter(which.sample)
+mu.sample = mean_(sample[[Y_RESID]])
+
+df.mu = group_by(input, !!sym(property)) %>%
+    summarise(n=n(),mu.sample=mean_(!!sym(Y_RESID)),sd.sample=sd_(!!sym(Y_RESID)),
+              sdmin=mu.sample-sd.sample, sdmax=mu.sample+sd.sample) %>%
+    mutate(MU = pop.mean)
+
+library(ggbeeswarm)
+library(see)
+col_mf= '3DA6DE'
+col_nb = 'FBBC1D'
+B = ggplot(fit_ER$P,aes_string(y=Y_RESID, x=name, fill=name,col=name)) +
+  geom_violin(aes_string(x=name),color=NA,alpha=0.9,show.legend = F) +
+  geom_pointrange_borderless(data=df.mu,mapping = aes_string(x=name,y='mu.sample',ymin='sdmin',ymax='sdmax'),size=1,fatten=6, position=position_dodge2(width=1)) +
+  geom_hline(df.mu,mapping = aes(yintercept = MU), col='black',linetype=1,size=1) + # mean
+  geom_text(data=df.mu,mapping = aes(label=n,x=!!sym(name),y=2.5,vjust='inward'),show.legend = F) +
+  scale_y_continuous(name='',limits = pop.range, expand = c(0,0)) + ylab('') +
+  ggpubr::grids() + xlab('Nucleotide binding') + ylab('Residual Evolutionary Rate (log10)') +
+  theme_ipsum() + theme(legend.position = 'none') + scale_fill('TRUE'=)
+
+B
+
+
+### HUMAN PREDICTION
+## best 10 variables from yeast to human
+## pick best codon for each AA
+
+
