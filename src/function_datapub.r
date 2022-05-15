@@ -350,6 +350,23 @@ load.lee2014.data = function(rawdata=F){
   }
 }
 
+
+load.filleton2015.data = function(){
+  message("REF: Filleton F. et al, 2015, Epigenetics & Chromatin")
+  message("The complex pattern of epigenomic variation between natural yeast strains at single-nucleosome resolution")
+  # Epidiv values for all genes (intra-species variation of chromatin modifications)
+  S12="https://static-content.springer.com/esm/art%3A10.1186%2Fs13072-015-0019-3/MediaObjects/13072_2015_19_MOESM12_ESM.ods"
+}
+
+
+load.lancaster2014.data = function(){
+  message("REF: Lancaster AK et al, 2014, Bioinformatics")
+  message("PLAAC: a web and command-line application to identify proteins with Prion-Like Amino Acid Composition")
+  #doi:10.1093/bioinformatics/btu310
+  yeast_datafile="http://plaac.wi.mit.edu/Scer-all-proteins-2014-05-17.xls"
+}
+
+
 load.vanleeuwen2016.data = function(single_orf=F){
   # load gene classification of biological functions (based on costanzo 2010)
   message("REF: J. Van Leeuwen et al., 2016, Science")
@@ -1692,4 +1709,17 @@ load.uniprot.proteome = function(species='yeast') { # Older version of get.unipr
   regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
   names(UNI) = str_extract(names(UNI), regexUNIPROTAC)
   return(UNI)
+}
+
+get.species.ensembl = function(){
+  URL_ENSEMBL = "https://www.ensembl.org/info/data/ftp/index.html"
+  library(rvest)
+  ens_ftp <- URL_ENSEMBL %>% read_html()
+  # single species data table
+  ss_table <- ens_ftp %>% html_element(css='.data_table') %>% html_table() %>%
+    janitor::clean_names() %>%
+    mutate(org = str_replace(species,'^(.+[a-z])[A-Z].+$','\\1'),
+           spname  = str_replace(species,'^.+[a-z]([A-Z].+$)','\\1')) %>%
+    dplyr::select(-x,-species) %>% relocate(org,spname)
+  return(ss_table)
 }
