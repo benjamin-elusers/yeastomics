@@ -32,27 +32,20 @@ vignettes/*.pdf
 *.knit.md
 # R Environment Variables
 .Renviron
-
 ### packrat ###
 packrat/
 packrat/src/data.table/data.table_1.12.8.tar.gz
 packrat/src/AnnotationDbi/AnnotationDbi_1.48.0.tar.gz
-
 ### R.Bookdown Stack ###
 # R package: bookdown caching files
 /*_files/
 misc/*
-
 *.dmp
-
-
 ### LARGE FILES >50MB
 # find . -size +50M | cat >> .gitignore
-
 data/ncbi/*
 output/css/*
 output/fonts/*
-
 data/d2p2-yeast-uniprotKB.rds
 data/d2p2-yeast-orf.rds
 output/proteome-features-04_01_2022.rds
@@ -66,3 +59,4 @@ data/proteome-1011-strains.rds
 .git/objects/pack/pack-b89b55d718dd769845c1751148210a689ec671e4.pack
 output/loaded-datasets-18_02_2022.rds
 output/loaded-datasets-04_01_2022.rds
+plots/*
