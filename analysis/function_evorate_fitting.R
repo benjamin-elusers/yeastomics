@@ -40,15 +40,22 @@ library(log)
 
 #hrbrthemes::import_roboto_condensed()
 #hrbrthemes::import_titillium_web()
-AXIS_TITLE_SIZE=18
-AXIS_TEXT_SIZE=14
+AXIS_TITLE_SIZE=16
+AXIS_TEXT_SIZE=12
 TEXT_SIZE=4
 #AXIS_TEXT_FONT = 'Roboto'
-th_txt_size = hrbrthemes::theme_ipsum_rc(
+# th_txt_size = hrbrthemes::theme_ipsum_rc(
+#   axis_title_just = 'm', axis = 'xy', axis_col = 'black',
+#   grid = F, base_family = 'titillium-web',
+#   axis_text_size = AXIS_TEXT_SIZE,
+#   axis_title_size = AXIS_TITLE_SIZE)
+
+th_txt_size = hrbrthemes::theme_ipsum(
   axis_title_just = 'm', axis = 'xy', axis_col = 'black',
-  grid = F, base_family = 'titillium-web',
+  grid = F, base_family = 'Helvetica',
   axis_text_size = AXIS_TEXT_SIZE,
   axis_title_size = AXIS_TITLE_SIZE)
+
 
 
 # 1. LOAD DATASETS -------------------------------------------------------------
@@ -499,7 +506,9 @@ PROCESS_MISSING_VALUES = function(MAT, IDS){
 make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                         XLAB='Protein Abundance (log10)', YLAB='Evolutionary Rate Orthologs (log10)',
                         ANNOT=ANNOTATION, id=c('ORF','UNIPROT'),
-                        col_points='#CCCCCC', centerY=T,
+                        col_lm = 'black', col_stat2d='black',
+                        centerY=T,
+                        fill_points='#CCCCCC', col_points='#CCCCCC', shape_points=19, stroke_points=1, size_points=1.5,
                         add_outliers=10,noplot=F,
                         add_smooth='lm',add_cor=T,show_cor='right',
                         x_as_exp10=F,y_as_exp10=F,
@@ -507,7 +516,7 @@ make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
 
   dat_annot = left_join(dat,ANNOT,by=id)
   yavg = mean_(dat_annot[[Y]])
-  yavg_line = geom_hline(yintercept = yavg - (centerY*yavg), col='dodgerblue',linetype=2,size=0.5) # mean
+  yavg_line = geom_hline(yintercept = yavg - (centerY*yavg), col=col_lm,linetype=2,size=0.5) # mean
   dat_annot[[Y]] = dat_annot[[Y]] - (yavg*centerY)
   OUTY = get_extremes(dat_annot,X,n=add_outliers)
   OUTX = get_extremes(dat_annot,Y,n=add_outliers)
@@ -526,12 +535,12 @@ make_plot_1A = function(dat=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   if(noplot){ return(F1A + yavg_line )}
 
   F1A = F1A +
-    ggiraph::geom_point_interactive(aes(tooltip=FUNCTION, data_id=ORF),size=2,shape=19,alpha=0.5,color=col_points,stroke=0) +
-    stat_density2d(size=0.5,color="black") +
+    ggiraph::geom_point_interactive(aes(tooltip=FUNCTION, data_id=ORF),size=size_points,shape=shape_points,alpha=0.5,color=col_points,stroke=stroke_points) +
+    stat_density2d(size=0.5,color=col_stat2d) +
     yavg_line +
     ylab(YLAB) + xlab(XLAB)
 
-  F1A = F1A + geom_smooth(method=add_smooth,color='limegreen')
+  F1A = F1A + geom_smooth(method=add_smooth,color=col_lm)
   if(add_cor){
     cor_xy = spearman.toplot(dat_annot[[X]],dat_annot[[Y]])
     if(show_cor=='right'){
@@ -619,20 +628,24 @@ make_plot_1B = function(clade1='schizo',clade2='sacch.wgd',control_var='ppm',
   return(F1B)
 }
 
+control_var = function(input_data, target, control_var, suffix="", force_intercept=T){
+  cat(sprintf("Controlling '%s' by '%s'\n",target,control_var))
+  cols_fit = c('.resid','.fitted','.se.fit','.hat','.sigma','.cooksd','.std.resid')
+  controlled = input_data %>%
+    broom::augment_columns(x=lm(reformulate(response=target, termlabels=control_var, intercept=force_intercept),data=.)) %>%
+    dplyr::rename_with(.cols = all_of(cols_fit),.fn = paste0, sep="", suffix)
+  return(controlled)
+}
 
 make_plot_1C = function(data2plot=EVOLUTION,Y='EVO.FULL',X='SNP.FULL',control_var='PPM',
-                        use_residuals=F,force_intercept=T, text_size=AXIS_TTITLE_SIZE){
+                        use_residuals=F,force_intercept=T, text_size=AXIS_TTITLE_SIZE,
+                        col_lm = 'black', col_stat2d='black',
+                        fill_points='#CCCCCC', col_points='#CCCCCC',
+                        shape_points=19, stroke_points=1, size_points=1.5){
 
   if(use_residuals){
-    cat(sprintf("Controlling %s by protein expression '%s'\n",X,control_var))
-    first = data2plot %>%
-      broom::augment_columns(x=lm(reformulate(response=X, termlabels=control_var, intercept=force_intercept),data=.)) %>%
-      dplyr::rename(.resid_x = .resid, .fitted_x=.fitted, .se.fit_x=.se.fit, .hat_x=.hat, .sigma_x=.sigma, .cooksd_x=.cooksd,.std.resid_x=.std.resid)
-
-    cat(sprintf("Controlling %s by protein expression '%s'\n",Y,control_var))
-    data2plot = first %>%
-      broom::augment_columns(x=lm(reformulate(response=Y, termlabels=control_var, intercept=force_intercept),data=.)) %>%
-      dplyr::rename(.resid_y = .resid, .fitted_y=.fitted, .se.fit_y=.se.fit, .hat_y=.hat, .sigma_y=.sigma, .cooksd_y=.cooksd,.std.resid_y=.std.resid)
+    first = control_var(data2plot, X, control_var, "_x", force_intercept)
+    data2plot = control_var(first, Y, control_var, "_y", force_intercept)
     X='.resid_x'
     Y='.resid_y'
   }
@@ -642,7 +655,8 @@ make_plot_1C = function(data2plot=EVOLUTION,Y='EVO.FULL',X='SNP.FULL',control_va
   rho=spearman.toplot(data2plot[[X]],data2plot[[Y]])
 
   F1C = ggplot(data=data2plot,aes_string(x=X,y=Y)) +
-    geom_point(size=0.7, alpha=0.8,shape=19) +
+    geom_point(size=size_points,shape=shape_points,alpha=0.5,color=col_points,stroke=stroke_points)+
+    #geom_point(size=0.7, alpha=0.8,shape=19) +
     stat_density_2d(aes(fill = ..level..), geom = "polygon", colour=NA,size=0.25,alpha=0.15,show.legend = F)+
     geom_smooth(method = 'lm',col='black',se=F,size=1) +
     geom_text(data=rho,aes(x=Inf,y=-Inf,label=toshow),hjust='inward',vjust='inward',size=4) +
@@ -754,34 +768,48 @@ make_logistic_fit = function(input,    # Input data
   return(fit)
 }
 
-decompose_variance = function(LM,to.df=F){
-  # DECOMPOSE VARIANCE FROM LINEAR REGRESSION
-  N=sum(complete.cases(LM$model))
-  TSS = var( LM$model[,1] ) * (N-1)
-  df.var = summary(aov(LM))[[1]]
-  nvar = nrow(df.var)
-  RSS = sum(df.var$`Sum Sq`[nvar])
-  rss.pc =100*RSS/TSS
-  ESS = sum(df.var$`Sum Sq`[-nvar])
+decompose_variance = function(MODEL,to.df=F){
 
-  ess.max = sum( (fitted(LM) - mean_(LM$model[,1]))^2 )
+  # DECOMPOSE VARIANCE FROM MODEL
+  D = MODEL$model %>% as_tibble()
+
+  N=sum(complete.cases(D))
+  TSS = var( D[,1] ) * (N-1)
+  df.var = broom::tidy(aov(MODEL))
+
+  df.ss = df.var %>% dplyr::filter(term != "Residuals")
+  nvar = nrow(df.ss)
+  df.res = df.var %>% dplyr::filter(term == "Residuals")
+  RSS = sum(df.res$sumsq) # sum( residuals(LM)^2 )
+
+  rss =  deviance(MODEL)
+  if( RSS != rss ){ warning("RSS not equal to deviance of the model...") }
+
   ess = TSS-RSS
-  ess.pc =100*ess/TSS
-  #RSS =  deviance(LM)
-  #rss = sum( residuals(LM)^2)
-  #ESS =  TSS - RSS
-  one_line_formula =  paste(deparse1(formula(LM))) %>%
+  ESS = sum(df.ss$sumsq)
+  # Maximum ESS (Fitted - Ymean)
+  ess.max = sum( (fitted(MODEL) - mean_(D[,1]))^2 )
+  if( ESS != ess ){ warning("ESS not equal to sum of squares from individual variables...") }
+
+  ESS.pc =100*ESS/TSS
+  RSS.pc =100*RSS/TSS
+
+  one_line_formula =  paste(deparse1(formula(MODEL))) %>%
                       str_trunc(side = 'center', width = 80)
-  nterms = n_distinct(labels(LM))
+  if( class(MODEL) == 'lm'){
+    nterms = n_distinct(labels(MODEL))
+  }else{
+    nterms = n_distinct(attr(terms(MODEL),'term.labels'))
+  }
 
   cat(sprintf("%s\n",one_line_formula))
   cat(sprintf("(%s predictor variables)\n",nterms))
   cat(sprintf("TSS %.1f (n=%s)\n",TSS,N))
-  cat(sprintf("--> ESS %.1f (%.0f%%)\n",ess, ess.pc))
-  cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  rss.pc))
+  cat(sprintf("--> ESS %.1f (%.0f%%)\n",ESS, ESS.pc))
+  cat(sprintf("--> RSS %.1f (%.0f%%)\n", RSS,  RSS.pc))
   if(to.df){
     res=tibble(N=N,nterms=nterms,TSS=TSS,ESS=ESS,RSS=RSS,
-               RSS_rel = rss.pc, ESS_rel=ess.pc
+               RSS_rel = RSS.pc, ESS_rel=ESS.pc
                )
     return(res)
   }
