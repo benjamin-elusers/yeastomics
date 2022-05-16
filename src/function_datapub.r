@@ -1716,12 +1716,43 @@ get.ensembl.species= function(){
   library(rvest)
   ens_ftp <- URL_ENSEMBL %>% read_html()
   # single species data table
+
+  link2data = ens_ftp %>% html_element(css='.data_table') %>% html_elements("a") %>% html_attr("href")
+  length(link2data)
+  url_ftp_pub='http://ftp.ensembl.org/pub/'
+
   ss_table <- ens_ftp %>% html_element(css='.data_table') %>% html_table() %>%
     janitor::clean_names() %>%
     mutate(org = str_replace(species,'^(.+[a-z])[A-Z].+$','\\1'),
            spname  = str_replace(species,'^.+[a-z]([A-Z].+$)','\\1')) %>%
     dplyr::select(-x,-species) %>% relocate(org,spname)
-  return(ss_table)
+
+  # COULD NOT EXTRACT URL LINKS AS A TABLE (so manually reconstructed links from ftp url and species name)
+  ss_table_links = ss_table %>%
+       mutate( sp = tolower(ss_table$spname) %>% str_replace(' ','_')  )%>%
+       mutate( dna_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'dna'),
+               c_dna_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'cdna'),
+               cds_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'cds'),
+               nc_rna_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'ncrna'),
+               protein_sequence_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'pep'),
+               annotated_sequence_embl = sprintf('%s/%s/%s/',url_ftp_pub,'current_embl',sp),
+               annotated_sequence_gen_bank = sprintf('%s/%s/%s/',url_ftp_pub,'current_genbank',sp),
+               gene_sets_gtf = sprintf('%s/%s/%s/',url_ftp_pub,'current_gtf/',sp),
+               gene_sets_gff3 =sprintf('%s/%s/%s/',url_ftp_pub,'current_gff3/',sp),
+               other_annotations_tsv = sprintf('%s/%s/%s/',url_ftp_pub,'current_tsv',sp),
+               other_annotations_rdf = sprintf('%s/%s/%s/',url_ftp_pub,'current_rdf',sp),
+               other_annotations_json = sprintf('%s/%s/%s/',url_ftp_pub,'current_json',sp),
+               whole_databases=sprintf('%s/%s/%s/',url_ftp_pub,'current_mysql',sp),
+               variation_gvf=sprintf('%s/%s/%s/%s',url_ftp_pub,'current_variation',sp,'/gvf'),
+               variation_vcf=sprintf('%s/%s/%s/%s',url_ftp_pub,'current_variation',sp,'/vcf'),
+               variation_vep=sprintf('%s/%s/%s/%s',url_ftp_pub,'current_variation',sp,'/vep'),
+               regulation_gff=sprintf('%s/%s/%s/',url_ftp_pub,'current_regulation',sp),
+               data_files=sprintf('%s/%s/%s/',url_ftp_pub,'current_data_files',sp),
+               bam_big_wig=sprintf('%s/%s/%s/',url_ftp_pub,'current_bamcov',sp)) %>%
+    dplyr::select(-other_annotations,-gene_sets)
+
+
+  return(ss_table_links)
 }
 
 find_ensembl_sptree = function(){
@@ -1751,3 +1782,30 @@ get_ensembl_sptree = function(treename){
   sptree = ape::read.tree(url_tree)
   return(sptree)
 }
+
+get_ensembl_mammals = function(){
+
+  mammals = tribble(~taxid, ~ens_pre, ~spname, ~sp,
+        9606,'ENSG', 'Homo sapiens', 'human',
+        9913,'ENSBTAG', 'Bos taurus', 'cow',
+        9615,'ENSCAFG', 'Canis lupus familiaris', 'dog',
+        9685,'ENSFCAG', 'Felis catus', 'cat',
+        9785,'ENSLAFG', 'Loxodonta africana', 'elephant',
+        9598,'ENSPTRG', 'Pan troglodytes', 'chimpanzee',
+        9739,'ENSTTRG','Tursiops truncatus','dolphin',
+        9796,'ENSECAG','Equus caballus','horse',
+        9595,'ENSGGOG','Gorilla gorilla gorilla','gorilla',
+        30608,'ENSMICG','Microcebus murinus','mouse_lemur',
+        9669,'ENSMPUG','Mustela putorius furo','ferret',
+        10090,'ENSMUSG','Mus musculus','mouse',
+        132908,'ENSPVAG','Pteropus vampyrus','bat',
+        13616,'ENSMODG','Monodelphis domestica','opossum',
+        9986,'ENSOCUG','Oryctolagus cuniculus','rabbit',
+        9601,'ENSPPYG','Pongo abelii','orang_outan',
+        10116,'ENSRNOG','Rattus norvegicus','rat',
+        9823,'ENSSSCG','Sus scrofa','pig',
+        43179,'ENSSTO','Ictidomys tridecemlineatus','squirrel'
+  )
+  return(mammals)
+}
+
