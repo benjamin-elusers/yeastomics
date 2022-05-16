@@ -1785,7 +1785,7 @@ get_ensembl_sptree = function(treename){
 
 get_ensembl_mammals = function(){
 
-  mammals = tribble(~taxid, ~ens_pre, ~spname, ~sp,
+  mammals = tribble(~taxid, ~ens_pre, ~spname, ~org,
         9606,'ENSG', 'Homo sapiens', 'human',
         9913,'ENSBTAG', 'Bos taurus', 'cow',
         9615,'ENSCAFG', 'Canis lupus familiaris', 'dog',
@@ -1805,7 +1805,8 @@ get_ensembl_mammals = function(){
         10116,'ENSRNOG','Rattus norvegicus','rat',
         9823,'ENSSSCG','Sus scrofa','pig',
         43179,'ENSSTO','Ictidomys tridecemlineatus','squirrel'
-  )
+  ) %>%
+    mutate(sp=str_replace(spname,'^([A-Z]).+ ([a-z]+)','\\1\\2') %>% str_to_lower())
   return(mammals)
 }
 
