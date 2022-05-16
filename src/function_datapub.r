@@ -1711,7 +1711,7 @@ load.uniprot.proteome = function(species='yeast') { # Older version of get.unipr
   return(UNI)
 }
 
-get.ensemble.species= function(){
+get.ensembl.species= function(){
   URL_ENSEMBL = "https://www.ensembl.org/info/data/ftp/index.html"
   library(rvest)
   ens_ftp <- URL_ENSEMBL %>% read_html()
@@ -1724,7 +1724,7 @@ get.ensemble.species= function(){
   return(ss_table)
 }
 
-find_ensemble_sptree = function(){
+find_ensembl_sptree = function(){
   URL_FTP_ENSEMBL="http://ftp.ensembl.org/pub/"
   URL_SPTREE = paste0(URL_FTP_ENSEMBL,"current_compara/species_trees/")
   httr::set_config(httr::config(ssl_verifypeer = FALSE))
@@ -1737,7 +1737,7 @@ find_ensemble_sptree = function(){
   return(paste0(URL_SPTREE,sptrees))
 }
 
-get_ensemble_sptree = function(treename){
+get_ensembl_sptree = function(treename){
   url_sptrees = find_ensemble_sptree()
   file_sptrees = basename(url_sptrees)
   urltools::url_parse(url_sptrees)
