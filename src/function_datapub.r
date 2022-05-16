@@ -1738,7 +1738,7 @@ find_ensembl_sptree = function(){
 }
 
 get_ensembl_sptree = function(treename){
-  url_sptrees = find_ensemble_sptree()
+  url_sptrees = find_ensembl_sptree()
   file_sptrees = basename(url_sptrees)
   urltools::url_parse(url_sptrees)
   if(missing(treename)){
