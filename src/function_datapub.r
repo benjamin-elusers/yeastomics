@@ -1810,3 +1810,50 @@ get_ensembl_mammals = function(){
   return(mammals)
 }
 
+get_ensg_dataset = function(){
+  library(biomaRt)
+  ens <- useEnsembl("ensembl")
+  ens_dataset = listDatasets(ens) %>% dplyr::as_tibble() %>%
+                dplyr::mutate(
+                  sp=str_split_fixed(dataset,'_',n=3)[,1],
+                  org = str_split_fixed(description,' genes ',n=2)[,1] %>% str_trim) %>%
+                dplyr::select(-description)
+  return(ens_dataset)
+}
+
+
+find_ncbi_lineage = function(){
+  url_ncbi_tax = "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz"
+  file_ncbi_tax = basename(ncbi_tax)
+  if( !file.exists(file_ncbi_tax) ){ download.file(ncbi_tax,file_ncbi_tax) }
+
+  rk_lineage = 'rankedlineage.dmp'
+  lineage = 'taxidlineage.dmp'
+
+  untar(file_ncbi_tax,rk_lineage)
+  hutils::replace_pattern_in(file_contents = "\t\\|",replace='', file_pattern=rk_lineage)
+  ncbi_lineage_rk <- readr::read_delim(rk_lineage, delim='\t',
+                                       col_names = c('tax_id','tax_name','species','genus','family','order','class','phylum','kingdom','superkingdom'))
+  unlink(rk_lineage)
+
+  # untar(file_ncbi_tax,lineage)
+  # hutils::replace_pattern_in(file_contents = "\t\\|",replace='', file_pattern=lineage)
+  # ncbi_lineage <- readr::read_delim(lineage, delim='\t',col_names = c('tax_id','node_ids'))
+  # unlink(lineage)
+  unlink(file_ncbi_tax)
+  return(ncbi_lineage_rk)
+}
+
+find_ncbi_taxid = function(spnames,dbfile='data/ncbi/accessionTaxa.sql',verbose=F){
+  library(taxonomizr)
+  if( file.exists(dbfile) ){
+    taxaId<-getId(taxa = spnames ,sqlFile = dbfile)
+    if(verbose){ print(taxaId) }
+    return(taxaId)
+  }else{
+    stop("NCBI database not found...Prepare the NCBI database with:\n prepareDatabase(dbfile)")
+    #prepareDatabase(dbfile)
+    return(NA)
+  }
+}
+
