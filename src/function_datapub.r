@@ -1873,6 +1873,30 @@ get_ens_filter_ortho = function(mart='ensembl',dat='hsapiens_gene_ensembl'){
   return(filter_ortho)
 }
 
+query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
+  tictoc::tic('query Ensembl orthologs')
+  dataset  = sprintf('%s_gene_ensembl',species)
+  ortholog = sprintf('with_%s_homolog',ortho)
+  t0 = proc.time()
+  out <- tryCatch({
+    cat(sprintf("Trying to fetch orthologs from '%s'...",dataset))
+    Q=getBM(attributes=At, mart=useEnsembl('ensembl',dataset), filters = ortholog,  values = T, uniqueRows = T, bmHeader = F)
+    return(Q)
+  },
+  error=function(cond) {
+    cat(sprintf('Failed to retrieve orthologs for current species: %s!\n',species))
+    message(cond)
+    return(NULL)
+  },
+  finally={
+    cat(sprintf('done [%s]\n',COUNTER))
+    elapsed=(proc.time()-t0)['elapsed']
+    if(elapsed>5){ tictoc::toc() }
+  }
+  )
+  return(out)
+}
+
 find_ncbi_lineage = function(){
   url_ncbi_tax = "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz"
   file_ncbi_tax = basename(ncbi_tax)
