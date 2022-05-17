@@ -1851,7 +1851,7 @@ get_ensembl_hs = function(verbose=T){
   if(verbose)
     message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | uniprot = %6s',nr,ng,nt,np,nu))
   #dplyr::select(-start_position,-end_position,-transcript_start,-transcript_end,-exon_chrom_start,-exon_chrom_end)
-  return(hs_ensg_uni)
+  return(hs_ensg)
 }
 
 find_ncbi_lineage = function(){
