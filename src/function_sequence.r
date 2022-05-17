@@ -61,7 +61,11 @@ rm.stop = function(BS){
 
 widths = function(BS){
   if(is.list(BS)){
-    return( sapply(BS,width) )
+    W = sapply(BS, function(x){
+      if(n_distinct(width(x))==1){ return(unique(width(x))) }
+      return(width(x))
+      })
+    return(W)
   }else if( class(BS) %in% c("AAStringSet","DNAStringSet") ){
     return(width(BS))
   }else if( class(BS) %in% c("AAStringSetList","DNAStringSetList") ){
