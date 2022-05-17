@@ -1820,7 +1820,7 @@ get_ensg_dataset = function(){
   return(ens_dataset)
 }
 
-get_ensembl_hs = function(with_uni=T){
+get_ensembl_hs = function(verbose=T){
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
   att_pos = c('start_position','end_position')
   att_struct = c('cds_length','transcript_length','transcript_start','transcript_end','ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
@@ -1829,7 +1829,7 @@ get_ensembl_hs = function(with_uni=T){
 
   hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl')
   # Get representative human proteome with UniProt/SwissProt identifiers
-  hs_ensg_uni = getBM(mart = hs_ens,
+  hs_ensg = getBM(mart = hs_ens,
                   attributes = c(att_gene,att_pos,att_struct,att_uni),
                   filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                   values=list('protein_coding','protein_coding',T),
@@ -1843,7 +1843,13 @@ get_ensembl_hs = function(with_uni=T){
            n_proteins = n_distinct(ensembl_peptide_id),
            n_uniprot = n_distinct(uniprotswissprot))
 
-  count_ens_id(hs_ensg_uni)
+  nr = nrow(hs_ensg)
+  ng = n_distinct(hs_ensg$ensembl_gene_id)
+  nt = n_distinct(hs_ensg$ensembl_transcript_id)
+  np = n_distinct(hs_ensg$ensembl_peptide_id)
+  nu = n_distinct(hs_ensg$uniprotswissprot)
+  if(verbose)
+    message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | uniprot = %6s',nr,ng,nt,np,nu))
   #dplyr::select(-start_position,-end_position,-transcript_start,-transcript_end,-exon_chrom_start,-exon_chrom_end)
   return(hs_ensg_uni)
 }
