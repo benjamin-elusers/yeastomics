@@ -1751,7 +1751,6 @@ get.ensembl.species= function(){
                bam_big_wig=sprintf('%s/%s/%s/',url_ftp_pub,'current_bamcov',sp)) %>%
     dplyr::select(-other_annotations,-gene_sets)
 
-
   return(ss_table_links)
 }
 
@@ -1821,6 +1820,33 @@ get_ensg_dataset = function(){
   return(ens_dataset)
 }
 
+get_ensembl_hs = function(with_uni=T){
+  att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
+  att_pos = c('start_position','end_position')
+  att_struct = c('cds_length','transcript_length','transcript_start','transcript_end','ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
+  att_uni = c('uniprotswissprot')
+  att_type = c('gene_biotype','transcript_biotype')
+
+  hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl')
+  # Get representative human proteome with UniProt/SwissProt identifiers
+  hs_ensg_uni = getBM(mart = hs_ens,
+                  attributes = c(att_gene,att_pos,att_struct,att_uni),
+                  filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
+                  values=list('protein_coding','protein_coding',T),
+                  uniqueRows = T, bmHeader = F) %>%
+    mutate( gene_length = end_position-start_position+1,
+            exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
+    group_by(ensembl_gene_id,ensembl_transcript_id,ensembl_peptide_id,uniprotswissprot) %>%
+    mutate(n_exons = n_distinct(ensembl_exon_id), n_exons_mini = sum(is_constitutive), tot_exon_len = sum(exon_length) ) %>%
+    group_by(ensembl_gene_id) %>%
+    mutate(n_transcripts = n_distinct(ensembl_transcript_id),
+           n_proteins = n_distinct(ensembl_peptide_id),
+           n_uniprot = n_distinct(uniprotswissprot))
+
+  count_ens_id(hs_ensg_uni)
+  #dplyr::select(-start_position,-end_position,-transcript_start,-transcript_end,-exon_chrom_start,-exon_chrom_end)
+  return(hs_ensg_uni)
+}
 
 find_ncbi_lineage = function(){
   url_ncbi_tax = "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz"
