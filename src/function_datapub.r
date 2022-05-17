@@ -1863,6 +1863,16 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
   return(hs_ensg)
 }
 
+get_ens_filter_ortho = function(mart='ensembl',dat='hsapiens_gene_ensembl'){
+  library(biomaRt)
+  hs_ens = useEnsembl(mart,dat)
+  filter_ortho = searchFilters(hs_ens,'homolog') %>%
+                 as_tibble %>%
+                 mutate(sp=str_split_fixed(name,'_',n=3)[,2]) %>%
+                 mutate(species = str_replace(description,pattern = "Orthologous (.+) Genes", replacement = "\\1"))
+  return(filter_ortho)
+}
+
 find_ncbi_lineage = function(){
   url_ncbi_tax = "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz"
   file_ncbi_tax = basename(ncbi_tax)
