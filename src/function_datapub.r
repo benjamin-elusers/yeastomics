@@ -1820,7 +1820,7 @@ get_ensg_dataset = function(){
   return(ens_dataset)
 }
 
-get_ensembl_hs = function(verbose=T){
+get_ensembl_hs = function(verbose=T,longest_transcript=F){
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
   att_pos = c('start_position','end_position')
   att_struct = c('cds_length','transcript_length','transcript_start','transcript_end','ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
@@ -1842,6 +1842,15 @@ get_ensembl_hs = function(verbose=T){
     mutate(n_transcripts = n_distinct(ensembl_transcript_id),
            n_proteins = n_distinct(ensembl_peptide_id),
            n_uniprot = n_distinct(uniprotswissprot))
+
+  if(longest_transcript){
+    hs_ensg = hs_ensg %>%
+      group_by(ensembl_gene_id) %>%
+      dplyr::filter(transcript_length ==  max(transcript_length) ) #%>%
+      #dplyr::select(-c(start_position,end_position,transcript_start,transcript_end,rank,
+      #               ensembl_exon_id,is_constitutive,exon_chrom_start,exon_chrom_end,exon_length)) %>%
+      #distinct()
+  }
 
   nr = nrow(hs_ensg)
   ng = n_distinct(hs_ensg$ensembl_gene_id)
