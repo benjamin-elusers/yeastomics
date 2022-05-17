@@ -2,7 +2,6 @@
 source(here::here("src","__setup_yeastomics__.r"))
 source(here::here("src","function_YK11.r"))
 
-
 # Find Single Amino Acid Polymorphisms (SNP_AA) ----------------------------------
 S288C = load.sgd.proteome(withORF=T,rm.stop=F) # Reference SGD protein sequences
 YK11_SNP_AA.rds = here("data",'YK11-SNP_AA.rds')
@@ -155,3 +154,89 @@ if( file.exists(aligned_1011_prot) ){
 }else{
   message("First, run align_s288c_to_1011strains.r to align all strains to S288C reference strain!")
 }
+
+
+#### 8 strains for proteomics/RNASeq/RiboSeq
+S288C = load.sgd.proteome(withORF=T,rm.stop=F) # Reference SGD protein sequences
+CDS = load.sgd.CDS(withORF=T) # Reference SGD DNA coding sequences
+WT = get.positions(S288C) %>% group_by(orf) %>% mutate(bin.pos=dplyr::ntile(wt_pos,100))
+wt = get.positions(CDS) %>% group_by(orf) %>% mutate(bin.pos=dplyr::ntile(wt_pos,100)) %>%
+  mutate(aa_pos = ceiling(wt_pos/3), codon_pos = (wt_pos%%3 + (wt_pos%%3==0)*3) ) %>%
+  mutate(codon = ifelse(codon_pos==2, paste0(lag(wt_aa),wt_aa,lead(wt_aa)), NA)) %>%
+  group_by(orf,aa_pos) %>% fill(codon,.direction = 'updown') %>%
+  mutate(codon_aa = Biostrings::GENETIC_CODE[codon])
+
+
+YK11_prot = read_rds(here("data","YK11-PROT.rds"))
+YK11_cds = read_rds(here("data","YK11-CDS.rds"))
+riboseq_strains = c('AMH','BAN','BED','BPL','BTT','CMP','CPI','CQC') # Strains with riboseq data (on 14/01/21)
+strains.info = load.peter2018.data(1) %>%  # strains info from supp mat of Science paper
+  mutate( has_riboseq = standardized_name %in% riboseq_strains)
+
+Y8 = lapply(YK11_prot, function(E){ E[get.strain_orf(E,"strains") %in% riboseq_strains] }) %>% purrr::compact()
+write_rds(Y8, here("data","Y8-PROT.rds"))
+y8 = lapply(YK11_cds, function(E){ E[get.strain_orf(E,"strains") %in% riboseq_strains] }) %>% purrr::compact()
+write_rds(y8,here("data","Y8-CDS.rds"))
+
+
+# snp nucleotides
+y8_nt_var = preload(here("data","Y8-VAR_NT.rds"),
+                    {lapply(y8, get.variants,verbose=F) %>% bind_rows()},"find nucleotide variants...")
+
+# GENOME DATAFRAME
+G = tibble( orf=names(y8),n_strains=lengths(y8),len = widths(y8)) %>%
+  left_join(get.width(CDS), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
+  mutate( match_wt = len == len.s288c )
+
+y8_snp_nt = get.variants.to.SNP(y8_nt_var) %>% add_count(id,ref_pos,name='nvar') %>%
+  group_by(id,ref_pos) %>% mutate( alt_cumfr=sum(alt_fr)) %>%
+  left_join(G,by=c('id'='orf'))
+y8_cds_snp_nt = left_join(y8_snp_nt,wt, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
+  mutate(wt_low = alt_aa == wt_aa, wt_missing=is.na(wt_aa)) %>%
+  mutate(alt_codon =stringi::stri_sub_replace(codon,from=codon_pos,to=codon_pos,replacement=alt_aa)) %>%
+  mutate(alt_codon_aa = Biostrings::GENETIC_CODE[alt_codon], synonymous = (codon_aa == alt_codon_aa) ) %>%
+  mutate(ambiguous= !(alt_aa %in% Biostrings::DNA_BASES)) %>%
+  # replace aa by nt in column names
+  dplyr::rename(ref_nt=ref_aa,alt_nt=alt_aa,wt_nt=wt_aa,cds_pos=ref_pos, cds_fr=ref_fr)
+
+write_rds(y8_cds_snp_nt,here("data",'Y8-SNP_NT.rds'))
+
+# Counting amino acid polymorphisms per protein
+y8_snp_nt_per_orf = y8_cds_snp_nt %>%
+  group_by(id,len,len.s288c,n_strains) %>%
+  summarize(n_snp=sum(nvar),n_var=n_distinct(cds_pos))
+y8_snp_nt_per_orf %>% arrange(n_snp)
+write_rds(y8_snp_nt_per_orf,here("data",'Y8-ORF-VAR_NT.rds'))
+
+# snp amino-acid
+# FIND AMINO ACID VARIANTS
+Y8_aa_var = here("data","Y8-VAR_AA.rds")
+Y8_AA_VAR = preload(Y8_aa_var,{lapply(Y8, get.variants,verbose=F) %>% bind_rows()},"find amino acid variants...")
+
+# PROTEOME DATAFRAME
+P = tibble( orf=names(Y8),n_strains=lengths(Y8),len = widths(Y8)) %>%
+  left_join(get.width(S288C), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
+  mutate( match_wt = len == len.s288c )
+
+# GET AMINO ACID POLYMORPHISMS
+Y8_SNP_AA = get.variants.to.SNP(Y8_AA_VAR) %>%
+  add_count(id,ref_pos,name='nvar') %>%
+  group_by(id,ref_pos) %>%
+  mutate( alt_cumfr=sum(alt_fr)) %>%
+  left_join(P,by=c('id'='orf'))
+
+Y8_PROT_SNP_AA = left_join(Y8_SNP_AA,WT, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
+  mutate(wt_low = alt_aa == wt_aa,
+         wt_missing=is.na(wt_aa),
+         early_stop = (alt_aa == "*" & ref_pos != len),
+         dSTI.ref=get.score.mutation(ref_aa,alt_aa),
+         dSTI.wt=get.score.mutation(wt_aa,alt_aa))
+write_rds(Y8_PROT_SNP_AA,here("data",'Y8-SNP_AA.rds'))
+
+# Counting amino acid polymorphisms per protein
+y8_snp_aa_per_orf = Y8_PROT_SNP_AA %>%
+  group_by(id,len,len.s288c,n_strains) %>%
+  summarize(n_snp=sum(nvar),n_var=n_distinct(ref_pos))
+y8_snp_aa_per_orf %>% arrange(n_snp)
+write_rds(y8_snp_aa_per_orf,here("data",'Y8-ORF-VAR_AA.rds'))
+
