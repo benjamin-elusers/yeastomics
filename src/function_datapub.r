@@ -1877,10 +1877,18 @@ query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
   tictoc::tic('query Ensembl orthologs')
   dataset  = sprintf('%s_gene_ensembl',species)
   ortholog = sprintf('with_%s_homolog',ortho)
+  ens = useEnsembl('ensembl',dataset)
   t0 = proc.time()
   out <- tryCatch({
+    att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
+    att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide','canonical_transcript_protein','subtype',
+                    'perc_id','perc_id_r1','goc_score','wga_coverage','orthology_confidence')
+    att_ortho = intersect(sprintf("%s_%s",ortho,att_species), listAttributes(ens,page='homologs')[,1])
     cat(sprintf("Trying to fetch orthologs from '%s'...",dataset))
-    Q=getBM(attributes=At, mart=useEnsembl('ensembl',dataset), filters = ortholog,  values = T, uniqueRows = T, bmHeader = F)
+    Q=getBM(mart=ens,
+            attributes=c(att_gene,att_ortho),
+            filters = c(ortholog,'biotype'),  values = c(T,'protein_coding'),
+            uniqueRows = T, bmHeader = F)
     return(Q)
   },
   error=function(cond) {
