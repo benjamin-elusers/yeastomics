@@ -1718,6 +1718,21 @@ load.uniprot.proteome = function(species='yeast') { # Older version of get.unipr
 
 ##### Ensembl #####
 ENS_MIRROR='asia'
+
+get_ensembl_version = function(latest=T,withURL=T){
+  URL_FTP_ENSEMBL="http://ftp.ensembl.org/pub/"
+  ensembl_releases = rvest::read_html(URL_FTP_ENSEMBL) %>%
+    rvest::html_nodes("a") %>%
+    rvest::html_text(trim = T) %>%
+    str_subset('release-') %>%
+    str_sub(end = -2) # remove backslash at the end
+
+  if(withURL){ ensembl_releases = paste0(URL_FTP_ENSEMBL,ensembl_releases) }
+  latest_release = gtools::mixedsort(ensembl_releases)[1]
+  if(latest){ return(latest_release) }
+  return(ensembl_releases)
+}
+
 get.ensembl.species= function(){
   URL_ENSEMBL = "https://www.ensembl.org/info/data/ftp/index.html"
   library(rvest)
@@ -1814,6 +1829,28 @@ get_ensembl_mammals = function(){
   ) %>%
     mutate(sp=str_replace(spname,'^([A-Z]).+ ([a-z]+)','\\1\\2') %>% str_to_lower())
   return(mammals)
+}
+
+get_ensembl_vertebrates=function(){
+  library(readr)
+  library(tidyverse)
+  url_ens_vertebrates=paste0(get_ensembl_version(),"/species_EnsemblVertebrates.txt")
+  url_uni_vertebrates=paste0(get_ensembl_version(),"/uniprot_report_EnsemblVertebrates.txt")
+
+  ens_vertebrates=read_delim(url_ens_vertebrates) %>% mutate(species_id=str_replace_all(species_id,'\t',''))
+  uni_vertebrates=read_delim(url_uni_vertebrates) %>% mutate(uniprotCoverage=str_replace_all(uniprotCoverage,'\t',''))
+
+  vertebrates = inner_join(ens_vertebrates,uni_vertebrates,
+                           by = c("#name", "species", "division", "taxonomy_id", "genebuild",
+                                  'assembly'='assembly_id','assembly_accession'='assembly_name') ) %>%
+                           readr::type_convert()
+
+  colnames(vertebrates) = c('name','species','division','tax_id',
+                            'assembly_version','assembly_accession','genebuild',
+                            'variation','microarray','pan_compara','peptide_compara','genome_alignments',
+                            'other_alignments', 'cored_db','species_id','n_protein_coding','n_swissprot','n_trembl','coverage')
+
+  return(vertebrates)
 }
 
 get_ensg_dataset = function(){
