@@ -1842,7 +1842,7 @@ get_ensembl_vertebrates=function(){
 
   vertebrates = inner_join(ens_vertebrates,uni_vertebrates,
                            by = c("#name", "species", "division", "taxonomy_id", "genebuild",
-                                  'assembly'='assembly_id','assembly_accession'='assembly_name') ) %>%
+                                  'assembly'='assembly_name','assembly_accession'='assembly_id') ) %>%
                            readr::type_convert()
 
   colnames(vertebrates) = c('name','species','division','tax_id',
