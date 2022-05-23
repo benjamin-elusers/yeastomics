@@ -1822,7 +1822,8 @@ get_ensg_dataset = function(){
   ens_dataset = listDatasets(ens) %>% dplyr::as_tibble() %>%
                 dplyr::mutate(
                   sp=str_split_fixed(dataset,'_',n=3)[,1],
-                  org = str_split_fixed(description,' genes ',n=2)[,1] %>% str_trim)
+                  org = str_split_fixed(description,' genes ',n=2)[,1] %>% str_trim
+                )
   return(ens_dataset)
 }
 
@@ -1874,8 +1875,9 @@ get_ens_filter_ortho = function(mart='ensembl',dat='hsapiens_gene_ensembl'){
   hs_ens = useEnsembl(mart,dat,mirror=ENS_MIRROR)
   filter_ortho = searchFilters(hs_ens,'homolog') %>%
                  as_tibble %>%
-                 mutate(org=str_split_fixed(name,'_',n=3)[,2]) %>%
-                 mutate(species = str_replace(description,pattern = "Orthologous (.+) Genes", replacement = "\\1"))
+                 mutate(ps=str_split_fixed(name,'_',n=3)[,2]) %>%
+                 mutate(org = str_replace(description,pattern = "Orthologous (.+) Genes", replacement = "\\1")) %>%
+                 dplyr::select(-description)
   return(filter_ortho)
 }
 
