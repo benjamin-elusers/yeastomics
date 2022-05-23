@@ -1737,25 +1737,25 @@ get.ensembl.species= function(){
   # COULD NOT EXTRACT URL LINKS AS A TABLE (so manually reconstructed links from ftp url and species name)
   ss_table_links = ss_table %>%
        mutate( species = tolower(ss_table$spname) %>% str_replace_all(' ','_')  )%>%
-       mutate( dna_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'dna'),
-               c_dna_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'cdna'),
-               cds_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'cds'),
-               nc_rna_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'ncrna'),
-               protein_sequence_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',sp,'pep'),
-               annotated_sequence_embl = sprintf('%s/%s/%s/',url_ftp_pub,'current_embl',sp),
-               annotated_sequence_gen_bank = sprintf('%s/%s/%s/',url_ftp_pub,'current_genbank',sp),
-               gene_sets_gtf = sprintf('%s/%s/%s/',url_ftp_pub,'current_gtf/',sp),
-               gene_sets_gff3 =sprintf('%s/%s/%s/',url_ftp_pub,'current_gff3/',sp),
-               other_annotations_tsv = sprintf('%s/%s/%s/',url_ftp_pub,'current_tsv',sp),
-               other_annotations_rdf = sprintf('%s/%s/%s/',url_ftp_pub,'current_rdf',sp),
-               other_annotations_json = sprintf('%s/%s/%s/',url_ftp_pub,'current_json',sp),
-               whole_databases=sprintf('%s/%s/%s/',url_ftp_pub,'current_mysql',sp),
-               variation_gvf=sprintf('%s/%s/%s/%s',url_ftp_pub,'current_variation',sp,'/gvf'),
-               variation_vcf=sprintf('%s/%s/%s/%s',url_ftp_pub,'current_variation',sp,'/vcf'),
-               variation_vep=sprintf('%s/%s/%s/%s',url_ftp_pub,'current_variation',sp,'/vep'),
-               regulation_gff=sprintf('%s/%s/%s/',url_ftp_pub,'current_regulation',sp),
-               data_files=sprintf('%s/%s/%s/',url_ftp_pub,'current_data_files',sp),
-               bam_big_wig=sprintf('%s/%s/%s/',url_ftp_pub,'current_bamcov',sp)) %>%
+       mutate( dna_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',species,'dna'),
+               c_dna_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',species,'cdna'),
+               cds_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',species,'cds'),
+               nc_rna_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',species,'ncrna'),
+               protein_sequence_fasta = sprintf('%s/%s/%s/%s',url_ftp_pub,'current_fasta',species,'pep'),
+               annotated_sequence_embl = sprintf('%s/%s/%s/',url_ftp_pub,'current_embl',species),
+               annotated_sequence_gen_bank = sprintf('%s/%s/%s/',url_ftp_pub,'current_genbank',species),
+               gene_sets_gtf = sprintf('%s/%s/%s/',url_ftp_pub,'current_gtf/',species),
+               gene_sets_gff3 =sprintf('%s/%s/%s/',url_ftp_pub,'current_gff3/',species),
+               other_annotations_tsv = sprintf('%s/%s/%s/',url_ftp_pub,'current_tsv',species),
+               other_annotations_rdf = sprintf('%s/%s/%s/',url_ftp_pub,'current_rdf',species),
+               other_annotations_json = sprintf('%s/%s/%s/',url_ftp_pub,'current_json',species),
+               whole_databases=sprintf('%s/%s/%s/',url_ftp_pub,'current_mysql',species),
+               variation_gvf=sprintf('%s/%s/%s/%s',url_ftp_pub,'current_variation',species,'/gvf'),
+               variation_vcf=sprintf('%s/%s/%s/%s',url_ftp_pub,'current_variation',species,'/vcf'),
+               variation_vep=sprintf('%s/%s/%s/%s',url_ftp_pub,'current_variation',species,'/vep'),
+               regulation_gff=sprintf('%s/%s/%s/',url_ftp_pub,'current_regulation',species),
+               data_files=sprintf('%s/%s/%s/',url_ftp_pub,'current_data_files',species),
+               bam_big_wig=sprintf('%s/%s/%s/',url_ftp_pub,'current_bamcov',species)) %>%
     dplyr::select(-other_annotations,-gene_sets)
 
   return(ss_table_links)
