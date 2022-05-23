@@ -1875,7 +1875,7 @@ get_ens_filter_ortho = function(mart='ensembl',dat='hsapiens_gene_ensembl'){
   hs_ens = useEnsembl(mart,dat,mirror=ENS_MIRROR)
   filter_ortho = searchFilters(hs_ens,'homolog') %>%
                  as_tibble %>%
-                 mutate(ps=str_split_fixed(name,'_',n=3)[,2]) %>%
+                 mutate(sp=str_split_fixed(name,'_',n=3)[,2]) %>%
                  mutate(org = str_replace(description,pattern = "Orthologous (.+) Genes", replacement = "\\1")) %>%
                  dplyr::select(-description)
   return(filter_ortho)
