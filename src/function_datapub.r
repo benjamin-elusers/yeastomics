@@ -1092,6 +1092,7 @@ load.pombe.orthologs = function() {
 }
 
 
+##### paxDB #####
 find_paxdb_downloads = function(){
   URL_PAXDB = "https://pax-db.org/downloads/latest/"
   paxdb_files = rvest::read_html(URL_PAXDB) %>%
@@ -1422,6 +1423,8 @@ get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated")
 #     numnode = menu(paxdb_nodes, title = "Pick a taxonomic node from the list below",graphics = T)
 #   }
 # }
+
+##### eggNOG #####
 find_eggnog_version = function(.print=T){
   eggnog_files=find_eggnog_downloads()
   .version = str_extract(pattern="^(e[0-9](\\.[0-9])?)\\.",string = eggnog_files) %>%
@@ -1560,7 +1563,7 @@ find.common.ancestor= function(lineage){
 }
 
 # Reference sequences ----------------------------------------------------------
-
+##### SGD #####
 load.sgd.CDS = function(withORF=T,orf.dna="sequence/S288C_reference/orf_dna") {
   library(stringr)
   sgd.url = "http://sgd-archive.yeastgenome.org"
@@ -1620,6 +1623,7 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
   return(Pombase)
 }
 
+##### Uniprot #####
 get.uniprot.mapping = function(taxid) {
   if(missing(taxid)){  stop("Need an uniprot taxon id") }
   UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
@@ -1711,6 +1715,9 @@ load.uniprot.proteome = function(species='yeast') { # Older version of get.unipr
   return(UNI)
 }
 
+
+##### Ensembl #####
+ENS_MIRROR='asia'
 get.ensembl.species= function(){
   URL_ENSEMBL = "https://www.ensembl.org/info/data/ftp/index.html"
   library(rvest)
@@ -1811,7 +1818,7 @@ get_ensembl_mammals = function(){
 
 get_ensg_dataset = function(){
   library(biomaRt)
-  ens <- useEnsembl("ensembl")
+  ens <- useEnsembl("ensembl",mirror=ENS_MIRROR)
   ens_dataset = listDatasets(ens) %>% dplyr::as_tibble() %>%
                 dplyr::mutate(
                   sp=str_split_fixed(dataset,'_',n=3)[,1],
@@ -1827,7 +1834,7 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
   att_uni = c('uniprotswissprot')
   att_type = c('gene_biotype','transcript_biotype')
 
-  hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl')
+  hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
   # Get representative human proteome with UniProt/SwissProt identifiers
   hs_ensg = getBM(mart = hs_ens,
                   attributes = c(att_gene,att_pos,att_struct,att_uni),
@@ -1865,7 +1872,7 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
 
 get_ens_filter_ortho = function(mart='ensembl',dat='hsapiens_gene_ensembl'){
   library(biomaRt)
-  hs_ens = useEnsembl(mart,dat)
+  hs_ens = useEnsembl(mart,dat,mirror=ENS_MIRROR)
   filter_ortho = searchFilters(hs_ens,'homolog') %>%
                  as_tibble %>%
                  mutate(sp=str_split_fixed(name,'_',n=3)[,2]) %>%
@@ -1877,7 +1884,7 @@ query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
   tictoc::tic('query Ensembl orthologs')
   dataset  = sprintf('%s_gene_ensembl',species)
   ortholog = sprintf('with_%s_homolog',ortho)
-  ens = useEnsembl('ensembl',dataset)
+  ens = useEnsembl('ensembl',dataset,mirror=ENS_MIRROR)
   t0 = proc.time()
   out <- tryCatch({
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
@@ -1905,6 +1912,7 @@ query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
   return(out)
 }
 
+##### NCBI Taxonomy #####
 find_ncbi_lineage = function(){
   url_ncbi_tax = "https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/new_taxdump/new_taxdump.tar.gz"
   file_ncbi_tax = basename(ncbi_tax)
