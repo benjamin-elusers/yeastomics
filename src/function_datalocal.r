@@ -425,14 +425,21 @@ load.trna.adaptation = function(inputseq,
   return(res)
 }
 
-load.codon.usage= function(cds,with.counts=F){
+load.codon.usage= function(cds,with.counts=F,sp='sce'){
   if( !require(coRdon) ){ BiocManager::install("coRdon") } # Install this package first
   if( !require(KEGGREST) ){ BiocManager::install("KEGGREST") } # Install this package first
   library(coRdon)
   library(KEGGREST)
   cT=codonTable(cds)
-  orf2ko = sub("ko:","",KEGGREST::keggLink("ko",'sce'))
-  names(orf2ko) =  sub("^.+:","",names(orf2ko))
+  orf2ko = sub("ko:","",KEGGREST::keggLink("ko",sp))
+
+  if(sp == 'hsa'){
+    #query <- keggGet(paste0(orf2ko))
+    uni = keggConv("uniprot", names(orf2ko))
+    names(orf2ko)=  intersect(sub("^.+:","",uni),names(cds))
+  }else{
+    names(orf2ko) =  sub("^.+:","",names(orf2ko))
+  }
 
   # Add KO identifiers to select ribosome
   cT=setKO(cT,ann=orf2ko[cT@ID])
