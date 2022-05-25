@@ -9,7 +9,6 @@
 .Ruserdata
 # Example code in package build process
 *-Ex.R
-data/datasaved-*.zip
 # Output files from R CMD build
 /*.tar.gz
 # Output files from R CMD check
@@ -44,19 +43,25 @@ misc/*
 ### LARGE FILES >50MB
 # find . -size +50M | cat >> .gitignore
 data/ncbi/*
-output/css/*
-output/fonts/*
+data/RESIDUE-EVORATE*.rds
 data/d2p2-yeast-uniprotKB.rds
 data/d2p2-yeast-orf.rds
-output/proteome-features-04_01_2022.rds
-output/PHD-THESIS-F3.1-ortholog-abundance-pombe-cerevisiae.pdf
-prepare/checkpoint_test-leisr-r4s.rdata
 data/YK11-SNP.rds
 data/paxdb_integrated-human_uniprot_features.rds
 data/sgduni-yeast-aligned-datasets.rds
 data/proteome-1011-strains.rds
+data/datasaved-*.zip
+
 .git/objects/pack/pack-15fbc3b388879ed110d246ccdb4c8899993f8e0d.pack
 .git/objects/pack/pack-b89b55d718dd769845c1751148210a689ec671e4.pack
+
 output/loaded-datasets-18_02_2022.rds
 output/loaded-datasets-04_01_2022.rds
+output/css/*
+output/fonts/*
+output/proteome-features-04_01_2022.rds
+output/PHD-THESIS-F3.1-ortholog-abundance-pombe-cerevisiae.pdf
+
+prepare/checkpoint_test-leisr-r4s.rdata
+
 plots/*
