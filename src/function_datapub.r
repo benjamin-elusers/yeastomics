@@ -1687,10 +1687,14 @@ get.uniprot.proteome = function(taxid,DNA=F,fulldesc=F) {
   if(!any(found)){ stop(sprintf("%s not found in the reference proteome!",taxid)) }
   TAX = str_to_title(refprot$superregnum[which(found)])
   UPID = refprot$proteome_id[which(found)]
-  if(DNA){ seqtype = "_DNA.fasta.gz" }
-  proteome_url = sprintf("%s/%s/%s/%s_%s%s",UNIPROT_URL,TAX,UPID,UPID,taxid,SEQTYPE)
-
-  UNI = load.proteome(proteome_url)
+  if(DNA){
+    SEQTYPE = "_DNA.fasta.gz"
+    genome_url = sprintf("%s/%s/%s/%s_%s%s",UNIPROT_URL,TAX,UPID,UPID,taxid,SEQTYPE)
+    UNI = load.genome(genome_url)
+  }else{
+    proteome_url = sprintf("%s/%s/%s/%s_%s%s",UNIPROT_URL,TAX,UPID,UPID,taxid,SEQTYPE)
+    UNI = load.proteome(proteome_url)
+  }
   if(!fulldesc){
     regexUNIPROTAC = "([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})"
     names(UNI) = str_extract(names(UNI), regexUNIPROTAC)
