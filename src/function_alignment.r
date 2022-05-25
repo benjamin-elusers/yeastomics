@@ -121,6 +121,7 @@ count_pair_ali = function(ali){
 msa2df = function(MSA_SEQ,REF_NAME,ID){
 
   if(is(MSA_SEQ,"AAStringSet")){ MSA_SEQ = AAMultipleAlignment(MSA_SEQ)}
+  if(is.null(REF_NAME)){ REF_NAME=ID }
   L = nchar(MSA_SEQ)
   N = length(unmasked(MSA_SEQ))
   IREF = which(rownames(MSA_SEQ) %in% REF_NAME)
