@@ -651,10 +651,15 @@ load.evorate = function(resdir="/media/WEXAC_data/1011G/",
   id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
   list_df_seq = pbmcapply::pbmclapply(X = names(sequences), FUN = id_msa2df, SEQLIST=sequences,
                                        mc.cores = ncores, mc.silent=F, mc.cleanup = T)
-  # list_df_seq=list()
-  # for( x in names(sequences)){
-  #   list_df_seq[[x]] = id_msa2df(x,sequences)
-  # }
+  list_df_seq=list()
+  i=1
+  NSEQ=length(sequences)
+  for( x in names(sequences)){
+    perc = (100 * i / NSEQ) %>% round(d=2)
+    cat(sprintf('[%20s] %s%% %s/%s\n',x,perc,i,NSEQ))
+     list_df_seq[[x]] = id_msa2df(x,sequences)
+     i=i+1
+  }
 
   df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
   tictoc::toc()
