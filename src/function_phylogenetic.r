@@ -400,7 +400,7 @@ get_r4s = function(r4s_resdir="/media/elusers/users/benjamin/A-PROJECTS/03_PostD
     if(!.pb$finished){ .pb$tick() }
     return(read.R4S(file,verbose = F))
   }
-  r4s_type = match.arg(arg=filetype, choices = c("raw.r4s","norm.r4s"),several.ok = F)
+  r4s_type = match.arg(arg=filetype, choices = c("raw.r4s","norm.r4s",".r4s"),several.ok = F)
   r4s_files = list.files(path=r4s_resdir,pattern = r4s_type,full.names = T)
   nfiles = length(r4s_files)
   pb_r4s=  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading r4s (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",r4s_type))
@@ -629,8 +629,11 @@ get_phylo_data = function(data, include.wgd=T,  include.ali=T,
   return(res)
 }
 
-load.evorate = function(resdir="/media/WEXAC_data/1011G/",ref='S288C',ID="ORF", ncores=parallelly::availableCores(which='max')-2){
+load.evorate = function(resdir="/media/WEXAC_data/1011G/",
+                        ext.r4s = 'raw.r4s',
+                        ref='S288C',ID="ORF", ncores=parallelly::availableCores(which='max')-2){
   tictoc::tic("load evolutionary rate...")
+
   sequences = read.sequences(seqfiles = list.files(file.path(resdir,'fasta'),pattern='.fasta$',full.names = T),type='AA',strip.fname = T)
 
   if(ID == "ORF" ){
@@ -645,20 +648,31 @@ load.evorate = function(resdir="/media/WEXAC_data/1011G/",ref='S288C',ID="ORF", 
   df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
   tictoc::toc()
 
-  r4s = get_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = 'raw.r4s',as_df = T)
-  iqtree = get_iqtree(iqtree_resdir = file.path(resdir,"IQTREE/"),filetype = '.mlrate', as_df = T)
-  iqtree2 = get_iqtree(iqtree_resdir = file.path(resdir,"IQTREE/"),filetype = '.rate', as_df = T)
-  leisr = get_leisr(leisr_resdir = file.path(resdir,"LEISR/"),filetype = 'LEISR.json', as_df = T)
+  r4s = get_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = ext.r4s, as_df = T)
+  r4s = r4s %>% mutate(ID=str_remove(ID,".r4s"))
+
+  IQTREE_DIR = file.path(resdir,"IQTREE/")
+  LEISR_DIR = file.path(resdir,"LEISR/")
 
   evorates = left_join(df_seq,r4s, by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
-    left_join(iqtree,by=c('id'='orf','msa_pos'='Site')) %>%
-    left_join(iqtree2,by=c('id'='orf','msa_pos'='Site')) %>%
-    left_join(leisr,by=c('id','msa_pos'='pos')) %>%
-    dplyr::filter(!is.na(ref_pos)) %>%
-    dplyr::rename(r4s_rate=SCORE,
-                  iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate,
-                  leisr_mle = mle, leisr_up=upper, leisr_low=lower, leisr_global= log_l_global, leisr_local= log_l_local  ) %>%
-    dplyr::select(-c('QQ1','QQ2','STD','MSA'))
+      dplyr::filter(!is.na(ref_pos)) %>%
+      dplyr::rename(r4s_rate=SCORE) %>%
+      dplyr::select(-c('QQ1','QQ2','STD','MSA'))
+  if( dir.exists(IQTREE_DIR) ){
+    iqtree = get_iqtree(iqtree_resdir = file.path(resdir,"IQTREE/"),filetype = '.mlrate', as_df = T)
+    iqtree2 = get_iqtree(iqtree_resdir = file.path(resdir,"IQTREE/"),filetype = '.rate', as_df = T)
+    evorates = evorates %>%
+        left_join(iqtree,by=c('id'='orf','msa_pos'='Site')) %>%
+        left_join(iqtree2,by=c('id'='orf','msa_pos'='Site'))
+        dplyr::rename(iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate)
+  }
+  if( dir.exists(LEISR_DIR) ){
+    leisr = get_leisr(leisr_resdir = file.path(resdir,"LEISR/"),filetype = 'LEISR.json', as_df = T)
+    evorates = evorates %>%
+      left_join(leisr,by=c('id','msa_pos'='pos'))
+      dplyr::rename(leisr_mle = mle, leisr_up=upper, leisr_low=lower,
+                    leisr_global= log_l_global, leisr_local= log_l_local  )
+  }
   tictoc::toc()
   return(evorates)
 }
