@@ -638,13 +638,24 @@ load.evorate = function(resdir="/media/WEXAC_data/1011G/",
 
   if(ID == "ORF" ){
     orf = get.orf(names(sequences))
+    orf[is.na(orf)]=names(sequences)[is.na(orf)]
     names(sequences) = orf
+  }else if(ID == "UNIPROT"){
+    uni = names(sequences) %>% str_extract(UNIPROT.nomenclature())
+    uni[is.na(uni)]=names(sequences)[is.na(uni)]
+    names(sequences) = uni
   }
 
   tictoc::tic("convert sequences to dataframe... (with multithreads)")
   message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
-  id_msa2df = function(x, SEQLIST=sequences){ msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x) }
-  list_df_seq = pbmcapply::pbmclapply(mc.cores = ncores, FUN = id_msa2df, SEQLIST=sequences, X = names(sequences), mc.silent=F, mc.cleanup = T)
+  id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
+  list_df_seq = pbmcapply::pbmclapply(X = names(sequences), FUN = id_msa2df, SEQLIST=sequences,
+                                       mc.cores = ncores, mc.silent=F, mc.cleanup = T)
+  # list_df_seq=list()
+  # for( x in names(sequences)){
+  #   list_df_seq[[x]] = id_msa2df(x,sequences)
+  # }
+
   df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
   tictoc::toc()
 
