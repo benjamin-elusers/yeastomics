@@ -6,6 +6,31 @@
 
 # I/O --------------------------------------------------------------------------
 
+url.exists <- function(url) {
+  # Test if url exists
+
+  x <- httr::status_code(httr::HEAD(url))
+  if (identical(x, 200L)) return(TRUE)
+  cnt <- 1
+  while (identical(x, 502L)) {
+    ## server not response
+    ## try again
+    x <- httr::status_code(httr::HEAD(url))
+    if (identical(x, 200L)) return(TRUE)
+    cnt <- cnt + 1
+    if (cnt > 10) break
+  }
+  return(FALSE)
+}
+
+check.url <- function(url) {
+  # Test if url exists and accessible
+
+  idx <- vapply(url, url.exists, logical(1))
+  url[!idx] <- NA
+  return(url)
+}
+
 # Retrieve text content from URL
 open.url <- function(file_url) {
   con <- gzcon(url(file_url))
