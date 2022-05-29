@@ -517,9 +517,9 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
       dplyr::select(protein_id,tm_protein,
                     protinfo,protein_coverage,length,
                     measured_domains, theoretical_number_of_domain,
-                    essential,npep )
+                    npep )
   }
-  # cols = c("Peptide.ID","Aggregation","Position","Tm.Peptide",
+  # cols = c("Peptide.ID","Aggregation","Position","Tm.Peptide", essential,
   #         "Sequence","Pepinfo", "Secondary.Structure","Domain.logic","Domain.Name",
   #          "is.disordered", "T.90..Unfolded")
 
