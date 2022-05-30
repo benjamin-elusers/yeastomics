@@ -65,42 +65,12 @@ DELTAG = load.leuenberger2017.data("Human HeLa Cells",rawdata = F) %>%
   distinct() %>%
   mutate( nres = round(0.01*protein_coverage*length))
 
-TM = load.jarzab2020.data(org = "H.sapiens") # error: only NAs
+TM = load.jarzab2020.data(org = "H.sapiens")
 
 STRING = load.string(tax="9606",phy=F, ful=T, min.score = 900) %>%
   mutate(ORF1 = str_extract(protein1,UNIPROT.nomenclature()),
          ORF2 = str_extract(protein2,UNIPROT.nomenclature())
   ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
-
-org='H.sapiens'
-message("REF: A. Jarzab et al., 2020, Nature Methods")
-message("Meltome atlas—thermal proteome stability across the tree of life")
-#https://static-content.springer.com/esm/art%3A10.1038%2Fs41592-020-0801-4/MediaObjects/41592_2020_801_MOESM7_ESM.xlsx
-F2_url = "https://figshare.com/ndownloader/files/21653313"
-species = c("T.thermophilus", "P.torridus", "G.stearothermophilus",
-            "E.coli", "B.subtilis",
-            "S.cerevisiae", "M.musculus",  "H.sapiens", "C.elegans", "D.melanogaster", "D.rerio",
-            "A.thaliana", "O.antarctica")
-organisms = match.arg(org,species,several.ok = T)
-
-F2a = rio::import(F2_url,col_names = TRUE,skip=1,sheet=1) %>%
-  as_tibble %>%
-  dplyr::filter(Species %in% organisms) %>%
-  janitor::clean_names()
-
-F2b = rio::import(F2_url,col_names = TRUE,skip=1,sheet=2) %>%
-  as_tibble %>%
-  mutate(Species = str_replace_all(Dataset," +","") ) %>%
-  dplyr::select(-Dataset) %>%
-  dplyr::filter(Species %pin% organisms) %>%
-  janitor::clean_names()
-
-F2=left_join(F2a,F2b) %>%
-  separate(col = protein_id, sep = '_',into = c('UNIPROT','GENENAME')) %>%
-  dplyr::select(species,UNIPROT,GENENAME,
-                Tm_celsius=melting_point_c,
-                Tm_type=protein_classification,
-                AUC=area_under_the_melting_curve)
 
 nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca'),"mer")
 CPX = load.meldal.2019.data(species = 'human') %>%

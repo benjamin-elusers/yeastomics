@@ -760,12 +760,13 @@ load.jarzab2020.data = function(org='S.cerevisiae'){
 
   F2b = rio::import(F2_url,col_names = TRUE,skip=1,sheet=2) %>%
     as_tibble %>%
-    mutate(Species = str_replace_all(Dataset," +","") ) %>%
+    mutate(sp = str_replace_all(Dataset," +","") ) %>%
     dplyr::select(-Dataset) %>%
-    dplyr::filter(Species %pin% organisms) %>% # Allow partial matching for H.sapiens
-    janitor::clean_names()
+    dplyr::filter(sp %pin% organisms) %>% # Allow partial matching for H.sapiens
+    janitor::clean_names() %>%
+    mutate(org = str_extract(sp,organisms))
 
-  F2=left_join(F2a,F2b) %>%
+  F2=left_join(F2a,F2b, by=c('species'='org','protein_id')) %>%
      separate(col = protein_id, sep = '_',into = c('UNIPROT','GENENAME')) %>%
      dplyr::select(species,UNIPROT,GENENAME,
                    Tm_celsius=melting_point_c,
