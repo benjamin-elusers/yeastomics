@@ -1,8 +1,7 @@
-hs_r4s = load.evorate(resdir = "/data/benjamin/Evolution/HUMAN",ref = NULL,ext.r4s = '.r4s')
-
+source(here::here("src","__setup_yeastomics__.r"))
 hs_prot = get.uniprot.proteome(9606,DNA = F)
-
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
+library(coRdon)
 hs_codons = codonTable(hs_cdna)
 # Add amino acid with its associated codons
 codon_table = seqinr::SEQINR.UTIL$CODON.AA %>%
@@ -15,6 +14,7 @@ col_codons=codon_table$codon_aa[codon_table$CODON == colnames(codon_count)]
 names(codon_count) = col_codons
 df.CU=load.codon.usage(cds=hs_cdna,with.counts=F,sp = 'hsa')#%>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
 
+#hs_r4s = load.evorate(resdir = "/data/benjamin/Evolution/HUMAN",ref = NULL,ext.r4s = '.r4s')
 hs_r4s = read_rds(here("data","RESIDUE-EVORATE-HUMAN.rds"))
 hs_d2p2 =  read_rds(here("data","d2p2-human-uniprotKB.rds"))
 #hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
@@ -60,8 +60,7 @@ names(df.aa_class)
 PFAM=load.pfam(tax = 9606)
 SUPERFAM=load.superfamily(tax = 'hs') %>% dplyr::rename(seqid = "sequence_id")
 
-
-DELTAG = load.leuenberger2017.data("Human HeLa Cells",rawdata = F) %>% # error with column 'essential'
+DELTAG = load.leuenberger2017.data("Human HeLa Cells",rawdata = F) %>%
   add_count(protein_id,name='npep') %>%
   distinct() %>%
   mutate( nres = round(0.01*protein_coverage*length))
@@ -72,8 +71,38 @@ STRING = load.string(tax="9606",phy=F, ful=T, min.score = 900) %>%
   mutate(ORF1 = str_extract(protein1,UNIPROT.nomenclature()),
          ORF2 = str_extract(protein2,UNIPROT.nomenclature())
   ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
-nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca'),"mer")
 
+org='H.sapiens'
+message("REF: A. Jarzab et al., 2020, Nature Methods")
+message("Meltome atlas—thermal proteome stability across the tree of life")
+#https://static-content.springer.com/esm/art%3A10.1038%2Fs41592-020-0801-4/MediaObjects/41592_2020_801_MOESM7_ESM.xlsx
+F2_url = "https://figshare.com/ndownloader/files/21653313"
+species = c("T.thermophilus", "P.torridus", "G.stearothermophilus",
+            "E.coli", "B.subtilis",
+            "S.cerevisiae", "M.musculus",  "H.sapiens", "C.elegans", "D.melanogaster", "D.rerio",
+            "A.thaliana", "O.antarctica")
+organisms = match.arg(org,species,several.ok = T)
+
+F2a = rio::import(F2_url,col_names = TRUE,skip=1,sheet=1) %>%
+  as_tibble %>%
+  dplyr::filter(Species %in% organisms) %>%
+  janitor::clean_names()
+
+F2b = rio::import(F2_url,col_names = TRUE,skip=1,sheet=2) %>%
+  as_tibble %>%
+  mutate(Species = str_replace_all(Dataset," +","") ) %>%
+  dplyr::select(-Dataset) %>%
+  dplyr::filter(Species %pin% organisms) %>%
+  janitor::clean_names()
+
+F2=left_join(F2a,F2b) %>%
+  separate(col = protein_id, sep = '_',into = c('UNIPROT','GENENAME')) %>%
+  dplyr::select(species,UNIPROT,GENENAME,
+                Tm_celsius=melting_point_c,
+                Tm_type=protein_classification,
+                AUC=area_under_the_melting_curve)
+
+nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca'),"mer")
 CPX = load.meldal.2019.data(species = 'human') %>%
   filter(is_uniprot) %>% # BASED ON UNIPROT
   mutate(oligomers = cut(n_members, breaks = c(1:10,20,81),
