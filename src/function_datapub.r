@@ -742,6 +742,7 @@ load.hausser2019.data=function(show_desc=F){
 }
 
 load.jarzab2020.data = function(org='S.cerevisiae'){
+  library(hutils)
   message("REF: A. Jarzab et al., 2020, Nature Methods")
   message("Meltome atlas—thermal proteome stability across the tree of life")
   #https://static-content.springer.com/esm/art%3A10.1038%2Fs41592-020-0801-4/MediaObjects/41592_2020_801_MOESM7_ESM.xlsx
@@ -761,7 +762,7 @@ load.jarzab2020.data = function(org='S.cerevisiae'){
     as_tibble %>%
     mutate(Species = str_replace_all(Dataset," +","") ) %>%
     dplyr::select(-Dataset) %>%
-    dplyr::filter(Species %in% organisms) %>%
+    dplyr::filter(Species %pin% organisms) %>% # Allow partial matching for H.sapiens
     janitor::clean_names()
 
   F2=left_join(F2a,F2b) %>%
