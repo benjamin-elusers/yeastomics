@@ -57,6 +57,12 @@ UNIPROT.nomenclature = function(){
   return(ACCESSION)
 }
 
+# Ensembl protein regular expression
+ENSEMBL.nomenclature = function(){
+  ACCESSION = "(ENSP[0-9]+)"
+  return(ACCESSION)
+}
+
 clean_header = function(header){
   header %>%
     tolower %>% # CONVERT TO LOWERCASE
