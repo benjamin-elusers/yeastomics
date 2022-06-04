@@ -1998,3 +1998,84 @@ find_ncbi_taxid = function(spnames,dbfile='data/ncbi/accessionTaxa.sql',verbose=
   }
 }
 
+
+
+
+
+
+
+
+# Shortcut for loading datasets ------------------------------------------------
+
+load.abundance = function(){
+  # UNIFIED ABUNDANCE OF S.CEREVISIAE PROTEOME
+  abundance = load.ho2018.data() %>%
+    dplyr::select(orf, MPC = mean.mpc, MDPC = median.mpc, gfp=GFP.avg, ms=MS.avg) %>% # select the average expression
+    group_by(orf) %>% dplyr::summarise(across(where(is.numeric),log10)) %>% # apply log10 to expression
+    rowwise() %>% mutate( rowNA = all(is.na(c_across(where(is.numeric)))) ) %>% # check how many expression values
+    dplyr::filter(rowNA || !is.na(MPC) ) %>% dplyr::select(-rowNA) # remove no values
+
+  return(abundance)
+}
+
+load.annotation = function(){
+  # Preloaded uniprot data can be generated in 5min with:
+  #   uni = load.uniprot.features(tax="559292",refdb="UNIPROTKB")
+  #   sgd = load.sgd.features()
+
+  uni_feat = preload(here::here('data','uniprot-features.rds'),load.uniprot.features(tax="559292",refdb="UNIPROTKB")) %>%
+    dplyr::select(-c(REVIEWED,COMMENTS,SUBLOC))
+  sgd_desc =  preload(here::here('data','uniprot-sgd-annotation.rds'),load.sgd.features())
+  biofunc = load.vanleeuwen2016.data(single_orf=T)
+  enog_annot = eggnog_annotations_species(4891,4932)
+
+  annotation = full_join(sgd_desc,uni_feat,by=c("SGD","UNIPROT"='UNIPROTKB')) %>%
+    full_join(biofunc,by='ORF')  %>%
+    full_join(enog_annot, by =c('ORF'='string')) %>%
+    filter(!is.na(ORF) | is.na(UNIPROT)) %>%
+    mutate(GENENAME = ifelse(is.na(GENENAME),ORF,GENENAME)) %>%
+    mutate(letter = fct_drop(letter)) %>%
+    relocate(SGD,GENENAME,ORF,UNIPROT,PNAME,
+             L,FAMILIES,FUNCTION,ROLE,BIOPROCESS_all,enog_annot,
+             LOC,COMPLEX,ORTHO,OTHER,KEYWORDS,
+             EXISTENCE,SCORE)
+
+  return(annotation)
+}
+
+load.network = function(net=c('string','intact')){
+  ref_net = match.arg(net,choices = net, several.ok = F)
+  if(ref_net=='string'){
+    network = load.string(tax="4932",phy=F, ful=T, min.score = 700) %>%
+      mutate(ORF1 = str_extract(protein1,SGD.nomenclature()),
+             ORF2 = str_extract(protein2,SGD.nomenclature())
+      ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
+  }else if(ref_net=='intact'){
+    network = load.intact.yeast(min.intact.score = 0.4) %>%
+      dplyr::rename(ORF1=protA,ORF2=protB)
+    #network = load.intact()
+  }
+  return(network)
+}
+
+load.clade = function(clade1='schizo',clade2='sacch.wgd'){
+  # BRANCH LENGTH IN FUNGI CLADES
+  # Normalized branch length (Kc):
+  #  Kc = SUM(branch lengths in clade subtree Tc) / SUM(branch lengths in species tree Ts)
+  enog.cols = c('Tax','NOG','nog.1to1','RAXML','FunCat','STRING','orf','sp1','sp2','uni1','uni2','ppm1','ppm2')
+  clade.cols = c('ppm1.log10','ppm2.log10','clade1','clade2','XX','YY')
+  clade = get_clade_data(g1=clade1,g2=clade2,rate = 'ratio') %>%
+    dplyr::select(all_of(enog.cols), all_of(clade.cols), starts_with(clade1), starts_with(clade2)) %>%
+    dplyr::rename(Kc1.log10=XX,Kc2.log10=YY)
+  return(clade)
+}
+
+load.fungi.evo = function(){
+  ### FUNGI CONTAIN ALL DATA ABOUT THE FUNGI LINEAGE EVOLUTIONARY RATE
+  fungi = load.dubreuil2021.data(1) %>%
+    dplyr::select('ORF','UNIPROT','PPM',c(starts_with('EVO.'))) %>%
+    filter(!(is.dup(UNIPROT) & is.na(EVO.FULL) & is.na(PPM))) %>%
+    #dplyr::mutate(across(starts_with("EVO."),function(x){ x/mean_(x) },.names="norm.{.col}")) %>% # scale and center all evo rate
+    dplyr::mutate(across(starts_with("log10.EVO."),log10,.names = "log10.{.col}")) # # apply log10 to rate4site
+  return(fungi)
+}
