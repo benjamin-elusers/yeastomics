@@ -240,3 +240,35 @@ y8_snp_aa_per_orf = Y8_PROT_SNP_AA %>%
 y8_snp_aa_per_orf %>% arrange(n_snp)
 write_rds(y8_snp_aa_per_orf,here("data",'Y8-ORF-VAR_AA.rds'))
 
+
+###
+
+#sc_identifiers = load.annotation(only_ids=T)
+
+yk11_snp_nt_per_orf = readRDS(here("data",'YK11-ORF-VAR_NT.rds'))
+yk11_snp_nt = readRDS(here('data','YK11-SNP_NT.rds')) %>% left_join(yk11_snp_nt_per_orf)
+y8_snp_nt_per_orf = readRDS(here("data",'Y8-ORF-VAR_NT.rds'))
+y8_snp_nt = readRDS(here('data','Y8-SNP_NT.rds')) %>% left_join(y8_snp_nt_per_orf)
+
+sc_snp_nt = left_join(yk11_snp_nt,y8_snp_nt,
+                      by=c('id', "len", "len.s288c",  "wt_nt", "wt_low", "wt_missing",
+                           "cds_pos", "bin.pos", "ref_nt", "match_wt",
+                           "codon_pos", "aa_pos", "codon", "codon_aa",
+                           "alt_nt", "alt_codon", "alt_codon_aa"),
+                      suffix = c(".yk11", ".y8") ) %>%
+            mutate(is_y8 = !is.na(n_snp.y8))
+write_rds(sc_snp_nt, here('data','YEAST_VAR_NT.rds'))
+
+yk11_snp_aa_per_orf = readRDS(here("data",'YK11-ORF-VAR_AA.rds'))
+yk11_snp_aa = readRDS(here('data','YK11-SNP_AA.rds')) %>% left_join(yk11_snp_aa_per_orf)
+
+y8_snp_aa_per_orf = readRDS(here("data",'Y8-ORF-VAR_AA.rds'))
+y8_snp_aa = readRDS(here('data','Y8-SNP_AA.rds'))  %>% left_join(y8_snp_aa_per_orf)
+
+sc_snp_aa = left_join(yk11_snp_aa,y8_snp_aa,
+                       by=c('id', "len", "len.s288c", "wt_low", "wt_missing",
+                            'ref_pos', "bin.pos", 'ref_aa', "match_wt", 'alt_aa'),
+                       suffix =  c(".yk11", ".y8") ) %>%
+            mutate(is_y8 = !is.na(n_snp.y8))
+write_rds(sc_snp_aa, here('data','YEAST_VAR_AA.rds'))
+

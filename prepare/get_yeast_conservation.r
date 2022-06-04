@@ -1,6 +1,9 @@
 source("https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/src/__setup_yeastomics__.r")
 
-sc_identifiers = load.annotation()
+sc_annotation = load.annotation()
+sc_identifiers = sc_annotation %>% dplyr::select(UNIPROT,ORF,GENENAME,SGD,OG) %>%
+                  dplyr::filter(!duplicated(ORF) & !duplicated(UNIPROT) & !duplicated(SGD) & !duplicated(GENENAME))
+
 evo_snp = preload( here('data','evorate-strains-snp.rds') ,load.evorate())
 #resdir="/media/WEXAC_data/1011G/"
 #ext.r4s = 'raw.r4s'
@@ -40,13 +43,30 @@ write_delim(evo_full,here::here('output','evolution-fungi-residue.tsv'),delim = 
 write_delim(evo_full_prot,here::here('output','evolution-fungi-protein.tsv'),delim = '\t')
 
 
-evo_yeast = left_join(evo_snp_prot,evo_full_prot, by=c('id','len_ref'),suffix=c('.yk11','.fungi')) %>%
+## CORRELATION EVORATE
+fungi_rate = evo_full_prot %>% dplyr::select(r4s:leisr_local) %>% as.matrix
+strains_rate = evo_snp_prot %>% dplyr::select(r4s:leisr_local) %>% as.matrix
+er_fungi_cor = cor(fungi_rate,use='pairwise.complete',met='spearman')
+er_strains_cor = cor(strains_rate,use='pairwise.complete',met='spearman')
+
+library(ggcorrplot)
+p_fungi = ggcorrplot(er_fungi_cor,type='upper',method='circle',lab = T,lab_size = 3, title='fungi evo. rate',ggtheme = theme_classic())
+p_snp = ggcorrplot(er_strains_cor,type='upper',method='circle',lab = T,lab_size = 3, title='strains evo. rate',ggtheme = theme_classic())
+ggsave(p_fungi, path = here('plots'),filename='cor-evolution-fungi.png',scale=1.2)
+ggsave(p_snp, path = here('plots'),filename='cor-evolution-snp.png',scale=1.2)
+er_fungi_worst   = colnames(er_fungi_cor)[ abs(er_fungi_cor[1,]) < 0.7 ]
+er_strains_worst = colnames(er_strains_cor)[ abs(er_strains_cor[1,]) < 0.7 ]
+
+evo_yeast = left_join(evo_full_prot,evo_snp_prot, by=c('id','len_ref'),suffix=c('.fungi','.yk11')) %>%
   mutate(HAS_ORTHOLOG = !is.na(len_msa.fungi) ) %>%
   left_join(sc_identifiers,by=c('id'='ORF')) %>%
-  dplyr::mutate( f_snp = n_mismatched/len_msa.yk11, pid.fungi=1-f_mismatched) %>%
-  dplyr::rename(orf=id,n_snp = n_mismatched) %>%
-  dplyr::select(-f_mismatched) %>%
-  relocate(orf,UNIPROT,GENENAME,SGD,HAS_ORTHOLOG, len_ref,
+  dplyr::mutate( f_snp = n_mismatched.yk11/len_msa.yk11, pid.fungi=1-f_mismatched.fungi) %>%
+  dplyr::rename(orf=id,n_snp = n_mismatched.yk11) %>%
+  dplyr::select(-f_mismatched.fungi) %>%
+  relocate(orf,UNIPROT,GENENAME,SGD, OG, HAS_ORTHOLOG, len_ref,
            len_msa.yk11, n_snp,f_snp, len_msa.fungi,pid.fungi) %>%
   dplyr::select(-paste0(er_fungi_worst,'.fungi'),-paste0(er_strains_worst,'.yk11'))
+
+write_delim(evo_yeast,here::here('output','evolution-yeast-protein.tsv'),delim = '\t')
+write_rds(evo_yeast,here::here('data','evolution-yeast-protein.rds'))
 
