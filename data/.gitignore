@@ -11,3 +11,5 @@ Y8-*.rds
 Y8*.rds
 ncbi/*
 RESIDUE-EVORATE*.rds
+YEAST_VAR_AA.rds
+YEAST_VAR_NT.rds
