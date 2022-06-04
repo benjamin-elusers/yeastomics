@@ -140,6 +140,8 @@ hs_string = load.string(tax="9606",phy=F, ful=T, min.score = 900) %>%
   ) %>% relocate(ens1,ens2) %>% dplyr::select(-c(protein1,protein2))
 
 hs_string_centralities = network.centrality(hs_string %>% dplyr::select(ens1,ens2))
+hs_string_centralities$string.megahub_func = hs_string_centralities$cent_deg >= 300
+hs_string_centralities$string.superhub_func = between(hs_string_centralities$cent_deg,100,300)
 #%>%
 #   mutate(string.megahub_func = )
 # INTERACTIONS$string.megahub_func = cent.STRING %>% dplyr::filter(cent_deg>300) %>% pull(ids)
