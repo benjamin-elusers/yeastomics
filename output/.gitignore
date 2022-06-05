@@ -21,3 +21,8 @@ proteome-properties-27_06_2021.rds
 yeastOmics-290921.rds
 evolution-snp-residue.tsv
 evolution-fungi-residue.tsv
+evolution-fungi-protein.tsv.gz
+evolution-fungi-residue.tsv.gz
+evolution-snp-protein.tsv.gz
+evolution-snp-residue.tsv.gz
+evolution-yeast-protein.tsv.gz
