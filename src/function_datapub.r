@@ -1459,9 +1459,10 @@ eggnog_annotations_species=function(node,species){
   #library(rotl)
   eggnog_annotation_file = sprintf("%s/%s.og_annotations.tsv",URL_EGGNOG,.ver)
   eggnog_annotations_node = readr::read_delim(eggnog_annotation_file,"\t",
-                                              col_types = 'fffc',
-                                              col_names = c('node','og','letter','enog_annot')) %>%
-                            dplyr::filter(node == node)
+                                              col_types = 'ccfc',
+                                              col_names = c('nodes','og','letter','enog_annot')) %>%
+                            dplyr::filter(nodes == node)
+
 
   members_node = get_eggnog_node(node) %>%
         separate_rows(string_ids,sep = ',') %>%
@@ -1470,8 +1471,9 @@ eggnog_annotations_species=function(node,species){
         dplyr::select( -c(algo,tree,taxon_ids,string_ids) ) %>%
         distinct()
 
-  annotation_sp = left_join(members_node,eggnog_annotations_node, by=c('node','OG'='og')) %>%
-                    dplyr::filter(taxon == species)
+  annotation_sp = left_join(members_node,eggnog_annotations_node, by=c('node'='nodes','OG'='og')) %>%
+                    dplyr::filter(taxon %in% species) %>%
+                    mutate( OG = fct_drop(OG))
   return(annotation_sp)
 }
 
