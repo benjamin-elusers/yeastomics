@@ -22,8 +22,8 @@ evo_snp_prot =  group_by(evo_snp,id) %>%
              leisr_low=mean(leisr_low[leisr_low!=0]),
              leisr_up=mean(leisr_up[leisr_up!=0]), leisr_global=mean(leisr_global), leisr_local=mean(leisr_local) )
 
-write_delim(evo_snp,here::here('output','evolution-snp-residue.tsv'),delim = '\t')
-write_delim(evo_snp_prot,here::here('output','evolution-snp-protein.tsv'),delim = '\t')
+write_delim(evo_snp,gzfile(here::here('output','evolution-snp-residue.tsv.gz')),delim = '\t')
+write_delim(evo_snp_prot,gzfile(here::here('output','evolution-snp-protein.tsv.gz')),delim = '\t')
 
 evo_full = preload(here('data','evorate-fungi-orthologs.rds'),
                     load.evorate(resdir="/media/WEXAC_data/FUNGI/",ref='Saccharomyces_cerevisiae',ID="ORF"))
@@ -38,9 +38,8 @@ evo_full_prot = group_by(evo_full, id) %>%
              leisr_mle = mean(leisr_mle), leisr_low=mean(leisr_low), leisr_up=mean(leisr_up),
              leisr_global=mean(leisr_global), leisr_local=mean(leisr_local) )
 
-
-write_delim(evo_full,here::here('output','evolution-fungi-residue.tsv'),delim = '\t')
-write_delim(evo_full_prot,here::here('output','evolution-fungi-protein.tsv'),delim = '\t')
+write_delim(evo_full,gzfile(here::here('output','evolution-fungi-residue.tsv.gz')),delim = '\t')
+write_delim(evo_full_prot,gzfile(here::here('output','evolution-fungi-protein.tsv.gz')),delim = '\t')
 
 
 ## CORRELATION EVORATE
@@ -67,6 +66,6 @@ evo_yeast = left_join(evo_full_prot,evo_snp_prot, by=c('id','len_ref'),suffix=c(
            len_msa.yk11, n_snp,f_snp, len_msa.fungi,pid.fungi) %>%
   dplyr::select(-paste0(er_fungi_worst,'.fungi'),-paste0(er_strains_worst,'.yk11'))
 
-write_delim(evo_yeast,here::here('output','evolution-yeast-protein.tsv'),delim = '\t')
-write_rds(evo_yeast,here::here('data','evolution-yeast-protein.rds'))
+write_delim(evo_yeast,gzfile(here::here('output','evolution-yeast-protein.tsv.gz')),delim = '\t')
+saveRDS(evo_yeast,here::here('data','evolution-yeast-protein.rds'))
 
