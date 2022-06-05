@@ -2013,7 +2013,7 @@ load.abundance = function(){
   return(abundance)
 }
 
-load.annotation = function(only_ids=T){
+load.annotation = function(only_ids=F){
   # Preloaded uniprot data can be generated in 5min with:
   #   uni = load.uniprot.features(tax="559292",refdb="UNIPROTKB")
   #   sgd = load.sgd.features()
@@ -2035,9 +2035,12 @@ load.annotation = function(only_ids=T){
              LOC,COMPLEX,ORTHO,OTHER,KEYWORDS,
              EXISTENCE,SCORE)
 
-  identifiers = annotation %>% dplyr::select(UNIPROT,ORF,GENENAME,SGD,OG) %>%
-    dplyr::filter(!duplicated(ORF) & !duplicated(UNIPROT) & !duplicated(SGD) & !duplicated(GENENAME))
-  if(only_ids){ return(identifiers) }
+
+  if(only_ids){
+    identifiers = annotation %>% dplyr::select(UNIPROT,ORF,GENENAME,SGD,OG) %>%
+      dplyr::filter(!duplicated(ORF) & !duplicated(UNIPROT) & !duplicated(SGD) & !duplicated(GENENAME))
+    return(identifiers)
+  }
 
   return(annotation)
 }
