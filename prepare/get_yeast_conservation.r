@@ -3,7 +3,6 @@ source("https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/src/_
 sc_annotation = load.annotation()
 sc_identifiers = sc_annotation %>% dplyr::select(UNIPROT,ORF,GENENAME,SGD,OG) %>%
                   dplyr::filter(!duplicated(ORF) & !duplicated(UNIPROT) & !duplicated(SGD) & !duplicated(GENENAME))
-
 evo_snp = preload( here('data','evorate-strains-snp.rds') ,load.evorate())
 #resdir="/media/WEXAC_data/1011G/"
 #ext.r4s = 'raw.r4s'
