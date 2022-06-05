@@ -44,7 +44,7 @@ if( file.exists(YK11_SNP_AA.rds) ){
            dSTI.ref=get.score.mutation(ref_aa,alt_aa),
            dSTI.wt=get.score.mutation(wt_aa,alt_aa))
   # Save amino acid polymorphism
-  write_rds(PROT_SNP_AA,here("data",'YK11-SNP_AA.rds'))
+  saveRDS(PROT_SNP_AA,here("data",'YK11-SNP_AA.rds'))
 }
 
 # Counting amino acid polymorphisms per protein
@@ -52,7 +52,7 @@ snp_aa_per_orf = PROT_SNP_AA %>%
   group_by(id,len,len.s288c,n_strains) %>%
   summarize(n_snp=sum(nvar),n_var=n_distinct(ref_pos))
 snp_aa_per_orf %>% arrange(n_snp)
-write_rds(snp_aa_per_orf,here("data",'YK11-ORF-VAR_AA.rds'))
+saveRDS(snp_aa_per_orf,here("data",'YK11-ORF-VAR_AA.rds'))
 
 # Find Single Nucleotide Polymorphisms (SNP) -----------------------------------
 CDS = load.sgd.CDS(withORF=T) # Reference SGD DNA coding sequences
@@ -103,7 +103,7 @@ if( file.exists(cds_snp_nt.rds) ){
     dplyr::rename(ref_nt=ref_aa,alt_nt=alt_aa,wt_nt=wt_aa,cds_pos=ref_pos, cds_fr=ref_fr)
 
   # Save nucleotide polymorphism
-  write_rds(cds_snp_nt,cds_snp_nt.rds)
+  saveRDS(cds_snp_nt,cds_snp_nt.rds)
 }
 
 # Counting amino acid polymorphisms per protein
@@ -111,7 +111,7 @@ snp_nt_per_orf = cds_snp_nt %>%
   group_by(id,len,len.s288c,n_strains) %>%
   summarize(n_snp=sum(nvar),n_var=n_distinct(cds_pos))
 snp_nt_per_orf %>% arrange(n_snp)
-write_rds(snp_nt_per_orf,here("data",'YK11-ORF-VAR_NT.rds'))
+saveRDS(snp_nt_per_orf,here("data",'YK11-ORF-VAR_NT.rds'))
 
 head(cds_snp_nt)
 head(PROT_SNP_AA)
@@ -140,7 +140,7 @@ if( file.exists(aligned_1011_prot) ){
     arrange(nsnp,desc(pid_proteome),desc(norf))%>%
     left_join(load.peter2018.data(1), by=c('strain'='standardized_name'))
 
-  write_rds(best_strain, here("prepare","best_strain_aligned_to_s288c_proteome.rds"))
+  saveRDS(best_strain, here("prepare","best_strain_aligned_to_s288c_proteome.rds"))
 
   # Show
   median_snp = median(best_strain$nsnp)
@@ -174,9 +174,9 @@ strains.info = load.peter2018.data(1) %>%  # strains info from supp mat of Scien
   mutate( has_riboseq = standardized_name %in% riboseq_strains)
 
 Y8 = lapply(YK11_prot, function(E){ E[get.strain_orf(E,"strains") %in% riboseq_strains] }) %>% purrr::compact()
-write_rds(Y8, here("data","Y8-PROT.rds"))
+saveRDS(Y8, here("data","Y8-PROT.rds"))
 y8 = lapply(YK11_cds, function(E){ E[get.strain_orf(E,"strains") %in% riboseq_strains] }) %>% purrr::compact()
-write_rds(y8,here("data","Y8-CDS.rds"))
+saveRDS(y8,here("data","Y8-CDS.rds"))
 
 
 # snp nucleotides
@@ -199,14 +199,14 @@ y8_cds_snp_nt = left_join(y8_snp_nt,wt, by=c('id'='orf','ref_pos'='wt_pos','len.
   # replace aa by nt in column names
   dplyr::rename(ref_nt=ref_aa,alt_nt=alt_aa,wt_nt=wt_aa,cds_pos=ref_pos, cds_fr=ref_fr)
 
-write_rds(y8_cds_snp_nt,here("data",'Y8-SNP_NT.rds'))
+saveRDS(y8_cds_snp_nt,here("data",'Y8-SNP_NT.rds'))
 
 # Counting amino acid polymorphisms per protein
 y8_snp_nt_per_orf = y8_cds_snp_nt %>%
   group_by(id,len,len.s288c,n_strains) %>%
   summarize(n_snp=sum(nvar),n_var=n_distinct(cds_pos))
 y8_snp_nt_per_orf %>% arrange(n_snp)
-write_rds(y8_snp_nt_per_orf,here("data",'Y8-ORF-VAR_NT.rds'))
+saveRDS(y8_snp_nt_per_orf,here("data",'Y8-ORF-VAR_NT.rds'))
 
 # snp amino-acid
 # FIND AMINO ACID VARIANTS
@@ -231,25 +231,23 @@ Y8_PROT_SNP_AA = left_join(Y8_SNP_AA,WT, by=c('id'='orf','ref_pos'='wt_pos','len
          early_stop = (alt_aa == "*" & ref_pos != len),
          dSTI.ref=get.score.mutation(ref_aa,alt_aa),
          dSTI.wt=get.score.mutation(wt_aa,alt_aa))
-write_rds(Y8_PROT_SNP_AA,here("data",'Y8-SNP_AA.rds'))
+saveRDS(Y8_PROT_SNP_AA,here("data",'Y8-SNP_AA.rds'))
 
 # Counting amino acid polymorphisms per protein
 y8_snp_aa_per_orf = Y8_PROT_SNP_AA %>%
   group_by(id,len,len.s288c,n_strains) %>%
   summarize(n_snp=sum(nvar),n_var=n_distinct(ref_pos))
 y8_snp_aa_per_orf %>% arrange(n_snp)
-write_rds(y8_snp_aa_per_orf,here("data",'Y8-ORF-VAR_AA.rds'))
+saveRDS(y8_snp_aa_per_orf,here("data",'Y8-ORF-VAR_AA.rds'))
 
 
 ###
-
-#sc_identifiers = load.annotation(only_ids=T)
-
 yk11_snp_nt_per_orf = readRDS(here("data",'YK11-ORF-VAR_NT.rds'))
 yk11_snp_nt = readRDS(here('data','YK11-SNP_NT.rds')) %>% left_join(yk11_snp_nt_per_orf)
 y8_snp_nt_per_orf = readRDS(here("data",'Y8-ORF-VAR_NT.rds'))
 y8_snp_nt = readRDS(here('data','Y8-SNP_NT.rds')) %>% left_join(y8_snp_nt_per_orf)
 
+# Yeast SNP (across 1011 or 8 species) ------------------------------------
 sc_snp_nt = left_join(yk11_snp_nt,y8_snp_nt,
                       by=c('id', "len", "len.s288c",  "wt_nt", "wt_low", "wt_missing",
                            "cds_pos", "bin.pos", "ref_nt", "match_wt",
@@ -257,7 +255,7 @@ sc_snp_nt = left_join(yk11_snp_nt,y8_snp_nt,
                            "alt_nt", "alt_codon", "alt_codon_aa"),
                       suffix = c(".yk11", ".y8") ) %>%
             mutate(is_y8 = !is.na(n_snp.y8))
-write_rds(sc_snp_nt, here('data','YEAST_VAR_NT.rds'))
+saveRDS(sc_snp_nt, here('data','YEAST_VAR_NT.rds'))
 
 yk11_snp_aa_per_orf = readRDS(here("data",'YK11-ORF-VAR_AA.rds'))
 yk11_snp_aa = readRDS(here('data','YK11-SNP_AA.rds')) %>% left_join(yk11_snp_aa_per_orf)
@@ -270,5 +268,20 @@ sc_snp_aa = left_join(yk11_snp_aa,y8_snp_aa,
                             'ref_pos', "bin.pos", 'ref_aa', "match_wt", 'alt_aa'),
                        suffix =  c(".yk11", ".y8") ) %>%
             mutate(is_y8 = !is.na(n_snp.y8))
-write_rds(sc_snp_aa, here('data','YEAST_VAR_AA.rds'))
+saveRDS(sc_snp_aa, here('data','YEAST_VAR_AA.rds'))
 
+# Yeast AA and NT variants per ORF (1011 or 8 strains) --------------------
+
+y8_orf_aavar = read_rds( here('data','Y8-ORF-VAR_AA.rds') )
+y8_orf_ntvar = read_rds( here('data','Y8-ORF-VAR_NT.rds') )
+yk11_orf_aavar = read_rds( here('data','YK11-ORF-VAR_AA.rds') )
+yk11_orf_ntvar = read_rds( here('data','YK11-ORF-VAR_NT.rds') )
+
+yk11_orf_var = left_join(yk11_orf_aavar,yk11_orf_ntvar, by=c('id','n_strains'),suffix=c('.aa','.nt'))
+y8_orf_var = left_join(y8_orf_aavar,y8_orf_ntvar, by=c('id','n_strains'),suffix=c('.aa','.nt'))
+
+yeast_orf_var = left_join(yk11_orf_var,y8_orf_var,
+                          by=c('id','len.aa','len.s288c.aa','len.nt','len.s288c.nt'),
+                          suffix=c('.yk11','.y8')) %>%
+  relocate(id,n_strains.y8,n_strains.yk11,len.s288c.nt,len.s288c.aa, len.aa,len.nt )
+saveRDS(yeast_orf_var, here('data','YEAST_ORF_VAR.rds'))
