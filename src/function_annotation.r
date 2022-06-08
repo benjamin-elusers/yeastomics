@@ -335,11 +335,12 @@ get.uniprot.pathways = function(ORG="YEAST"){
   return(PATHWAY)
 }
 
-get.KEGG = function(sp='sce',type=c('pathway','module'),as.df=F){
+get.KEGG = function(sp='sce',type=c('pathway','module'),as.df=F,to_uniprot=F){
 
   library(KEGGREST)
   library(tidyverse)
 
+  ko = KEGGREST::keggLink("ko",sp)
   genes.grp = keggLink(type,sp)
   df1 =enframe(genes.grp, name="sp.id", value="grp") %>%
         mutate( id = sub(paste0(sp,":"),"",sp.id) )
@@ -348,13 +349,24 @@ get.KEGG = function(sp='sce',type=c('pathway','module'),as.df=F){
     sp = ""
   }
 
-  grp.desc = keggList(type,sp)
+  grp.desc = keggList(type,s)
   df2 =enframe(grp.desc, name = 'grp', value='desc')
   if(type == 'pathway'){ df2$desc  = sub(" -[^-]+$","",df2$desc) }
 
   ## returns gene-pathway
   df = left_join(df2,df1,by='grp') %>%
        filter(!is.na(id))
+
+  if(to_uniprot){
+    cat('convert id to uniprot...')
+    # Takes a long time...
+    id_kegg = sub("ko:","",ko) %>% enframe(value='ko')
+    uni = keggConv("uniprot", id_kegg$name) %>% enframe(value='uniprot')
+    kegg2uni = dplyr::left_join(id_kegg,uni,by=c('name')) %>% mutate(uniprot = sub("up:","",uniprot))
+    df = df %>% left_join(kegg2uni, by=c('sp.id'='name')) %>% dplyr::filter(!is.na(uniprot))
+    df$id = df$uniprot
+  }
+
   if(as.df){ return(df) }
   return( split(df$id,df$desc,drop = T) )
 }
