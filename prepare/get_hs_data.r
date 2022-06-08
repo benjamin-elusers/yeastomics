@@ -1,4 +1,7 @@
 source(here::here("src","__setup_yeastomics__.r"))
+# Reference identifiers for human proteome (Ensembl and Uniprot) ---------------
+hs_ens2uni =readRDS(here("data","ensembl-human-uniprot.rds"))
+
 # Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
@@ -18,12 +21,12 @@ col_codons=codon_table$codon_aa[codon_table$CODON == colnames(codon_count)]
 names(codon_count) = col_codons
 hs_CU=load.codon.usage(cds=hs_cdna,with.counts=F,sp = 'hsa') %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
 
-# Single amino-acid frequencies ----------------------------------------------
+# Single amino-acid frequencies ------------------------------------------------
 AA.FR = letterFrequency(hs_prot,as.prob = T,letters = get.AA1()) %>% bind_cols( id=names(hs_prot))
 AA.COUNT = letterFrequency(hs_prot,as.prob = F,letters = get.AA1())%>% bind_cols( id=names(hs_prot))
 hs_aa = AA.FR %>% rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-id)
 
-# Grouped amino-acid frequencies ---------------------------------------------
+# Grouped amino-acid frequencies -----------------------------------------------
 aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>%
   append( list('Alcohol'=c('S','T'),
                'Turnlike'=c('A','C','D','E','G','H','K','N','Q','R','S','T'))
@@ -38,8 +41,10 @@ AACLASS.FR = map(aa.prop, sum.aa.fr, BS=hs_prot )
 hs_aa_class = AACLASS.FR %>% purrr::reduce(full_join,by='id') %>%
               rename_with(~aa.class, starts_with('fr')) %>%
               rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-id)
+# Abundance --------------------------------------------------------------------
+hs_ppm_uni = readRDS(here::here("data","paxdb_integrated_human.rds"))
 
-# Conservation ---------------------------------------------------------------
+# Conservation -----------------------------------------------------------------
 #hs_r4s = load.evorate(resdir = "/data/benjamin/Evolution/HUMAN",ref = NULL,ext.r4s = '.r4s')
 hs_r4s = read_rds(here("data","RESIDUE-EVORATE-HUMAN.rds")) %>% group_by(id) %>%
              summarize(lmsa=max(msa_pos), lref=max(ref_pos),
@@ -50,7 +55,7 @@ hs_r4s = read_rds(here("data","RESIDUE-EVORATE-HUMAN.rds")) %>% group_by(id) %>%
 
 #plot(density(x = hs_r4s_prot$r4s_mammals))
 
-# Disorder -------------------------------------------------------------------
+# Disorder ---------------------------------------------------------------------
 hs_d2p2 =  read_rds(here("data","d2p2-human-uniprotKB.rds")) %>%
         get.d2p2.diso(.,as.df = T) %>%
         mutate(d2p2.seg = find.consecutive(d2p2.diso>=7, TRUE, min=3),
@@ -63,7 +68,8 @@ hs_d2p2 =  read_rds(here("data","d2p2-human-uniprotKB.rds")) %>%
         summarise(d2p2.L = sum_(d2p2.diso>=7),
                   d2p2.f = mean_(d2p2.diso>=7),
                   d2p2.nseg = n_distinct(d2p2.seg),
-                  d2p2.Lsegmax = max(d2p2.seglen))
+                  d2p2.Lsegmax = max(d2p2.seglen)) %>%
+        mutate(id = str_extract(d2p2.id,UNIPROT.nomenclature()))
 
 hs_pepstats = load.dubreuil2019.data(8) %>%
               dplyr::select(UNIPROT,pepstats.netcharge=netcharge,pepstats.mw=MW,pepstats.pI=pI,uniprot.prot_size=prot.size) %>%
@@ -82,8 +88,7 @@ hs_pepstats = load.dubreuil2019.data(8) %>%
 #   rename_with(.fn=str_replace, pattern="(.+)\\.(.+)",replacement = 'dubreuil2019.\\1_\\2') %>%
 #   left_join(fullsti,by=c('UNIPROT'='uni'))
 
-# Domains --------------------------------------------------------------------
-
+# Domains ----------------------------------------------------------------------
 hs_pfam=load.pfam(tax = 9606) %>%
              group_by(clan) %>% mutate(pfam.clansize = n_distinct(seq_id)) %>%
              add_count(seq_id,name="pfam.ndom") %>%
@@ -102,7 +107,7 @@ hs_supfam=load.superfamily(tax = 'hs') %>%
                  superfam.supfam_multi =superfamily.ndom>=3)
 
 
-# Folding energy and stability -----------------------------------------------
+# Folding energy and stability -------------------------------------------------
 hs_stab = load.leuenberger2017.data("Human HeLa Cells",rawdata = F) %>%
           add_count(protein_id,name='npep') %>%
           distinct() %>%
@@ -122,7 +127,7 @@ hs_tm = load.jarzab2020.data(org = "H.sapiens") %>%
         rename_with(.fn=Pxx, px='jarzab2020.TPP',s='_',.cols=-UNIPROT)
 
 
-# Complexes ------------------------------------------------------------------
+# Complexes --------------------------------------------------------------------
 
 nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca'),"mer")
 hs_complex = load.meldal.2019.data(species = 'human') %>%
@@ -132,7 +137,7 @@ hs_complex = load.meldal.2019.data(species = 'human') %>%
          CPLX_ASSEMBLY = gsub("(.+)(\\.$)","\\1",CPLX_ASSEMBLY) )
 
 
-# Functional interactions ----------------------------------------------------
+# Functional interactions ------------------------------------------------------
 
 hs_string = load.string(tax="9606",phy=F, ful=T, min.score = 900) %>%
   mutate(ens1 = str_extract(protein1,ENSEMBL.nomenclature()),
@@ -142,33 +147,35 @@ hs_string = load.string(tax="9606",phy=F, ful=T, min.score = 900) %>%
 hs_string_centralities = network.centrality(hs_string %>% dplyr::select(ens1,ens2))
 hs_string_centralities$string.megahub_func = hs_string_centralities$cent_deg >= 300
 hs_string_centralities$string.superhub_func = between(hs_string_centralities$cent_deg,100,300)
+
 #%>%
 #   mutate(string.megahub_func = )
 # INTERACTIONS$string.megahub_func = cent.STRING %>% dplyr::filter(cent_deg>300) %>% pull(ids)
 # INTERACTIONS$string.superhub_func = cent.STRING %>% dplyr::filter(between(cent_deg,100,300)) %>% pull(ids)
 
 
-#Biological pathways --------------------------------------------------------
+#Biological pathways -----------------------------------------------------------
+hs_pathways=get.KEGG(sp='hsa',type='pathway',as.df=T,to_uniprot = T)
+hs_modules=get.KEGG(sp='hsa',type='module',as.df=T,to_uniprot = T)
 
-hs_pathways=get.KEGG('hsa','pathway',as.df=T)
-hs_modules=get.KEGG('hsa','module',as.df=T)
 
-
-# Integrate all datasets -----------------------------------------------------
+# Integrate all datasets -------------------------------------------------------
 save(list = ls(pattern = '^hs_'), file = here('output','hs_datasets.rdata'))
 load(here('output','hs_datasets.rdata'))
 
-head(hs_r4s)
-head(hs_codons)
-head(hs_CU)
-head(hs_aa)
-head(hs_aa_class)
-head(hs_d2p2)
-head(hs_pfam)
-head(hs_supfam)
-head(hs_stab)
-head(hs_tm)
-head(hs_complex)
-head(hs_string_centralities)
+head(hs_ens2uni)
+head(hs_r4s) # id = uniprot AC
+head(hs_ppm_uni) # protid = ensembl peptide ; uniprot = uniprot AC ; id_uniprot = uniprot NAME ; GENENAME = gene symbol
+head(hs_codons) # ID = uniprot AC
+head(hs_CU) # ID = uniprot AC
+head(hs_aa) # id = uniprot AC
+head(hs_aa_class) # id = uniprot AC
+head(hs_d2p2) # id = uniprot AC
+head(hs_pfam) # seq_id = uniprot AC
+head(hs_supfam) # seqid = ensembl peptide
+head(hs_stab) # protein_id = uniprot AC
+head(hs_tm) # UNIPROT = uniprot AC; jarzab2020.TPP_GENENAME = gene symbol
+head(hs_complex) # members = uniprot AC
+head(hs_string_centralities) # ids = ensembl peptide
 head(hs_pathways)
 head(hs_modules)
