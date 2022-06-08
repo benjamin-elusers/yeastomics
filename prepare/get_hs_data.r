@@ -164,18 +164,20 @@ save(list = ls(pattern = '^hs_'), file = here('output','hs_datasets.rdata'))
 load(here('output','hs_datasets.rdata'))
 
 head(hs_ens2uni)
+# Based on uniprot accession
 head(hs_r4s) # id = uniprot AC
-head(hs_ppm_uni) # protid = ensembl peptide ; uniprot = uniprot AC ; id_uniprot = uniprot NAME ; GENENAME = gene symbol
 head(hs_codons) # ID = uniprot AC
 head(hs_CU) # ID = uniprot AC
 head(hs_aa) # id = uniprot AC
 head(hs_aa_class) # id = uniprot AC
 head(hs_d2p2) # id = uniprot AC
 head(hs_pfam) # seq_id = uniprot AC
-head(hs_supfam) # seqid = ensembl peptide
 head(hs_stab) # protein_id = uniprot AC
 head(hs_tm) # UNIPROT = uniprot AC; jarzab2020.TPP_GENENAME = gene symbol
 head(hs_complex) # members = uniprot AC
+head(hs_pathways) # uniprot = uniprot AC
+head(hs_modules)  # uniprot = uniprot AC
+# Based on Ensembl peptide identifiers
+head(hs_ppm_uni) # protid = ensembl peptide ; uniprot = uniprot AC ; id_uniprot = uniprot NAME ; GENENAME = gene symbol
+head(hs_supfam) # seqid = ensembl peptide
 head(hs_string_centralities) # ids = ensembl peptide
-head(hs_pathways)
-head(hs_modules)
