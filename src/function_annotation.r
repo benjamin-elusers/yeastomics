@@ -349,7 +349,7 @@ get.KEGG = function(sp='sce',type=c('pathway','module'),as.df=F,to_uniprot=F){
     sp = ""
   }
 
-  grp.desc = keggList(type,s)
+  grp.desc = keggList(type,sp)
   df2 =enframe(grp.desc, name = 'grp', value='desc')
   if(type == 'pathway'){ df2$desc  = sub(" -[^-]+$","",df2$desc) }
 
