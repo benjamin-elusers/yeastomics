@@ -1900,7 +1900,9 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
     mutate( gene_length = end_position-start_position+1,
             exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
     group_by(ensembl_gene_id,ensembl_transcript_id,ensembl_peptide_id,uniprotswissprot) %>%
-    mutate(n_exons = n_distinct(ensembl_exon_id), n_exons_mini = sum(is_constitutive), tot_exon_len = sum(exon_length) ) %>%
+    mutate(n_exons = n_distinct(ensembl_exon_id), n_exons_mini = sum(is_constitutive),
+           has_introns = n_exons_mini>1,
+           tot_exon_len = sum(exon_length) ) %>%
     group_by(ensembl_gene_id) %>%
     mutate(n_transcripts = n_distinct(ensembl_transcript_id),
            n_proteins = n_distinct(ensembl_peptide_id),
