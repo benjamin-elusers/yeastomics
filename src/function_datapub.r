@@ -1884,6 +1884,7 @@ get_ensg_dataset = function(){
 }
 
 get_ensembl_hs = function(verbose=T,longest_transcript=F){
+  library(biomaRt)
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
   att_pos = c('chromosome_name','start_position','end_position')
   att_struct = c('cds_length','transcript_length','transcript_start','transcript_end','ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
@@ -1926,6 +1927,34 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
     message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | uniprot = %6s',nr,ng,nt,np,nu))
   #dplyr::select(-start_position,-end_position,-transcript_start,-transcript_end,-exon_chrom_start,-exon_chrom_end)
   return(hs_ensg)
+}
+
+get_hs_GC = function(){
+  library(biomaRt)
+  att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','percentage_gene_gc_content')
+  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+    hs_gc_gene=getBM(attributes=att_gene, mart=ens,
+                     filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
+                     values=list('protein_coding','protein_coding',T),
+                     uniqueRows = T, bmHeader = F)
+  return(hs_gc_gene)
+}
+
+get_hs_chr = function(as.df=T){
+  library(biomaRt)
+  att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','chromosome_name')
+  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+  hs_chr=getBM(attributes=att_gene, mart=ens,
+                   filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
+                   values=list('protein_coding','protein_coding',T),
+                   uniqueRows = T, bmHeader = F)
+  if(as.df){
+    hs_chr= hs_chr %>% mutate(chr_val=T) %>%
+      pivot_wider(id_cols=c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot'),
+                  names_from=chromosome_name, names_prefix='chr_',
+                  values_from = chr_val, values_fn = sum, values_fill = F )
+  }
+  return(hs_chr)
 }
 
 get_ens_filter_ortho = function(mart='ensembl',dat='hsapiens_gene_ensembl'){
