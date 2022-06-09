@@ -16,18 +16,16 @@ hs_transcript = hs_ens %>%
                 cds_length,transcript_length,n_exons,n_exons_mini,has_introns) %>%
   distinct()
 
-hs_chr = get_hs_chr()
+hs_chr = get_hs_chr() %>% dplyr::select(-ensembl_peptide_id)  %>% distinct()
+
 # Reference identifiers for human proteome (Ensembl and Uniprot) ---------------
-hs_uni2ens = get.uniprot.mapping(9606,c('Ensembl','Ensembl_PRO')) %>%
+hs_uni2ens = get.uniprot.mapping(9606,'Ensembl_PRO') %>%
              separate(col='extid',into = c('extid','vers'), sep='\\.') %>%
-             pivot_wider(id_cols=uniprot, names_from='extdb',values_from='extid')
+             dplyr::select(-vers,-sp,-upid,-extdb) %>%
+             distinct() %>%  rename(uniprot=uni,ensp=extid) %>%
              mutate(is_uniref = uniprot %in% hs_uniref) %>%
              left_join(get.width(hs_prot),by=c('uniprot'='orf')) %>% rename(uniprot.prot_len = len ) %>%
              left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
-
-
-
-
 
 # Codons -----------------------------------------------------------------------
 #hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
@@ -180,8 +178,7 @@ hs_modules=get.KEGG(sp='hsa',type='module',as.df=T,to_uniprot = T)
 save(list = ls(pattern = '^hs_'), file = here('output','hs_datasets.rdata'))
 load(here('output','hs_datasets.rdata'))
 
-head(hs_ens)
-head(hs_uni2ens)
+head(hs_uni2ens) # uniprot = uniprot AC
 
 
 head(hs_gc)
