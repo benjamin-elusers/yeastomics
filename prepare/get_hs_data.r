@@ -2,35 +2,21 @@ source(here::here("src","__setup_yeastomics__.r"))
 # Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
-hs_uniref = names(hs_uniref)
+hs_gc_cdna = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
+hs_uniref = names(hs_prot)
 
-hs_ens = get_ensembl_hs(longest_transcript = T) %>%
-  dplyr::select(ensembl_gene_id,ensembl_peptide_id,uniprotswissprot,chromosome_name,
-                cds_length,transcript_length,n_exons,n_exons_mini,has_introns,percentage_gene_gc_content) %>%
-  distinct() %>% mutate(has_introns = n_exons > 1)
+# Genomics (%GC, and chromosome number) ----------------------------------------
+hs_gc = get_hs_GC() %>%
+        rename(ensg=ensembl_gene_id, ensp=ensembl_peptide_id, uniprot=uniprotswissprot,
+               ensembl.GC_gene=percentage_gene_gc_content) %>%
+        left_join( tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_gc_cdna), by=c('uniprot'))
+hs_ens = get_ensembl_hs(longest_transcript = T)
+hs_transcript = hs_ens %>%
+  dplyr::select(ensembl_gene_id,ensembl_peptide_id,uniprotswissprot,
+                cds_length,transcript_length,n_exons,n_exons_mini,has_introns) %>%
+  distinct()
 
-# Genomics (%GC, and chromosome number)
-library(biomaRt)
-ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
-att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
-att_struct = c('chromosome_name','percentage_gene_gc_content')
-
-if(!missing(Fi) && !missing(Va)){
-  Q=getBM(attributes=att_valid, mart=Ma, filters = Fi,  values = Va, uniqueRows = T, bmHeader = F) %>%
-    group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
-  return(Q)
-}else{
-
-#hs_ensuni = get_ensembl_hs(verbose=T)
-#count_ens_id(hs_ensuni)
-
-att_pos = c('start_position','end_position')
-att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
-att_uni = c('uniprotswissprot')
-
-hs_chr =
-hs_gc  = tibble(orf=names(hs_cdna),uniprot.pGC = rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T)))
-
+hs_chr = get_hs_chr()
 # Reference identifiers for human proteome (Ensembl and Uniprot) ---------------
 hs_uni2ens = get.uniprot.mapping(9606,c('Ensembl','Ensembl_PRO')) %>%
              separate(col='extid',into = c('extid','vers'), sep='\\.') %>%
@@ -194,7 +180,14 @@ hs_modules=get.KEGG(sp='hsa',type='module',as.df=T,to_uniprot = T)
 save(list = ls(pattern = '^hs_'), file = here('output','hs_datasets.rdata'))
 load(here('output','hs_datasets.rdata'))
 
-head(hs_ens2uni)
+head(hs_ens)
+head(hs_uni2ens)
+
+
+head(hs_gc)
+head(hs_transcript)
+head(hs_chr)
+
 # Based on uniprot accession
 head(hs_r4s) # id = uniprot AC
 head(hs_codon) # ID = uniprot AC
