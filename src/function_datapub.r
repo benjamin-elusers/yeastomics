@@ -1940,7 +1940,7 @@ get_hs_GC = function(){
   return(hs_gc_gene)
 }
 
-get_hs_chr = function(as.df=T){
+get_hs_chr = function(as.df=T,remove_patches=T){
   library(biomaRt)
   att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','chromosome_name')
   ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
@@ -1948,6 +1948,11 @@ get_hs_chr = function(as.df=T){
                    filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                    values=list('protein_coding','protein_coding',T),
                    uniqueRows = T, bmHeader = F)
+
+  if(remove_patches){
+    hs_chr = hs_chr %>% dplyr::filter(chromosome_name %in% c(1:22,'MT','X','Y'))
+  }
+
   if(as.df){
     hs_chr= hs_chr %>% mutate(chr_val=T) %>%
       pivot_wider(id_cols=c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot'),
