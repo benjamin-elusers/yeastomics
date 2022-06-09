@@ -459,6 +459,9 @@ get_os <- function(){
 }
 
 # shorthands -------------------------------------------------------------------
+
+get_match = function(x,y){ x[match(x,y)] }
+
 load.package <- function(name) { # Quietly Load Libraries
   if(length(name)>1){
     for(i in 1:length(name)){ load.package(name[i]) }
