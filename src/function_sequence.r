@@ -178,3 +178,14 @@ seq2df = function(BS){
     NA
   }
 }
+
+
+get_codon_table = function(){
+  library(seqinr)
+  codon_table = seqinr::SEQINR.UTIL$CODON.AA %>% as_tibble() %>%
+                mutate(CODON=toupper(CODON),
+                       AA=str_to_title(AA),
+                       L=str_replace(L, "\\*", "STOP"),
+                       codon_aa = paste0(CODON,"_",AA,"_",L))
+  return(codon_table)
+}
