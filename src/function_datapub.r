@@ -1634,7 +1634,7 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
 }
 
 ##### Uniprot #####
-get.uniprot.mapping = function(taxid) {
+get.uniprot.mapping = function(taxid, targetdb='Ensembl') {
   if(missing(taxid)){  stop("Need an uniprot taxon id") }
   UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
   EXTENSION = ".idmapping.gz"
@@ -1647,6 +1647,11 @@ get.uniprot.mapping = function(taxid) {
   gene2acc_url = sprintf("%s/%s/%s/%s_%s%s",UNIPROT_URL,TAX,UPID,UPID,taxid,EXTENSION)
   mapped = readr::read_delim(gene2acc_url,delim='\t',col_names=c('uni','extdb','extid')) %>%
     dplyr::mutate(sp=taxid,upid=UPID)
+  if(!is.null(targetdb)){
+    all_db = sort(unique(mapped$extdb))
+    dbs = match.arg(targetdb,choices = all_db, several.ok = T)
+     mapped = mapped %>% dplyr::filter( extdb %in% dbs )
+  }
   return(mapped)
 }
 
