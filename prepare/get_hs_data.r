@@ -1,24 +1,22 @@
 source(here::here("src","__setup_yeastomics__.r"))
-# Reference identifiers for human proteome (Ensembl and Uniprot) ---------------
-hs_ens2uni =readRDS(here("data","ensembl-human-uniprot.rds"))
 
 # Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
 
+# Reference identifiers for human proteome (Ensembl and Uniprot) ---------------
+hs_ens2uni =readRDS(here("data","ensembl-human-uniprot.rds")) %>%
+            mutate(is_uniref = uniprot %in% names(hs_prot))
+            left_join(get.width(hs_prot),by=c('uniprot'='orf')) %>% rename(uniprot.prot_len = len ) %>%
+            left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
+
 # Codons -----------------------------------------------------------------------
 #hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
 library(coRdon)
-hs_codons = codonTable(hs_cdna)
+codon_table = get_codon_table()
+hs_codon = Biostrings::trinucleotideFrequency(hs_cdna,step = 3) %>% as_tibble %>%
+  rename(all_of(set_names(codon_table$CODON,codon_table$codon_aa)))
 # Add amino acid with its associated codons
-codon_table = seqinr::SEQINR.UTIL$CODON.AA %>%
-  as_tibble() %>%
-  mutate(CODON=toupper(CODON), AA=str_to_title(AA),
-         L=str_replace(string = L, "\\*", "STOP"),
-         codon_aa = paste0(CODON,"_",AA,"_",L))
-codon_count = Biostrings::trinucleotideFrequency(hs_cdna,step = 3) %>% as_tibble
-col_codons=codon_table$codon_aa[codon_table$CODON == colnames(codon_count)]
-names(codon_count) = col_codons
 hs_CU=load.codon.usage(cds=hs_cdna,with.counts=F,sp = 'hsa') %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
 
 # Single amino-acid frequencies ------------------------------------------------
@@ -166,7 +164,7 @@ load(here('output','hs_datasets.rdata'))
 head(hs_ens2uni)
 # Based on uniprot accession
 head(hs_r4s) # id = uniprot AC
-head(hs_codons) # ID = uniprot AC
+head(hs_codon) # ID = uniprot AC
 head(hs_CU) # ID = uniprot AC
 head(hs_aa) # id = uniprot AC
 head(hs_aa_class) # id = uniprot AC
