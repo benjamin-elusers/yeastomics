@@ -1885,7 +1885,7 @@ get_ensg_dataset = function(){
 
 get_ensembl_hs = function(verbose=T,longest_transcript=F){
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
-  att_pos = c('chromosome_name','start_position','end_position','percentage_gene_gc_content')
+  att_pos = c('chromosome_name','start_position','end_position')
   att_struct = c('cds_length','transcript_length','transcript_start','transcript_end','ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
   att_uni = c('uniprotswissprot')
   att_type = c('gene_biotype','transcript_biotype')
