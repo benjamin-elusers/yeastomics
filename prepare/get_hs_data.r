@@ -1,18 +1,51 @@
 source(here::here("src","__setup_yeastomics__.r"))
-
 # Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
+hs_uniref = names(hs_uniref)
+
+hs_ens = get_ensembl_hs(longest_transcript = T) %>%
+  dplyr::select(ensembl_gene_id,ensembl_peptide_id,uniprotswissprot,chromosome_name,
+                cds_length,transcript_length,n_exons,n_exons_mini,has_introns,percentage_gene_gc_content) %>%
+  distinct() %>% mutate(has_introns = n_exons > 1)
+
+# Genomics (%GC, and chromosome number)
+library(biomaRt)
+ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
+att_struct = c('chromosome_name','percentage_gene_gc_content')
+
+if(!missing(Fi) && !missing(Va)){
+  Q=getBM(attributes=att_valid, mart=Ma, filters = Fi,  values = Va, uniqueRows = T, bmHeader = F) %>%
+    group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
+  return(Q)
+}else{
+
+#hs_ensuni = get_ensembl_hs(verbose=T)
+#count_ens_id(hs_ensuni)
+
+att_pos = c('start_position','end_position')
+att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
+att_uni = c('uniprotswissprot')
+
+hs_chr =
+hs_gc  = tibble(orf=names(hs_cdna),uniprot.pGC = rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T)))
 
 # Reference identifiers for human proteome (Ensembl and Uniprot) ---------------
-hs_ens2uni =readRDS(here("data","ensembl-human-uniprot.rds")) %>%
-            mutate(is_uniref = uniprot %in% names(hs_prot))
-            left_join(get.width(hs_prot),by=c('uniprot'='orf')) %>% rename(uniprot.prot_len = len ) %>%
-            left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
+hs_uni2ens = get.uniprot.mapping(9606,c('Ensembl','Ensembl_PRO')) %>%
+             separate(col='extid',into = c('extid','vers'), sep='\\.') %>%
+             pivot_wider(id_cols=uniprot, names_from='extdb',values_from='extid')
+             mutate(is_uniref = uniprot %in% hs_uniref) %>%
+             left_join(get.width(hs_prot),by=c('uniprot'='orf')) %>% rename(uniprot.prot_len = len ) %>%
+             left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
+
+
+
+
 
 # Codons -----------------------------------------------------------------------
 #hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
-library(coRdon)
+# library(coRdon)
 codon_table = get_codon_table()
 hs_codon = Biostrings::trinucleotideFrequency(hs_cdna,step = 3) %>% as_tibble %>%
   rename(all_of(set_names(codon_table$CODON,codon_table$codon_aa)))
