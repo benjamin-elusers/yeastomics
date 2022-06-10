@@ -1918,7 +1918,7 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
                   attributes = c(att_gene,att_pos,att_struct,att_uni,att_type),
                   filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                   values=list('protein_coding','protein_coding',T),
-                  uniqueRows = T, bmHeader = F) %>%
+                  uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
     mutate( gene_length = end_position-start_position+1,
             exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
     group_by(ensembl_gene_id,ensembl_transcript_id,ensembl_peptide_id,uniprotswissprot) %>%
@@ -1957,7 +1957,7 @@ get_hs_GC = function(){
     hs_gc_gene=getBM(attributes=att_gene, mart=ens,
                      filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                      values=list('protein_coding','protein_coding',T),
-                     uniqueRows = T, bmHeader = F)
+                     uniqueRows = T, bmHeader = F) %>% as_tibble()
   return(hs_gc_gene)
 }
 
@@ -1968,7 +1968,7 @@ get_hs_chr = function(as.df=T,remove_patches=T){
   hs_chr=getBM(attributes=att_gene, mart=ens,
                    filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                    values=list('protein_coding','protein_coding',T),
-                   uniqueRows = T, bmHeader = F)
+                   uniqueRows = T, bmHeader = F) %>% as_tibble()
 
   if(remove_patches){
     hs_chr = hs_chr %>% dplyr::filter(chromosome_name %in% c(1:22,'MT','X','Y'))
