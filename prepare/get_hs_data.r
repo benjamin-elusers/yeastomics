@@ -14,21 +14,21 @@ hs_uni2ensp = hs_map_uni %>% filter(extdb == 'Ensembl_PRO') %>%
               dplyr::select(-sp,-upid,-extdb) %>%
               mutate(is_uniref = uniprot %in% hs_uniref)
 
-# Proteome of reference --------------------------------------------------------
+# Proteome of reference  (Ensembl and Uniprot) ---------------------------------
 hs_ref = hs_uni2ensp %>% separate(col='ensp',into = c('ensp','vers'), sep='\\.') %>%
   dplyr::select(-vers) %>% distinct() %>%
-  inner_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens)) , by=c('ensp','uniprot')) %>%
-  filter(chromosome_name %in% c(1:23,"X","Y","MT"))
+  inner_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens[1:2])) , by=c('ensp','uniprot')) %>%
+  filter(is_uniref)
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
 hs_gc = get_hs_GC() %>% as_tibble %>% dplyr::rename(all_of(col_ens)) %>%
         rename(ensembl.GC_gene=percentage_gene_gc_content) %>%
         left_join( tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_gc_cdna), by=c('uniprot'))
 
-hs_chr = get_hs_chr() %>%dplyr::rename(all_of(col_ens)) %>% dplyr::select(-ensp) %>% distinct()
+hs_chr = get_hs_chr(remove_patches = F) %>% dplyr::rename(all_of(col_ens)) %>%
+          dplyr::select(-ensp) %>% distinct()
 
-# Reference identifiers for human proteome (Ensembl and Uniprot) ---------------
-
+# Sequences Length -------------------------------------------------------------
 hs_len = get.width(hs_prot) %>% rename(uniprot=orf, uniprot.prot_len = len ) %>%
          left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
 
@@ -37,6 +37,13 @@ hs_transcript = get_ensembl_hs(longest_transcript = T) %>% dplyr::rename(all_of(
                 n_exons,n_exons_mini,has_introns) %>%
   distinct() %>% left_join(hs_len, by=c('uniprot'))
 
+
+dim(hs_ref)
+dim(hs_gc)
+dim(hs_chr)
+dim(hs_transcript)
+
+left_join(hs_ref,hs_gc) %>% left_join(hs_chr) %>% left_join(hs_transcript)
 
 
 # Codons -----------------------------------------------------------------------
