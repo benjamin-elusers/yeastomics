@@ -1963,22 +1963,29 @@ get_hs_GC = function(){
 
 get_hs_chr = function(as.df=T,remove_patches=T){
   library(biomaRt)
+  chromosomes = c(1:22,'MT','X','Y')
   att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','chromosome_name')
   ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
   hs_chr=getBM(attributes=att_gene, mart=ens,
                    filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                    values=list('protein_coding','protein_coding',T),
-                   uniqueRows = T, bmHeader = F) %>% as_tibble()
+                   uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
+         mutate(is_patched = !(chromosome_name %in% chromosomes))
 
   if(remove_patches){
-    hs_chr = hs_chr %>% dplyr::filter(chromosome_name %in% c(1:22,'MT','X','Y'))
+    hs_chr = hs_chr %>% dplyr::filter(is_patched)
   }
 
+  patched_chr = setdiff(unique(hs_chr$chromosome_name),chromosomes)
+
   if(as.df){
-    hs_chr= hs_chr %>% mutate(chr_val=T) %>%
+    hs_chr= hs_chr %>%
+            mutate( chr_val=T,
+                    chromosome_name = fct_other(chromosome_name, keep=chromosomes, other_level = "other")) %>%
       pivot_wider(id_cols=c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot'),
                   names_from=chromosome_name, names_prefix='chr_',
-                  values_from = chr_val, values_fn = sum, values_fill = F )
+                  values_from = chr_val, values_fill = F )
+
   }
   return(hs_chr)
 }
