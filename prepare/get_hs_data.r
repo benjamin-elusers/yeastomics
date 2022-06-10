@@ -6,26 +6,33 @@ hs_gc_cdna = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %
 hs_uniref = names(hs_prot)
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
-hs_gc = get_hs_GC() %>%
+hs_gc = get_hs_GC() %>% as_tibble %>%
         rename(ensg=ensembl_gene_id, ensp=ensembl_peptide_id, uniprot=uniprotswissprot,
                ensembl.GC_gene=percentage_gene_gc_content) %>%
         left_join( tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_gc_cdna), by=c('uniprot'))
-hs_ens = get_ensembl_hs(longest_transcript = T)
-hs_transcript = hs_ens %>%
-  dplyr::select(ensembl_gene_id,ensembl_peptide_id,uniprotswissprot,
-                cds_length,transcript_length,n_exons,n_exons_mini,has_introns) %>%
-  distinct()
 
 hs_chr = get_hs_chr() %>% dplyr::select(-ensembl_peptide_id)  %>% distinct()
 
 # Reference identifiers for human proteome (Ensembl and Uniprot) ---------------
-hs_uni2ens = get.uniprot.mapping(9606,'Ensembl_PRO') %>%
-             separate(col='extid',into = c('extid','vers'), sep='\\.') %>%
-             dplyr::select(-vers,-sp,-upid,-extdb) %>%
-             distinct() %>%  rename(uniprot=uni,ensp=extid) %>%
-             mutate(is_uniref = uniprot %in% hs_uniref) %>%
-             left_join(get.width(hs_prot),by=c('uniprot'='orf')) %>% rename(uniprot.prot_len = len ) %>%
-             left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
+
+hs_len = get.width(hs_prot) %>% rename(uniprot=orf, uniprot.prot_len = len ) %>%
+         left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
+
+hs_ens = get_ensembl_hs(longest_transcript = T)
+hs_transcript = hs_ens %>%
+  dplyr::select(ensembl_gene_id,ensembl_peptide_id,uniprotswissprot,
+                gene_biotype,transcript_biotype, cds_length,
+                transcript_length,n_exons,n_exons_mini,has_introns) %>%
+  distinct() %>%
+  left_join(hs_len, by=c('uniprotswissprot'='uniprot'))
+
+
+hs_ref = get.uniprot.mapping(9606,'Ensembl_PRO') %>%
+  separate(col='extid',into = c('extid','vers'), sep='\\.') %>%
+  dplyr::select(-vers,-sp,-upid,-extdb) %>%
+  distinct() %>%  rename(uniprot=uni,ensp=extid) %>%
+  mutate(is_uniref = uniprot %in% hs_uniref) %>%
+  inner_join(get_ensembl_hsprot(), by=c('ensp'='ensembl_peptide_id','uniprot'='uniprotswissprot'))
 
 # Codons -----------------------------------------------------------------------
 #hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
@@ -178,12 +185,12 @@ hs_modules=get.KEGG(sp='hsa',type='module',as.df=T,to_uniprot = T)
 save(list = ls(pattern = '^hs_'), file = here('output','hs_datasets.rdata'))
 load(here('output','hs_datasets.rdata'))
 
-head(hs_uni2ens) # uniprot = uniprot AC
-
-
-head(hs_gc)
-head(hs_transcript)
-head(hs_chr)
+#hs_ens
+hs_ens2uni
+hs_uni2ens
+hs_chr
+hs_gc
+hs_transcript
 
 # Based on uniprot accession
 head(hs_r4s) # id = uniprot AC
