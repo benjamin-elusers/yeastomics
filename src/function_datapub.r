@@ -1883,6 +1883,28 @@ get_ensg_dataset = function(){
   return(ens_dataset)
 }
 
+
+get_ensembl_hsprot = function(verbose=T){
+  library(biomaRt)
+  att_prot = c('ensembl_peptide_id','uniprotswissprot','chromosome_name')
+  att_struct = c('gene_biotype')
+
+  hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
+  # Get representative human proteome with UniProt/SwissProt identifiers
+  hs_ensp = getBM(mart = hs_ens,
+                  attributes = c(att_prot,att_struct),
+                  filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
+                  values=list('protein_coding','protein_coding',T),
+                  uniqueRows = T, bmHeader = F) %>% as_tibble()
+
+  nr = nrow(hs_ensp)
+  np = n_distinct(hs_ensp$ensembl_peptide_id)
+  nu = n_distinct(hs_ensp$uniprotswissprot)
+  if(verbose)
+    message(sprintf('rows = %7s | proteins = %6s | uniprot = %6s',nr,np,nu))
+  return(hs_ensp)
+}
+
 get_ensembl_hs = function(verbose=T,longest_transcript=F){
   library(biomaRt)
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
@@ -1894,7 +1916,7 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
   hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
   # Get representative human proteome with UniProt/SwissProt identifiers
   hs_ensg = getBM(mart = hs_ens,
-                  attributes = c(att_gene,att_pos,att_struct,att_uni),
+                  attributes = c(att_gene,att_pos,att_struct,att_uni,att_type),
                   filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                   values=list('protein_coding','protein_coding',T),
                   uniqueRows = T, bmHeader = F) %>%
