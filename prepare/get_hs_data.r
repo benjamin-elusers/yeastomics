@@ -1,9 +1,13 @@
 source(here::here("src","__setup_yeastomics__.r"))
+col_ens = setNames(nm =c('uniprot','ensp','ensg'),
+                   object=c('uniprotswissprot','ensembl_peptide_id','ensembl_gene_id'))
+
 # Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
 hs_gc_cdna = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
 hs_uniref = names(hs_prot)
+
 hs_map_uni = get.uniprot.mapping(9606)
 hs_uni2ensp = hs_map_uni %>% filter(extdb == 'Ensembl_PRO') %>%
               dplyr::rename(uniprot=uni,ensp=extid) %>%
@@ -13,26 +17,25 @@ hs_uni2ensp = hs_map_uni %>% filter(extdb == 'Ensembl_PRO') %>%
 # Proteome of reference --------------------------------------------------------
 hs_ref = hs_uni2ensp %>% separate(col='ensp',into = c('ensp','vers'), sep='\\.') %>%
   dplyr::select(-vers) %>% distinct() %>%
-  inner_join(get_ensembl_hsprot(), by=c('ensp','uniprot')) %>%
+  inner_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens)) , by=c('ensp','uniprot')) %>%
   filter(chromosome_name %in% c(1:23,"X","Y","MT"))
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
-hs_gc = get_hs_GC() %>% as_tibble %>%
-        rename(uniprot=uniprotswissprot, ensembl.GC_gene=percentage_gene_gc_content) %>%
+hs_gc = get_hs_GC() %>% as_tibble %>% dplyr::rename(all_of(col_ens)) %>%
+        rename(ensembl.GC_gene=percentage_gene_gc_content) %>%
         left_join( tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_gc_cdna), by=c('uniprot'))
 
-hs_chr = get_hs_chr() %>% dplyr::select(-ensembl_peptide_id)  %>% distinct()
+hs_chr = get_hs_chr() %>%dplyr::rename(all_of(col_ens)) %>% dplyr::select(-ensp) %>% distinct()
 
 # Reference identifiers for human proteome (Ensembl and Uniprot) ---------------
 
 hs_len = get.width(hs_prot) %>% rename(uniprot=orf, uniprot.prot_len = len ) %>%
          left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
 
-hs_transcript = get_ensembl_hs(longest_transcript = T) %>%
-  dplyr::select(ensembl_gene_id,ensembl_peptide_id,uniprotswissprot,
-                cds_length,transcript_length,n_exons,n_exons_mini,has_introns) %>%
-  distinct() %>%
-  left_join(hs_len, by=c('uniprotswissprot'='uniprot'))
+hs_transcript = get_ensembl_hs(longest_transcript = T) %>% dplyr::rename(all_of(col_ens)) %>%
+  dplyr::select(ensg,ensp,uniprot, cds_length,transcript_length,
+                n_exons,n_exons_mini,has_introns) %>%
+  distinct() %>% left_join(hs_len, by=c('uniprot'))
 
 
 
