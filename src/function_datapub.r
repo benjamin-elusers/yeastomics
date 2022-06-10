@@ -1886,7 +1886,7 @@ get_ensg_dataset = function(){
 
 get_ensembl_hsprot = function(verbose=T){
   library(biomaRt)
-  att_prot = c('ensembl_peptide_id','uniprotswissprot','chromosome_name')
+  att_prot = c('ensembl_peptide_id','uniprotswissprot')
   att_struct = c('gene_biotype')
 
   hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
