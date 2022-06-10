@@ -1634,7 +1634,7 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
 }
 
 ##### Uniprot #####
-get.uniprot.mapping = function(taxid, targetdb='Ensembl') {
+get.uniprot.mapping = function(taxid, targetdb=NULL) {
   if(missing(taxid)){  stop("Need an uniprot taxon id") }
   UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
   EXTENSION = ".idmapping.gz"
@@ -1895,11 +1895,13 @@ get_ensembl_hsprot = function(verbose=T){
                   attributes = c(att_prot,att_struct),
                   filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                   values=list('protein_coding','protein_coding',T),
-                  uniqueRows = T, bmHeader = F) %>% as_tibble()
+                  uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
+                  dplyr::rename(uniprot=uniprotswissprot, ensp=ensembl_peptide_id,
+                                chr=chromosome_name)
 
   nr = nrow(hs_ensp)
-  np = n_distinct(hs_ensp$ensembl_peptide_id)
-  nu = n_distinct(hs_ensp$uniprotswissprot)
+  np = n_distinct(hs_ensp$ensp)
+  nu = n_distinct(hs_ensp$uniprot)
   if(verbose)
     message(sprintf('rows = %7s | proteins = %6s | uniprot = %6s',nr,np,nu))
   return(hs_ensp)
@@ -1929,11 +1931,14 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
     group_by(ensembl_gene_id) %>%
     mutate(n_transcripts = n_distinct(ensembl_transcript_id),
            n_proteins = n_distinct(ensembl_peptide_id),
-           n_uniprot = n_distinct(uniprotswissprot))
+           n_uniprot = n_distinct(uniprotswissprot)) %>%
+    dplyr::rename(uniprot=uniprotswissprot,
+                  ensp=ensembl_peptide_id,ensg=ensembl_gene_id, enst=ensembl_transcript_id,
+                  chr=chromosome_name)
 
   if(longest_transcript){
     hs_ensg = hs_ensg %>%
-      group_by(ensembl_gene_id) %>%
+      group_by(ensg) %>%
       dplyr::filter(transcript_length ==  max(transcript_length) ) #%>%
       #dplyr::select(-c(start_position,end_position,transcript_start,transcript_end,rank,
       #               ensembl_exon_id,is_constitutive,exon_chrom_start,exon_chrom_end,exon_length)) %>%
@@ -1941,10 +1946,10 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
   }
 
   nr = nrow(hs_ensg)
-  ng = n_distinct(hs_ensg$ensembl_gene_id)
-  nt = n_distinct(hs_ensg$ensembl_transcript_id)
-  np = n_distinct(hs_ensg$ensembl_peptide_id)
-  nu = n_distinct(hs_ensg$uniprotswissprot)
+  ng = n_distinct(hs_ensg$ensg)
+  nt = n_distinct(hs_ensg$enst)
+  np = n_distinct(hs_ensg$ensp)
+  nu = n_distinct(hs_ensg$uniprot)
   if(verbose)
     message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | uniprot = %6s',nr,ng,nt,np,nu))
   #dplyr::select(-start_position,-end_position,-transcript_start,-transcript_end,-exon_chrom_start,-exon_chrom_end)
@@ -1958,7 +1963,9 @@ get_hs_GC = function(){
     hs_gc_gene=getBM(attributes=att_gene, mart=ens,
                      filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                      values=list('protein_coding','protein_coding',T),
-                     uniqueRows = T, bmHeader = F)
+                     uniqueRows = T, bmHeader = F) %>%
+      dplyr::rename(uniprot=uniprotswissprot, ensp=ensembl_peptide_id, ensg=ensembl_gene_id,
+                    pGC_gene = percentage_gene_gc_content)
   return(hs_gc_gene)
 }
 
@@ -1969,16 +1976,18 @@ get_hs_chr = function(as.df=T,remove_patches=T){
   hs_chr=getBM(attributes=att_gene, mart=ens,
                    filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                    values=list('protein_coding','protein_coding',T),
-                   uniqueRows = T, bmHeader = F)
+                   uniqueRows = T, bmHeader = F) %>%
+    dplyr::rename(uniprot=uniprotswissprot, ensp=ensembl_peptide_id, ensg=ensembl_gene_id,
+                  chr = chromosome_name)
 
   if(remove_patches){
-    hs_chr = hs_chr %>% dplyr::filter(chromosome_name %in% c(1:22,'MT','X','Y'))
+    hs_chr = hs_chr %>% dplyr::filter(chr %in% c(1:22,'MT','X','Y'))
   }
 
   if(as.df){
     hs_chr= hs_chr %>% mutate(chr_val=T) %>%
-      pivot_wider(id_cols=c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot'),
-                  names_from=chromosome_name, names_prefix='chr_',
+      pivot_wider(id_cols=c('ensg','ensp','uniprot'),
+                  names_from=chr, names_prefix='chr_',
                   values_from = chr_val, values_fn = sum, values_fill = F )
   }
   return(hs_chr)
