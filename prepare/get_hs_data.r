@@ -4,11 +4,21 @@ hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
 hs_gc_cdna = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
 hs_uniref = names(hs_prot)
+hs_map_uni = get.uniprot.mapping(9606)
+hs_uni2ensp = hs_map_uni %>% filter(extdb == 'Ensembl_PRO') %>%
+              dplyr::rename(uniprot=uni,ensp=extid) %>%
+              dplyr::select(-sp,-upid,-extdb) %>%
+              mutate(is_uniref = uniprot %in% hs_uniref)
+
+# Proteome of reference --------------------------------------------------------
+hs_ref = hs_uni2ensp %>% separate(col='ensp',into = c('ensp','vers'), sep='\\.') %>%
+  dplyr::select(-vers) %>% distinct() %>%
+  inner_join(get_ensembl_hsprot(), by=c('ensp','uniprot')) %>%
+  filter(chromosome_name %in% c(1:23,"X","Y","MT"))
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
 hs_gc = get_hs_GC() %>% as_tibble %>%
-        rename(ensg=ensembl_gene_id, ensp=ensembl_peptide_id, uniprot=uniprotswissprot,
-               ensembl.GC_gene=percentage_gene_gc_content) %>%
+        rename(uniprot=uniprotswissprot, ensembl.GC_gene=percentage_gene_gc_content) %>%
         left_join( tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_gc_cdna), by=c('uniprot'))
 
 hs_chr = get_hs_chr() %>% dplyr::select(-ensembl_peptide_id)  %>% distinct()
@@ -18,21 +28,13 @@ hs_chr = get_hs_chr() %>% dplyr::select(-ensembl_peptide_id)  %>% distinct()
 hs_len = get.width(hs_prot) %>% rename(uniprot=orf, uniprot.prot_len = len ) %>%
          left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
 
-hs_ens = get_ensembl_hs(longest_transcript = T)
-hs_transcript = hs_ens %>%
+hs_transcript = get_ensembl_hs(longest_transcript = T) %>%
   dplyr::select(ensembl_gene_id,ensembl_peptide_id,uniprotswissprot,
-                gene_biotype,transcript_biotype, cds_length,
-                transcript_length,n_exons,n_exons_mini,has_introns) %>%
+                cds_length,transcript_length,n_exons,n_exons_mini,has_introns) %>%
   distinct() %>%
   left_join(hs_len, by=c('uniprotswissprot'='uniprot'))
 
 
-hs_ref = get.uniprot.mapping(9606,'Ensembl_PRO') %>%
-  separate(col='extid',into = c('extid','vers'), sep='\\.') %>%
-  dplyr::select(-vers,-sp,-upid,-extdb) %>%
-  distinct() %>%  rename(uniprot=uni,ensp=extid) %>%
-  mutate(is_uniref = uniprot %in% hs_uniref) %>%
-  inner_join(get_ensembl_hsprot(), by=c('ensp'='ensembl_peptide_id','uniprot'='uniprotswissprot'))
 
 # Codons -----------------------------------------------------------------------
 #hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
@@ -41,7 +43,8 @@ codon_table = get_codon_table()
 hs_codon = Biostrings::trinucleotideFrequency(hs_cdna,step = 3) %>% as_tibble %>%
   rename(all_of(set_names(codon_table$CODON,codon_table$codon_aa)))
 # Add amino acid with its associated codons
-hs_CU=load.codon.usage(cds=hs_cdna,with.counts=F,sp = 'hsa') %>% dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
+hs_CU=load.codon.usage(cds=hs_cdna,with.counts=F,sp = 'hsa') %>%
+   dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
 
 # Single amino-acid frequencies ------------------------------------------------
 AA.FR = letterFrequency(hs_prot,as.prob = T,letters = get.AA1()) %>% bind_cols( id=names(hs_prot))
@@ -112,21 +115,44 @@ hs_pepstats = load.dubreuil2019.data(8) %>%
 
 # Domains ----------------------------------------------------------------------
 hs_pfam=load.pfam(tax = 9606) %>%
+             filter(seq_id %in% hs_uniref) %>%
              group_by(clan) %>% mutate(pfam.clansize = n_distinct(seq_id)) %>%
              add_count(seq_id,name="pfam.ndom") %>%
-             mutate(pfam.HMM_none=pfam.ndom==0,
+             mutate(
+                   pfam.HMM_none=pfam.ndom==0,
                    pfam.HMM_single=pfam.ndom==1,
                    pfam.HMM_pair=pfam.ndom==2,
                    pfam.HMM_multi=pfam.ndom>=3)
 
+hs_pfam_dom = pivot_wider(hs_pfam %>% mutate(pfam_val=T), id_cols=seq_id,
+                          names_from = 'hmm_name',names_prefix = 'pfam.dom_',
+                          values_from = 'pfam_val', values_fill = F, values_fn = sum ) %>%
+              dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
+hs_pfam_clan = pivot_wider(hs_pfam %>% mutate(pfam_val=T), id_cols=seq_id,
+                          names_from = 'clan_name',names_prefix = 'pfam.clan_',
+                          values_from = 'pfam_val', values_fill = F, values_fn = sum ) %>%
+  dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
+
+
 hs_supfam=load.superfamily(tax = 'hs') %>%
           dplyr::rename(seqid = "sequence_id") %>%
           janitor::clean_names() %>%
+          dplyr::filter(seqid %in% hs_ref$ensp) %>%
           dplyr::add_count(seqid,name="superfamily.ndom") %>%
           mutate(superfam.supfam_none=superfamily.ndom==0,
                  superfam.supfam_single=superfamily.ndom==1,
                  superfam.supfam_pair=superfamily.ndom==2,
                  superfam.supfam_multi =superfamily.ndom>=3)
+
+hs_superfamilies = pivot_wider(hs_supfam %>% mutate(supfam_val=T), id_cols=seqid,
+                          names_from = 'superfamily_description',names_prefix = 'superfamily.SF_',
+                          values_from = 'supfam_val', values_fill = F, values_fn = sum ) %>%
+                  dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
+
+hs_families = pivot_wider(hs_supfam %>% mutate(supfam_val=T), id_cols=seqid,
+                               names_from = 'family_description',names_prefix = 'superfamily.F_',
+                               values_from = 'supfam_val', values_fill = F, values_fn = sum ) %>%
+  dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
 
 
 # Folding energy and stability -------------------------------------------------
@@ -146,7 +172,7 @@ hs_tm = load.jarzab2020.data(org = "H.sapiens") %>%
                Tm_med = Tm_type == 'Medium-Tm',
                Tm_hi = Tm_type == 'High-Tm',
                Tm_nomelt =  Tm_type == 'Non-melter' ) %>%
-        rename_with(.fn=Pxx, px='jarzab2020.TPP',s='_',.cols=-UNIPROT)
+        rename_with(.fn=Pxx, px='jarzab2020.TPP',s='_',.cols=-c(UNIPROT,GENENAME))
 
 
 # Complexes --------------------------------------------------------------------
@@ -156,8 +182,18 @@ hs_complex = load.meldal.2019.data(species = 'human') %>%
   filter(is_uniprot) %>% # BASED ON UNIPROT
   mutate(oligomers = cut(n_members, breaks = c(1:10,20,81),
                          labels = paste0("meldal2019.CPX_",c(nmers[2:10],'high_oligomer','molecular_machine'))),
-         CPLX_ASSEMBLY = gsub("(.+)(\\.$)","\\1",CPLX_ASSEMBLY) )
+         CPLX_ASSEMBLY = gsub("(.+)(\\.$)","\\1",CPLX_ASSEMBLY) ) %>%
+  mutate(oligomers_val=T)
 
+hs_oligomers = pivot_wider(hs_complex, id_cols = members, names_from = 'oligomers',
+                           values_from = oligomers_val, values_fn=sum,values_fill = F)
+hs_assembly = pivot_wider(hs_complex, id_cols = members,
+                          names_from = 'CPLX_ASSEMBLY', names_prefix = 'meldal2019.',
+                           values_from = oligomers_val, values_fn=sum,values_fill = F)
+hs_complexes = pivot_wider(hs_complex, id_cols = members,
+                           names_from = 'CPLX_NAME', names_prefix = 'meldal2019.',
+                           values_from = oligomers_val, values_fn=sum,values_fill = F) %>%
+               dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
 
 # Functional interactions ------------------------------------------------------
 
@@ -185,6 +221,7 @@ hs_modules=get.KEGG(sp='hsa',type='module',as.df=T,to_uniprot = T)
 save(list = ls(pattern = '^hs_'), file = here('output','hs_datasets.rdata'))
 load(here('output','hs_datasets.rdata'))
 
+hs_ref
 #hs_ens
 hs_ens2uni
 hs_uni2ens
@@ -200,12 +237,19 @@ head(hs_aa) # id = uniprot AC
 head(hs_aa_class) # id = uniprot AC
 head(hs_d2p2) # id = uniprot AC
 head(hs_pfam) # seq_id = uniprot AC
+head(hs_pfam_dom) # seq_id = uniprot AC
+head(hs_pfam_clan) # seq_id = uniprot AC
+
 head(hs_stab) # protein_id = uniprot AC
 head(hs_tm) # UNIPROT = uniprot AC; jarzab2020.TPP_GENENAME = gene symbol
-head(hs_complex) # members = uniprot AC
+head(hs_oligomers) # members = uniprot AC
+head(hs_assembly) # members = uniprot AC
+head(hs_complexes) # members = uniprot AC
 head(hs_pathways) # uniprot = uniprot AC
 head(hs_modules)  # uniprot = uniprot AC
 # Based on Ensembl peptide identifiers
 head(hs_ppm_uni) # protid = ensembl peptide ; uniprot = uniprot AC ; id_uniprot = uniprot NAME ; GENENAME = gene symbol
 head(hs_supfam) # seqid = ensembl peptide
+head(hs_superfamilies)  # seqid = ensembl peptide
+head(hs_families)  # seqid = ensembl peptide
 head(hs_string_centralities) # ids = ensembl peptide
