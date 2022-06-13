@@ -380,13 +380,13 @@ retrieve_missing_centrality = function(orf_missing,type='string'){
   return(cent)
 }
 
-fix_missing_centrality = function(df,col_prefix='cat_interactions.string.'){
+fix_missing_centrality = function(df,id='ORF',col_prefix='cat_interactions.string.'){
   # Replace orf with missing values for centrality with 0's
   net_type = str_extract(col_prefix,'(string|intact)')
   if(net_type=='string'){
-    orf_missing = df %>% column_to_rownames('ORF') %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
+    orf_missing = df %>% column_to_rownames(id) %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
   }else if(net_type=='intact'){
-    orf_missing = df %>% filter(!is.dup(UNIPROTKB)) %>% column_to_rownames('UNIPROTKB') %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
+    orf_missing = df %>% filter(!is.dup(id)) %>% column_to_rownames(id) %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
   }
 
   if( length(orf_missing) == 0 ){
