@@ -1,12 +1,72 @@
 source(here::here("src","__setup_yeastomics__.r"))
+source(here::here("analysis","function_evorate_fitting.R"))
+
 col_ens = setNames(nm =c('uniprot','ensp','ensg'),
                    object=c('uniprotswissprot','ensembl_peptide_id','ensembl_gene_id'))
+load(here::here('output','hs_datasets.rdata'))
+load(here::here('output','hs_integrated_datasets.rdata'))
+
+load.mcshane2016.data = function(){
+  # Cell 2016 mcshane E.
+  # Kinetic Analysis of Protein Stability Reveals Age-Dependent Degradation
+  #Table S4. All AHA Pulse-Chase and Related Data for the Human RPE-1 Cells
+  S4="https://www.cell.com/cms/10.1016/j.cell.2016.09.015/attachment/ed36d0dc-573c-4f65-ba99-6ce9713d2584/mmc4.xlsx"
+  temp = tempfile()
+  download.file(S4,destfile = temp)
+  deg_rate = readxl::read_xlsx(path = S4)
+  rio::import(S4)
+  unlink(temp)
+}
+
+load.kristensen2013.data = function(){
+  # Mol. Sys. Bio. 2013
+  # Protein synthesis rate is the predominant regulator of protein expression during differentiation
+  S3 = "https://www.embopress.org/action/downloadSupplement?doi=10.1038%2Fmsb.2013.47&file=msb201347-sup-0004.xlsx"
+  temp = tempfile()
+  open.url(S3)
+  options(internet.info = 0)
+  x=rvest::session("https://www.embopress.org/doi/full/10.1038/msb.2013.47")
+  rvest::session_follow_link(S3)
+  deg_rate = rio::import(S3)
+}
+load.bossi2009.data = function(){
+  # Mol. Sys. Bio. 2009
+  # Tissue specificity and the human protein interaction network
+  # https://doi.org/10.1038/msb.2009.17
+  interactome="https://www.embopress.org/action/downloadSupplement?doi=10.1038%2Fmsb.2009.17&file=msb200917-sup-0002.zip"
+  temp = tempfile()
+  test = download.file(interactome)
+
+  tmp <- tempfile()
+  curl::curl_download(interactome, tmp)
+}
+
+
+load.soonhengtan2018.data=function(){
+# Science 2018
+# Thermal proximity coaggregation for system-wide profiling of protein complex dynamics in cells
+# DOI: 10.1126/science.aan0346
+  Stab = "https://www.science.org/doi/suppl/10.1126/science.aan0346/suppl_file/tabless1_to_s27.zip"
+  download_file(Stab,'~/test')
+}
+load.schroeter2018.data= function(){
+  # FASEB 2018, C.B.Schroeter et al
+  # Protein half-life determines expression of proteostatic networks in podocyte differentiation
+  # https://doi.org/10.1096/fj.201701307R
+  halflife = "https://faseb.onlinelibrary.wiley.com/action/downloadSupplement?doi=10.1096%2Ffj.201701307R&file=fsb2fj201701307r-sup-0010.xlsx"
+  read.xlsx( xlsxFile = halflife, sheet = 1)
+}
+
 
 # Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
-hs_gc_cdna = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
 hs_uniref = names(hs_prot)
+
+hs_aa_freq = (letterFrequency(hs_prot,as.prob = T,letters = get.AA1()) * 100) %>% bind_cols( id=names(hs_prot))
+hs_aa_count = letterFrequency(hs_prot,as.prob = F,letters = get.AA1()) %>% bind_cols( id=names(hs_prot))
+hs_cdna_gc = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
+hs_codon_freq = Biostrings::trinucleotideFrequency(hs_cdna,step = 3,as.prob = T) *100
 
 hs_map_uni = get.uniprot.mapping(9606)
 hs_uni2ensp = hs_map_uni %>% filter(extdb == 'Ensembl_PRO') %>%
@@ -23,44 +83,46 @@ hs_ref = hs_uni2ensp %>% separate(col='ensp',into = c('ensp','vers'), sep='\\.')
 # Genomics (%GC, and chromosome number) ----------------------------------------
 hs_gc = get_hs_GC() %>% as_tibble %>% dplyr::rename(all_of(col_ens)) %>%
         rename(ensembl.GC_gene=percentage_gene_gc_content) %>%
-        left_join( tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_gc_cdna), by=c('uniprot'))
+        left_join( tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_cdna_gc), by=c('uniprot'))
 
 hs_chr = get_hs_chr(remove_patches = F) %>% dplyr::rename(all_of(col_ens)) %>%
           dplyr::select(-ensp) %>% distinct()
 
 # Sequences Length -------------------------------------------------------------
-hs_len = get.width(hs_prot) %>% rename(uniprot=orf, uniprot.prot_len = len ) %>%
-         left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
 
 hs_transcript = get_ensembl_hs(longest_transcript = T) %>% dplyr::rename(all_of(col_ens)) %>%
   dplyr::select(ensg,ensp,uniprot, cds_length,transcript_length,
                 n_exons,n_exons_mini,has_introns) %>%
-  distinct() %>% left_join(hs_len, by=c('uniprot'))
+  distinct() %>%
 
 
-dim(hs_ref)
-dim(hs_gc)
-dim(hs_chr)
-dim(hs_transcript)
-
-left_join(hs_ref,hs_gc) %>% left_join(hs_chr) %>% left_join(hs_transcript)
-
+HS_CODING = left_join(hs_ref,hs_transcript) %>%
+            left_join(hs_gc) %>%
+            left_join(hs_chr) %>%
+            relocate(uniprot,ensp,is_uniref,ensg,gene_biotype,ensembl.GC_gene,uniprot.GC_cdna,
+                     cds_length,transcript_length,
+                     has_introns,n_exons,n_exons_mini,
+                     paste0('chr_',c(1:22,'X','Y','MT'))) %>%
+            group_by(uniprot) %>% filter( row_number() == nearest(value=F,x=max(transcript_length),y=transcript_length,n = 1)) %>%
+            dplyr::rename_with(-c(uniprot:gene_biotype, starts_with('uniprot.'), starts_with('ensembl.')),.fn = Pxx, 'ensembl')
 
 # Codons -----------------------------------------------------------------------
 #hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
 # library(coRdon)
+hs_len = get.width(hs_prot) %>% rename(uniprot=orf, uniprot.prot_len = len ) %>%
+  left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
+
 codon_table = get_codon_table()
-hs_codon = Biostrings::trinucleotideFrequency(hs_cdna,step = 3) %>% as_tibble %>%
-  rename(all_of(set_names(codon_table$CODON,codon_table$codon_aa)))
+hs_codon = bind_cols(uniprot=names(hs_cdna),hs_codon_freq) %>%
+  rename(all_of(set_names(codon_table$CODON,codon_table$codon_aa))) %>%
+  rename_with(-uniprot, .fn=Pxx, 'ensembl')
+
 # Add amino acid with its associated codons
 hs_CU=load.codon.usage(cds=hs_cdna,with.counts=F,sp = 'hsa') %>%
-   dplyr::rename_with(.fn=Pxx,px='coRdon',s='.',.cols=starts_with('CU_'))
+   dplyr::rename_with(starts_with('CU_'),.fn=Pxx,'elek2022')
 
 # Single amino-acid frequencies ------------------------------------------------
-AA.FR = letterFrequency(hs_prot,as.prob = T,letters = get.AA1()) %>% bind_cols( id=names(hs_prot))
-AA.COUNT = letterFrequency(hs_prot,as.prob = F,letters = get.AA1())%>% bind_cols( id=names(hs_prot))
-hs_aa = AA.FR %>% rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-id)
-
+hs_aa = hs_aa_freq %>% rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-id)
 # Grouped amino-acid frequencies -----------------------------------------------
 aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>%
   append( list('Alcohol'=c('S','T'),
@@ -76,8 +138,15 @@ AACLASS.FR = map(aa.prop, sum.aa.fr, BS=hs_prot )
 hs_aa_class = AACLASS.FR %>% purrr::reduce(full_join,by='id') %>%
               rename_with(~aa.class, starts_with('fr')) %>%
               rename_with(.fn = Pxx, px="uniprot.f",s='_',.cols=-id)
+
+HS_COUNT = left_join(hs_aa,hs_aa_class) %>% left_join(hs_codon,by=c('id'='uniprot')) %>%
+            dplyr::rename(uniprot=id) %>% left_join(hs_len,by='uniprot')
 # Abundance --------------------------------------------------------------------
 hs_ppm_uni = readRDS(here::here("data","paxdb_integrated_human.rds"))
+HS_PPM = hs_ppm_uni %>%
+        dplyr::select(ensp=protid,uniprot,GENENAME,is_uniref,is_duplicated,
+                      ppm_wholeorg,ppm_max,ppm_int_max,ppm_int) %>%
+        dplyr::rename_with(-c(ensp,uniprot,GENENAME), .fn = Pxx, 'paxdb')
 
 # Conservation -----------------------------------------------------------------
 #hs_r4s = load.evorate(resdir = "/data/benjamin/Evolution/HUMAN",ref = NULL,ext.r4s = '.r4s')
@@ -85,8 +154,10 @@ hs_r4s = read_rds(here("data","RESIDUE-EVORATE-HUMAN.rds")) %>% group_by(id) %>%
              summarize(lmsa=max(msa_pos), lref=max(ref_pos),
                        pid=mean(matched==total-1), pdiv=mean(mismatched>0),pgap=mean(indel>0),
                        nsp = mean(total),
-                       r4s_mammals = abs(min(r4s_rate)) + mean_(r4s_rate)) %>%
-             dplyr::filter(!is.na(r4s_mammals))
+                       rate = abs(min_(r4s_rate)) + mean_(r4s_rate)) %>%
+             dplyr::filter(!is.na(rate)) %>%
+             dplyr::rename_with(-id, .fn = Pxx, 'r4s_mammals')
+
 
 #plot(density(x = hs_r4s_prot$r4s_mammals))
 
@@ -104,7 +175,8 @@ hs_d2p2 =  read_rds(here("data","d2p2-human-uniprotKB.rds")) %>%
                   d2p2.f = mean_(d2p2.diso>=7),
                   d2p2.nseg = n_distinct(d2p2.seg),
                   d2p2.Lsegmax = max(d2p2.seglen)) %>%
-        mutate(id = str_extract(d2p2.id,UNIPROT.nomenclature()))
+        mutate(id = str_extract(d2p2.id,UNIPROT.nomenclature())) %>%
+        dplyr::select(-d2p2.id)
 
 hs_pepstats = load.dubreuil2019.data(8) %>%
               dplyr::select(UNIPROT,pepstats.netcharge=netcharge,pepstats.mw=MW,pepstats.pI=pI,uniprot.prot_size=prot.size) %>%
@@ -127,42 +199,65 @@ hs_pepstats = load.dubreuil2019.data(8) %>%
 hs_pfam=load.pfam(tax = 9606) %>%
              filter(seq_id %in% hs_uniref) %>%
              group_by(clan) %>% mutate(pfam.clansize = n_distinct(seq_id)) %>%
-             add_count(seq_id,name="pfam.ndom") %>%
-             mutate(
-                   pfam.HMM_none=pfam.ndom==0,
-                   pfam.HMM_single=pfam.ndom==1,
-                   pfam.HMM_pair=pfam.ndom==2,
-                   pfam.HMM_multi=pfam.ndom>=3)
+              group_by(seq_id) %>% mutate(pfam.ndom=n_distinct(hmm_acc)) %>%
+              add_count(hmm_acc,name="pfam.repeat")
 
+#dup_dom = hs_pfam %>% filter(duplicated(seq_id,hmm_acc)) %>% pull(seq_id)
+# pfam_dup = hs_pfam %>% filter(is.dup(seq_id)) %>% arrange(seq_id,alignment_start,alignment_end)
+# pf_ol_list = pbmcapply::pbmclapply(X= unique(pfam_dup$seq_id),
+#                               FUN = calculate_pfam_overlap,
+#                              pf=pfam_dup, verbose=F,
+#                               mc.cores =  14)
+#
+# pf_ol = pf_ol_list %>% bind_rows()
+#summary(pf_ol)
+#pf_ol %>% filter( seq_id %in% pf_ol$seq_id[pf_ol$overlap & pf_ol$no_overlap])
+
+hs_pfam_count = hs_pfam %>% group_by(seq_id) %>%
+             summarize( pfam.HMM_none=pfam.ndom==0,
+                        pfam.HMM_single=pfam.ndom==1,
+                        pfam.HMM_pair=pfam.ndom==2,
+                        pfam.HMM_multi=pfam.ndom>=3)%>% distinct()
 hs_pfam_dom = pivot_wider(hs_pfam %>% mutate(pfam_val=T), id_cols=seq_id,
                           names_from = 'hmm_name',names_prefix = 'pfam.dom_',
                           values_from = 'pfam_val', values_fill = F, values_fn = sum ) %>%
-              dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
+               mutate(across(where(is.integer), as.logical)) %>%
+              dplyr::select(seq_id,where(~ is.logical(.x) && sum(.x) >9 ))%>% distinct()
+
 hs_pfam_clan = pivot_wider(hs_pfam %>% mutate(pfam_val=T), id_cols=seq_id,
                           names_from = 'clan_name',names_prefix = 'pfam.clan_',
                           values_from = 'pfam_val', values_fill = F, values_fn = sum ) %>%
-  dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
+              mutate(across(where(is.integer), as.logical)) %>%
+              dplyr::select(seq_id,where(~ is.logical(.x) && sum(.x) >9 ))%>% distinct()
 
+HS_PFAM = left_join(hs_pfam_count,hs_pfam_dom) %>% left_join(hs_pfam_clan) %>% distinct()
 
 hs_supfam=load.superfamily(tax = 'hs') %>%
           dplyr::rename(seqid = "sequence_id") %>%
           janitor::clean_names() %>%
           dplyr::filter(seqid %in% hs_ref$ensp) %>%
-          dplyr::add_count(seqid,name="superfamily.ndom") %>%
-          mutate(superfam.supfam_none=superfamily.ndom==0,
-                 superfam.supfam_single=superfamily.ndom==1,
-                 superfam.supfam_pair=superfamily.ndom==2,
-                 superfam.supfam_multi =superfamily.ndom>=3)
+          group_by(seqid) %>% mutate(superfamily.ndom=n_distinct(superfamily_id)) %>%
+          add_count(superfamily_id,name="pfam.repeat")
 
+hs_supfam_count = hs_supfam %>% group_by(seqid) %>%
+                 summarize(superfamily.supfam_none=superfamily.ndom==0,
+                 superfamily.supfam_single=superfamily.ndom==1,
+                 superfamily.supfam_pair=superfamily.ndom==2,
+                 superfamily.supfam_multi =superfamily.ndom>=3)
 hs_superfamilies = pivot_wider(hs_supfam %>% mutate(supfam_val=T), id_cols=seqid,
                           names_from = 'superfamily_description',names_prefix = 'superfamily.SF_',
                           values_from = 'supfam_val', values_fill = F, values_fn = sum ) %>%
-                  dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
+                  mutate(across(where(is.integer), as.logical)) %>%
+                  dplyr::select(seqid,where(~ is.logical(.x) && sum(.x) >9 ))%>% distinct()
 
 hs_families = pivot_wider(hs_supfam %>% mutate(supfam_val=T), id_cols=seqid,
                                names_from = 'family_description',names_prefix = 'superfamily.F_',
                                values_from = 'supfam_val', values_fill = F, values_fn = sum ) %>%
-  dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
+  mutate(across(where(is.integer), as.logical)) %>%
+  dplyr::select(seqid,where(~ is.logical(.x) && sum(.x) >9 ))%>% distinct()
+
+
+HS_SUPFAM = left_join(hs_supfam_count,hs_superfamilies) %>% left_join(hs_families) %>% distinct()
 
 
 # Folding energy and stability -------------------------------------------------
@@ -173,37 +268,63 @@ hs_stab = load.leuenberger2017.data("Human HeLa Cells",rawdata = F) %>%
                   Tm_stable = protinfo=="Stable",
                   Tm_medium = protinfo=="Medium",
                   Tm_unstable = protinfo=="Unstable") %>%
-          rename_with(.fn=Pxx, px='leuenberger2017.LIP',s='_',.cols=-protein_id)
+          rename_with(.fn=Pxx, px='leuenberger2017.LIP',s='_',.cols=-protein_id) %>%
+          dplyr::select(-c(leuenberger2017.LIP_protinfo,
+                        leuenberger2017.LIP_protein_coverage,
+                        leuenberger2017.LIP_length,
+                        leuenberger2017.LIP_measured_domains,
+                        leuenberger2017.LIP_theoretical_number_of_domain,
+                        leuenberger2017.LIP_nres))
 
 
 hs_tm = load.jarzab2020.data(org = "H.sapiens") %>%
         dplyr::select(UNIPROT,GENENAME,Tm_celsius,Tm_type,AUC) %>%
-        mutate(Tm_low = Tm_type == 'Low-Tm',
-               Tm_med = Tm_type == 'Medium-Tm',
-               Tm_hi = Tm_type == 'High-Tm',
-               Tm_nomelt =  Tm_type == 'Non-melter' ) %>%
+         group_by(UNIPROT,GENENAME) %>%
+         mutate(Tm_mean=mean_(Tm_celsius),Tm_max=max_(Tm_celsius))
+
+tm_low_celsius = max_(hs_tm$Tm_celsius[hs_tm$Tm_type == 'Low-Tm'])
+tm_med_celsius = max_(hs_tm$Tm_celsius[hs_tm$Tm_type == 'Medium-Tm'])
+tm_nomelt_celsius =max_(hs_tm$Tm_celsius[hs_tm$Tm_type =='Non-melter' ])
+
+hs_tm = hs_tm %>% mutate(Tm_low = Tm_max < tm_low_celsius,
+                         Tm_med = between(Tm_max,tm_low_celsius,tm_med_celsius),
+                         Tm_high = Tm_max > tm_med_celsius,
+                         Tm_nomelt = is.na(Tm_max)) %>%
+        dplyr::select(-c(Tm_type,AUC,Tm_celsius)) %>% distinct() %>%
         rename_with(.fn=Pxx, px='jarzab2020.TPP',s='_',.cols=-c(UNIPROT,GENENAME))
 
-
+HS_FOLD = left_join(hs_tm,hs_stab, by=c('UNIPROT'='protein_id'))
 # Complexes --------------------------------------------------------------------
-
 nmers= paste0(c('mono','di','tri','tetra','penta','hexa','septa','octa','nona','deca'),"mer")
 hs_complex = load.meldal.2019.data(species = 'human') %>%
   filter(is_uniprot) %>% # BASED ON UNIPROT
   mutate(oligomers = cut(n_members, breaks = c(1:10,20,81),
                          labels = paste0("meldal2019.CPX_",c(nmers[2:10],'high_oligomer','molecular_machine'))),
-         CPLX_ASSEMBLY = gsub("(.+)(\\.$)","\\1",CPLX_ASSEMBLY) ) %>%
+         CPLX_ASSEMBLY = gsub("(.+)(\\.$)","\\1",CPLX_ASSEMBLY),
+         CPLX_ASSEMBLY = str_replace_all(CPLX_ASSEMBLY," ","_"),
+         CPLX_NAME = str_replace_all(CPLX_NAME," ","_")) %>%
   mutate(oligomers_val=T)
 
 hs_oligomers = pivot_wider(hs_complex, id_cols = members, names_from = 'oligomers',
-                           values_from = oligomers_val, values_fn=sum,values_fill = F)
+                           names_prefix = 'meldal2019.',
+                           values_from = oligomers_val, values_fn=sum,values_fill = F) %>%
+  mutate(across(where(is.integer), as.logical)) %>%
+  dplyr::select(members,where(~ is.logical(.x) && sum(.x) > 9 )) %>%
+  dplyr::rename(meldal2019.unknown_oligomer = meldal2019.NA)
+
 hs_assembly = pivot_wider(hs_complex, id_cols = members,
                           names_from = 'CPLX_ASSEMBLY', names_prefix = 'meldal2019.',
-                           values_from = oligomers_val, values_fn=sum,values_fill = F)
+                           values_from = oligomers_val, values_fn=sum,values_fill = F) %>%
+  mutate(across(where(is.integer), as.logical)) %>%
+  dplyr::select(members,where(~ is.logical(.x) && sum(.x) > 9 )) %>%
+  dplyr::rename(meldal2019.unknown_assembly = meldal2019.NA)
+
 hs_complexes = pivot_wider(hs_complex, id_cols = members,
                            names_from = 'CPLX_NAME', names_prefix = 'meldal2019.',
-                           values_from = oligomers_val, values_fn=sum,values_fill = F) %>%
-               dplyr::select(where(~ is.numeric(.x) && sum(.x) >9 ))
+                           values_from = oligomers_val, values_fn=sum, values_fill = F) %>%
+                mutate(across(where(is.integer), as.logical)) %>%
+                dplyr::select(members,where(~ is.logical(.x) && sum(.x) > 4 ))
+HS_COMPLEX = left_join(hs_oligomers,hs_assembly) %>% left_join(hs_complexes)
 
 # Functional interactions ------------------------------------------------------
 
@@ -213,53 +334,168 @@ hs_string = load.string(tax="9606",phy=F, ful=T, min.score = 900) %>%
   ) %>% relocate(ens1,ens2) %>% dplyr::select(-c(protein1,protein2))
 
 hs_string_centralities = network.centrality(hs_string %>% dplyr::select(ens1,ens2))
-hs_string_centralities$string.megahub_func = hs_string_centralities$cent_deg >= 300
-hs_string_centralities$string.superhub_func = between(hs_string_centralities$cent_deg,100,300)
-
-#%>%
-#   mutate(string.megahub_func = )
-# INTERACTIONS$string.megahub_func = cent.STRING %>% dplyr::filter(cent_deg>300) %>% pull(ids)
-# INTERACTIONS$string.superhub_func = cent.STRING %>% dplyr::filter(between(cent_deg,100,300)) %>% pull(ids)
-
-
+hs_string_centralities$megahub_func = hs_string_centralities$cent_deg >= 300
+hs_string_centralities$superhub_func = between(hs_string_centralities$cent_deg,100,300)
+hs_string_centralities = hs_string_centralities %>% type_convert() %>%
+  dplyr::rename_with(.cols = -ids, .fn = str_replace_all, pattern='string.',replacement="") %>%
+  dplyr::rename_with(-ids,.fn=Pxx, 'string')
 #Biological pathways -----------------------------------------------------------
-hs_pathways=get.KEGG(sp='hsa',type='pathway',as.df=T,to_uniprot = T)
-hs_modules=get.KEGG(sp='hsa',type='module',as.df=T,to_uniprot = T)
+hs_pathways=get.KEGG(sp='hsa',type='pathway',as.df=T,to_uniprot = T) %>%
+            mutate(desc=str_replace_all(tolower(desc),' ','_'))
 
+kegg_pathways = hs_pathways %>% mutate(pathway_val=T) %>%
+                pivot_wider(id_cols=id,names_from = 'desc',names_prefix = 'kegg.path_',
+                     values_from = 'pathway_val', values_fill = F, values_fn = sum ) %>%
+                mutate(across(where(is.integer), as.logical)) %>%
+                dplyr::select(id,where(~ is.logical(.x) && sum(.x) >9 ))
+
+hs_modules=get.KEGG(sp='hsa',type='module',as.df=T,to_uniprot = T) %>%
+           mutate(desc=str_replace_all(tolower(desc),' ','_'))
+
+kegg_modules = hs_modules %>% mutate(module_val=T) %>%
+  pivot_wider(id_cols=id,names_from = 'desc',names_prefix = 'kegg.mod_',
+              values_from = 'module_val', values_fill = F, values_fn = sum ) %>%
+          mutate(across(where(is.integer), as.logical)) %>%
+          dplyr::select(id,where(~ is.logical(.x) && sum(.x) >9 ))
+
+HS_KEGG = left_join(kegg_pathways,kegg_modules)
 
 # Integrate all datasets -------------------------------------------------------
 save(list = ls(pattern = '^hs_'), file = here('output','hs_datasets.rdata'))
-load(here('output','hs_datasets.rdata'))
-
-hs_ref
-#hs_ens
-hs_ens2uni
-hs_uni2ens
-hs_chr
-hs_gc
-hs_transcript
+save(list = ls(pattern = '^HS_'), file = here('output','hs_integrated_datasets.rdata'))
+load(here::here('output','hs_datasets.rdata'))
+load(here::here('output','hs_integrated_datasets.rdata'))
 
 # Based on uniprot accession
 head(hs_r4s) # id = uniprot AC
-head(hs_codon) # ID = uniprot AC
-head(hs_CU) # ID = uniprot AC
-head(hs_aa) # id = uniprot AC
-head(hs_aa_class) # id = uniprot AC
-head(hs_d2p2) # id = uniprot AC
-head(hs_pfam) # seq_id = uniprot AC
-head(hs_pfam_dom) # seq_id = uniprot AC
-head(hs_pfam_clan) # seq_id = uniprot AC
+hs_orthologs = unique(hs_r4s$id)
 
-head(hs_stab) # protein_id = uniprot AC
-head(hs_tm) # UNIPROT = uniprot AC; jarzab2020.TPP_GENENAME = gene symbol
-head(hs_oligomers) # members = uniprot AC
-head(hs_assembly) # members = uniprot AC
-head(hs_complexes) # members = uniprot AC
-head(hs_pathways) # uniprot = uniprot AC
-head(hs_modules)  # uniprot = uniprot AC
+#head(hs_codon) # ID = uniprot AC
+#head(hs_aa) # id = uniprot AC
+#head(hs_aa_class) # id = uniprot AC
+#head(hs_CU) # ID = uniprot AC
+#head(hs_d2p2) # id = uniprot AC
+
+# head(hs_pfam) # seq_id = uniprot AC
+# head(hs_pfam_dom) # seq_id = uniprot AC
+# head(hs_pfam_clan) # seq_id = uniprot AC
+
+#head(hs_stab) # protein_id = uniprot AC
+#head(hs_tm) # UNIPROT = uniprot AC; jarzab2020.TPP_GENENAME = gene symbol
+
+#head(hs_oligomers) # members = uniprot AC
+#head(hs_assembly) # members = uniprot AC
+#head(hs_complexes) # members = uniprot AC
+
+
+#head(hs_pathways) # uniprot = uniprot AC
+#head(hs_modules)  # uniprot = uniprot AC
 # Based on Ensembl peptide identifiers
-head(hs_ppm_uni) # protid = ensembl peptide ; uniprot = uniprot AC ; id_uniprot = uniprot NAME ; GENENAME = gene symbol
-head(hs_supfam) # seqid = ensembl peptide
-head(hs_superfamilies)  # seqid = ensembl peptide
-head(hs_families)  # seqid = ensembl peptide
-head(hs_string_centralities) # ids = ensembl peptide
+# head(hs_supfam) # seqid = ensembl peptide
+# head(hs_superfamilies)  # seqid = ensembl peptide
+# head(hs_families)  # seqid = ensembl peptide
+#head(hs_string_centralities) # ids = ensembl peptide
+
+dim(HS_CODING)
+dim(HS_PFAM)
+dim(HS_SUPFAM)
+dim(HS_COUNT)
+dim(hs_CU)
+dim(hs_pepstats)
+dim(HS_KEGG)
+dim(HS_FOLD)
+dim(HS_COMPLEX)
+
+
+HS_DATA = left_join(HS_COUNT,HS_CODING,by=c('uniprot')) %>%
+  left_join(hs_pepstats,by=c('uniprot'='UNIPROT')) %>%
+  left_join(HS_PPM,by=c('ensp','uniprot')) %>%
+  left_join(HS_PFAM,by=c('uniprot'='seq_id')) %>%
+  left_join(HS_SUPFAM,by=c('ensp'='seqid')) %>%
+  left_join(hs_d2p2,by=c('uniprot'='id')) %>%
+  left_join(hs_string_centralities,by=c('ensp'='ids')) %>%
+  left_join(hs_CU,by=c('uniprot'='ID')) %>%
+  left_join(HS_FOLD,by=c('uniprot'='UNIPROT','GENENAME')) %>%
+#  left_join(hs_stab,by=c('uniprot'='protein_id')) %>%
+  left_join(HS_COMPLEX,by=c('uniprot'='members')) %>%
+  left_join(HS_KEGG,by=c('uniprot'='id')) %>%
+  left_join(hs_r4s,by=c('uniprot'='id')) %>%
+  distinct()
+
+# Replace NA
+HS_DATA_nona = HS_DATA %>%
+  mutate( across( starts_with('kegg.'), ~replace_na(., F)) ) %>%
+  mutate( across( starts_with('pfam.'), ~replace_na(., F)) ) %>%
+  mutate( across( starts_with('superfamily.'), ~replace_na(., F)) ) %>%
+  mutate( across( starts_with('pepstats.'), ~replace_na(., F)) ) %>%
+  mutate( across( starts_with('meldal2019.'), ~replace_na(., F)) ) %>%
+  mutate( across( starts_with('jarzab2020.'), ~replace_na(., F)) ) %>%
+  mutate( across( starts_with('leuenberger2017.LIP'), ~replace_na(., F)) ) %>%
+  mutate( across( where(is.logical) & starts_with('paxdb.'), ~replace_na(., F)) ) %>%
+  mutate( across( starts_with('ensembl.'), ~replace_na(., F)) ) %>%
+  mutate( across( where(is.logical) & starts_with('string.'), ~replace_na(., F)) ) %>%
+  distinct()
+
+#source(here::here("analysis","function_evorate_fitting.R"))
+test = HS_DATA %>% mutate( across(where(is.logical), .fns = ~replace_na(.,F) )) %>% distinct()
+
+all_orthologs = HS_DATA_nona %>%
+  filter(!is.na(r4s_mammals.rate) & uniprot %in% hs_orthologs) %>%
+  distinct()
+
+validation = all_orthologs %>% filter(is.na(paxdb.ppm_wholeorg))
+orthologs =  all_orthologs %>% filter(!is.na(paxdb.ppm_wholeorg))
+# miss0 = check_missing_var(HS_DATA)
+# miss1 = check_missing_var(HS_DATA_nona)
+# miss1.1 = check_missing_var(test)
+miss2 = check_missing_var(orthologs)
+
+
+
+# Remove rare variables (less than 2 occurrences in orthologs)
+HS_DATA_pred1 = orthologs %>% filter(uniprot %in% hs_orthologs) %>% remove_rare_vars()
+HS_DATA_pred2 = fix_missing_centrality(df=HS_DATA_pred1, id='uniprot', col_prefix="string.")
+
+miss.6 = check_missing_var(PREDICTORS.6)
+
+
+id_missing_d2p2 = HS_DATA_nona %>% dplyr::filter(is.na(d2p2.L)) %>% pull(uniprot)
+missing_d2p2 = load.d2p2(id_missing_d2p2,save="~/missing_d2p2.rds",autosave=F)
+
+df_missing_d2p2 = missing_d2p2 %>% get.d2p2.diso(.,as.df = T) %>%
+  mutate(d2p2.seg = find.consecutive(d2p2.diso>=7, TRUE, min=3),
+         d2p2.gap = find.consecutive(d2p2.diso>=7, FALSE, min=1)) %>%
+  group_by(d2p2.seg) %>% mutate( d2p2.seglen = sum_(d2p2.seg!=0)) %>%
+  group_by(d2p2.gap) %>% mutate( d2p2.gaplen = sum_(d2p2.gap!=0)) %>%
+  dplyr::filter(has.d2p2) %>%
+  dplyr::select(-c(has.d2p2,d2p2.size)) %>%
+  group_by(d2p2.id) %>%
+  summarise(d2p2.L = sum_(d2p2.diso>=7),
+            d2p2.f = mean_(d2p2.diso>=7),
+            d2p2.nseg = n_distinct(d2p2.seg),
+            d2p2.Lsegmax = max(d2p2.seglen)) %>%
+  mutate(id = str_extract(d2p2.id,UNIPROT.nomenclature())) %>%
+  dplyr::select(-d2p2.id)
+#mutate( across( starts_with('d2p2.'), ~replace_na(., F)) ) %>%
+#mutate( across( starts_with('string.'), ~replace_na(., F)) ) %>%
+
+
+miss1$skim_variable
+#HS_DATA_impute = MsCoreUtils::impute_bpca(HS_DATA_nona)
+
+
+miss2 = check_missing_var(HS_DATA_nona)
+
+predictor_vars = c(str_subset(colnames(HS_DATA_nona), pattern = '^[a-z0-9]+\\.'),codon_table$codon_aa)
+nonpred = str_subset(colnames(HS_DATA_nona), pattern = '^[a-z0-9]+\\.',negate = T)
+
+XCOL="ppm"
+YCOL="log10.EVO.FULL_R4S"
+ZCOL="log10.SNP.FULL_R4S"
+IDCOLS = c("UNIPROTKB","SGD","ORF","GNAME","PNAME")
+
+fit0 = fit_m0(orthologs,XCOL,YCOL,PREDICTORS,ZCOL,IDCOLS)
+P_best= select_variable(fit0,response = '.resid', min_ess = 1, min_ess_frac = 1)
+best_pred = fit0$P[,c(XCOL, YCOL, y_resid, ZCOL, P_best$variable)]
+n_best = n_distinct(P_best$variable)
+
