@@ -96,13 +96,21 @@ load.annotation = function(){
   return(annotation)
 }
 
-load.network = function(net=c('string','intact')){
+load.network = function(net=c('string','intact'),taxon=4932){
   ref_net = match.arg(net,choices = net, several.ok = F)
   if(ref_net=='string'){
-    network = load.string(tax="4932",phy=F, ful=T, min.score = 700) %>%
-      mutate(ORF1 = str_extract(protein1,SGD.nomenclature()),
-             ORF2 = str_extract(protein2,SGD.nomenclature())
-      ) %>% relocate(ORF1,ORF2) %>% dplyr::select(-c(protein1,protein2))
+    network = load.string(tax=taxon,phy=F, ful=T, min.score = 700)
+    if(taxon==4932){
+      network = network %>% relocate(protein1,protein2) %>%
+      mutate(protein1 = str_extract(protein1,SGD.nomenclature()),
+             protein2 = str_extract(protein2,SGD.nomenclature())
+      )
+    }else if(taxon==9606){
+      network = network %>%
+        mutate(protein1 = str_extract(protein1,ENSEMBL.nomenclature()),
+               protein2 = str_extract(protein2,ENSEMBL.nomenclature())
+        )
+    }
   }else if(ref_net=='intact'){
     network = load.intact.yeast(min.intact.score = 0.4) %>%
               dplyr::rename(ORF1=protA,ORF2=protB)
@@ -370,17 +378,17 @@ get_centrality_col = function(df,col_prefix="cat_interactions.string."){
   return(res)
 }
 
-retrieve_missing_centrality = function(orf_missing,type='string'){
-  interactions=load.network(type)
+retrieve_missing_centrality = function(orf_missing,type='string',taxon=4932){
+  interactions=load.network(type,taxon)
   cent=interactions %>%
-        filter(ORF1 %in% orf_missing | ORF2 %in% orf_missing) %>%
-        dplyr::select(ORF1,ORF2) %>%
+        #filter(ORF1 %in% orf_missing | ORF2 %in% orf_missing) %>%
+        dplyr::select(protein1,protein2) %>%
         network.centrality(fromTo = ., namenet = toupper(type)) %>%
         filter(ids %in% orf_missing)
   return(cent)
 }
 
-fix_missing_centrality = function(df,id='ORF',col_prefix='cat_interactions.string.'){
+fix_missing_centrality = function(df,id='ORF',col_prefix='cat_interactions.string.',taxon=4932){
   # Replace orf with missing values for centrality with 0's
   net_type = str_extract(col_prefix,'(string|intact)')
   if(net_type=='string'){
@@ -394,10 +402,9 @@ fix_missing_centrality = function(df,id='ORF',col_prefix='cat_interactions.strin
     return(df)
   }
   .warn$log("Replace columns with missing values for network centrality measures...\n")
-  df_missing = tibble(ORF = orf_missing)
-  df_na_centrality = retrieve_missing_centrality(orf_missing,net_type) %>%
-                     dplyr::rename(ORF=ids) %>%
-                     right_join(df_missing,by='ORF') %>%
+  df_missing = tibble(ids = orf_missing)
+  df_na_centrality = retrieve_missing_centrality(orf_missing,net_type,taxon) %>%
+                     right_join(df_missing,by='ids') %>%
                      dplyr::rename_with(.cols=starts_with('cent_'), Pxx, px=col_prefix, s='')
 
   numVar = df_na_centrality %>% dplyr::select(where(is.numeric)) %>% as.matrix
@@ -427,7 +434,7 @@ fix_missing_paxdb = function(df){
   return(df_impute)
 }
 ### WORKFLOW PROCESSING MISSING VALUES
-PROCESS_MISSING_VALUES = function(MAT, IDS){
+PROCESS_MISSING_VALUES = function(MAT, IDS, taxon=4932){
 
   miss.0=check_missing_var(MAT)
   # Predictors with missing values must be corrected
@@ -446,8 +453,8 @@ PROCESS_MISSING_VALUES = function(MAT, IDS){
   miss.2=check_missing_var(PREDICTORS.2)
 
   #     C) missing centrality values (STRING and INTACT network are treated individually)
-  PREDICTORS.3 = fix_missing_centrality(df=PREDICTORS.2,col_prefix="cat_interactions.string.")
-  PREDICTORS.4 = fix_missing_centrality(PREDICTORS.3,col_prefix="cat_interactions.intact.")
+  PREDICTORS.3 = fix_missing_centrality(df=PREDICTORS.2,col_prefix="cat_interactions.string.",taxon)
+  PREDICTORS.4 = fix_missing_centrality(PREDICTORS.3,col_prefix="cat_interactions.intact.",taxon) # only available for yeast
   #     D) missing protein disorder (D2P2/IUP)
   #     E) missing transcriptomics in barton 2010
 
