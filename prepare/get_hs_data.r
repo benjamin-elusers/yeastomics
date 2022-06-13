@@ -93,7 +93,7 @@ hs_chr = get_hs_chr(remove_patches = F) %>% dplyr::rename(all_of(col_ens)) %>%
 hs_transcript = get_ensembl_hs(longest_transcript = T) %>% dplyr::rename(all_of(col_ens)) %>%
   dplyr::select(ensg,ensp,uniprot, cds_length,transcript_length,
                 n_exons,n_exons_mini,has_introns) %>%
-  distinct() %>%
+  distinct()
 
 
 HS_CODING = left_join(hs_ref,hs_transcript) %>%
@@ -450,11 +450,9 @@ orthologs =  all_orthologs %>% filter(!is.na(paxdb.ppm_wholeorg))
 # miss1.1 = check_missing_var(test)
 miss2 = check_missing_var(orthologs)
 
-
-
 # Remove rare variables (less than 2 occurrences in orthologs)
 HS_DATA_pred1 = orthologs %>% filter(uniprot %in% hs_orthologs) %>% remove_rare_vars()
-HS_DATA_pred2 = fix_missing_centrality(df=HS_DATA_pred1, id='uniprot', col_prefix="string.")
+HS_DATA_pred2 = fix_missing_centrality(df=HS_DATA_pred1, id='uniprot', col_prefix="string.", taxon=9606)
 
 miss.6 = check_missing_var(PREDICTORS.6)
 
