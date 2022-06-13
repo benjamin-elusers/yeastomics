@@ -430,6 +430,57 @@ make_scatterplot  = function(data2plot,xvar,yvar, grp=NULL,
   return(p)
 }
 
+calculate_pfam_overlap = function(id,pf,verbose=T){
+  library(tidyverse)
+  pf_id = dplyr::filter(pf, seq_id %in% id)
+  Nprot = n_distinct(pf_id$seq_id)
+  N = nrow(pf_id)
+
+  if(verbose){
+    cat(sprintf('id = %s\n',id))
+    cat(sprintf('ndom = %s\n',N))
+  }
+
+  if(Nprot>1){ stop('more than one protein...') }
+  if(N<2){ stop('single assignment in protein (no overlap)...') }
+
+  pf_id = pf_id %>% mutate(overlap=F,ol_nter=F,ol_cter=F,ol_inside=F,ol_across=F,ol_dom="",is_repeat=F)
+  for(i in 1:(N-1)){
+    s1 = pf_id$alignment_start[i]
+    e1 = pf_id$alignment_end[i]
+    for(j in 1:N){
+      if(i != j ){
+        s2 = pf_id$alignment_start[j]
+        e2 = pf_id$alignment_end[j]
+        pf_id$no_overlap[i] = s1>e2 | e1<s2
+        if( !pf_id$no_overlap[i]){
+          pf_id$ol_nter[i]   =  s1>s2 & s1<e2 & e1>e2
+          pf_id$ol_cter[i]   =  s1<s2 & s2<e1 & e1<e2
+          pf_id$ol_inside[i] =  s1<s2 & e1>e2
+          pf_id$ol_across[i] =  s1>s2 & e1<e2
+          has_overlap = pf_id$ol_nter[i] | pf_id$ol_cter[i] | pf_id$ol_inside[i] | pf_id$ol_across[i]
+          pf_id$overlap[i] = has_overlap
+
+          if(verbose){
+            cat(sprintf('s1:%s-e1:%s <==> s2:%s-e2:%s\n',s1,e1,s2,e2))
+            cat(sprintf('Nter:%s Cter:%s inside:%s across:%s => has_overlap:%s\n\n',
+                        pf_id$ol_nter[i],
+                        pf_id$ol_cter[i],
+                        pf_id$ol_inside[i],
+                        pf_id$ol_across[i],
+                        has_overlap))
+          }
+          if(has_overlap){
+            pf_id$ol_dom[i] = paste0(pf_id$ol_dom[i],pf_id$hmm_acc[j],collapse=",")
+            if(pf_id$hmm_acc[i] == pf_id$hmm_acc[j]){ pf_id$is_repeat[i] = T }
+          }
+        }
+      }
+    }
+  }
+  return(pf_id)
+}
+
 get_clade_residual_evorate = function(cladedata){
   cat("==> Get residuals of clade-specific evolutionary rate from abundance <==\n")
   if(missing(cladedata)){ stop("Run get_clade_data() with the two clades you want to compare...") }
