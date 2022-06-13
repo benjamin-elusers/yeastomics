@@ -38,7 +38,7 @@ if(file.exists(save_predictors)){
 }else{
   tic("Handling missing values...")
   # HANDLING MISSING VALUES (MANUALLY & AUTOMATICALLY)
-  PREDICTORS_raw = PROCESS_MISSING_VALUES(MAT=PROP_FEAT, IDS=orf_orthologs)
+  PREDICTORS_raw = PROCESS_MISSING_VALUES(MAT=PROP_FEAT, IDS=orf_orthologs, taxon=4932)
   #missing_var = check_missing_var(PREDICTORS)
   PREDICTORS_raw = PREDICTORS
   write_rds(PREDICTORS_raw,save_predictors)
