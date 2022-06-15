@@ -1172,7 +1172,7 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
   return(node_ortho)
 }
 
-load.paxdb = function(taxon=4932){
+load.paxdb = function(taxon=4932,rm.zero=T){
   URL_PAXDB = "https://pax-db.org/downloads/latest/"
   paxdb_dataset =paste0(URL_PAXDB,"datasets/")
   taxon_dir=file.path(paxdb_dataset,taxon,"/")
@@ -1234,12 +1234,16 @@ load.paxdb = function(taxon=4932){
   taxon_ppm = left_join(ppm,infodata, by=c('dataset'='filename','taxid')) %>%
               left_join(map2uniprot, by=c('string'='id_string')) %>%
               arrange(protid,id_uniprot,ppm)
+
+  if(rm.zero){
+    taxon_ppm = taxon_ppm %>% mutate(ppm = ppm +min_above(ppm,above=0,na.rm=T))
+  }
   return(taxon_ppm)
 }
 
-get.paxdb = function(tax=4932, abundance='integrated'){
+get.paxdb = function(tax=4932, abundance='integrated',rm.zero=T){
   #closeAllConnections() # Make sure to close connections
-  paxdb = load.paxdb(tax)
+  paxdb = load.paxdb(tax,rm.zero=rm.zero)
   # if nothing selected return the integrated values
   # (if there is a single dataset, it is considered as integrated)
   targets=match.arg(abundance,c('integrated','median','mean','weighted'), T)
