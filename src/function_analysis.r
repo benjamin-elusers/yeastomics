@@ -369,7 +369,7 @@ coalesce_join <- function(x, y,
     nchar(to_coalesce) - nchar(suffix_used)
   ))
 
-  coalesced <- purrr::map_dfc(set_names(to_coalesce), ~dplyr::coalesce(
+  coalesced <- purrr::map_dfc(set_names(to_coalesce,to_coalesce), ~dplyr::coalesce(
     joined[[paste0(.x, suffix[1])]],
     joined[[paste0(.x, suffix[2])]]
   )) %>% setNames(to_coalesce)
