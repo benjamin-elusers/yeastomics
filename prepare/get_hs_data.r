@@ -141,20 +141,14 @@ hs_aa_class = AACLASS.FR %>% purrr::reduce(full_join,by='id') %>%
 
 HS_COUNT = left_join(hs_aa,hs_aa_class) %>% left_join(hs_codon,by=c('id'='uniprot')) %>%
             dplyr::rename(uniprot=id) %>% left_join(hs_len,by='uniprot')
-# Abundance --------------------------------------------------------------------
-hs_ppm_uni = readRDS(here::here("data","paxdb_integrated_human.rds"))
-HS_PPM = hs_ppm_uni %>%
-        dplyr::select(ensp=protid,uniprot,GENENAME,is_uniref,is_duplicated,
-                      ppm_wholeorg,ppm_max,ppm_int_max,ppm_int) %>%
-        dplyr::rename_with(-c(ensp,uniprot,GENENAME), .fn = Pxx, 'paxdb')
-
 # Conservation -----------------------------------------------------------------
 #hs_r4s = load.evorate(resdir = "/data/benjamin/Evolution/HUMAN",ref = NULL,ext.r4s = '.r4s')
 hs_r4s = read_rds(here("data","RESIDUE-EVORATE-HUMAN.rds")) %>% group_by(id) %>%
              summarize(lmsa=max(msa_pos), lref=max(ref_pos),
                        pid=mean(matched==total-1), pdiv=mean(mismatched>0),pgap=mean(indel>0),
                        nsp = mean(total),
-                       rate = abs(min_(r4s_rate)) + mean_(r4s_rate)) %>%
+                       rate = mean_(r4s_rate),
+                       rate_norm = abs(2*min_(r4s_rate)) + mean_(r4s_rate)) %>%
              dplyr::filter(!is.na(rate)) %>%
              dplyr::rename_with(-id, .fn = Pxx, 'r4s_mammals')
 
@@ -409,18 +403,20 @@ dim(HS_COMPLEX)
 
 HS_DATA = left_join(HS_COUNT,HS_CODING,by=c('uniprot')) %>%
   left_join(hs_pepstats,by=c('uniprot'='UNIPROT')) %>%
-  left_join(HS_PPM,by=c('ensp','uniprot')) %>%
   left_join(HS_PFAM,by=c('uniprot'='seq_id')) %>%
   left_join(HS_SUPFAM,by=c('ensp'='seqid')) %>%
   left_join(hs_d2p2,by=c('uniprot'='id')) %>%
   left_join(hs_string_centralities,by=c('ensp'='ids')) %>%
   left_join(hs_CU,by=c('uniprot'='ID')) %>%
-  left_join(HS_FOLD,by=c('uniprot'='UNIPROT','GENENAME')) %>%
+  left_join(HS_FOLD,by=c('uniprot'='UNIPROT')) %>%
 #  left_join(hs_stab,by=c('uniprot'='protein_id')) %>%
   left_join(HS_COMPLEX,by=c('uniprot'='members')) %>%
   left_join(HS_KEGG,by=c('uniprot'='id')) %>%
   left_join(hs_r4s,by=c('uniprot'='id')) %>%
   distinct()
+
+
+# Replace missing values  ------------------------------------------------------
 
 # Replace NA
 HS_DATA_nona = HS_DATA %>%
@@ -431,7 +427,7 @@ HS_DATA_nona = HS_DATA %>%
   mutate( across( starts_with('meldal2019.'), ~replace_na(., F)) ) %>%
   mutate( across( starts_with('jarzab2020.'), ~replace_na(., F)) ) %>%
   mutate( across( starts_with('leuenberger2017.LIP'), ~replace_na(., F)) ) %>%
-  mutate( across( where(is.logical) & starts_with('paxdb.'), ~replace_na(., F)) ) %>%
+  #mutate( across( where(is.logical) & starts_with('paxdb.'), ~replace_na(., F)) ) %>%
   mutate( across( starts_with('ensembl.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('string.'), ~replace_na(., F)) ) %>%
   distinct()
@@ -439,9 +435,27 @@ HS_DATA_nona = HS_DATA %>%
 #source(here::here("analysis","function_evorate_fitting.R"))
 test = HS_DATA %>% mutate( across(where(is.logical), .fns = ~replace_na(.,F) )) %>% distinct()
 
+
+
+# Orthologs dataset (with/out abundance) ----------------------------------
+
 all_orthologs = HS_DATA_nona %>%
   filter(!is.na(r4s_mammals.rate) & uniprot %in% hs_orthologs) %>%
   distinct()
+
+## Abundance -------------------------------------------------------------------
+# hs_ppm_uni = readRDS(here::here("data","paxdb_integrated_human.rds"))
+# HS_PPM = hs_ppm_uni %>%
+#   dplyr::select(ensp=protid,uniprot,GENENAME,is_uniref,is_duplicated,
+#                 ppm_wholeorg,ppm_max,ppm_int_max,ppm_int) %>%
+#   dplyr::rename_with(-c(ensp,uniprot,GENENAME), .fn = Pxx, 'paxdb')
+hs_ppm = get.paxdb(tax=9606,abundance = 'integrated')
+
+hs_ppm_organ = pivot_wider(hs_ppm, id_cols = c(protid,id_uniprot),
+                           names_from = 'organ',
+                           values_from = c(ppm_int,ppm_n)  )
+
+left_join(HS_DATA_nona,hs_ppm),by=c('ensp','uniprot')) %>%
 
 validation = all_orthologs %>% filter(is.na(paxdb.ppm_wholeorg))
 orthologs =  all_orthologs %>% filter(!is.na(paxdb.ppm_wholeorg))
@@ -450,50 +464,48 @@ orthologs =  all_orthologs %>% filter(!is.na(paxdb.ppm_wholeorg))
 # miss1.1 = check_missing_var(test)
 miss2 = check_missing_var(orthologs)
 
+
+
+# Features selection (and fixing missing values) --------------------------
+
 # Remove rare variables (less than 2 occurrences in orthologs)
 HS_DATA_pred1 = orthologs %>% filter(uniprot %in% hs_orthologs) %>% remove_rare_vars()
-HS_DATA_pred2 = fix_missing_centrality(df=HS_DATA_pred1, id='uniprot', col_prefix="string.", taxon=9606)
+# Use lower stringencies for string centrality + random forest imputation for proteins with unknown interactions
+HS_DATA_pred2 = fix_missing_centrality(df=HS_DATA_pred1, id='ensp', col_prefix="string.", taxon=9606)
+miss_pred1 = check_missing_var(HS_DATA_pred1)
+miss_pred2 = check_missing_var(HS_DATA_pred2)
 
-miss.6 = check_missing_var(PREDICTORS.6)
+predictor_vars = HS_DATA_pred2 %>% dplyr::select(where(is.numeric) | where(is.logical)) %>% colnames
+nonpred = setdiff(colnames(HS_DATA_pred2),predictor_vars)
+save.image(here::here('output','hs_predictors_proteome.rdata'))
 
+predictor_vars = predictor_vars()
 
-id_missing_d2p2 = HS_DATA_nona %>% dplyr::filter(is.na(d2p2.L)) %>% pull(uniprot)
-missing_d2p2 = load.d2p2(id_missing_d2p2,save="~/missing_d2p2.rds",autosave=F)
+min_ppm  = min(HS_DATA_pred2$paxdb.ppm_wholeorg[HS_DATA_pred2$paxdb.ppm_wholeorg!=0])
 
-df_missing_d2p2 = missing_d2p2 %>% get.d2p2.diso(.,as.df = T) %>%
-  mutate(d2p2.seg = find.consecutive(d2p2.diso>=7, TRUE, min=3),
-         d2p2.gap = find.consecutive(d2p2.diso>=7, FALSE, min=1)) %>%
-  group_by(d2p2.seg) %>% mutate( d2p2.seglen = sum_(d2p2.seg!=0)) %>%
-  group_by(d2p2.gap) %>% mutate( d2p2.gaplen = sum_(d2p2.gap!=0)) %>%
-  dplyr::filter(has.d2p2) %>%
-  dplyr::select(-c(has.d2p2,d2p2.size)) %>%
-  group_by(d2p2.id) %>%
-  summarise(d2p2.L = sum_(d2p2.diso>=7),
-            d2p2.f = mean_(d2p2.diso>=7),
-            d2p2.nseg = n_distinct(d2p2.seg),
-            d2p2.Lsegmax = max(d2p2.seglen)) %>%
-  mutate(id = str_extract(d2p2.id,UNIPROT.nomenclature())) %>%
-  dplyr::select(-d2p2.id)
-#mutate( across( starts_with('d2p2.'), ~replace_na(., F)) ) %>%
-#mutate( across( starts_with('string.'), ~replace_na(., F)) ) %>%
+HS_DATA_pred2$PPM = log10(HS_DATA_pred2$paxdb.ppm_wholeorg+min_ppm)
+PREDICTORS= HS_DATA_pred2
+PREDICTORS_nona = PREDICTORS %>% drop_na
+check_missing_var(PREDICTORS_nona)
 
+XCOL="PPM"
+YCOL="r4s_mammals.rate"
+ZCOL=""
+IDCOLS = c("uniprot","ensp","ensg","GENENAME","gene_biotype")
 
-miss1$skim_variable
-#HS_DATA_impute = MsCoreUtils::impute_bpca(HS_DATA_nona)
+fit0 = fit_m0(orthologs,XCOL,YCOL,PREDICTORS_nona,ZCOL,IDCOLS)
+formula_M0=reformulate(response = YCOL, termlabels = XCOL, intercept = T )
+LM0 = lm(data=PREDICTORS_nona, formula_M0)
+df0=decompose_variance(LM0,T)
+fit0=list(LM0=LM0,P=PREDICTORS_nona)
+spearman.toplot(PREDICTORS$r4s_mammals.rate,PREDICTORS$PPM)
 
+n_pred_vars = colnames(fit0$P) %>% str_extract("cat_.+") %>% setdiff(NA) %>% n_distinct()
 
-miss2 = check_missing_var(HS_DATA_nona)
-
-predictor_vars = c(str_subset(colnames(HS_DATA_nona), pattern = '^[a-z0-9]+\\.'),codon_table$codon_aa)
-nonpred = str_subset(colnames(HS_DATA_nona), pattern = '^[a-z0-9]+\\.',negate = T)
-
-XCOL="ppm"
-YCOL="log10.EVO.FULL_R4S"
-ZCOL="log10.SNP.FULL_R4S"
-IDCOLS = c("UNIPROTKB","SGD","ORF","GNAME","PNAME")
-
-fit0 = fit_m0(orthologs,XCOL,YCOL,PREDICTORS,ZCOL,IDCOLS)
 P_best= select_variable(fit0,response = '.resid', min_ess = 1, min_ess_frac = 1)
 best_pred = fit0$P[,c(XCOL, YCOL, y_resid, ZCOL, P_best$variable)]
 n_best = n_distinct(P_best$variable)
 
+hs_evo_ppm = left_join(hs_r4s,HS_PPM, by=c('id'='uniprot')) %>% drop_na
+hs_evo_ppm %>% filter(is.dup(id))
+spearman.toplot(hs_evo_ppm$r4s_mammals.rate_norm,hs_evo_ppm$paxdb.ppm_int)
