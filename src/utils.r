@@ -155,6 +155,7 @@ maxrep  <- function(x,n){ sort(table(x), decreasing = TRUE)[1:n] } # gets the Nt
 sum.na  <- function (x,notNA=FALSE){ sum(is.na(x) == !notNA) } # returns sum of NA or not-NA values
 geomean <- function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) } # returns geometrical mean
 geosd   <- function(x) {  exp(sd(log(x[x != 0 & !is.na(x)]))) } # returns geometrical standard deviation
+min_above <- function(x,above=0,...){ min(x[x>above],...) }
 
 rowsNA = function(m){ # counts how many rows have NAs
   # input must be 2D array (matrix/dataframe)
