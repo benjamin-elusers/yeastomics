@@ -410,13 +410,16 @@ fix_missing_centrality = function(df,id='ORF',col_prefix='cat_interactions.strin
   numVar = df_na_centrality %>% dplyr::select(where(is.numeric)) %>% as.matrix
   .info$log("Remaining missing values of centralities are replaced by imputation with 'missForest'!")
   library(missForest)
-  df_na_centrality = missForest::missForest(numVar)$ximp %>% as_tibble() %>% mutate(ORF=orf_missing)
-
+  df_na_centrality = missForest::missForest(numVar)$ximp %>% as_tibble() %>% mutate(ids=orf_missing)
   if(net_type=='intact'){
     df_na_centrality = df_na_centrality %>% dplyr::rename(UNIPROTKB=ORF)
     df_fixed = coalesce_join(x = df, y=df_na_centrality, by = 'UNIPROTKB')
   }else{
-    df_fixed = coalesce_join(x = df, y=df_na_centrality, by = 'ORF')
+    if( taxon==9606){
+      df = df %>% mutate(across(where(is.character) & starts_with('string.cent_'), as.numeric))
+      df_na_centrality = df_na_centrality %>% rename(ensp=ids)
+    }
+    df_fixed = coalesce_join(x = df, y=df_na_centrality, by = c('ensp'))
   }
 
   return(df_fixed)
