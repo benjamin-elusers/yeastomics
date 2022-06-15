@@ -1253,6 +1253,7 @@ get.paxdb = function(tax=4932, abundance='integrated'){
       dplyr::group_by(taxid,organ,protid) %>%
       dplyr::filter(is_integrated) %>%
       group_by(protid) %>% mutate(n_int = n_distinct(organ)) %>%
+      ungroup %>%
       dplyr::select(taxid,organ,protid,id_uniprot, ppm_int = ppm, n_data, n_int)
   }
 
