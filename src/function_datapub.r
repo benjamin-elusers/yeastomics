@@ -1099,6 +1099,16 @@ load.pombe.orthologs = function() {
   return(sp.sc)
 }
 
+get.mobidb.id = function(id="A0A075B734"){
+
+  URL_API = "https://mobidb.bio.unipd.it/api/download?"
+  URL_PARAM = sprintf("acc=%s&format=tsv",id)
+  URL_QUERY = paste0(URL_API,URL_PARAM)
+  df_mobi = readr::read_delim(URL_QUERY) %>%
+            separate(col=feature, sep='-',into=c('evidence','feature','source'))
+  return(df_mobi)
+}
+
 
 ##### paxDB #####
 find_paxdb_downloads = function(){
