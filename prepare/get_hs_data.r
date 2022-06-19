@@ -1,10 +1,12 @@
+load(here::here('output','hs_datasets.rdata'))
+load(here::here('output','hs_integrated_datasets.rdata'))
+load(here::here('output','hs_predictors_proteome.rdata'))
+
 source(here::here("src","__setup_yeastomics__.r"))
 source(here::here("analysis","function_evorate_fitting.R"))
 
 col_ens = setNames(nm =c('uniprot','ensp','ensg'),
                    object=c('uniprotswissprot','ensembl_peptide_id','ensembl_gene_id'))
-load(here::here('output','hs_datasets.rdata'))
-load(here::here('output','hs_integrated_datasets.rdata'))
 
 load.mcshane2016.data = function(){
   # Cell 2016 mcshane E.
@@ -69,16 +71,26 @@ hs_cdna_gc = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %
 hs_codon_freq = Biostrings::trinucleotideFrequency(hs_cdna,step = 3,as.prob = T) *100
 
 hs_map_uni = get.uniprot.mapping(9606)
-hs_uni2ensp = hs_map_uni %>% filter(extdb == 'Ensembl_PRO') %>%
-              dplyr::rename(uniprot=uni,ensp=extid) %>%
-              dplyr::select(-sp,-upid,-extdb) %>%
-              mutate(is_uniref = uniprot %in% hs_uniref)
+hs_uni2ensp = hs_map_uni %>%
+       filter(extdb %in% c('Gene_Name','Ensembl','Ensembl_PRO') ) %>%
+       mutate(row = dense_rank(uni)) %>%
+       tidyr::pivot_wider(id_cols = c(uni,row), names_from='extdb', values_from='extid', values_fn = list ) %>%
+       unnest_longer(col = 'Gene_Name') %>%
+       unnest_longer(col = 'Ensembl') %>%
+       unnest_longer(col = 'Ensembl_PRO') %>%
+       separate(col = Ensembl_PRO, sep = '\\.',into=c('ensp','ensp_v')) %>%
+       separate(col = Ensembl, sep = '\\.',into=c('ensg','ensg_v')) %>%
+       dplyr::select(-row,-ensp_v,-ensg_v) %>%
+       dplyr::rename(uniprot=uni, gname=Gene_Name) %>%
+       mutate(is_uniref = uniprot %in% hs_uniref) %>%
+       distinct()
 
 # Proteome of reference  (Ensembl and Uniprot) ---------------------------------
-hs_ref = hs_uni2ensp %>% separate(col='ensp',into = c('ensp','vers'), sep='\\.') %>%
-  dplyr::select(-vers) %>% distinct() %>%
-  inner_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens[1:2])) , by=c('ensp','uniprot')) %>%
-  filter(is_uniref)
+hs_ref = hs_uni2ensp %>%
+         left_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens[1:2])) , by=c('ensp','uniprot')) %>%
+         filter(is_uniref & gene_biotype == 'protein_coding') %>%
+         group_by(uniprot) %>% mutate(n_ensg = n_distinct(ensg), n_ensp = n_distinct(ensp)) %>%
+         arrange(desc(n_ensg), ensg, desc(n_ensp), ensp, uniprot, gname)
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
 hs_gc = get_hs_GC() %>% as_tibble %>% dplyr::rename(all_of(col_ens)) %>%
@@ -104,6 +116,7 @@ HS_CODING = left_join(hs_ref,hs_transcript) %>%
                      has_introns,n_exons,n_exons_mini,
                      paste0('chr_',c(1:22,'X','Y','MT'))) %>%
             group_by(uniprot) %>% filter( row_number() == nearest(value=F,x=max(transcript_length),y=transcript_length,n = 1)) %>%
+            relocate(uniprot,is_uniref,gname,ensg,ensp,gene_biotype) %>%
             dplyr::rename_with(-c(uniprot:gene_biotype, starts_with('uniprot.'), starts_with('ensembl.')),.fn = Pxx, 'ensembl')
 
 # Codons -----------------------------------------------------------------------
@@ -389,7 +402,6 @@ hs_orthologs = unique(hs_r4s$id)
 # head(hs_superfamilies)  # seqid = ensembl peptide
 # head(hs_families)  # seqid = ensembl peptide
 #head(hs_string_centralities) # ids = ensembl peptide
-
 dim(HS_CODING)
 dim(HS_PFAM)
 dim(HS_SUPFAM)
@@ -413,7 +425,8 @@ HS_DATA = left_join(HS_COUNT,HS_CODING,by=c('uniprot')) %>%
   left_join(HS_COMPLEX,by=c('uniprot'='members')) %>%
   left_join(HS_KEGG,by=c('uniprot'='id')) %>%
   left_join(hs_r4s,by=c('uniprot'='id')) %>%
-  distinct()
+  distinct() %>%
+  relocate(uniprot,is_uniref,ensg,ensp,ensembl.gname, GENENAME, gene_biotype)
 
 
 # Replace missing values  ------------------------------------------------------
@@ -430,12 +443,11 @@ HS_DATA_nona = HS_DATA %>%
   #mutate( across( where(is.logical) & starts_with('paxdb.'), ~replace_na(., F)) ) %>%
   mutate( across( starts_with('ensembl.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('string.'), ~replace_na(., F)) ) %>%
+  mutate( is_uniref=replace_na(is_uniref,F)) %>%
   distinct()
 
 #source(here::here("analysis","function_evorate_fitting.R"))
 test = HS_DATA %>% mutate( across(where(is.logical), .fns = ~replace_na(.,F) )) %>% distinct()
-
-
 
 # Orthologs dataset (with/out abundance) ----------------------------------
 
@@ -449,27 +461,50 @@ all_orthologs = HS_DATA_nona %>%
 #   dplyr::select(ensp=protid,uniprot,GENENAME,is_uniref,is_duplicated,
 #                 ppm_wholeorg,ppm_max,ppm_int_max,ppm_int) %>%
 #   dplyr::rename_with(-c(ensp,uniprot,GENENAME), .fn = Pxx, 'paxdb')
-hs_ppm = get.paxdb(tax=9606,abundance = 'integrated')
+hs_ppm = get.paxdb(tax=9606,abundance = 'integrated',rm.zero=T)
 
-hs_ppm_organ = pivot_wider(hs_ppm, id_cols = c(protid,id_uniprot),
-                           names_from = 'organ',
-                           values_from = c(ppm_int,ppm_n)  )
+hs_organ = hs_ppm %>% group_by(protid) %>%
+           summarize( PPM_MIN_ORGAN = min_(ppm_int),
+                   PPM_MAX_ORGAN = max_(ppm_int),
+                   PPM_AVG_ORGAN = mean_(ppm_int),
+                   PPM_MD_ORGAN = median_(ppm_int),
+                   PPM_geomAVG_ORGAN = geomean(ppm_int)) %>%
+          mutate( across(starts_with('PPM_'), log10) )
 
-left_join(HS_DATA_nona,hs_ppm),by=c('ensp','uniprot')) %>%
 
-validation = all_orthologs %>% filter(is.na(paxdb.ppm_wholeorg))
-orthologs =  all_orthologs %>% filter(!is.na(paxdb.ppm_wholeorg))
+hs_ppm_organ = pivot_wider(hs_ppm, id_cols = c(protid,id_uniprot,n_data,n_int),
+                           names_from = 'organ', names_prefix = 'PPM_',
+                           values_from = 'ppm_int', values_fn = log10) %>%
+               left_join(hs_organ,by='protid')
+hs_map_uni = get.uniprot.mapping(9606,'UniProtKB-ID') %>% dplyr::select(uni,extid)
+HS_PPM = left_join(hs_ppm_organ,hs_map_uni, by=c('id_uniprot'='extid'))
+
+hs_ER = left_join(hs_r4s,HS_PPM, by=c('id'='uni')) %>%
+        mutate(log10.rate = log10(r4s_mammals.rate))
+
+ppm_ER = hs_ER %>% dplyr::select(starts_with('PPM_')) %>% colnames %>%
+          bind_cols( map_dfr(., function(x){ spearman.toplot(X=hs_ER$log10.rate, Y=hs_ER[[x]]) }) ) %>%
+          rename(ppm_dataset ='...1') %>% arrange(estimate,N) %>%
+  dplyr::select(ppm_dataset,N,r=estimate,p.value,) %>% mutate(R2 = 100*r^2)
+
+ppm_ER %>% print(n=40)
+
+
+validation = all_orthologs %>% filter( !(uniprot %in% HS_PPM$uni) )
+orthologs =  all_orthologs %>% filter(uniprot %in% HS_PPM$uni)
+dim(validation)
+dim(orthologs)
+
+
 # miss0 = check_missing_var(HS_DATA)
-# miss1 = check_missing_var(HS_DATA_nona)
-# miss1.1 = check_missing_var(test)
-miss2 = check_missing_var(orthologs)
-
-
+miss1 = check_missing_var(HS_DATA_nona)
+miss1.1 = check_missing_var(test)
+miss2 = check_missing_var(all_orthologs)
 
 # Features selection (and fixing missing values) --------------------------
 
 # Remove rare variables (less than 2 occurrences in orthologs)
-HS_DATA_pred1 = orthologs %>% filter(uniprot %in% hs_orthologs) %>% remove_rare_vars()
+HS_DATA_pred1 = remove_rare_vars(df=orthologs,min_obs=2)
 # Use lower stringencies for string centrality + random forest imputation for proteins with unknown interactions
 HS_DATA_pred2 = fix_missing_centrality(df=HS_DATA_pred1, id='ensp', col_prefix="string.", taxon=9606)
 miss_pred1 = check_missing_var(HS_DATA_pred1)
@@ -477,7 +512,7 @@ miss_pred2 = check_missing_var(HS_DATA_pred2)
 
 predictor_vars = HS_DATA_pred2 %>% dplyr::select(where(is.numeric) | where(is.logical)) %>% colnames
 nonpred = setdiff(colnames(HS_DATA_pred2),predictor_vars)
-save.image(here::here('output','hs_predictors_proteome.rdata'))
+#save.image(here::here('output','hs_predictors_proteome.rdata'))
 
 predictor_vars = predictor_vars()
 
