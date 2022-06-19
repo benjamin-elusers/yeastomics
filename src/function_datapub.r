@@ -1920,7 +1920,7 @@ get_ensembl_hsprot = function(verbose=T){
   return(hs_ensp)
 }
 
-get_ensembl_hs = function(verbose=T,longest_transcript=F){
+get_ensembl_hs = function(verbose=T,longest_transcript=F,with_uniprot=T){
   library(biomaRt)
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
   att_pos = c('chromosome_name','start_position','end_position')
@@ -1928,12 +1928,16 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F){
   att_uni = c('uniprotswissprot')
   att_type = c('gene_biotype','transcript_biotype')
 
+  filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
+
+  if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
+
   hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
   # Get representative human proteome with UniProt/SwissProt identifiers
   hs_ensg = getBM(mart = hs_ens,
                   attributes = c(att_gene,att_pos,att_struct,att_uni,att_type),
-                  filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
-                  values=list('protein_coding','protein_coding',T),
+                  filters=names(filters),
+                  values=filters,
                   uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
     mutate( gene_length = end_position-start_position+1,
             exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
