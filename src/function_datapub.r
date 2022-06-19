@@ -1936,8 +1936,7 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F,with_uniprot=T){
   # Get representative human proteome with UniProt/SwissProt identifiers
   hs_ensg = getBM(mart = hs_ens,
                   attributes = c(att_gene,att_pos,att_struct,att_uni,att_type),
-                  filters=names(filters),
-                  values=as.list(filters),
+                  filters=names(filters), values=as.list(filters),
                   uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
     mutate( gene_length = end_position-start_position+1,
             exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
@@ -1952,7 +1951,7 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F,with_uniprot=T){
 
   if(longest_transcript){
     hs_ensg = hs_ensg %>%
-      group_by(ensembl_gene_id) %>%
+      group_by(ensembl_gene_id,uniprotswissprot) %>%
       dplyr::filter(transcript_length ==  max(transcript_length) ) #%>%
       #dplyr::select(-c(start_position,end_position,transcript_start,transcript_end,rank,
       #               ensembl_exon_id,is_constitutive,exon_chrom_start,exon_chrom_end,exon_length)) %>%
@@ -1970,26 +1969,30 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F,with_uniprot=T){
   return(hs_ensg)
 }
 
-get_hs_GC = function(){
+get_hs_GC = function(with_uniprot=T){
   library(biomaRt)
   att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','percentage_gene_gc_content')
   ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+  filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
+  if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
+
     hs_gc_gene=getBM(attributes=att_gene, mart=ens,
-                     filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
-                     values=list('protein_coding','protein_coding',T),
+                     filters=names(filters), values=as.list(filters),
                      uniqueRows = T, bmHeader = F) %>% as_tibble()
   return(hs_gc_gene)
 }
 
-get_hs_chr = function(as.df=T,remove_patches=T){
+get_hs_chr = function(as.df=T,remove_patches=T,with_uniprot=T){
   library(biomaRt)
   chromosomes = c(1:22,'MT','X','Y')
   att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','chromosome_name')
   ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+  filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
+  if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
+
   hs_chr=getBM(attributes=att_gene, mart=ens,
-                   filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
-                   values=list('protein_coding','protein_coding',T),
-                   uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
+               filters=names(filters), values=as.list(filters),
+               uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
          mutate(is_patched = !(chromosome_name %in% chromosomes))
 
   if(remove_patches){
@@ -2033,9 +2036,13 @@ query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
                     'perc_id','perc_id_r1','goc_score','wga_coverage','orthology_confidence')
     att_ortho = intersect(sprintf("%s_homolog_%s",ortho,att_species), listAttributes(ens,page='homologs')[,1])
     cat(sprintf("Trying to fetch orthologs '%s' VS. '%s'...",species,ortho))
+
+    filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
+    if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
+
     Q=getBM(mart=ens,
             attributes=c(att_gene,att_ortho),
-            filters = c(ortholog,'biotype','transcript_biotype'),  values = list(T,'protein_coding','protein_coding'),
+            filters=names(filters), values=as.list(filters),
             uniqueRows = T, bmHeader = F)
     return(Q)
   },
