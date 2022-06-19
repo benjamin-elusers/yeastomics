@@ -1937,7 +1937,7 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F,with_uniprot=T){
   hs_ensg = getBM(mart = hs_ens,
                   attributes = c(att_gene,att_pos,att_struct,att_uni,att_type),
                   filters=names(filters),
-                  values=filters,
+                  values=as.list(filters),
                   uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
     mutate( gene_length = end_position-start_position+1,
             exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
