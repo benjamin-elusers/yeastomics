@@ -1917,7 +1917,7 @@ get_ensg_dataset = function(){
 
 get_ensembl_hsprot = function(verbose=T){
   library(biomaRt)
-  att_prot = c('ensembl_peptide_id','uniprotswissprot','transcript_is_canonical')
+  att_prot = c('ensembl_peptide_id','uniprotswissprot')
   att_struct = c('gene_biotype')
 
   hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
@@ -1937,7 +1937,7 @@ get_ensembl_hsprot = function(verbose=T){
 
 get_ensembl_hs = function(verbose=T,longest_transcript=F,with_uniprot=T){
   library(biomaRt)
-  att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id','transcript_is_canonical')
+  att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
   att_pos = c('chromosome_name','start_position','end_position')
   att_struct = c('cds_length','transcript_length','transcript_start','transcript_end','ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
   att_uni = c('uniprotswissprot')
@@ -1986,7 +1986,7 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F,with_uniprot=T){
 
 get_hs_GC = function(with_uniprot=T){
   library(biomaRt)
-  att_gene = c('ensembl_gene_id','ensembl_peptide_id','transcript_is_canonical','uniprotswissprot','percentage_gene_gc_content')
+  att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','percentage_gene_gc_content')
   ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
   filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
   if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
@@ -2000,7 +2000,7 @@ get_hs_GC = function(with_uniprot=T){
 get_hs_chr = function(as.df=T,remove_patches=T,with_uniprot=T){
   library(biomaRt)
   chromosomes = c(1:22,'MT','X','Y')
-  att_gene = c('ensembl_gene_id','ensembl_peptide_id','transcript_is_canonical','uniprotswissprot','chromosome_name')
+  att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','chromosome_name')
   ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
   filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
   if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
@@ -2046,7 +2046,7 @@ query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
   ens = useEnsembl('ensembl',dataset,mirror=ENS_MIRROR)
   t0 = proc.time()
   out <- tryCatch({
-    att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id','transcript_is_canonical')
+    att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
     att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide','canonical_transcript_protein','subtype',
                     'perc_id','perc_id_r1','goc_score','wga_coverage','orthology_confidence')
     att_ortho = intersect(sprintf("%s_homolog_%s",ortho,att_species), listAttributes(ens,page='homologs')[,1])
