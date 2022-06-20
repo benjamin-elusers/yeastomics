@@ -88,35 +88,37 @@ hs_uni2ensp = hs_map_uni %>%
 # Proteome of reference  (Ensembl and Uniprot) ---------------------------------
 hs_ref = hs_uni2ensp %>%
          left_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens[1:2])) , by=c('ensp','uniprot')) %>%
-         filter(is_uniref & gene_biotype == 'protein_coding') %>%
+         filter(is_uniref) %>%
          group_by(uniprot) %>% mutate(n_ensg = n_distinct(ensg), n_ensp = n_distinct(ensp)) %>%
          arrange(desc(n_ensg), ensg, desc(n_ensp), ensp, uniprot, gname)
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
-hs_gc = get_hs_GC() %>% as_tibble %>% dplyr::rename(all_of(col_ens)) %>%
+hs_gc = get_hs_GC(with_uniprot = F) %>% as_tibble %>% dplyr::rename(all_of(col_ens)) %>%
         rename(ensembl.GC_gene=percentage_gene_gc_content) %>%
         left_join( tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_cdna_gc), by=c('uniprot'))
 
-hs_chr = get_hs_chr(remove_patches = F) %>% dplyr::rename(all_of(col_ens)) %>%
+hs_chr = get_hs_chr(remove_patches = F,with_uniprot = F) %>%
+          dplyr::rename(all_of(col_ens)) %>%
           dplyr::select(-ensp) %>% distinct()
 
 # Sequences Length -------------------------------------------------------------
 
-hs_transcript = get_ensembl_hs(longest_transcript = T) %>% dplyr::rename(all_of(col_ens)) %>%
-  dplyr::select(ensg,ensp,uniprot, cds_length,transcript_length,
-                n_exons,n_exons_mini,has_introns) %>%
-  distinct()
+hs_transcript = get_ensembl_hs(longest_transcript = T, with_uniprot = F) %>%
+                  dplyr::rename(all_of(col_ens)) %>%
+                  dplyr::select(ensg,ensp,uniprot, cds_length,transcript_length,
+                                n_exons,n_exons_mini,has_introns) %>%
+                  distinct()
 
 
 HS_CODING = left_join(hs_ref,hs_transcript) %>%
             left_join(hs_gc) %>%
             left_join(hs_chr) %>%
-            relocate(uniprot,ensp,is_uniref,ensg,gene_biotype,ensembl.GC_gene,uniprot.GC_cdna,
+            relocate(uniprot,is_uniref,gname,ensg,ensp,gene_biotype,
+                     ensembl.GC_gene,uniprot.GC_cdna,
                      cds_length,transcript_length,
                      has_introns,n_exons,n_exons_mini,
                      paste0('chr_',c(1:22,'X','Y','MT'))) %>%
-            group_by(uniprot) %>% filter( row_number() == nearest(value=F,x=max(transcript_length),y=transcript_length,n = 1)) %>%
-            relocate(uniprot,is_uniref,gname,ensg,ensp,gene_biotype) %>%
+            group_by(uniprot) %>% filter( row_number() == nearest(value=F,x=max_(transcript_length),y=transcript_length,n = 1)) %>%
             dplyr::rename_with(-c(uniprot:gene_biotype, starts_with('uniprot.'), starts_with('ensembl.')),.fn = Pxx, 'ensembl')
 
 # Codons -----------------------------------------------------------------------
@@ -426,7 +428,7 @@ HS_DATA = left_join(HS_COUNT,HS_CODING,by=c('uniprot')) %>%
   left_join(HS_KEGG,by=c('uniprot'='id')) %>%
   left_join(hs_r4s,by=c('uniprot'='id')) %>%
   distinct() %>%
-  relocate(uniprot,is_uniref,ensg,ensp,ensembl.gname, GENENAME, gene_biotype)
+  relocate(uniprot,is_uniref,ensg,ensp,gname, GENENAME, gene_biotype)
 
 
 # Replace missing values  ------------------------------------------------------
@@ -455,7 +457,7 @@ all_orthologs = HS_DATA_nona %>%
   filter(!is.na(r4s_mammals.rate) & uniprot %in% hs_orthologs) %>%
   distinct()
 
-## Abundance -------------------------------------------------------------------
+# Abundance -------------------------------------------------------------------
 # hs_ppm_uni = readRDS(here::here("data","paxdb_integrated_human.rds"))
 # HS_PPM = hs_ppm_uni %>%
 #   dplyr::select(ensp=protid,uniprot,GENENAME,is_uniref,is_duplicated,
@@ -471,6 +473,22 @@ hs_organ = hs_ppm %>% group_by(protid) %>%
                    PPM_geomAVG_ORGAN = geomean(ppm_int)) %>%
           mutate( across(starts_with('PPM_'), log10) )
 
+hs_paxdb = load.paxdb(9606,rm.zero=T)
+
+
+test = pivot_wider(hs_paxdb,id_cols = c(protid,id_uniprot), names_from = c('id'),
+            values_from=ppm, values_fn = mean_)
+tmp = left_join(test,hs_map_uni, by=c('id_uniprot'='extid')) %>%
+      left_join(hs_r4s,by=c('uni'='id')) %>%
+      mutate(log10.rate = log10(r4s_mammals.rate_norm))
+
+
+all_ppm_er_cor = test %>% dplyr::select(where(is.numeric)) %>% colnames %>%
+  bind_cols( map_dfr(., function(x){ spearman.toplot(X=tmp$log10.rate, Y=tmp[[x]]) }) )
+all_ppm_er_cor %>% arrange(desc(estimate)) %>% print(n=200)
+
+
+HS_PPM =
 
 hs_ppm_organ = pivot_wider(hs_ppm, id_cols = c(protid,id_uniprot,n_data,n_int),
                            names_from = 'organ', names_prefix = 'PPM_',
