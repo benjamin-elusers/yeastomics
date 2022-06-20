@@ -1247,7 +1247,8 @@ load.paxdb = function(taxon=4932,rm.zero=T){
   #      mutate()
   # }else{
   # If only one file, read twice the url and keep the distinct rows
-    ppm = rio::import_list(file=c(taxon_url[1],taxon_url),
+  message(sprintf('retrieving paxdb abundance values  [%s]...\n',taxon))
+  ppm = rio::import_list(file=c(taxon_url[1],taxon_url),
                            setclass="tibble",
                            rbind = TRUE,rbind_label = "dataurl",rbind_fill = T) %>%
       dplyr::rename(paxid="#internal_id", string="string_external_id", ppm="abundance") %>%
