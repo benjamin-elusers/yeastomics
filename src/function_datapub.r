@@ -1120,9 +1120,12 @@ find_paxdb_downloads = function(){
   return(paxdb_files)
 }
 
-get_paxdb_version = function(){
+get_paxdb_version = function(verbose=T){
   paxdb_files=find_paxdb_downloads()
   .version = str_extract(pattern="[0-9]\\.[0-9]",string = paxdb_files) %>% gtools::mixedsort(na.last = F) %>% last
+  if(verbose){
+    cat(sprintf("PAXDB VERSION: %s\n",.version))
+  }
   return(.version)
 }
 
@@ -1134,7 +1137,6 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
   URL_PAXDB = "https://pax-db.org/downloads/latest/"
   .version= get_paxdb_version()
 
-  cat(sprintf("PAXDB VERSION: %s\n",.version))
   paxdb_ortho=grep("paxdb-orthologs",find_paxdb_downloads(),v=T) %>% str_subset(pattern=.version) %>% paste0(URL_PAXDB,.)
   # download the archive
   temp<-tempfile()
@@ -1182,26 +1184,18 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
   return(node_ortho)
 }
 
-load.paxdb = function(taxon=4932,rm.zero=T){
+find_paxdb_datasets = function(taxon=4932){
   URL_PAXDB = "https://pax-db.org/downloads/latest/"
   paxdb_dataset =paste0(URL_PAXDB,"datasets/")
   taxon_dir=file.path(paxdb_dataset,taxon,"/")
 
   .version= get_paxdb_version()
-  cat(sprintf("PAXDB VERSION: %s\n",.version))
-
-  mapping_uniprot=paste0(URL_PAXDB,sprintf("paxdb-uniprot-links-v%s/paxdb-uniprot-links-v%s.tsv",.version,.version))
-  map2uniprot = readr::read_delim(mapping_uniprot,delim="\t",col_names = c('id_string','id_uniprot'))
 
   taxon_data <- rvest::read_html(taxon_dir) %>%
-                rvest::html_nodes("a") %>%
-                rvest::html_attr(name='href') %>%
-                stringr::str_subset(pattern = "/$",negate = T) %>%
-                stringr::str_subset("\\.txt")
-
-  # taxon_data <- RCurl::getURL(taxon_dir,dirlistonly = TRUE) %>%
-  #               stringr::str_extract_all('(?<=\\<a href\\=\\")(.+\\.txt)(?=\\">)') %>%
-  #               unlist
+    rvest::html_nodes("a") %>%
+    rvest::html_attr(name='href') %>%
+    stringr::str_subset(pattern = "/$",negate = T) %>%
+    stringr::str_subset("\\.txt")
 
   Ndata = length(taxon_data)
   message(Ndata," paxDB datasets for taxon [",taxon,"]")
@@ -1218,11 +1212,32 @@ load.paxdb = function(taxon=4932,rm.zero=T){
       mutate(taxid=as.character(taxon))
   }
 
-  infodata = map_dfr(taxon_url,get.paxdb_header) %>%
-    mutate( w=parse_number(weight)*0.01,
-            ndata = n_distinct(id,filename),
-            is_integrated = integrated=='true' | ndata==1) %>%
-    dplyr::select(taxid,organ,ndata,id,filename,is_integrated,score,w,cov=coverage,yr=publication_year)
+  message(sprintf('retrieving paxdb datasets information [%s]...\n',taxon))
+  if(require(pbmcapply)){
+    ncpu = parallelly::availableCores()-2
+    cat(sprintf("Using 'pbmcapply' with %s parallel threads",ncpu))
+    infos = pbmcapply::pbmcmapply(mc.cores = ncpu, taxon_url , FUN = get.paxdb_header) %>%
+               bind_rows()
+  }else{
+    cat("Using only 1 cpu! please consider installing 'pbmcapply' to use parallel threads.")
+    infos = map_dfr(mc.cores = ncpu, taxon_url , FUN = get.paxdb_header)
+  }
+  infodata = infos %>%
+              mutate( w=parse_number(weight)*0.01,ndata = n_distinct(id,filename),
+                      is_integrated = integrated=='true' | ndata==1) %>%
+              dplyr::select(taxid,organ,ndata,id,filename,is_integrated,
+                  score,w,cov=coverage,yr=publication_year)
+  return(infodata)
+}
+
+load.paxdb = function(taxon=4932,rm.zero=T){
+  URL_PAXDB = "https://pax-db.org/downloads/latest/"
+  .version= get_paxdb_version()
+
+  mapping_uniprot=paste0(URL_PAXDB,sprintf("paxdb-uniprot-links-v%s/paxdb-uniprot-links-v%s.tsv",.version,.version))
+  map2uniprot = readr::read_delim(mapping_uniprot,delim="\t",col_names = c('id_string','id_uniprot'))
+
+  infodata <- find_paxdb_datasets(taxon)
 
   # if( Ndata == 1){
   # ppm = rio::import(taxon_url) %>%
