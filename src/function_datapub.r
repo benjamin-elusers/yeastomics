@@ -1237,7 +1237,7 @@ load.paxdb = function(taxon=4932,rm.zero=T){
   map2uniprot = readr::read_delim(mapping_uniprot,delim="\t",col_names = c('id_string','id_uniprot'))
 
   infodata <- find_paxdb_datasets(taxon)
-  taxon_url = file.path(URL_PAXDB,taxon,infodata$filename)
+  taxon_url = file.path(URL_PAXDB,'datasets',taxon,infodata$filename)
 
   # if( Ndata == 1){
   # ppm = rio::import(taxon_url) %>%
