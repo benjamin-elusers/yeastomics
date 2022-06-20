@@ -1216,11 +1216,11 @@ find_paxdb_datasets = function(taxon=4932){
   if(require(pbmcapply)){
     ncpu = parallelly::availableCores()-2
     cat(sprintf("Using 'pbmcapply' with %s parallel threads",ncpu))
-    infos = pbmcapply::pbmcmapply(mc.cores = ncpu, taxon_url , FUN = get.paxdb_header) %>%
-               bind_rows()
+    infos = pbmcapply::pbmcmapply(mc.cores = ncpu, taxon_url , FUN = get.paxdb_header)  %>%
+            bind_rows(.id='taxon_url')
   }else{
     cat("Using only 1 cpu! please consider installing 'pbmcapply' to use parallel threads.")
-    infos = map_dfr(mc.cores = ncpu, taxon_url , FUN = get.paxdb_header)
+    infos = map_dfr(taxon_url, get.paxdb_header)
   }
   infodata = infos %>%
               mutate( w=parse_number(weight)*0.01,ndata = n_distinct(id,filename),
@@ -1237,6 +1237,7 @@ load.paxdb = function(taxon=4932,rm.zero=T){
   map2uniprot = readr::read_delim(mapping_uniprot,delim="\t",col_names = c('id_string','id_uniprot'))
 
   infodata <- find_paxdb_datasets(taxon)
+  taxon_url = file.path(URL_PAXDB,taxon,infodata$filename)
 
   # if( Ndata == 1){
   # ppm = rio::import(taxon_url) %>%
