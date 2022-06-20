@@ -1666,6 +1666,43 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
 }
 
 ##### Uniprot #####
+
+parse_uniprot_fasta_header = function(fasta_header){
+#  uni_desc = get.uniprot.proteome(9606,DNA = F,fulldesc = T) %>% names
+
+  #IDS = str_extract(uni_desc,pattern="^[^ ]+")
+  df_ids = str_split_fixed(fasta_header,pattern = '[\\| ]', n=4) %>% as_tibble() %>%
+           set_colnames(c('DB','AC','ID','DESC'))
+  df_name = str_split_fixed(df_ids$DESC,' OS=',n = 2) %>% as_tibble() %>%
+             set_colnames(c('NAME','DESC')) %>%
+             mutate(DESC = paste0("OS=",DESC))
+
+  df_info = tibble(
+    OS = str_extract("(?<=OS\\=)([^\\=]+)(?= OX\\=)", string = df_name$DESC),
+    OX = str_extract("(?<=OX\\=)([^\\=]+)(?= (GN|PE)\\=)", string = df_name$DESC),
+    GN = str_extract("(?<=GN\\=)([^\\=]+)(?= PE\\=)", string = df_name$DESC),
+    PE = str_extract("(?<=PE\\=)([^\\=]+)(?= SV\\=)", string = df_name$DESC),
+    SV = str_extract("(?<=SV\\=)([^\\=]+)$", string = df_name$DESC)
+  )
+
+  df_uni_desc = bind_cols(df_ids,df_name,df_info) %>%
+                dplyr::select(-starts_with("DESC")) %>% type_convert() %>%
+                relocate(DB,OX,OS,AC,ID,GN,NAME,PE,SV)
+  return(df_uni_desc)
+}
+
+get_uniprot_reference = function(taxon=9606){
+  cdna_name = get.uniprot.proteome(taxon,DNA=T,fulldesc=T) %>% names
+  prot_name = get.uniprot.proteome(taxon,DNA=F,fulldesc=T) %>% names
+
+  id_dna = str_split_fixed(string=cdna_name,pattern = '\\|',n = 3) %>%
+    set_colnames(c('db','uni','ensp')) %>% as_tibble
+  id_prot = prot_name %>% parse_uniprot_fasta_header()
+
+  id_reference =left_join(id_dna,id_prot,by=c('db'='DB','uni'='AC'))
+  return(id_reference)
+}
+
 get.uniprot.mapping = function(taxid, targetdb=NULL) {
   if(missing(taxid)){  stop("Need an uniprot taxon id") }
   UNIPROT_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
