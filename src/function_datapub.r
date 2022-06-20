@@ -1232,8 +1232,7 @@ find_paxdb_datasets = function(taxon=4932){
 
 load.paxdb = function(taxon=4932,rm.zero=T){
   URL_PAXDB = "https://pax-db.org/downloads/latest/"
-  .version= get_paxdb_version()
-
+  .version= get_paxdb_version(F)
   mapping_uniprot=paste0(URL_PAXDB,sprintf("paxdb-uniprot-links-v%s/paxdb-uniprot-links-v%s.tsv",.version,.version))
   map2uniprot = readr::read_delim(mapping_uniprot,delim="\t",col_names = c('id_string','id_uniprot'))
 
