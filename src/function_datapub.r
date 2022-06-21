@@ -1671,10 +1671,13 @@ parse_uniprot_fasta_header = function(fasta_header){
 #  uni_desc = get.uniprot.proteome(9606,DNA = F,fulldesc = T) %>% names
 
   #IDS = str_extract(uni_desc,pattern="^[^ ]+")
-  df_ids = str_split_fixed(fasta_header,pattern = '[\\| ]', n=4) %>% as_tibble() %>%
-           set_colnames(c('DB','AC','ID','DESC'))
-  df_name = str_split_fixed(df_ids$DESC,' OS=',n = 2) %>% as_tibble() %>%
+  df_ids = str_split_fixed(fasta_header,pattern = '[\\| ]', n=4) %>%
+            set_colnames(c('DB','AC','ID','DESC')) %>%
+            as_tibble()
+
+  df_name = str_split_fixed(df_ids$DESC,' OS=',n = 2) %>%
              set_colnames(c('NAME','DESC')) %>%
+             as_tibble() %>%
              mutate(DESC = paste0("OS=",DESC))
 
   df_info = tibble(
