@@ -2153,6 +2153,17 @@ find_ncbi_taxid = function(spnames,dbfile='data/ncbi/accessionTaxa.sql',verbose=
   }
 }
 
+load.hgnc = function(with_protein=T, all_fields=F){
+
+  hgnc = read_delim("http://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/non_alt_loci_set.txt",delim = '\t')
+  minified = c('uniprot_ids','ensembl_gene_id','symbol','name','location','gene_group')
+
+  if(with_protein){
+    hgnc = hgnc %>% filter(locus_group == 'protein-coding gene' & locus_type=='gene with protein product')
+  }
+  if(!all_fields){ hgnc = dplyr::select(hgnc,all_of(minified)) }
+  return(hgnc)
+}
 # Shortcut for loading datasets ------------------------------------------------
 
 load.abundance = function(){
