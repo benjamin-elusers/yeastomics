@@ -66,34 +66,28 @@ load.schroeter2018.data= function(){
 hs_uniprot = get_uniprot_reference()
 hs_map_uni = get.uniprot.mapping(9606)
 hs_uniref = hs_uniprot$AC
-hs_ensref = hs_uniprot$ensp
-hs_hgnc = load.hgnc(with_protein = T, all_fields = F)
+hs_ensref = str_subset(hs_uniprot$ensp, ENSEMBL.nomenclature())
+hs_hgnc = load.hgnc(with_protein = F, all_fields = F) %>% filter(uniprot_ids %in% hs_uniref)
 
-
-library(biomaRt)
-useMart(biomart = 'HGNC',host = 'https://biomart.genenames.org/')
-
-
-hs_uni2ensg = hs_map_uni %>% filter(extdb %in% c('Ensembl') & uni %in% hs_uniref ) %>%
-  mutate(row = dense_rank(uni)) %>%
-  tidyr::pivot_wider(id_cols = c(uni,row), names_from='extdb', values_from='extid', values_fn = list ) %>%
-  unnest_longer(col = 'Ensembl') %>%
-  separate(col = Ensembl, sep = '\\.',into=c('ensg','ensg_v')) %>%
-  dplyr::select(-row,-ensg_v) %>%
-  distinct()
-
-test = hs_uniprot %>% left_join(hs_hgnc, by=c('AC'='uniprot'))
-test %>% filter(!is.na(ensg) & is.dup(AC))
-
-glimpse(test)
+# hs_uni2ensg = hs_map_uni %>% filter(extdb %in% c('Ensembl') & uni %in% hs_uniref ) %>%
+#   mutate(row = dense_rank(uni)) %>%
+#   tidyr::pivot_wider(id_cols = c(uni,row), names_from='extdb', values_from='extid', values_fn = list ) %>%
+#   unnest_longer(col = 'Ensembl') %>%
+#   separate(col = Ensembl, sep = '\\.',into=c('ensg','ensg_v')) %>%
+#   dplyr::select(-row,-ensg_v) %>%
+#   distinct()
 
 # Proteome of reference  (Ensembl and Uniprot) ---------------------------------
-hs_ref = left_join(hs_uniprot,hs_uni2ensp, by=c('uni'='uniprot', 'ensp', 'GN'='gname')) %>%
-  left_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens[1:2])) , by=c('ensp','uni'='uniprot')) %>%
-  group_by(uni) %>% mutate(n_ensg = n_distinct(ensg), n_ensp = n_distinct(ensp)) %>%
-  arrange(desc(n_ensg), ensg, desc(n_ensp), ensp, uni, GN) %>%
-  mutate(is_uniref = uni %in% hs_uniref, uniprot=uni)
+hs_ref = left_join(hs_uniprot,hs_hgnc, by=c('AC'='uniprot_ids','GN'='symbol')) %>%
+  arrange(AC,ensembl_gene_id,ensp,GN) %>%
+  mutate(is_uniref = AC %in% hs_uniref,is_ensref = ensp %in% hs_ensref, has_cdna = !is.na(ensp),
+         gene_group = fct_explicit_na(gene_group,na_level = 'unannotated'),
+         locus_group = fct_explicit_na(locus_group,na_level = 'unannotated'),
+         locus_type = fct_explicit_na(locus_type,na_level = 'unannotated'),
+         name = if_na(name,NAME))
+skimr::skim(hs_ref)
 
+find_na_rows(hs_ref) %>% arrange(GN,ensp)
 # Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
