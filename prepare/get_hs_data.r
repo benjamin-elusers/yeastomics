@@ -62,11 +62,10 @@ load.schroeter2018.data= function(){
 
 # Sequences --------------------------------------------------------------------
 hs_uniprot = get_uniprot_reference()
-hs_uniref = hs_uniprot$uni
+hs_uniref = names(hs_prot)
 
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
-
 
 hs_aa_freq = (letterFrequency(hs_prot,as.prob = T,letters = get.AA1()) * 100) %>% bind_cols( id=names(hs_prot))
 hs_aa_count = letterFrequency(hs_prot,as.prob = F,letters = get.AA1()) %>% bind_cols( id=names(hs_prot))
@@ -92,14 +91,13 @@ hs_ref = left_join(hs_uniprot,hs_uni2ensp, by=c('uni'='uniprot', 'ensp', 'GN'='g
          left_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens[1:2])) , by=c('ensp','uni'='uniprot')) %>%
          group_by(uni) %>% mutate(n_ensg = n_distinct(ensg), n_ensp = n_distinct(ensp)) %>%
          arrange(desc(n_ensg), ensg, desc(n_ensp), ensp, uni, GN) %>%
-         mutate(is_uniref = uni %in% hs_uniref)
+         mutate(is_uniref = uni %in% hs_uniref, uniprot=uni)
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
 hs_gc =  hs_ref %>%
          left_join(tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_cdna_gc),by='uniprot') %>%
          left_join( get_hs_GC(with_uniprot = F) %>% dplyr::rename(all_of(col_ens)) %>% dplyr::select(-uniprot), by=c('ensg','ensp')) %>%
          rename(ensembl.GC_gene=percentage_gene_gc_content) %>%
-         filter(is_uniref & (!is.na(ensembl.GC_gene) & !is.na(uniprot.GC_cdna)) ) %>%
          distinct()
 
 hs_chr = get_hs_chr(remove_patches = F,with_uniprot = F) %>%
@@ -107,21 +105,21 @@ hs_chr = get_hs_chr(remove_patches = F,with_uniprot = F) %>%
           dplyr::select(-ensp) %>% distinct()
 
 # Sequences Length -------------------------------------------------------------
-hs_transcript = get_ensembl_hs(longest_transcript = T, with_uniprot = F) %>%
+hs_transcript = get_ensembl_hs(longest_transcript = F, with_uniprot = F) %>%
                   dplyr::rename(all_of(col_ens)) %>%
                   dplyr::select(ensg,ensp,uniprot, cds_length,transcript_length,
                                 n_exons,n_exons_mini,has_introns) %>%
-                  distinct()
+                  right_join(hs_ref)
 
 HS_CODING = left_join(hs_ref,hs_transcript) %>%
+            group_by(uniprot) %>% filter( row_number() == nearest(value=F,x=max_(transcript_length),y=transcript_length,n = 1)) %>%
             left_join(hs_gc) %>%
             left_join(hs_chr) %>%
-            relocate(uniprot,is_uniref,gname,ensg,ensp,gene_biotype,
+            relocate(uniprot,is_uniref,GN,ensg,ensp,gene_biotype,
                      ensembl.GC_gene,uniprot.GC_cdna,
                      cds_length,transcript_length,
                      has_introns,n_exons,n_exons_mini,
                      paste0('chr_',c(1:22,'X','Y','MT'))) %>%
-            group_by(uniprot) %>% filter( row_number() == nearest(value=F,x=max_(transcript_length),y=transcript_length,n = 1)) %>%
             dplyr::rename_with(-c(uniprot:gene_biotype, starts_with('uniprot.'), starts_with('ensembl.')),.fn = Pxx, 'ensembl')
 
 # Codons -----------------------------------------------------------------------
