@@ -1699,7 +1699,8 @@ get_uniprot_reference = function(taxon=9606){
   prot_name = get.uniprot.proteome(taxon,DNA=F,fulldesc=T) %>% names
 
   id_dna = str_split_fixed(string=cdna_name,pattern = '\\|',n = 3) %>%
-    set_colnames(c('db','uni','ensp')) %>% as_tibble
+    set_colnames(c('db','uni','id_cdna')) %>% as_tibble %>%
+    mutate(ensp = str_subset(id_cdna,ENSEMBL.nomenclature()))
   id_prot = prot_name %>% parse_uniprot_fasta_header()
 
   # PROTEOME first
@@ -2156,12 +2157,13 @@ find_ncbi_taxid = function(spnames,dbfile='data/ncbi/accessionTaxa.sql',verbose=
 load.hgnc = function(with_protein=T, all_fields=F){
 
   hgnc = read_delim("http://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/non_alt_loci_set.txt",delim = '\t')
-  minified = c('uniprot_ids','ensembl_gene_id','symbol','name','location','gene_group')
+  minified = c('uniprot_ids','ensembl_gene_id','symbol','name','location','gene_group','locus_group','locus_type')
 
   if(with_protein){
-    hgnc = hgnc %>% filter(locus_group == 'protein-coding gene' & locus_type=='gene with protein product')
+    hgnc = hgnc %>% filter(locus_group == 'protein-coding gene' & locus_type=='gene with protein product') %>%
+           dplyr::select(-locus_group,-locus_type)
   }
-  if(!all_fields){ hgnc = dplyr::select(hgnc,all_of(minified)) }
+  if(!all_fields){ hgnc = dplyr::select(hgnc,any_of(minified)) }
   return(hgnc)
 }
 # Shortcut for loading datasets ------------------------------------------------
