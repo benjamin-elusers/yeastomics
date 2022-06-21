@@ -25,6 +25,8 @@ load.kristensen2013.data = function(){
   # Protein synthesis rate is the predominant regulator of protein expression during differentiation
   S3 = "https://www.embopress.org/action/downloadSupplement?doi=10.1038%2Fmsb.2013.47&file=msb201347-sup-0004.xlsx"
   temp = tempfile()
+  download.file(S3,destfile = temp)
+
   open.url(S3)
   options(internet.info = 0)
   x=rvest::session("https://www.embopress.org/doi/full/10.1038/msb.2013.47")
@@ -60,38 +62,46 @@ load.schroeter2018.data= function(){
 }
 
 
-# Sequences --------------------------------------------------------------------
+# Reference Identifiers --------------------------------------------------------
 hs_uniprot = get_uniprot_reference()
-hs_uniref = names(hs_prot)
+hs_map_uni = get.uniprot.mapping(9606)
+hs_uniref = hs_uniprot$AC
+hs_ensref = hs_uniprot$ensp
+hs_hgnc = load.hgnc(with_protein = T, all_fields = F)
 
+
+library(biomaRt)
+useMart(biomart = 'HGNC',host = 'https://biomart.genenames.org/')
+
+
+hs_uni2ensg = hs_map_uni %>% filter(extdb %in% c('Ensembl') & uni %in% hs_uniref ) %>%
+  mutate(row = dense_rank(uni)) %>%
+  tidyr::pivot_wider(id_cols = c(uni,row), names_from='extdb', values_from='extid', values_fn = list ) %>%
+  unnest_longer(col = 'Ensembl') %>%
+  separate(col = Ensembl, sep = '\\.',into=c('ensg','ensg_v')) %>%
+  dplyr::select(-row,-ensg_v) %>%
+  distinct()
+
+test = hs_uniprot %>% left_join(hs_hgnc, by=c('AC'='uniprot'))
+test %>% filter(!is.na(ensg) & is.dup(AC))
+
+glimpse(test)
+
+# Proteome of reference  (Ensembl and Uniprot) ---------------------------------
+hs_ref = left_join(hs_uniprot,hs_uni2ensp, by=c('uni'='uniprot', 'ensp', 'GN'='gname')) %>%
+  left_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens[1:2])) , by=c('ensp','uni'='uniprot')) %>%
+  group_by(uni) %>% mutate(n_ensg = n_distinct(ensg), n_ensp = n_distinct(ensp)) %>%
+  arrange(desc(n_ensg), ensg, desc(n_ensp), ensp, uni, GN) %>%
+  mutate(is_uniref = uni %in% hs_uniref, uniprot=uni)
+
+# Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
-
 hs_aa_freq = (letterFrequency(hs_prot,as.prob = T,letters = get.AA1()) * 100) %>% bind_cols( id=names(hs_prot))
 hs_aa_count = letterFrequency(hs_prot,as.prob = F,letters = get.AA1()) %>% bind_cols( id=names(hs_prot))
 hs_cdna_gc = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
 hs_codon_freq = Biostrings::trinucleotideFrequency(hs_cdna,step = 3,as.prob = T) *100
 
-hs_map_uni = get.uniprot.mapping(9606)
-hs_uni2ensp = hs_map_uni %>%
-       filter(extdb %in% c('Gene_Name','Ensembl','Ensembl_PRO') ) %>%
-       mutate(row = dense_rank(uni)) %>%
-       tidyr::pivot_wider(id_cols = c(uni,row), names_from='extdb', values_from='extid', values_fn = list ) %>%
-       unnest_longer(col = 'Gene_Name') %>%
-       unnest_longer(col = 'Ensembl') %>%
-       unnest_longer(col = 'Ensembl_PRO') %>%
-       separate(col = Ensembl_PRO, sep = '\\.',into=c('ensp','ensp_v')) %>%
-       separate(col = Ensembl, sep = '\\.',into=c('ensg','ensg_v')) %>%
-       dplyr::select(-row,-ensp_v,-ensg_v) %>%
-       dplyr::rename(uniprot=uni, gname=Gene_Name) %>%
-       distinct()
-
-# Proteome of reference  (Ensembl and Uniprot) ---------------------------------
-hs_ref = left_join(hs_uniprot,hs_uni2ensp, by=c('uni'='uniprot', 'ensp', 'GN'='gname')) %>%
-         left_join(get_ensembl_hsprot() %>% dplyr::rename(all_of(col_ens[1:2])) , by=c('ensp','uni'='uniprot')) %>%
-         group_by(uni) %>% mutate(n_ensg = n_distinct(ensg), n_ensp = n_distinct(ensp)) %>%
-         arrange(desc(n_ensg), ensg, desc(n_ensp), ensp, uni, GN) %>%
-         mutate(is_uniref = uni %in% hs_uniref, uniprot=uni)
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
 hs_gc =  hs_ref %>%
