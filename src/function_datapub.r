@@ -1700,7 +1700,7 @@ get_uniprot_reference = function(taxon=9606){
 
   id_dna = str_split_fixed(string=cdna_name,pattern = '\\|',n = 3) %>%
     set_colnames(c('db','uni','id_cdna')) %>% as_tibble %>%
-    mutate(ensp = str_subset(id_cdna,ENSEMBL.nomenclature()))
+    mutate(ensp = str_extract(id_cdna,ENSEMBL.nomenclature()))
   id_prot = prot_name %>% parse_uniprot_fasta_header()
 
   # PROTEOME first
