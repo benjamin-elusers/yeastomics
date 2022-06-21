@@ -1699,7 +1699,8 @@ get_uniprot_reference = function(taxon=9606){
     set_colnames(c('db','uni','ensp')) %>% as_tibble
   id_prot = prot_name %>% parse_uniprot_fasta_header()
 
-  id_reference =left_join(id_dna,id_prot,by=c('db'='DB','uni'='AC'))
+  # PROTEOME first
+  id_reference =left_join(id_prot,id_dna,by=c('DB'='db','AC'='uni'))
   return(id_reference)
 }
 
