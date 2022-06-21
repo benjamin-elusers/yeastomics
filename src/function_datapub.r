@@ -2027,6 +2027,18 @@ get_ensembl_hs = function(verbose=T,longest_transcript=F,with_uniprot=T){
   return(hs_ensg)
 }
 
+
+get_ensembl_gc = function(ENSG){
+  library(biomaRt)
+  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+
+  filters = c('ensembl_gene_id'=list(ENSG))
+  hs_gc_gene=getBM(attributes=c("ensembl_gene_id",'percentage_gene_gc_content'), mart=ens,
+                 filters=names(filters), values=as.list(filters),
+                 uniqueRows = T, bmHeader = F) %>% as_tibble()
+  return(hs_gc_gene)
+}
+
 get_hs_GC = function(with_uniprot=T){
   library(biomaRt)
   att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','percentage_gene_gc_content')
@@ -2156,13 +2168,16 @@ find_ncbi_taxid = function(spnames,dbfile='data/ncbi/accessionTaxa.sql',verbose=
 
 load.hgnc = function(with_protein=T, all_fields=F){
 
-  hgnc = read_delim("http://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/non_alt_loci_set.txt",delim = '\t')
-  minified = c('uniprot_ids','ensembl_gene_id','symbol','name','location','gene_group','locus_group','locus_type')
+  hgnc = read_delim("http://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/non_alt_loci_set.txt",delim = '\t') %>%
+          dplyr::rename(uni=uniprot_ids,ensg=ensembl_gene_id)
+
+  minified = c('uni','ensg','symbol','name','location','gene_group','locus_group','locus_type')
 
   if(with_protein){
     hgnc = hgnc %>% filter(locus_group == 'protein-coding gene' & locus_type=='gene with protein product') %>%
            dplyr::select(-locus_group,-locus_type)
   }
+
   if(!all_fields){ hgnc = dplyr::select(hgnc,any_of(minified)) }
   return(hgnc)
 }

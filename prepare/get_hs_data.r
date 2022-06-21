@@ -66,8 +66,9 @@ load.schroeter2018.data= function(){
 hs_uniprot = get_uniprot_reference()
 hs_map_uni = get.uniprot.mapping(9606)
 hs_uniref = hs_uniprot$AC
-hs_ensref = str_subset(hs_uniprot$ensp, ENSEMBL.nomenclature())
-hs_hgnc = load.hgnc(with_protein = F, all_fields = F) %>% filter(uniprot_ids %in% hs_uniref)
+hs_enspref = str_subset(hs_uniprot$ensp, ENSEMBL.nomenclature())
+hs_hgnc = load.hgnc(with_protein = F, all_fields = F) %>% filter(uni %in% hs_uniref)
+hs_ensgref = hs_hgnc %>% drop_na %>% pull(ensg)
 
 # hs_uni2ensg = hs_map_uni %>% filter(extdb %in% c('Ensembl') & uni %in% hs_uniref ) %>%
 #   mutate(row = dense_rank(uni)) %>%
@@ -78,16 +79,20 @@ hs_hgnc = load.hgnc(with_protein = F, all_fields = F) %>% filter(uniprot_ids %in
 #   distinct()
 
 # Proteome of reference  (Ensembl and Uniprot) ---------------------------------
-hs_ref = left_join(hs_uniprot,hs_hgnc, by=c('AC'='uniprot_ids','GN'='symbol')) %>%
-  arrange(AC,ensembl_gene_id,ensp,GN) %>%
-  mutate(is_uniref = AC %in% hs_uniref,is_ensref = ensp %in% hs_ensref, has_cdna = !is.na(ensp),
-         gene_group = fct_explicit_na(gene_group,na_level = 'unannotated'),
-         locus_group = fct_explicit_na(locus_group,na_level = 'unannotated'),
-         locus_type = fct_explicit_na(locus_type,na_level = 'unannotated'),
-         name = if_na(name,NAME))
-skimr::skim(hs_ref)
+hs_ref = left_join(hs_uniprot,hs_hgnc, by=c('AC'='uni','GN'='symbol')) %>%
+         arrange(AC,ensg,ensp,GN) %>%
+         mutate(
+           uniprot=AC,
+           is_uniref = AC %in% hs_uniref,
+           has_ensp = ensp %in% hs_enspref,
+           has_ensg = ensg %in% hs_enspref,
+           has_cdna = !is.na(id_cdna),
+           gene_group = fct_explicit_na(gene_group,na_level = 'unannotated'),
+           locus_group = fct_explicit_na(locus_group,na_level = 'unannotated'),
+           locus_type = fct_explicit_na(locus_type,na_level = 'unannotated'),
+           name = if_na(name,NAME))
+#skimr::skim(hs_ref)
 
-find_na_rows(hs_ref) %>% arrange(GN,ensp)
 # Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
 hs_cdna = get.uniprot.proteome(9606,DNA = T)
@@ -97,10 +102,11 @@ hs_cdna_gc = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %
 hs_codon_freq = Biostrings::trinucleotideFrequency(hs_cdna,step = 3,as.prob = T) *100
 
 
+dim(hs_gc_gene)
+
 # Genomics (%GC, and chromosome number) ----------------------------------------
 hs_gc =  hs_ref %>%
-         left_join(tibble(uniprot=names(hs_cdna),uniprot.GC_cdna = hs_cdna_gc),by='uniprot') %>%
-         left_join( get_hs_GC(with_uniprot = F) %>% dplyr::rename(all_of(col_ens)) %>% dplyr::select(-uniprot), by=c('ensg','ensp')) %>%
+         left_join( get_ensembl_gc(with_uniprot = F) %>% dplyr::rename(all_of(col_ens)) %>% dplyr::select(-uniprot), by=c('ensg','ensp')) %>%
          rename(ensembl.GC_gene=percentage_gene_gc_content) %>%
          distinct()
 
