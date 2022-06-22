@@ -104,22 +104,17 @@ hs_codon_freq = Biostrings::trinucleotideFrequency(hs_cdna,step = 3,as.prob = T)
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
 hs_gc =  get_ensembl_gc(hs_ensgref) %>%
-         rename(ensembl.GC_gene=percentage_gene_gc_content) %>%
-         distinct()
+         rename(ensembl.GC_gene=percentage_gene_gc_content)
 
 hs_chr = get_ensembl_chr(remove_patches = F,ENSG=hs_ensgref)
 
 
 # Sequences Length -------------------------------------------------------------
-hs_transcript = get_ensembl_hs(longest_transcript = F, with_uniprot = F) %>%
-                  dplyr::rename(all_of(col_ens)) %>%
-                  dplyr::select(ensg,ensp,uniprot, cds_length,transcript_length,
-                                n_exons,n_exons_mini,has_introns) %>%
-                  right_join(hs_ref)
-
+hs_transcript = get_ensembl_hs(longest_transcript = F, ENSG=hs_ensgref,ENSP=hs_enspref) %>%
+                  dplyr::select(ensg,ensp,uniprot,gene_length,cds_length,transcript_length,
+                                n_exons,n_exons_mini,has_introns)
 HS_CODING = left_join(hs_ref,hs_transcript) %>%
-            group_by(uniprot) %>% filter( row_number() == nearest(value=F,x=max_(transcript_length),y=transcript_length,n = 1)) %>%
-            left_join(hs_gc) %>%
+            group_by(uniprot) %>%     left_join(hs_gc) %>%
             left_join(hs_chr) %>%
             relocate(uniprot,is_uniref,GN,ensg,ensp,gene_biotype,
                      ensembl.GC_gene,uniprot.GC_cdna,
