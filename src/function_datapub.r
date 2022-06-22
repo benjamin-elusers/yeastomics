@@ -2002,12 +2002,14 @@ get_ensembl_tx = function(verbose=T,longest_transcript=F,ENSG,ENSP){
     group_by(ensembl_gene_id) %>%
     mutate(n_transcripts = n_distinct(ensembl_transcript_id),
            n_proteins = n_distinct(ensembl_peptide_id)) %>%
-    dplyr::rename(ensg=ensembl_gene_id, enst=ensembl_transcript_id, ensp=ensembl_peptide_id)
+    dplyr::rename(ensg=ensembl_gene_id, enst=ensembl_transcript_id, ensp=ensembl_peptide_id) %>%
+    distinct()
 
   if(longest_transcript){
     hs_trans = hs_trans %>%
       group_by(ensg) %>%
-      dplyr::filter( row_number() == nearest(value=F,x=max_(transcript_length),y=transcript_length,n = 1) )
+      dplyr::filter( row_number() == nearest(value=F,x=max_(transcript_length),y=transcript_length,n = 1) ) %>%
+      distinct()
       #dplyr::select(-c(start_position,end_position,transcript_start,transcript_end,rank,
       #               ensembl_exon_id,is_constitutive,exon_chrom_start,exon_chrom_end,exon_length)) %>%
       #distinct()
