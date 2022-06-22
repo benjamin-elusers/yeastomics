@@ -2035,9 +2035,43 @@ get_ensembl_gc = function(ENSG){
   filters = c('ensembl_gene_id'=list(ENSG))
   hs_gc_gene=getBM(attributes=c("ensembl_gene_id",'percentage_gene_gc_content'), mart=ens,
                  filters=names(filters), values=as.list(filters),
-                 uniqueRows = T, bmHeader = F) %>% as_tibble()
+                 uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
+             dplyr::rename(ensg=ensembl_gene_id) %>% distinct()
   return(hs_gc_gene)
 }
+
+get_ensembl_chr = function(as.df=T,remove_patches=T,ENSG){
+  library(biomaRt)
+
+  chromosomes = c(1:22,'MT','X','Y')
+  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+  att_gene = c('ensembl_gene_id','chromosome_name')
+  filters = c('ensembl_gene_id'=list(ENSG))
+
+  hs_chr=getBM(attributes=att_gene, mart=ens,
+               filters=names(filters), values=as.list(filters),
+               uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
+    mutate(is_patched = !(chromosome_name %in% chromosomes)) %>%
+    dplyr::rename(ensg=ensembl_gene_id)  %>% distinct()
+
+  if(remove_patches){
+    hs_chr = hs_chr %>% dplyr::filter(!is_patched)  %>% distinct()
+  }
+
+  patched_chr = setdiff(unique(hs_chr$chromosome_name),chromosomes)
+
+  if(as.df){
+    hs_chr= hs_chr %>%
+      mutate( chr_val=T,
+              chromosome_name = fct_other(chromosome_name, keep=chromosomes, other_level = "other")) %>%
+      pivot_wider(id_cols=c('ensg'),
+                  names_from=chromosome_name, names_prefix='chr_',
+                  values_from = chr_val, values_fill = F )  %>% distinct()
+
+  }
+  return(hs_chr)
+}
+
 
 get_hs_GC = function(with_uniprot=T){
   library(biomaRt)
