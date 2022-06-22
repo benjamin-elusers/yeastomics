@@ -86,7 +86,7 @@ hs_len = get.width(hs_prot) %>% rename(uniprot=orf,prot_len=len) %>%
   left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(cdna_len=len)
 
 # Proteome of reference  (Ensembl and Uniprot) ---------------------------------
-hs_ref = left_join(hs_uniprot,hs_hgnc, by=c('AC'='uni','GN'='symbol')) %>%
+hs_ref = left_join(hs_uniprot,hs_hgnc, by=c('AC'='uni')) %>%
          arrange(AC,ensg,ensp,GN) %>%
          mutate(
            uniprot=AC,
@@ -99,33 +99,24 @@ hs_ref = left_join(hs_uniprot,hs_hgnc, by=c('AC'='uni','GN'='symbol')) %>%
            locus_type = fct_explicit_na(locus_type,na_level = 'unannotated'),
            name = if_na(name,NAME)) %>%
         left_join(hs_len, by='uniprot')
-#skimr::skim(hs_ref)
-
 
 hs_aa_freq = (letterFrequency(hs_prot,as.prob = T,letters = get.AA1()) * 100) %>% bind_cols( id=names(hs_prot))
 hs_aa_count = letterFrequency(hs_prot,as.prob = F,letters = get.AA1()) %>% bind_cols( id=names(hs_prot))
 hs_cdna_gc = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
 hs_codon_freq = Biostrings::trinucleotideFrequency(hs_cdna,step = 3,as.prob = T) *100
 
-
 # Genomics (%GC, and chromosome number) ----------------------------------------
-hs_gc =  get_ensembl_gc(hs_ensgref) %>%
+hs_gc =  get_ensembl_gc(hs_ref$ensg) %>%
          rename(ensembl.GC_gene=percentage_gene_gc_content)
 
-hs_chr = get_ensembl_chr(remove_patches = F,ENSG=hs_ensgref)
+hs_chr = get_ensembl_chr(remove_patches = F,ENSG=hs_ref$ensg)
 
-# Sequences Length -------------------------------------------------------------
-hs_transcript = get_ensembl_tx(longest_transcript = F, ENSG=hs_ensgref,ENSP=hs_enspref) %>%
-                dplyr::filter(ensg %in% hs_ensgref & ensp %in% hs_enspref) %>%
-                dplyr::select(ensg,ensp,gene_length,cds_length,transcript_length,
-                                n_exons,n_exons_mini,has_introns) %>%
-                distinct()
-
-skimr::skim(hs_transcript)
+# Transcriptomics --------------------------------------------------------------
+hs_transcript = get_ensembl_tx(ENSG=hs_ref$ensg,ENSP=hs_ref$ensp)
 
 HS_CODING = left_join(hs_ref,hs_transcript) %>%
-            group_by(uniprot) %>%     left_join(hs_gc) %>%
-            left_join(hs_chr) %>%
+            left_join(hs_gc) %>%
+            left_join(hs_chr)# %>%
             relocate(uniprot,is_uniref,GN,ensg,ensp,gene_biotype,
                      ensembl.GC_gene,uniprot.GC_cdna,
                      cds_length,transcript_length,
