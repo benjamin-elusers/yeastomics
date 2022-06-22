@@ -68,7 +68,7 @@ hs_map_uni = get.uniprot.mapping(9606)
 hs_uniref = hs_uniprot$AC
 hs_enspref = str_subset(hs_uniprot$ensp, ENSEMBL.nomenclature())
 hs_hgnc = load.hgnc(with_protein = F, all_fields = F) %>% filter(uni %in% hs_uniref)
-hs_ensgref = hs_hgnc %>% drop_na %>% pull(ensg)
+hs_ensgref = drop_na(hs_hgnc,ensg) %>% pull(ensg)
 
 # hs_uni2ensg = hs_map_uni %>% filter(extdb %in% c('Ensembl') & uni %in% hs_uniref ) %>%
 #   mutate(row = dense_rank(uni)) %>%
@@ -85,7 +85,7 @@ hs_ref = left_join(hs_uniprot,hs_hgnc, by=c('AC'='uni','GN'='symbol')) %>%
            uniprot=AC,
            is_uniref = AC %in% hs_uniref,
            has_ensp = ensp %in% hs_enspref,
-           has_ensg = ensg %in% hs_enspref,
+           has_ensg = ensg %in% hs_ensgref,
            has_cdna = !is.na(id_cdna),
            gene_group = fct_explicit_na(gene_group,na_level = 'unannotated'),
            locus_group = fct_explicit_na(locus_group,na_level = 'unannotated'),
@@ -102,17 +102,13 @@ hs_cdna_gc = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %
 hs_codon_freq = Biostrings::trinucleotideFrequency(hs_cdna,step = 3,as.prob = T) *100
 
 
-dim(hs_gc_gene)
-
 # Genomics (%GC, and chromosome number) ----------------------------------------
-hs_gc =  hs_ref %>%
-         left_join( get_ensembl_gc(with_uniprot = F) %>% dplyr::rename(all_of(col_ens)) %>% dplyr::select(-uniprot), by=c('ensg','ensp')) %>%
+hs_gc =  get_ensembl_gc(hs_ensgref) %>%
          rename(ensembl.GC_gene=percentage_gene_gc_content) %>%
          distinct()
 
-hs_chr = get_hs_chr(remove_patches = F,with_uniprot = F) %>%
-          dplyr::rename(all_of(col_ens)) %>%
-          dplyr::select(-ensp) %>% distinct()
+hs_chr = get_ensembl_chr(remove_patches = F,ENSG=hs_ensgref)
+
 
 # Sequences Length -------------------------------------------------------------
 hs_transcript = get_ensembl_hs(longest_transcript = F, with_uniprot = F) %>%
