@@ -1978,53 +1978,49 @@ get_ensembl_hsprot = function(verbose=T){
   return(hs_ensp)
 }
 
-get_ensembl_hs = function(verbose=T,longest_transcript=F,with_uniprot=T){
+get_ensembl_tx = function(verbose=T,longest_transcript=F,ENSG,ENSP){
   library(biomaRt)
+
+  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
-  att_pos = c('chromosome_name','start_position','end_position')
-  att_struct = c('cds_length','transcript_length','transcript_start','transcript_end','ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
-  att_uni = c('uniprotswissprot')
-  att_type = c('gene_biotype','transcript_biotype')
+  att_struct = c('start_position','end_position','cds_length',
+                 'transcript_length','transcript_start','transcript_end',
+                 'ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
+  filters = c('ensembl_gene_id'=list(ENSG),'ensembl_peptide_id'=list(ENSP))
 
-  filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
-
-  if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
-
-  hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
   # Get representative human proteome with UniProt/SwissProt identifiers
-  hs_ensg = getBM(mart = hs_ens,
-                  attributes = c(att_gene,att_pos,att_struct,att_uni,att_type),
+  hs_trans = getBM(mart = ens,
+                  attributes = c(att_gene,att_struct),
                   filters=names(filters), values=as.list(filters),
                   uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
     mutate( gene_length = end_position-start_position+1,
             exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
-    group_by(ensembl_gene_id,ensembl_transcript_id,ensembl_peptide_id,uniprotswissprot) %>%
+    group_by(ensembl_gene_id,ensembl_transcript_id,ensembl_peptide_id) %>%
     mutate(n_exons = n_distinct(ensembl_exon_id), n_exons_mini = sum(is_constitutive),
            has_introns = n_exons_mini>1,
            tot_exon_len = sum(exon_length) ) %>%
     group_by(ensembl_gene_id) %>%
     mutate(n_transcripts = n_distinct(ensembl_transcript_id),
-           n_proteins = n_distinct(ensembl_peptide_id),
-           n_uniprot = n_distinct(uniprotswissprot))
+           n_proteins = n_distinct(ensembl_peptide_id)) %>%
+    dplyr::rename(ensg=ensembl_gene_id, enst=ensembl_transcript_id, ensp=ensembl_peptide_id)
 
   if(longest_transcript){
-    hs_ensg = hs_ensg %>%
-      group_by(ensembl_gene_id,uniprotswissprot) %>%
-      dplyr::filter(transcript_length ==  max(transcript_length) ) #%>%
+    hs_trans = hs_trans %>%
+      group_by(ensg) %>%
+      dplyr::filter( row_number() == nearest(value=F,x=max_(transcript_length),y=transcript_length,n = 1) )
       #dplyr::select(-c(start_position,end_position,transcript_start,transcript_end,rank,
       #               ensembl_exon_id,is_constitutive,exon_chrom_start,exon_chrom_end,exon_length)) %>%
       #distinct()
   }
 
-  nr = nrow(hs_ensg)
-  ng = n_distinct(hs_ensg$ensembl_gene_id)
-  nt = n_distinct(hs_ensg$ensembl_transcript_id)
-  np = n_distinct(hs_ensg$ensembl_peptide_id)
-  nu = n_distinct(hs_ensg$uniprotswissprot)
+  nr = nrow(hs_trans)
+  ng = n_distinct(hs_trans$ensg)
+  nt = n_distinct(hs_trans$enst)
+  np = n_distinct(hs_trans$ensp)
   if(verbose)
-    message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | uniprot = %6s',nr,ng,nt,np,nu))
+    message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s',nr,ng,nt,np))
   #dplyr::select(-start_position,-end_position,-transcript_start,-transcript_end,-exon_chrom_start,-exon_chrom_end)
-  return(hs_ensg)
+  return(hs_trans)
 }
 
 
@@ -2115,6 +2111,55 @@ get_hs_chr = function(as.df=T,remove_patches=T,with_uniprot=T){
 
   }
   return(hs_chr)
+}
+
+get_hs_transcript = function(verbose=T,longest_transcript=F,with_uniprot=T){
+  library(biomaRt)
+  att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
+  att_pos = c('chromosome_name','start_position','end_position')
+  att_struct = c('cds_length','transcript_length','transcript_start','transcript_end','ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
+  att_uni = c('uniprotswissprot')
+  att_type = c('gene_biotype','transcript_biotype')
+
+  filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
+
+  if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
+
+  hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
+  # Get representative human proteome with UniProt/SwissProt identifiers
+  hs_ensg = getBM(mart = hs_ens,
+                  attributes = c(att_gene,att_pos,att_struct,att_uni,att_type),
+                  filters=names(filters), values=as.list(filters),
+                  uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
+    mutate( gene_length = end_position-start_position+1,
+            exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
+    group_by(ensembl_gene_id,ensembl_transcript_id,ensembl_peptide_id,uniprotswissprot) %>%
+    mutate(n_exons = n_distinct(ensembl_exon_id), n_exons_mini = sum(is_constitutive),
+           has_introns = n_exons_mini>1,
+           tot_exon_len = sum(exon_length) ) %>%
+    group_by(ensembl_gene_id) %>%
+    mutate(n_transcripts = n_distinct(ensembl_transcript_id),
+           n_proteins = n_distinct(ensembl_peptide_id),
+           n_uniprot = n_distinct(uniprotswissprot))
+
+  if(longest_transcript){
+    hs_ensg = hs_ensg %>%
+      group_by(ensembl_gene_id,uniprotswissprot) %>%
+      dplyr::filter(transcript_length ==  max(transcript_length) ) #%>%
+    #dplyr::select(-c(start_position,end_position,transcript_start,transcript_end,rank,
+    #               ensembl_exon_id,is_constitutive,exon_chrom_start,exon_chrom_end,exon_length)) %>%
+    #distinct()
+  }
+
+  nr = nrow(hs_ensg)
+  ng = n_distinct(hs_ensg$ensembl_gene_id)
+  nt = n_distinct(hs_ensg$ensembl_transcript_id)
+  np = n_distinct(hs_ensg$ensembl_peptide_id)
+  nu = n_distinct(hs_ensg$uniprotswissprot)
+  if(verbose)
+    message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | uniprot = %6s',nr,ng,nt,np,nu))
+  #dplyr::select(-start_position,-end_position,-transcript_start,-transcript_end,-exon_chrom_start,-exon_chrom_end)
+  return(hs_ensg)
 }
 
 get_ens_filter_ortho = function(mart='ensembl',dat='hsapiens_gene_ensembl'){
