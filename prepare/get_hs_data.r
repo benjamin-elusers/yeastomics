@@ -78,6 +78,13 @@ hs_ensgref = drop_na(hs_hgnc,ensg) %>% pull(ensg)
 #   dplyr::select(-row,-ensg_v) %>%
 #   distinct()
 
+# Sequences --------------------------------------------------------------------
+hs_prot = get.uniprot.proteome(9606,DNA = F)
+hs_cdna = get.uniprot.proteome(9606,DNA = T)
+
+hs_len = get.width(hs_prot) %>% rename(uniprot=orf,prot_len=len) %>%
+  left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(cdna_len=len)
+
 # Proteome of reference  (Ensembl and Uniprot) ---------------------------------
 hs_ref = left_join(hs_uniprot,hs_hgnc, by=c('AC'='uni','GN'='symbol')) %>%
          arrange(AC,ensg,ensp,GN) %>%
@@ -90,12 +97,11 @@ hs_ref = left_join(hs_uniprot,hs_hgnc, by=c('AC'='uni','GN'='symbol')) %>%
            gene_group = fct_explicit_na(gene_group,na_level = 'unannotated'),
            locus_group = fct_explicit_na(locus_group,na_level = 'unannotated'),
            locus_type = fct_explicit_na(locus_type,na_level = 'unannotated'),
-           name = if_na(name,NAME))
+           name = if_na(name,NAME)) %>%
+        left_join(hs_len, by='uniprot')
 #skimr::skim(hs_ref)
 
-# Sequences --------------------------------------------------------------------
-hs_prot = get.uniprot.proteome(9606,DNA = F)
-hs_cdna = get.uniprot.proteome(9606,DNA = T)
+
 hs_aa_freq = (letterFrequency(hs_prot,as.prob = T,letters = get.AA1()) * 100) %>% bind_cols( id=names(hs_prot))
 hs_aa_count = letterFrequency(hs_prot,as.prob = F,letters = get.AA1()) %>% bind_cols( id=names(hs_prot))
 hs_cdna_gc = (100*rowSums(letterFrequency(hs_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
@@ -108,11 +114,15 @@ hs_gc =  get_ensembl_gc(hs_ensgref) %>%
 
 hs_chr = get_ensembl_chr(remove_patches = F,ENSG=hs_ensgref)
 
-
 # Sequences Length -------------------------------------------------------------
-hs_transcript = get_ensembl_hs(longest_transcript = F, ENSG=hs_ensgref,ENSP=hs_enspref) %>%
-                  dplyr::select(ensg,ensp,uniprot,gene_length,cds_length,transcript_length,
-                                n_exons,n_exons_mini,has_introns)
+hs_transcript = get_ensembl_tx(longest_transcript = F, ENSG=hs_ensgref,ENSP=hs_enspref) %>%
+                dplyr::filter(ensg %in% hs_ensgref & ensp %in% hs_enspref) %>%
+                dplyr::select(ensg,ensp,gene_length,cds_length,transcript_length,
+                                n_exons,n_exons_mini,has_introns) %>%
+                distinct()
+
+skimr::skim(hs_transcript)
+
 HS_CODING = left_join(hs_ref,hs_transcript) %>%
             group_by(uniprot) %>%     left_join(hs_gc) %>%
             left_join(hs_chr) %>%
@@ -126,8 +136,6 @@ HS_CODING = left_join(hs_ref,hs_transcript) %>%
 # Codons -----------------------------------------------------------------------
 #hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
 # library(coRdon)
-hs_len = get.width(hs_prot) %>% rename(uniprot=orf, uniprot.prot_len = len ) %>%
-  left_join(get.width(hs_cdna), by=c('uniprot'='orf')) %>% rename(uniprot.cdna_len = len )
 
 codon_table = get_codon_table()
 hs_codon = bind_cols(uniprot=names(hs_cdna),hs_codon_freq) %>%
