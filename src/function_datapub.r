@@ -2020,17 +2020,18 @@ get_ensembl_tx = function(verbose=T,ENSG,ENSP){
 
   ens_trans = left_join(ens_canonical,ensg_trans) %>% left_join(ensp_trans) %>%
               ungroup() %>% distinct() %>%
-              mutate( gene_length = end_position-start_position+1,
-                      exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
+              mutate( gene_len = end_position-start_position+1,
+                      exon_len = exon_chrom_end-exon_chrom_start+1 ) %>%
+              dplyr::rename(cds_len=cds_length, transcript_len=transcript_length) %>%
               group_by(ensg,enst,ensp) %>%
               mutate(n_exons = n_distinct(ensembl_exon_id), n_exons_mini = sum(is_constitutive),
                      has_introns = n_exons_mini>1,
-                     tot_exon_len = sum(exon_length) ) %>%
+                     tot_exon_len = sum(exon_len) ) %>%
               group_by(ensg) %>%
               mutate(n_transcripts = n_distinct(enst),
                      n_proteins = n_distinct(ensp)) %>%
               dplyr::select(-start_position,-end_position,-transcript_start,-transcript_end,
-                            -ensembl_exon_id,-exon_chrom_start,-exon_chrom_end,-tot_exon_len,-exon_length,-rank,-is_constitutive,
+                            -ensembl_exon_id,-exon_chrom_start,-exon_chrom_end,-tot_exon_len,-exon_len,-rank,-is_constitutive,
                             -is_ensgref,-has_enspref) %>%
               ungroup() %>% distinct()
 
