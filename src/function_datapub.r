@@ -2031,7 +2031,7 @@ get_ensembl_tx = function(verbose=T,ENSG,ENSP){
                      n_proteins = n_distinct(ensp)) %>%
               dplyr::select(-start_position,-end_position,-transcript_start,-transcript_end,
                             -ensembl_exon_id,-exon_chrom_start,-exon_chrom_end,-tot_exon_len,-exon_length,-rank,-is_constitutive,
-                            -is_ensgref,-is_enspref,-has_enspref) %>%
+                            -is_ensgref,-has_enspref) %>%
               ungroup() %>% distinct()
 
   nr = nrow(ens_trans)
