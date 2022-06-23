@@ -8,60 +8,6 @@ source(here::here("analysis","function_evorate_fitting.R"))
 col_ens = setNames(nm =c('uniprot','ensp','ensg'),
                    object=c('uniprotswissprot','ensembl_peptide_id','ensembl_gene_id'))
 
-load.mcshane2016.data = function(){
-  # Cell 2016 mcshane E.
-  # Kinetic Analysis of Protein Stability Reveals Age-Dependent Degradation
-  #Table S4. All AHA Pulse-Chase and Related Data for the Human RPE-1 Cells
-  S4="https://www.cell.com/cms/10.1016/j.cell.2016.09.015/attachment/ed36d0dc-573c-4f65-ba99-6ce9713d2584/mmc4.xlsx"
-  temp = tempfile()
-  download.file(S4,destfile = temp)
-  deg_rate = readxl::read_xlsx(path = S4)
-  rio::import(S4)
-  unlink(temp)
-}
-
-load.kristensen2013.data = function(){
-  # Mol. Sys. Bio. 2013
-  # Protein synthesis rate is the predominant regulator of protein expression during differentiation
-  S3 = "https://www.embopress.org/action/downloadSupplement?doi=10.1038%2Fmsb.2013.47&file=msb201347-sup-0004.xlsx"
-  temp = tempfile()
-  download.file(S3,destfile = temp)
-
-  open.url(S3)
-  options(internet.info = 0)
-  x=rvest::session("https://www.embopress.org/doi/full/10.1038/msb.2013.47")
-  rvest::session_follow_link(S3)
-  deg_rate = rio::import(S3)
-}
-load.bossi2009.data = function(){
-  # Mol. Sys. Bio. 2009
-  # Tissue specificity and the human protein interaction network
-  # https://doi.org/10.1038/msb.2009.17
-  interactome="https://www.embopress.org/action/downloadSupplement?doi=10.1038%2Fmsb.2009.17&file=msb200917-sup-0002.zip"
-  temp = tempfile()
-  test = download.file(interactome)
-
-  tmp <- tempfile()
-  curl::curl_download(interactome, tmp)
-}
-
-
-load.soonhengtan2018.data=function(){
-# Science 2018
-# Thermal proximity coaggregation for system-wide profiling of protein complex dynamics in cells
-# DOI: 10.1126/science.aan0346
-  Stab = "https://www.science.org/doi/suppl/10.1126/science.aan0346/suppl_file/tabless1_to_s27.zip"
-  download_file(Stab,'~/test')
-}
-load.schroeter2018.data= function(){
-  # FASEB 2018, C.B.Schroeter et al
-  # Protein half-life determines expression of proteostatic networks in podocyte differentiation
-  # https://doi.org/10.1096/fj.201701307R
-  halflife = "https://faseb.onlinelibrary.wiley.com/action/downloadSupplement?doi=10.1096%2Ffj.201701307R&file=fsb2fj201701307r-sup-0010.xlsx"
-  read.xlsx( xlsxFile = halflife, sheet = 1)
-}
-
-
 # Reference Identifiers --------------------------------------------------------
 hs_uniprot = get_uniprot_reference()
 hs_map_uni = get.uniprot.mapping(9606)
@@ -69,14 +15,6 @@ hs_uniref = hs_uniprot$AC
 hs_enspref = str_subset(hs_uniprot$ensp, ENSEMBL.nomenclature())
 hs_hgnc = load.hgnc(with_protein = F, all_fields = F) %>% filter(uni %in% hs_uniref)
 hs_ensgref = drop_na(hs_hgnc,ensg) %>% pull(ensg)
-
-# hs_uni2ensg = hs_map_uni %>% filter(extdb %in% c('Ensembl') & uni %in% hs_uniref ) %>%
-#   mutate(row = dense_rank(uni)) %>%
-#   tidyr::pivot_wider(id_cols = c(uni,row), names_from='extdb', values_from='extid', values_fn = list ) %>%
-#   unnest_longer(col = 'Ensembl') %>%
-#   separate(col = Ensembl, sep = '\\.',into=c('ensg','ensg_v')) %>%
-#   dplyr::select(-row,-ensg_v) %>%
-#   distinct()
 
 # Sequences --------------------------------------------------------------------
 hs_prot = get.uniprot.proteome(9606,DNA = F)
@@ -112,7 +50,8 @@ hs_gc =  get_ensembl_gc(hs_ref$ensg) %>%
 hs_chr = get_ensembl_chr(remove_patches = F,ENSG=hs_ref$ensg)
 
 # Transcriptomics --------------------------------------------------------------
-hs_transcript = get_ensembl_tx(ENSG=hs_ref$ensg,ENSP=hs_ref$ensp)
+hs_transcript = get_ensembl_tx(ENSG=hs_ref$ensg,ENSP=hs_ref$ensp) %>%
+                mutate(id_join = ifelse(is_r))
 
 HS_CODING = left_join(hs_ref,hs_transcript) %>%
             left_join(hs_gc) %>%
@@ -577,3 +516,89 @@ n_best = n_distinct(P_best$variable)
 hs_evo_ppm = left_join(hs_r4s,HS_PPM, by=c('id'='uniprot')) %>% drop_na
 hs_evo_ppm %>% filter(is.dup(id))
 spearman.toplot(hs_evo_ppm$r4s_mammals.rate_norm,hs_evo_ppm$paxdb.ppm_int)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Additional datasets (human specific) ------------------------------------
+load.mcshane2016.data = function(){
+  # Cell 2016 mcshane E.
+  # Kinetic Analysis of Protein Stability Reveals Age-Dependent Degradation
+  #Table S4. All AHA Pulse-Chase and Related Data for the Human RPE-1 Cells
+  S4="https://www.cell.com/cms/10.1016/j.cell.2016.09.015/attachment/ed36d0dc-573c-4f65-ba99-6ce9713d2584/mmc4.xlsx"
+  temp = tempfile()
+  download.file(S4,destfile = temp)
+  deg_rate = readxl::read_xlsx(path = S4)
+  rio::import(S4)
+  unlink(temp)
+}
+
+load.kristensen2013.data = function(){
+  # Mol. Sys. Bio. 2013
+  # Protein synthesis rate is the predominant regulator of protein expression during differentiation
+  S3 = "https://www.embopress.org/action/downloadSupplement?doi=10.1038%2Fmsb.2013.47&file=msb201347-sup-0004.xlsx"
+  temp = tempfile()
+  download.file(S3,destfile = temp)
+
+  open.url(S3)
+  options(internet.info = 0)
+  x=rvest::session("https://www.embopress.org/doi/full/10.1038/msb.2013.47")
+  rvest::session_follow_link(S3)
+  deg_rate = rio::import(S3)
+}
+load.bossi2009.data = function(){
+  # Mol. Sys. Bio. 2009
+  # Tissue specificity and the human protein interaction network
+  # https://doi.org/10.1038/msb.2009.17
+  interactome="https://www.embopress.org/action/downloadSupplement?doi=10.1038%2Fmsb.2009.17&file=msb200917-sup-0002.zip"
+  temp = tempfile()
+  test = download.file(interactome)
+
+  tmp <- tempfile()
+  curl::curl_download(interactome, tmp)
+}
+
+
+load.soonhengtan2018.data=function(){
+  # Science 2018
+  # Thermal proximity coaggregation for system-wide profiling of protein complex dynamics in cells
+  # DOI: 10.1126/science.aan0346
+  Stab = "https://www.science.org/doi/suppl/10.1126/science.aan0346/suppl_file/tabless1_to_s27.zip"
+  download_file(Stab,'~/test')
+}
+load.schroeter2018.data= function(){
+  # FASEB 2018, C.B.Schroeter et al
+  # Protein half-life determines expression of proteostatic networks in podocyte differentiation
+  # https://doi.org/10.1096/fj.201701307R
+  halflife = "https://faseb.onlinelibrary.wiley.com/action/downloadSupplement?doi=10.1096%2Ffj.201701307R&file=fsb2fj201701307r-sup-0010.xlsx"
+  read.xlsx( xlsxFile = halflife, sheet = 1)
+}
+
+
