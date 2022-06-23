@@ -50,10 +50,9 @@ hs_gc =  get_ensembl_gc(hs_ref$ensg) %>%
 hs_chr = get_ensembl_chr(remove_patches = F,ENSG=hs_ref$ensg)
 
 # Transcriptomics --------------------------------------------------------------
-hs_transcript = get_ensembl_tx(ENSG=hs_ref$ensg,ENSP=hs_ref$ensp) %>%
-                mutate(id_join = ifelse(is_r))
+hs_transcript = get_ensembl_tx(ENSG=hs_ref$ensg,ENSP=hs_ref$ensp)
 
-HS_CODING = left_join(hs_ref,hs_transcript) %>%
+HS_CODING = left_join(hs_ref,hs_transcript, by='ensg', suffix=c('','_canonical')) %>%
             left_join(hs_gc) %>%
             left_join(hs_chr)# %>%
             relocate(uniprot,is_uniref,GN,ensg,ensp,gene_biotype,
@@ -63,9 +62,15 @@ HS_CODING = left_join(hs_ref,hs_transcript) %>%
                      paste0('chr_',c(1:22,'X','Y','MT'))) %>%
             dplyr::rename_with(-c(uniprot:gene_biotype, starts_with('uniprot.'), starts_with('ensembl.')),.fn = Pxx, 'ensembl')
 
+uni_col  = c("DB","OX","OS","uniprot","AC","ID","GN","PE","has_cdna","id_cdna","is_uniref","has_ensp","has_ensg","NAME","SV")
+"cdna_len","prot_len", "cds_length","transcript_length","gene_length"
+hgnc_col = c("symbol","name","location","gene_group","locus_group","locus_type")
+ens_col  = c("ensg","enst","ensp","ensp_canonical","canonical","is_canonical","
+
+
 # Codons -----------------------------------------------------------------------
 #hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
-# library(coRdon)
+library(coRdon)
 
 codon_table = get_codon_table()
 hs_codon = bind_cols(uniprot=names(hs_cdna),hs_codon_freq) %>%
