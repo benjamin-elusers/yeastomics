@@ -2,8 +2,13 @@ source(here::here("src","__setup_yeastomics__.r"))
 library(tidyverse)
 library(here)
 library(Biostrings)
-
-
+library(furrr)
+library(progressr)
+library(pbmcapply)
+#handlers(global = TRUE)
+#handlers("progress")
+library(dplyr)
+plan(multisession, workers = availableCores()-2)
 
 # 1. Find the taxon id matching your keywords (case-insensitive) ===============
 find.uniprot_refprot(c('human','homo','sapiens','eukaryota'))
@@ -18,43 +23,56 @@ ec_aa = get.uniprot.proteome(taxid = 83333, DNA = F)
 ec_uniref = names(ec_aa)
 
 # 4. Get all disorder predictions (from taxon id or from list of ids) ==========
-# ------> Using a vector of uniprot ids <------
+# ------> With uniprot accession <------
 # EC_MOBIDB = fetch.mobidb(ec_uniref) # Took 130 sec. for 4402 identifiers from e. coli
 # n_distinct(EC_MOBIDB$acc)
 
-# Using a taxon id
+# ------> With ncbi taxon id <------
 ec_mobidb = load.mobidb(83333) %>% # Took 20 sec. for the protein identifiers of the taxon
             dplyr::filter(acc %in% ec_uniref) # Only use uniprot reference proteome
 n_distinct(ec_mobidb$acc)
 
 # 5. Get the sequence for disorder stretches and compute amino-acid scores =====
-ec_sticky = ec_mobidb %>%
-            rowwise()
+# !!!!! This is longest step (might help to filter disorder regions first) !!!!!
+ec_sticky = ec_mobidb %>% rowwise()
 
-
-library(furrr)
-library(progressr)
-library(dplyr)
-
+### PARALLEL
 tic('retrieve regions sequence...')
-plan(multisession, workers = 14)
-with_progress({
-  p <- progressor(steps = nrow(ec_sticky), message = 'extract sequence from region start-end positions...')
+# with_progress({
+#   p <- progressor(steps = nrow(ec_sticky))
+message('get sequences of mobidb features/regions...')
+diso_seq <- pbmcapply::pbmclapply(X=1:nrow(ec_sticky),
+                                  mc.cores = parallel::detectCores()-2,
+                                  FUN = function(x){
+                                        ACC = ec_sticky$acc[x]
+                                        START = ec_sticky$S[x] %>% as.integer()
+                                        END = ec_sticky$E[x] %>% as.integer()
+                                        #p(message = sprintf('get regions from %s [%s/%s]',ACC,x,nrow(ec_sticky)))
+                                        feature_seq = subseq(x=ec_aa[[ACC]], start=START,end=END)
+                                        return(as.character(feature_seq))
+                                  })
+# })
+toc(log=T)
+### with pbmcapply()
+### TOOK 15 SECONDS
 
-  diso_seq <- furrr::future_map(1:nrow(ec_sticky), ~{
-    p()
-    subseq(x=ec_aa[[ec_sticky$acc[.x]]], start=as.integer(ec_sticky$S[.x]), end=as.integer(ec_sticky$E[.x]))
-  })
-})
-toc()
 
-tic('compute aa score...')
-with_progress({
-  p <- progressor(steps = length(diso_seq), message = 'calculate amino acid scores for sequences...')
+### with furrr::future_map()
+### TOOK 3834 SECONDS
 
-  diso_score <- furrr::future_map(seq_along(diso_seq), ~{
-    p()
-    get_aa_score(diso_seq[[.x]])
-  })
-})
 
+tic('compute aa scores of mobidb features ...')
+diso_score <- pbmcapply::pbmclapply(X=1:length(diso_seq),
+                                  FUN = function(x){
+                                    SEQ = diso_seq[[x]]
+                                    cat(SEQ)
+                                    get_aa_score(string = SEQ)
+                                  },mc.cores = parallel::detectCores()-2)
+toc(log=T)
+# with_progress({
+#   p <- progressor(steps = length(diso_seq))
+#
+#   diso_score <- furrr::future_map(seq_along(diso_seq), ~{
+#     p(message = 'get aa scores...')
+#   })
+# })

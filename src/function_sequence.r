@@ -195,7 +195,7 @@ get_aa_score = function(string,score){
   aa_scores = get.aascales()
   if(!missing(score)){
     scores = match.arg(score,all_scores,several.ok = T)
-    aa_scores = aa_score[,c('AA',scores)]
+    aa_scores = aa_scores[,c('AA',scores)]
   }
 
   BS = Biostrings::AAString(string)
