@@ -1099,6 +1099,8 @@ load.pombe.orthologs = function() {
   return(sp.sc)
 }
 
+##### MobiDB #####
+
 get.mobidb.id = function(id="A0A075B734"){
 
   URL_API = "https://mobidb.bio.unipd.it/api/download?"
@@ -1116,6 +1118,36 @@ get.mobidb.id = function(id="A0A075B734"){
   }
 }
 
+fetch.mobidb = function(ids,to.df=T){
+  # Check mobidb data description at the following url:
+  # https://mobidb.bio.unipd.it/about/mobidb
+  library(pbmcapply)
+  library(parallel)
+  library(tictoc)
+  cpus=detectCores()-2
+  tic('get disorder from MobiDB')
+  message(sprintf('retrieve disorder predictions from MobiDB for %s identifiers (uniprot) ...',n_distinct(ids)))
+  mobidb = pbmcapply::pbmclapply(ids, get.mobidb.id,mc.cores=cpus)
+  names(mobidb) = ids
+  toc()
+
+  if(to.df){ return( purrr::compact(mobidb) %>% bind_rows() ) }
+
+  return(mobidb)
+}
+
+load.mobidb = function(taxon){
+  # Check mobidb data description at the following url:
+  # https://mobidb.bio.unipd.it/about/mobidb
+  tic('get mobidb for taxon from url....')
+  mobidb = readr::read_delim(sprintf("https://mobidb.bio.unipd.it/api/download?ncbi_taxon_id=%s&format=tsv",taxon)) %>%
+    separate(col=feature, sep='-',into=c('evidence','feature','source')) %>%
+    separate_rows('start..end',sep=',') %>%
+    separate('start..end',into = c('S','E'),convert = T) %>%
+    mutate( feature_len = E-S+1 )
+  toc()
+  return(mobidb)
+}
 
 ##### paxDB #####
 find_paxdb_downloads = function(){
