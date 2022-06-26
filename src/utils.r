@@ -463,7 +463,7 @@ get_os <- function(){
 
 get_rows_by_keyword = function(word,df){
   library(tidyverse)
-  rows = df %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, as.character(word)))
+  rows = df %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, paste0("(?i)",as.character(word))))
   return(rows)
 }
 
