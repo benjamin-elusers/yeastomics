@@ -203,8 +203,8 @@ get_aa_score = function(string,score){
 
 
   sum_scores = left_join(aa_count,aa_scores,by=c('aa'='AA')) %>%
-                  pivot_longer(cols=all_of(scores),names_to='scales',values_to='aa_score') %>%
-                  mutate(tot_score = n * aa_score ) %>%
+                  pivot_longer(cols=all_of(scores),names_to='scales',values_to='score') %>%
+                  mutate(tot_score = n * score ) %>%
                   group_by(scales) %>%
                   summarize(sum_score=sum_(tot_score))
 
