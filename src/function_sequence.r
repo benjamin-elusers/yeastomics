@@ -190,9 +190,8 @@ get_codon_table = function(){
 }
 
 get_aa_score = function(string,score){
-
-  scores = names(aa_score)[-1]
   aa_scores = get.aascales()
+  scores = names(aa_scores)[-1]
   if(!missing(score)){
     scores = match.arg(score,all_scores,several.ok = T)
     aa_scores = aa_scores[,c('AA',scores)]
