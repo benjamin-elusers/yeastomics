@@ -1747,8 +1747,13 @@ find.uniprot_refprot = function(keyword,all=T,GUI=interactive()){
   refprot = readr::read_tsv(file=I(row_content), col_names = row_header) %>%
     janitor::clean_names() %>% dplyr::arrange(tax_id)
   if(!missing(keyword)){
-    matched = refprot %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, as.character(keyword)))
-    message(sprintf('%s entries matched keyword "%s"',nrow(matched),keyword))
+    if(length(keyword)==1){
+      matched = get_rows_by_keyword(word = keyword, df = refprot)
+      message(sprintf('%s entries matched keyword "%s"',nrow(matched),keyword))
+    }else{
+      matched = find_keywords(refprot,keyword,strict=T)
+      message(sprintf('%s entries matched keywords "%s"',nrow(matched),toString(unique(keyword))))
+    }
     if(all){
       return(matched)
     }else{

@@ -461,6 +461,26 @@ get_os <- function(){
 
 # shorthands -------------------------------------------------------------------
 
+get_rows_by_keyword = function(word,df){
+  library(tidyverse)
+  rows = df %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, as.character(word)))
+  return(rows)
+}
+
+find_keywords = function(df,keywords,strict=T){
+  library(tidyverse)
+  row_keywords = purrr::map(unique(keywords), get_rows_by_keyword) %>%
+                 bind_rows %>%
+                 group_by(proteome_id) %>% mutate(keyword_matched = n()) %>%
+                 distinct() %>%
+                 arrange(desc(keyword_matched)) %>% ungroup()
+ if(strict){
+   MAX_K = max(row_keywords$keyword_matched)
+   return( row_keywords %>% dplyr::filter( keyword_matched == MAX_K) )
+ }
+  return( row_keywords )
+}
+
 get_match = function(x,y){ x[match(x,y)] }
 
 load.package <- function(name) { # Quietly Load Libraries
