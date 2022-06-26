@@ -179,7 +179,6 @@ seq2df = function(BS){
   }
 }
 
-
 get_codon_table = function(){
   library(seqinr)
   codon_table = seqinr::SEQINR.UTIL$CODON.AA %>% as_tibble() %>%
@@ -188,4 +187,28 @@ get_codon_table = function(){
                        L=str_replace(L, "\\*", "STOP"),
                        codon_aa = paste0(CODON,"_",AA,"_",L))
   return(codon_table)
+}
+
+get_aa_score = function(string,score){
+
+  scores = names(aa_score)[-1]
+  aa_scores = get.aascales()
+  if(!missing(score)){
+    scores = match.arg(score,all_scores,several.ok = T)
+    aa_scores = aa_score[,c('AA',scores)]
+  }
+
+  BS = Biostrings::AAString(string)
+  aa_count = alphabetFrequency(BS) %>% enframe(name = 'aa','n')
+
+
+  sum_scores = left_join(aa_count,aa_scores,by=c('aa'='AA')) %>%
+                  pivot_longer(cols=all_of(scores),names_to='scales',values_to='aa_score') %>%
+                  mutate(tot_score = n * aa_score ) %>%
+                  group_by(scales) %>%
+                  summarize(sum_score=sum_(tot_score))
+
+  df_scores = pivot_wider(sum_scores,names_from = 'scales',values_from = 'sum_score')
+
+  return(df_scores)
 }
