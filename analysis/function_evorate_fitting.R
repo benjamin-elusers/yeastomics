@@ -390,17 +390,21 @@ retrieve_missing_centrality = function(orf_missing,type='string',taxon=4932){
 
 fix_missing_centrality = function(df,id='ORF',col_prefix='cat_interactions.string.',taxon=4932){
   # Replace orf with missing values for centrality with 0's
-  net_type = str_extract(col_prefix,'(string|intact)')
+  net_type = str_extract(tolower(col_prefix),'(string|intact)')
+  df$has_unique_id = !is.na(df[[id]]) & !duplicated(df[[id]])
+  df_unique = df %>% drop_na(id) %>% rowwise %>% filter(has_unique_id) %>% column_to_rownames(id)
+
   if(net_type=='string'){
-    orf_missing = df %>% column_to_rownames(id) %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
+    orf_missing =  df_unique %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
   }else if(net_type=='intact'){
-    orf_missing = df %>% filter(!is.dup(id)) %>% column_to_rownames(id) %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
+    orf_missing = df_unique %>% get_centrality_col(col_prefix) %>% find_na_rows() %>% rownames()
   }
 
   if( length(orf_missing) == 0 ){
     .warn$log("No missing values found for any of the network centrality measures used!")
     return(df)
   }
+
   .warn$log("Replace columns with missing values for network centrality measures...\n")
   df_missing = tibble(ids = orf_missing)
   df_na_centrality = retrieve_missing_centrality(orf_missing,net_type,taxon) %>%
