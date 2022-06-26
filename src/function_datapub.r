@@ -1105,8 +1105,15 @@ get.mobidb.id = function(id="A0A075B734"){
   URL_PARAM = sprintf("acc=%s&format=tsv",id)
   URL_QUERY = paste0(URL_API,URL_PARAM)
   df_mobi = readr::read_delim(URL_QUERY) %>%
-            separate(col=feature, sep='-',into=c('evidence','feature','source'))
-  return(df_mobi)
+            separate(col=feature, sep='-',into=c('evidence','feature','source')) %>%
+            separate_rows('start..end',sep=',') %>%
+            separate('start..end',into = c('S','E'),convert = T) %>%
+            mutate( feature_len = E-S+1 )
+  if( nrow(df_mobi) > 0L ){
+    return(df_mobi)
+  }else{
+    return(NULL)
+  }
 }
 
 
