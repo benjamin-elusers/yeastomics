@@ -29,37 +29,31 @@ ec_uniref = names(ec_aa)
 
 # ------> With ncbi taxon id <------
 ec_mobidb = load.mobidb(83333) %>% # Took 20 sec. for the protein identifiers of the taxon
-            dplyr::filter(acc %in% ec_uniref) # Only use uniprot reference proteome
+            dplyr::filter(acc %in% ec_uniref) %>%  # Only use uniprot reference proteome
+            rowwise()
 n_distinct(ec_mobidb$acc)
 
 # 5. Get the sequence for disorder stretches and compute amino-acid scores =====
 # !!!!! This is longest step (might help to filter disorder regions first) !!!!!
-ec_sticky = ec_mobidb %>% rowwise()
 
 ### PARALLEL
 tic('retrieve regions sequence...')
 # with_progress({
 #   p <- progressor(steps = nrow(ec_sticky))
 message('get sequences of mobidb features/regions...')
-diso_seq <- pbmcapply::pbmclapply(X=1:nrow(ec_sticky),
+diso_seq <- pbmcapply::pbmclapply(X=1:nrow(ec_mobidb),
                                   mc.cores = parallel::detectCores()-2,
                                   FUN = function(x){
-                                        ACC = ec_sticky$acc[x]
-                                        START = ec_sticky$S[x] %>% as.integer()
-                                        END = ec_sticky$E[x] %>% as.integer()
-                                        #p(message = sprintf('get regions from %s [%s/%s]',ACC,x,nrow(ec_sticky)))
+                                        ACC = ec_mobidb$acc[x]
+                                        START = ec_mobidb$S[x] %>% as.integer()
+                                        END = ec_mobidb$E[x] %>% as.integer()
+                                        #p(message = sprintf('get regions from %s [%s/%s]',ACC,x,nrow(ec_mobidb)))
                                         feature_seq = subseq(x=ec_aa[[ACC]], start=START,end=END)
                                         return(as.character(feature_seq))
                                   })
 # })
 toc(log=T)
-### with pbmcapply()
-### TOOK 15 SECONDS
-
-
-### with furrr::future_map()
-### TOOK 3834 SECONDS
-
+### TOOK 15 SECONDS with pbmcapply() (parallel on 14 cpus)
 
 tic('compute aa scores of mobidb features ...')
 diso_score <- pbmcapply::pbmclapply(X=1:length(diso_seq),
@@ -69,6 +63,8 @@ diso_score <- pbmcapply::pbmclapply(X=1:length(diso_seq),
                                     get_aa_score(string = SEQ)
                                   },mc.cores = parallel::detectCores()-2)
 toc(log=T)
+### TOOK  SECONDS with pbmcapply() (parallel on 14 cpus)
+
 # with_progress({
 #   p <- progressor(steps = length(diso_seq))
 #
