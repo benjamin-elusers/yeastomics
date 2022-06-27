@@ -39,7 +39,6 @@ END = ec_mobidb$E %>% as.integer()
 ## Might be slow on single-cpu depending on no. of (features+proteins) to process
 ## Filtering out unnecessary features/proteins would make it faster
 
-
 tic('retrieve regions sequence...') # Time the task of retrieving feature sequences
 #message('get sequences of mobidb features/regions...')
 irows=1:nrow(ec_mobidb)
@@ -59,6 +58,11 @@ toc(log=T)
 # 6. Compute residue propensities on sequence of mobidb features ==================
 # !! LONG COMPUTATION (>5mn on (n-2) cpus) !!
 
+# Residue propensities used are the same as in Fig3. of Dubreuil et al. 2019 (JMB):
+# - hydrophobicity (wimleywhite, kytedoolittle, roseman, camsol)
+# - amyloidogenicity (foldamyloid, pawar, aggrescan)
+# - interaction propensity (stickiness, voronoi_sickiness)
+
 tic('compute aa scores of mobidb features ...')
 #message('get amino acid scores of mobidb features/regions...')
 iseq = 1:length(diso_seq)
@@ -72,10 +76,6 @@ toc(log=T)
 
 # 7. Get average residue propensity for all proteins ===========================
 # Average propensity = sum aa score / feature length
-# Propsenties used are:
-# - hydrophobicity (wimleywhite, kytedoolittle, roseman, camsol)
-# - amyloidogenicity (foldamyloid, pawar, aggrescan)
-# - interaction propensity (stickiness, voronoi_sickiness)
 
 ec_mobidb_scores = ec_mobidb %>%
                     bind_cols( bind_rows(diso_score) ) %>%
@@ -87,5 +87,6 @@ ec_mobidb_scores = ec_mobidb %>%
 
 
 # 8. FILTER CONSENSUS PREDICTION OR INTERESTING FEATURES =======================
+# ... You can add your own code here to filter the data ...
 
 # Check description of features from MobiDB at: https://mobidb.bio.unipd.it/about/mobidb
