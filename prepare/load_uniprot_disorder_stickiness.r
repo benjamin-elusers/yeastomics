@@ -1,12 +1,16 @@
-source(here::here("src","__setup_yeastomics__.r"))
 library(tidyverse)
 library(here)
+# requires Yeastomics from my github
+# can be loaded directly from url
+url_yeastomics="https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/"
+source(here::here(url_yeastomics,"__setup_yeastomics__.r"))
+
 library(Biostrings)
 library(dplyr)
 library(furrr)
 library(progressr)
 library(pbmcapply)
-NCPUS=parallel::detectCores()-2 # In my workstation (16-2) = 14 CPUS
+NCPUS=parallel::detectCores()-2 # on my workstation (16-2) = 14 CPUS
 
 # 1. Find the taxon id matching your keywords (case-insensitive) ===============
 find.uniprot_refprot(c('human','homo','sapiens','eukaryota'))
@@ -27,13 +31,12 @@ ec_uniref = names(ec_aa)
 
 # ------> With ncbi taxon id <------
 ec_mobidb = load.mobidb(83333) %>% # Took 20 sec. for the protein identifiers of the taxon
-            dplyr::filter(acc %in% ec_uniref) # Only use uniprot in reference proteome
+            dplyr::filter(acc %in% ec_uniref) %>% # Only use uniprot in reference proteome
+            group_by(acc) %>%
+            mutate(feature_maxlen = max_(content_count),
+                   longest_idr = feature == 'disorder' & content_count == feature_maxlen )
 n_distinct(ec_mobidb$acc)
 
-# Preparing
-ACC = ec_mobidb$acc
-START = ec_mobidb$S %>% as.integer()
-END = ec_mobidb$E %>% as.integer()
 
 # 5. Get the sequence for disorder stretches ===================================
 ## Might be slow on single-cpu depending on no. of (features+proteins) to process
@@ -42,17 +45,24 @@ END = ec_mobidb$E %>% as.integer()
 tic('retrieve regions sequence...') # Time the task of retrieving feature sequences
 #message('get sequences of mobidb features/regions...')
 irows=1:nrow(ec_mobidb)
+
+# Preparing data for accessing feature sequences
+ACC = ec_mobidb$acc
+START = ec_mobidb$S %>% as.integer()
+END = ec_mobidb$E %>% as.integer()
+
 # pbmclapply to loop across rows of mobidb features in parallel on (n-2) cpus
 diso_seq <- pbmcapply::pbmclapply(
                 X=irows,
                 # extract subsequence of mobidb feature from uniprot protein using positions
                 FUN = function(x){
-                        feature_seq = subseq(x=ec_aa[[ACC[x]]], start=START[x],end=END[x])
-                        return(as.character(feature_seq))
+                        feature_seq = subseq(x=ec_aa[[ACC[x]]], start=START[x],end=END[x]) %>% as.character
                       },
                 mc.cores=NCPUS)
-# })
 toc(log=T)
+# Adding feature sequence to the dataframe
+ec_mobidb$feature_seq = unlist(diso_seq)
+
 ### TOOK ~20 SECONDS with pbmcapply() (parallel on (n-2) cpus)
 
 # 6. Compute residue propensities on sequence of mobidb features ==================
@@ -76,17 +86,22 @@ toc(log=T)
 
 # 7. Get average residue propensity for all proteins ===========================
 # Average propensity = sum aa score / feature length
-
+names(diso_seq) = iseq
 ec_mobidb_scores = ec_mobidb %>%
                     bind_cols( bind_rows(diso_score) ) %>%
-                    group_by(acc,evidence,feature,source,length) %>%
-                    summarize( feat_count= unique(content_count),
-                               feat_frac = unique(content_fraction),
-                               across(aggrescan:wimleywhite, ~ sum(.x)/length)) %>%
-                    distinct()
+                    group_by(acc,evidence,feature,source,length,S,E,feature_len,feature_maxlen) %>%
+                    distinct() %>%
+                    summarize( is_longest_idr = longest_idr,
+                               feat_seq   = str_c(feature_seq),
+                               feat_count = unique(content_count),
+                               feat_frac  = unique(content_fraction),
+                               across(aggrescan:wimleywhite, ~ sum(.x)/feature_len))
 
 
-# 8. FILTER CONSENSUS PREDICTION OR INTERESTING FEATURES =======================
+# 8. YOUR OWN FILTER ===========================================================
 # ... You can add your own code here to filter the data ...
+
+# For example, selecting longest disordered region in each protein
+ec_mobidb_scores %>% filter( is_longest_idr )
 
 # Check description of features from MobiDB at: https://mobidb.bio.unipd.it/about/mobidb
