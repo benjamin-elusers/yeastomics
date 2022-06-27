@@ -101,7 +101,14 @@ ec_mobidb_scores = ec_mobidb %>%
 # 8. YOUR OWN FILTER ===========================================================
 # ... You can add your own code here to filter the data ...
 
-# For example, selecting longest disordered region in each protein
+# EXAMPLE 1: Selecting longest disordered region in each protein
 ec_mobidb_scores %>% filter( is_longest_idr )
+# EXAMPLE 2: get the mobidb sub-regions enriched for various characteristics such as:
+# polyampholyte
+# positive/negative electrolyte
+# G/C/P rich
+# polar
+# ...
+ec_mobidb_scores %>% filter(source == 'mobidb_lite_sub')
 
 # Check description of features from MobiDB at: https://mobidb.bio.unipd.it/about/mobidb
