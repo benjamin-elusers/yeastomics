@@ -2,13 +2,11 @@ source(here::here("src","__setup_yeastomics__.r"))
 library(tidyverse)
 library(here)
 library(Biostrings)
+library(dplyr)
 library(furrr)
 library(progressr)
 library(pbmcapply)
-#handlers(global = TRUE)
-#handlers("progress")
-library(dplyr)
-plan(multisession, workers = availableCores()-2)
+NCPUS=parallel::detectCores()-2 # In my workstation (16-2) = 14 CPUS
 
 # 1. Find the taxon id matching your keywords (case-insensitive) ===============
 find.uniprot_refprot(c('human','homo','sapiens','eukaryota'))
@@ -29,46 +27,65 @@ ec_uniref = names(ec_aa)
 
 # ------> With ncbi taxon id <------
 ec_mobidb = load.mobidb(83333) %>% # Took 20 sec. for the protein identifiers of the taxon
-            dplyr::filter(acc %in% ec_uniref) %>%  # Only use uniprot reference proteome
-            rowwise()
+            dplyr::filter(acc %in% ec_uniref) # Only use uniprot in reference proteome
 n_distinct(ec_mobidb$acc)
 
-# 5. Get the sequence for disorder stretches and compute amino-acid scores =====
-# !!!!! This is longest step (might help to filter disorder regions first) !!!!!
+# Preparing
+ACC = ec_mobidb$acc
+START = ec_mobidb$S %>% as.integer()
+END = ec_mobidb$E %>% as.integer()
 
-### PARALLEL
-tic('retrieve regions sequence...')
-# with_progress({
-#   p <- progressor(steps = nrow(ec_sticky))
-message('get sequences of mobidb features/regions...')
-diso_seq <- pbmcapply::pbmclapply(X=1:nrow(ec_mobidb),
-                                  mc.cores = parallel::detectCores()-2,
-                                  FUN = function(x){
-                                        ACC = ec_mobidb$acc[x]
-                                        START = ec_mobidb$S[x] %>% as.integer()
-                                        END = ec_mobidb$E[x] %>% as.integer()
-                                        #p(message = sprintf('get regions from %s [%s/%s]',ACC,x,nrow(ec_mobidb)))
-                                        feature_seq = subseq(x=ec_aa[[ACC]], start=START,end=END)
-                                        return(as.character(feature_seq))
-                                  })
+# 5. Get the sequence for disorder stretches ===================================
+## Might be slow on single-cpu depending on no. of (features+proteins) to process
+## Filtering out unnecessary features/proteins would make it faster
+
+
+tic('retrieve regions sequence...') # Time the task of retrieving feature sequences
+#message('get sequences of mobidb features/regions...')
+irows=1:nrow(ec_mobidb)
+# pbmclapply to loop across rows of mobidb features in parallel on (n-2) cpus
+diso_seq <- pbmcapply::pbmclapply(
+                X=irows,
+                # extract subsequence of mobidb feature from uniprot protein using positions
+                FUN = function(x){
+                        feature_seq = subseq(x=ec_aa[[ACC[x]]], start=START[x],end=END[x])
+                        return(as.character(feature_seq))
+                      },
+                mc.cores=NCPUS)
 # })
 toc(log=T)
-### TOOK 15 SECONDS with pbmcapply() (parallel on 14 cpus)
+### TOOK ~20 SECONDS with pbmcapply() (parallel on (n-2) cpus)
+
+# 6. Compute residue propensities on sequence of mobidb features ==================
+# !! LONG COMPUTATION (>5mn on (n-2) cpus) !!
 
 tic('compute aa scores of mobidb features ...')
-diso_score <- pbmcapply::pbmclapply(X=1:length(diso_seq),
-                                  FUN = function(x){
-                                    SEQ = diso_seq[[x]]
-                                    cat(SEQ)
-                                    get_aa_score(string = SEQ)
-                                  },mc.cores = parallel::detectCores()-2)
+#message('get amino acid scores of mobidb features/regions...')
+iseq = 1:length(diso_seq)
+diso_score <- pbmcapply::pbmclapply(
+                  X=iseq,
+                  # Using subsequence of mobidb features, compute sum of residue propensities
+                  FUN = function(x){ get_aa_score(string = diso_seq[[x]]) },
+                  mc.cores = NCPUS)
 toc(log=T)
-### TOOK  SECONDS with pbmcapply() (parallel on 14 cpus)
+### TOOK ~340 SECONDS with pbmcapply() (parallel on (n-2) cpus)
 
-# with_progress({
-#   p <- progressor(steps = length(diso_seq))
-#
-#   diso_score <- furrr::future_map(seq_along(diso_seq), ~{
-#     p(message = 'get aa scores...')
-#   })
-# })
+# 7. Get average residue propensity for all proteins ===========================
+# Average propensity = sum aa score / feature length
+# Propsenties used are:
+# - hydrophobicity (wimleywhite, kytedoolittle, roseman, camsol)
+# - amyloidogenicity (foldamyloid, pawar, aggrescan)
+# - interaction propensity (stickiness, voronoi_sickiness)
+
+ec_mobidb_scores = ec_mobidb %>%
+                    bind_cols( bind_rows(diso_score) ) %>%
+                    group_by(acc,evidence,feature,source,length) %>%
+                    summarize( feat_count= unique(content_count),
+                               feat_frac = unique(content_fraction),
+                               across(aggrescan:wimleywhite, ~ sum(.x)/length)) %>%
+                    distinct()
+
+
+# 8. FILTER CONSENSUS PREDICTION OR INTERESTING FEATURES =======================
+
+# Check description of features from MobiDB at: https://mobidb.bio.unipd.it/about/mobidb
