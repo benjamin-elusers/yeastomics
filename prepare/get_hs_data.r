@@ -360,6 +360,8 @@ hs_orthologs = unique(hs_r4s$id)
 # head(hs_families)  # seqid = ensembl peptide
 #head(hs_string_centralities) # ids = ensembl peptide
 dim(HS_CODING)
+colnames(HS_CODING)
+
 dim(HS_COUNT)
 dim(hs_CU)
 dim(hs_pepstats)
@@ -374,7 +376,7 @@ dim(HS_COMPLEX)
 
 HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
   left_join(hs_CU,by=c('uniprot'='ID')) %>%
-  left_join(hs_pepstats,by=c('uniprot'='UNIPROT')) %>%
+  left_join(hs_pepstats,by=c('uniprot'='UNIPROT','UP.prot_len')) %>%
   left_join(HS_PFAM,by=c('uniprot'='seq_id')) %>%
   left_join(hs_d2p2,by=c('uniprot')) %>%
   left_join(HS_SUPFAM,by=c('ensp'='seqid')) %>%
@@ -429,7 +431,8 @@ HS_DATA_pred2 = HS_DATA_pred2 %>% mutate(across(starts_with("STRING.cent_"), .fn
 miss_pred2 = check_missing_var(HS_DATA_pred2)
 
 HS_DATA_pred3 = HS_DATA_pred2 %>%
-                mutate(across(starts_with('jarzab2020'), fn=replace_na(.,replace = mean_(.))))
+                 mutate(across(starts_with(c('jarzab2020','leuenberger2017.LIP_tm_protein')),
+                               ~coalesce(.x, mean_(get(cur_column())))))
 
 miss_pred3 = check_missing_var(HS_DATA_pred3)
 
