@@ -331,6 +331,23 @@ get.d2p2.diso = function(d2p2,as.df=F){
   return(diso.L)
 }
 
+summarize.d2p2= function(d2p2_diso){
+  # Summarize d2p2 predictions per id
+  D2P2 = d2p2_diso %>%
+  mutate(d2p2.seg = find.consecutive(d2p2.diso>=7, TRUE, min=3),
+         d2p2.gap = find.consecutive(d2p2.diso>=7, FALSE, min=1)) %>%
+  group_by(d2p2.seg) %>% mutate( d2p2.seglen = sum_(d2p2.seg!=0)) %>%
+  group_by(d2p2.gap) %>% mutate( d2p2.gaplen = sum_(d2p2.gap!=0)) %>%
+  dplyr::filter(has.d2p2) %>%
+  dplyr::select(-c(has.d2p2,d2p2.size)) %>%
+  group_by(d2p2.id) %>%
+  summarise(D2P2.diso_len = sum_(d2p2.diso>=7),
+            D2P2.diso_frac = mean_(d2p2.diso>=7),
+            D2P2.diso_seg.count = n_distinct(d2p2.seg),
+            D2P2.diso_segmax.len = max(d2p2.seglen)) %>%
+  return(D2P2)
+}
+
 # Gene expression --------------------------------------------------------------
 get.codons4tai = function(noSTOP=F){
   codon.ord = c('TTT', 'TTC', 'TTA', 'TTG', 'TCT', 'TCC', 'TCA', 'TCG',
