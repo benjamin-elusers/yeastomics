@@ -431,10 +431,19 @@ HS_DATA_pred2 = HS_DATA_pred2 %>% mutate(across(starts_with("STRING.cent_"), .fn
 miss_pred2 = check_missing_var(HS_DATA_pred2)
 
 HS_DATA_pred3 = HS_DATA_pred2 %>%
-                 mutate(across(starts_with(c('jarzab2020','leuenberger2017.LIP_tm_protein')),
-                               ~coalesce(.x, mean_(get(cur_column())))))
+                 mutate(across(starts_with(c('jarzab2020','leuenberger2017')),
+                               ~coalesce(as.numeric(.x), mean_(get(cur_column())))))
 
 miss_pred3 = check_missing_var(HS_DATA_pred3)
+
+uni_missing_d2p2 = HS_DATA_pred3 %>% filter(is.na(D2P2.diso_len)) %>% dplyr::select(1:20,starts_with('D2P2')) %>% pull(uniprot)
+ensp_missing_d2p2 = HS_DATA_pred3 %>% filter(is.na(D2P2.diso_len)) %>% dplyr::select(1:20,starts_with('D2P2')) %>% pull(ensp)
+
+#xxx =  load.d2p2(missing_d2p2, 'hs-missing-d2p2.rds')
+xxx = fetch.mobidb(missing_d2p2) %>%
+      filter(feature=='disorder') %>%
+      dplyr::select(-S,-E,-feature_len) %>%
+      distinct()
 
 
 # Abundance -------------------------------------------------------------------
