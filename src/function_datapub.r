@@ -1941,7 +1941,7 @@ get_ensembl_sptree = function(treename){
   return(sptree)
 }
 
-get_ensembl_mammals = function(){
+get_ensembl_19mammals = function(){
 
   mammals = tribble(~taxid, ~ens_pre, ~spname, ~org,
         9606,'ENSG', 'Homo sapiens', 'human',
@@ -1988,6 +1988,10 @@ get_ensembl_vertebrates=function(){
                             'other_alignments', 'cored_db','species_id','n_protein_coding','n_swissprot','n_trembl','coverage')
 
   return(vertebrates)
+}
+
+get_ensembl_mammals=function(){
+  # select mammals from vertebrates
 }
 
 get_ensg_dataset = function(){
