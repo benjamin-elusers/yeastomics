@@ -120,20 +120,9 @@ hs_r4s = read_rds(here("data","RESIDUE-EVORATE-HUMAN.rds")) %>% group_by(id) %>%
 
 # Disorder ---------------------------------------------------------------------
 hs_d2p2 =  read_rds(here("data","d2p2-human-uniprotKB.rds")) %>%
-        get.d2p2.diso(.,as.df = T) %>%
-        mutate(d2p2.seg = find.consecutive(d2p2.diso>=7, TRUE, min=3),
-               d2p2.gap = find.consecutive(d2p2.diso>=7, FALSE, min=1)) %>%
-        group_by(d2p2.seg) %>% mutate( d2p2.seglen = sum_(d2p2.seg!=0)) %>%
-        group_by(d2p2.gap) %>% mutate( d2p2.gaplen = sum_(d2p2.gap!=0)) %>%
-        dplyr::filter(has.d2p2) %>%
-        dplyr::select(-c(has.d2p2,d2p2.size)) %>%
-        group_by(d2p2.id) %>%
-        summarise(D2P2.diso_len = sum_(d2p2.diso>=7),
-                  D2P2.diso_frac = mean_(d2p2.diso>=7),
-                  D2P2.diso_seg.count = n_distinct(d2p2.seg),
-                  D2P2.diso_segmax.len = max(d2p2.seglen)) %>%
-        mutate(uniprot = str_extract(d2p2.id,UNIPROT.nomenclature())) %>%
-        dplyr::select(-d2p2.id)
+            get.d2p2.diso(as.df=T) %>%
+            summarize.d2p2() %>%
+            mutate(uniprot = str_extract(d2p2.id, UNIPROT.nomenclature()))
 
 hs_pepstats = load.dubreuil2019.data(8) %>%
               dplyr::select(UNIPROT,PEPSTATS.netcharge=netcharge,PEPSTATS.mw=MW,PEPSTATS.pI=pI,UP.prot_len=prot.size) %>%
@@ -437,10 +426,14 @@ HS_DATA_pred3 = HS_DATA_pred2 %>%
 miss_pred3 = check_missing_var(HS_DATA_pred3)
 
 uni_missing_d2p2 = HS_DATA_pred3 %>% filter(is.na(D2P2.diso_len)) %>% dplyr::select(1:20,starts_with('D2P2')) %>% pull(uniprot)
-ensp_missing_d2p2 = HS_DATA_pred3 %>% filter(is.na(D2P2.diso_len)) %>% dplyr::select(1:20,starts_with('D2P2')) %>% pull(ensp)
+ensp_missing_d2p2 = HS_DATA_pred3 %>% filter(is.na(D2P2.diso_len) & !is.na(ensp)) %>% dplyr::select(1:20,starts_with('D2P2')) %>% pull(ensp)
+#n_distinct(uni_missing_d2p2)
+#n_distinct(ensp_missing_d2p2)
 
-#xxx =  load.d2p2(missing_d2p2, 'hs-missing-d2p2.rds')
-xxx = fetch.mobidb(missing_d2p2) %>%
+zzz =  load.d2p2(ensp_missing_d2p2, 'output/hs-missing-d2p2.rds')
+get.d2p2.diso(zzz,as.df = T)
+
+xxx = fetch.mobidb(uni_missing_d2p2) %>%
       filter(feature=='disorder') %>%
       dplyr::select(-S,-E,-feature_len) %>%
       distinct()

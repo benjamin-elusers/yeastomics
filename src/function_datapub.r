@@ -1982,7 +1982,7 @@ get_ensembl_vertebrates=function(){
                                   'assembly'='assembly_name','assembly_accession'='assembly_id') ) %>%
                            readr::type_convert()
 
-  colnames(vertebrates) = c('name','species','division','tax_id',
+  colnames(vertebrates) = c('organism','species','division','tax_id',
                             'assembly_version','assembly_accession','genebuild',
                             'variation','microarray','pan_compara','peptide_compara','genome_alignments',
                             'other_alignments', 'cored_db','species_id','n_protein_coding','n_swissprot','n_trembl','coverage')
