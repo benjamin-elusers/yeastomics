@@ -1,6 +1,6 @@
 load(here::here('output','hs_datasets.rdata'))
 load(here::here('output','hs_integrated_datasets.rdata'))
-load(here::here('output','hs_predictors_proteome.rdata'))
+#load(here::here('output','hs_predictors_proteome.rdata'))
 
 source(here::here("src","__setup_yeastomics__.r"))
 source(here::here("analysis","function_evorate_fitting.R"))
@@ -122,7 +122,8 @@ hs_r4s = read_rds(here("data","RESIDUE-EVORATE-HUMAN.rds")) %>% group_by(id) %>%
 hs_d2p2 =  read_rds(here("data","d2p2-human-uniprotKB.rds")) %>%
             get.d2p2.diso(as.df=T) %>%
             summarize.d2p2() %>%
-            mutate(uniprot = str_extract(d2p2.id, UNIPROT.nomenclature()))
+            mutate(uniprot = str_extract(d2p2.id, UNIPROT.nomenclature())) %>%
+            dplyr::select(-d2p2.id)
 
 hs_pepstats = load.dubreuil2019.data(8) %>%
               dplyr::select(UNIPROT,PEPSTATS.netcharge=netcharge,PEPSTATS.mw=MW,PEPSTATS.pI=pI,UP.prot_len=prot.size) %>%
@@ -322,35 +323,8 @@ load(here::here('output','hs_integrated_datasets.rdata'))
 # Based on uniprot accession
 head(hs_r4s) # id = uniprot AC
 hs_orthologs = unique(hs_r4s$id)
-
-#head(hs_codon) # ID = uniprot AC
-#head(hs_aa) # id = uniprot AC
-#head(hs_aa_class) # id = uniprot AC
-#head(hs_CU) # ID = uniprot AC
-#head(hs_d2p2) # id = uniprot AC
-
-# head(hs_pfam) # seq_id = uniprot AC
-# head(hs_pfam_dom) # seq_id = uniprot AC
-# head(hs_pfam_clan) # seq_id = uniprot AC
-
-#head(hs_stab) # protein_id = uniprot AC
-#head(hs_tm) # UNIPROT = uniprot AC; jarzab2020.TPP_GENENAME = gene symbol
-
-#head(hs_oligomers) # members = uniprot AC
-#head(hs_assembly) # members = uniprot AC
-#head(hs_complexes) # members = uniprot AC
-
-
-#head(hs_pathways) # uniprot = uniprot AC
-#head(hs_modules)  # uniprot = uniprot AC
-# Based on Ensembl peptide identifiers
-# head(hs_supfam) # seqid = ensembl peptide
-# head(hs_superfamilies)  # seqid = ensembl peptide
-# head(hs_families)  # seqid = ensembl peptide
-#head(hs_string_centralities) # ids = ensembl peptide
 dim(HS_CODING)
 colnames(HS_CODING)
-
 dim(HS_COUNT)
 dim(hs_CU)
 dim(hs_pepstats)
@@ -381,9 +355,10 @@ HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
 
 
 # Replace missing values  ------------------------------------------------------
+miss0 = check_missing_var(HS_DATA)
 
-# Replace NA
-HS_DATA_nona = HS_DATA %>%
+#### 1. Fix logical variables (NA replaced by FALSE) ####
+HS_FEATURES.1 = HS_DATA %>%
   mutate( across( where(is.logical) & starts_with('kegg.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('pfam.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('superfamily.'), ~replace_na(., F)) ) %>%
@@ -400,46 +375,98 @@ HS_DATA_nona = HS_DATA %>%
   mutate( across( where(is.logical) & starts_with('HGNC.'), ~replace_na(., F)) ) %>%
   distinct()
 
+miss1 = check_missing_var(HS_FEATURES.1)
 
-IDCOLS = c("uniprot","ensp","ensg","GENENAME","gene_biotype")
-#source(here::here("analysis","function_evorate_fitting.R"))
-#test = HS_DATA %>% mutate( across(where(is.logical), .fns = ~replace_na(.,F) )) %>% distinct()
+#### 2. Remove rare variables  (less than 2 occurrences in proteome) ####
+HS_FEATURES.2 = remove_rare_vars(df=HS_FEATURES.1,min_obs=2)
 
-miss0 = check_missing_var(HS_DATA)
-miss1 = check_missing_var(HS_DATA_nona)
+miss2 = check_missing_var(HS_FEATURES.2)
 
-#HS_DATA_nona[,IDCOLS] %>% summarize(across(everything(), sum.na))
+#### 3. Fix network centrality (lower confidence + random forest) ####
+# Take a long time (@!30mn!@)
+HS_FEATURES.3 = fix_missing_centrality(df=HS_FEATURES.2, id='ensp', col_prefix="STRING.", taxon=9606)
+HS_FEATURES.3 = HS_FEATURES.3 %>% mutate(across(starts_with("STRING.cent_"), .fns = min_))
 
-# Features selection (and fixing missing values) --------------------------
-# Remove rare variables (less than 2 occurrences in orthologs)
-HS_DATA_pred1 = remove_rare_vars(df=HS_DATA_nona,min_obs=2)
-miss_pred1 = check_missing_var(HS_DATA_pred1)
-# Use lower stringencies for string centrality + random forest imputation for proteins with unknown interactions
-HS_DATA_pred2 = fix_missing_centrality(df=HS_DATA_pred1, id='ensp', col_prefix="STRING.", taxon=9606)
-HS_DATA_pred2 = HS_DATA_pred2 %>% mutate(across(starts_with("STRING.cent_"), .fns = min_))
-miss_pred2 = check_missing_var(HS_DATA_pred2)
+miss3 = check_missing_var(HS_FEATURES.3)
 
-HS_DATA_pred3 = HS_DATA_pred2 %>%
+#### 4. Fix thermodynamcis stability (replace NA by average) ####
+HS_FEATURES.4 = HS_FEATURES.3 %>%
                  mutate(across(starts_with(c('jarzab2020','leuenberger2017')),
                                ~coalesce(as.numeric(.x), mean_(get(cur_column())))))
 
-miss_pred3 = check_missing_var(HS_DATA_pred3)
+miss4 = check_missing_var(HS_FEATURES.4)
 
-uni_missing_d2p2 = HS_DATA_pred3 %>% filter(is.na(D2P2.diso_len)) %>% dplyr::select(1:20,starts_with('D2P2')) %>% pull(uniprot)
-ensp_missing_d2p2 = HS_DATA_pred3 %>% filter(is.na(D2P2.diso_len) & !is.na(ensp)) %>% dplyr::select(1:20,starts_with('D2P2')) %>% pull(ensp)
-#n_distinct(uni_missing_d2p2)
-#n_distinct(ensp_missing_d2p2)
+#### 5. Fix PEPSTATS missing values (i.e not included in Dubreuil et al. 2019) ####
+HS_FEATURES.5 = fix_missing_peptide_stats(df=HS_FEATURES.4, id='uniprot', taxon=9606,
+                                         col_len='UP.prot_len',
+                                         col_mw='PEPSTATS.mw',
+                                         col_mw_avg='PEPSTATS.mean_MW',
+                                         col_charge='PEPSTATS.netcharge',
+                                         col_pi='PEPSTATS.pI')
+miss5 = check_missing_var(HS_FEATURES.5)
 
-zzz =  load.d2p2(ensp_missing_d2p2, 'output/hs-missing-d2p2.rds')
-get.d2p2.diso(zzz,as.df = T)
+#### 6. Fix D2P2 missing values (fetch from d2p2 or use consensus prediction from mobiDB) ####
 
-xxx = fetch.mobidb(uni_missing_d2p2) %>%
-      filter(feature=='disorder') %>%
-      dplyr::select(-S,-E,-feature_len) %>%
-      distinct()
+# Get all uniprot or ensembl reference identifiers
+uni_na_d2p2 = HS_FEATURES.5 %>% filter(is.na(D2P2.diso_len)) %>%  pull(uniprot)
+ensp_na_d2p2 = HS_FEATURES.5 %>% filter(is.na(D2P2.diso_len) & !is.na(ensp)) %>% pull(ensp)
+#n_distinct(uni_na_d2p2)
+#n_distinct(ensp_na_d2p2)
+id_na_d2p2 = c(uni_na_d2p2,ensp_na_d2p2)
+
+#  Fetch d2p2 missing identifiers
+d2p2_na =  load.d2p2(id_na_d2p2, 'output/hs-missing-d2p2.rds') %>%
+        get.d2p2.diso(as.df=T) %>%
+        summarize.d2p2() %>%
+        mutate(uniprot = str_extract(d2p2.id, UNIPROT.nomenclature())) %>%
+        mutate(ensp = str_extract(d2p2.id, ENSEMBL.nomenclature()),
+               has_d2p2=T) %>%
+        dplyr::select(-d2p2.id)
+
+# Get mobiDB data for missing identifiers
+mobidb_d2p2 = fetch.mobidb(id_na_d2p2)
+# Filter for consensus disorder prediction (50% agreement) and without d2p2 data
+mobidb_d2p2_na = mobidb_d2p2 %>%
+        filter(feature=='disorder' & source=='th_50' & !(acc %in% c(d2p2_na$ensp,d2p2_na$uniprot)) ) %>%
+        group_by(acc) %>%
+        # To combine d2p2 and mobidb they must have absolutely identical column names
+        mutate(D2P2.diso_seg.count = n(), D2P2.diso_segmax.len = max(feature_len),
+             D2P2.diso_len=sum(feature_len), D2P2.diso_frac=sum(feature_len)/length,
+             uniprot=acc, has_d2p2=F) %>%
+        ungroup() %>%
+        dplyr::select(-c(S,E,feature_len,evidence,feature,source,content_fraction,content_count,length,acc)) %>%
+        distinct()
+# Combine d2p2 and mobidb data
+d2p2_nona = bind_rows(d2p2_na,mobidb_d2p2_na) %>%
+          mutate( uniprot=ifelse(is.na(uniprot) | uniprot=="P00000",NA,uniprot))
+uni_d2p2_nona =  d2p2_nona %>% filter(!is.na(uniprot)) %>% dplyr::select(-ensp)
+ensp_d2p2_nona =  d2p2_nona %>% filter(!is.na(ensp)) %>% dplyr::select(-uniprot)
+
+# Replace the missing d2p2 values by the d2p2/mobidb fixed data
+HS_FEATURES.6 = coalesce_join(HS_FEATURES.5,uni_d2p2_nona,by=c('uniprot')) %>%
+                coalesce_join(ensp_d2p2_nona,by=c('ensp')) %>%
+                mutate(has_d2p2 = ifelse(is.na(has_d2p2),T,has_d2p2) )
+
+miss6 = check_missing_var(HS_FEATURES.6)
+
+#### 7. Fix missing cDNA sequences ####
+
+cdna_na = HS_FEATURES.6 %>% dplyr::select( all_of(miss6$variable) )
+#missing_cdna = HS_DATA_pred5 %>% filter( is.na(UP_cdna.AAA_Lys_K) ) %>% pull(uniprot)
+#get.uniprot.proteome(9606,DNA=T)
+
+HS_PROTEOME_DATA = HS_FEATURES.6 %>%
+                     # Get out the rows with NA
+                     drop_na(starts_with(c('UP_cdna.','elek2022.','D2P2.','ENS.'))) %>%
+                     dplyr::select(-GENENAME) %>%
+                     # RENAME VARIABLES NON-ALPHANUMERIC CHARACTERS (NOT VALID FOR FORMULA)
+                     dplyr::rename_with(.cols = everything(), .fn = str_replace_all, pattern="[^A-Za-z0-9\\.]+", replacement="_")
 
 
-# Abundance -------------------------------------------------------------------
+miss = check_missing_var(HS_PROTEOME_DATA)
+dim(HS_PROTEOME_DATA)
+
+# Retrieve human abundance -----------------------------------------------------
 # hs_ppm_uni = readRDS(here::here("data","paxdb_integrated_human.rds"))
 hs_uni = hs_map_uni %>% filter(extdb=='UniProtKB-ID') %>% dplyr::select(uni,extid)
 hs_paxdb_datasets = find_paxdb_datasets(9606)
@@ -453,7 +480,7 @@ hs_ppm = load.paxdb(9606,rm.zero=T) %>%
             mutate(log10.rate = log10(r4s_mammals.rate_norm))
 
 # integrated paxdb datasets
- hs_paxdb = get.paxdb(tax=9606,abundance = 'integrated',rm.zero=T)
+hs_paxdb = get.paxdb(tax=9606,abundance = 'integrated',rm.zero=T)
 HS_PPM = hs_paxdb %>%
           group_by(protid,id_uniprot) %>%
           summarize( PPM_MIN_ORGAN = min_(ppm_int),
@@ -466,30 +493,28 @@ HS_PPM = hs_paxdb %>%
           left_join( pivot_wider(hs_paxdb, id_cols = c(protid,id_uniprot,n_data,n_int),
                            names_from = 'organ', names_prefix = 'PPM_',
                            values_from = 'ppm_int', values_fn = log10) )
-#           left_join(hs_r4s,by=c('uni'='id')) %>%
-#           mutate(log10.rate = log10(r4s_mammals.rate_norm)) %>%
-#           relocate(protid,id_uniprot,uniprot=uni,n_data,n_int)
-#
-#
-# ppm_ER = HS_PPM %>% dplyr::select(starts_with('PPM_')) %>% colnames %>%
-#   bind_cols( map_dfr(., function(x){ spearman.toplot(X=hs_ER$log10.rate, Y=hs_ER[[x]]) }) ) %>%
-#   rename(ppm_dataset ='...1') %>% arrange(desc(abs(estimate)),N) %>%
-#   dplyr::select(ppm_dataset,N,r=estimate,p.value,) %>% mutate(R2 = 100*r^2)
-
 
 save(list = ls(pattern = '^hs_'), file = here('output','hs_datasets.rdata'))
 save(list = ls(pattern = '^HS_'), file = here('output','hs_integrated_datasets.rdata'))
 
-# Orthologs dataset (with/out abundance) ----------------------------------
-all_orthologs = HS_DATA_pred2 %>%
-  filter(!is.na(r4s_mammals.rate) & uniprot %in% hs_r4s$id) %>%
-  distinct()
-dim(all_orthologs)
+# Orthologs dataset (with/out abundance) ---------------------------------------
+# Full proteome N=20722 - after removing NA = 19417
+HS_ORTHOLOGS = HS_PROTEOME_DATA %>%
+                filter(!is.na(r4s_mammals.rate) & uniprot %in% hs_r4s$id) %>%
+                filter(!is.na(uniprot) & !is.dup(uniprot)) %>%
+                # Remove rare variables among orthlogs (min 3 orthologs must share the feature)
+                remove_rare_vars(df=.,min_obs=3) %>%
+                distinct()
 
-validation = all_orthologs %>% filter( !(uniprot %in% HS_PPM$uni) )
-orthologs =  all_orthologs %>% filter(uniprot %in% HS_PPM$uni)
-dim(validation)
-dim(orthologs)
+dim(HS_ORTHOLOGS)
+# All orthologs N = 13012
+miss_ortho = check_missing_var(HS_ORTHOLOGS)
+
+# Define two predictions datasets with/out abundance (training/validation)
+hs_validation = HS_ORTHOLOGS %>% filter( !(uniprot %in% HS_PPM$uni) )
+hs_orthologs =  HS_ORTHOLOGS %>% filter(uniprot %in% HS_PPM$uni)
+dim(hs_validation) # n=261
+dim(orthologs) # n=12751
 
 # Evo Rate vs. Expression -------------------------------------------------
 all_ppm_er_cor = map_dfr(hs_paxdb_datasets$id ,
@@ -515,80 +540,66 @@ p_ER_int = ggplot(all_ppm_er_cor %>% filter(is_integrated),
 ggsave(p_ER_int, filename=here::here('plots','hs-abundance-evolution-tissues-integrated.pdf'))
 
 p_ER = ggplot(all_ppm_er_cor %>% filter(!is_integrated),
-              aes(y=reorder(filename_n,abs(estimate)),fill=organ,x=estimate)) +
-  geom_col() +
+              aes(y=reorder(filename_n,abs(estimate)),x=organ, fill=estimate)) +
+  geom_raster() + scale_fill_viridis_c() + theme(axis.text.x = element_text(angle=90,hjust=1))
   #geom_text(aes(label=N,x=1.2*max(estimate)),size=3) +
-  geom_text(aes(label=round(estimate,3),x=estimate),size=2,hjust='inward') +
-  facet_grid(organ~cor_range,scales = 'free_y',drop = T) +
-  theme(legend.position='none',axis.text = element_text(size=6), strip.text = element_text(size=5))
+  #geom_text(aes(label=round(estimate,3),x=estimate),size=2,hjust='inward') +
+  #facet_grid(organ~cor_range,scales = 'free_y',drop = T) +
+  #theme(legend.position='none',axis.text = element_text(size=6), strip.text = element_text(size=5))
+ggsave(p_ER,scale=3,filename=here::here('plots','hs-abundance-evolution-tissues-experimental.pdf'))
 
-ggsave(p_ER, width = 20, height=40, filename=here::here('plots','hs-abundance-evolution-tissues-experimental.pdf'))
 
-
-# Dataset for prediction --------------------------------------------------
-hs_predictors = HS_DATA_pred2 %>% dplyr::select(where(is.numeric) | where(is.logical)) %>% colnames
-nonpred = setdiff(colnames(HS_DATA_pred2),predictor_vars)
-check_missing_var(orthologs[,hs_predictors]) #%>% drop_na(-leuenberger2017.tm_protein))
-# dim(orthologs)
-mean(colnames(orthologs) %in% predictor_vars )
-
-#save.image(here::here('output','hs_predictors_proteome.rdata'))
-#predictor_vars = predictor_vars()
-
-HS_DATA_pred2$PPM = log10(HS_DATA_pred2$paxdb.ppm_wholeorg+min_ppm)
-PREDICTORS= HS_DATA_pred2
-PREDICTORS_nona = PREDICTORS %>% drop_na
-check_missing_var(PREDICTORS_nona)
-
+# Explaining variance in evolutionary rate -------------------------------------
+#IDCOLS = c("uniprot","ensp","ensg","GENENAME","gene_biotype")
+ID_COLS = c('uniprot','GN','ensp')
 XCOL="PPM"
-YCOL="r4s_mammals.rate"
-ZCOL=""
+YCOL="ER"
+ZCOL=NULL
 
-fit0 = fit_m0(orthologs,XCOL,YCOL,PREDICTORS_nona,ZCOL,IDCOLS)
-formula_M0=reformulate(response = YCOL, termlabels = XCOL, intercept = T )
-LM0 = lm(data=PREDICTORS_nona, formula_M0)
-df0=decompose_variance(LM0,T)
-fit0=list(LM0=LM0,P=PREDICTORS_nona)
-spearman.toplot(PREDICTORS$r4s_mammals.rate,PREDICTORS$PPM)
+hs_ortho_predictors = hs_orthologs %>% group_by(uniprot,GN,ensp) %>%
+  dplyr::select(where(is.numeric) | where(is.logical)) %>%
+  dplyr::select(-c('SV',"UP.OX", starts_with("r4s_mammals"),"has_unique_id") )
 
-n_pred_vars = colnames(fit0$P) %>% str_extract("cat_.+") %>% setdiff(NA) %>% n_distinct()
+HS_PREDICTORS = hs_ortho_predictors %>% ungroup
+#orthologs_predictors = orthologs[, hs_predictors %>% colnames] %>% ungroup()
 
-P_best= select_variable(fit0,response = '.resid', min_ess = 1, min_ess_frac = 1)
-best_pred = fit0$P[,c(XCOL, YCOL, y_resid, ZCOL, P_best$variable)]
-n_best = n_distinct(P_best$variable)
+HS_PPM$PPM = HS_PPM$PPM_WHOLE_ORGANISM
+HS_ER = left_join(hs_r4s,HS_PPM, by=c('id'='uni'))
+HS_ER$ER = log10(HS_ER$r4s_mammals.rate_norm)
 
-hs_evo_ppm = left_join(hs_r4s,HS_PPM, by=c('id'='uniprot')) %>% drop_na
-hs_evo_ppm %>% filter(is.dup(id))
-spearman.toplot(hs_evo_ppm$r4s_mammals.rate_norm,hs_evo_ppm$paxdb.ppm_int)
+HS_LMDATA = left_join(HS_PREDICTORS,HS_ER,by=c('uniprot'='id')) %>% drop_na(PPM) %>%
+            filter(!is.na(uniprot) & !is.dup(uniprot)) %>%
+            distinct()
 
+fit0 = fit_m0(INPUT_LM = HS_LMDATA,PREDICTORS = HS_PREDICTORS,
+              XCOL = XCOL,YCOL = YCOL, ZCOL=NULL, IDCOLS=ID_COLS,
+              MAX_XCOR = 0.5, MAX_YCOR=0.5, MIN_N = 2)
+df0=decompose_variance(fit0$LM0,T)
+spearman.toplot(fit0$P$ER,fit0$P$PPM)
 
-
-
-
-
-
-
+# Filter Dataset for prediction --------------------------------------------------
 
 
+hs_evo_all= select_variable(fit0,response='.resid', raw=T)
+saveRDS(hs_evo_all,here("output","hs-all-lm-evo.rds"))
+
+hs_best= hs_evo_all %>% filter(pc_ess > 0.5 & variable != YCOL)
+hs_best_pred = fit0$P[,c(XCOL, YCOL, '.resid', ZCOL, hs_best$variable)]
+hs_nbest = n_distinct(hs_best$variable)
 
 
+formula_null = reformulate(response=YCOL,termlabels = "1",intercept = T)
+LM_ER = lm(data=hs_best_pred, formula_null)
+decompose_variance(LM_ER)
 
+#formula_hs_best_ER=paste0(YCOL," ~ ",paste0( P_evo$variable,collapse=" + "))
+formula_hs_best = reformulate(hs_best$variable, response =  '.resid')
 
+m_best_ER = step(object=LM_ER, scope = as.formula(formula_hs_best), direction = 'forward',k=log(hs_nbest)*2,trace=0)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+hs_best_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),data=hs_best_pred)
+print(labels(m_best_ER))
+decompose_variance(hs_best_lm,to.df = T)
 
 
 # Additional datasets (human specific) ------------------------------------
