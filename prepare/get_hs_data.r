@@ -1,5 +1,5 @@
-load(here::here('output','hs_datasets.rdata'))
-load(here::here('output','hs_integrated_datasets.rdata'))
+#load(here::here('output','hs_datasets.rdata'))
+#load(here::here('output','hs_integrated_datasets.rdata'))
 #load(here::here('output','hs_predictors_proteome.rdata'))
 
 source(here::here("src","__setup_yeastomics__.r"))
@@ -274,7 +274,6 @@ hs_complexes = pivot_wider(hs_complex, id_cols = members,
 HS_COMPLEX = left_join(hs_oligomers,hs_assembly) %>% left_join(hs_complexes)
 
 # Functional interactions ------------------------------------------------------
-
 hs_string = load.string(tax="9606",phy=F, ful=T, min.score = 900) %>%
   mutate(ens1 = str_extract(protein1,ENSEMBL.nomenclature()),
          ens2 = str_extract(protein2,ENSEMBL.nomenclature())
@@ -317,8 +316,6 @@ kegg_modules = hs_modules %>% mutate(module_val=T) %>%
 HS_KEGG = left_join(kegg_pathways,kegg_modules)
 
 # Integrate all datasets -------------------------------------------------------
-load(here::here('output','hs_datasets.rdata'))
-load(here::here('output','hs_integrated_datasets.rdata'))
 
 # Based on uniprot accession
 head(hs_r4s) # id = uniprot AC
@@ -451,11 +448,18 @@ miss6 = check_missing_var(HS_FEATURES.6)
 
 #### 7. Fix missing cDNA sequences ####
 
-cdna_na = HS_FEATURES.6 %>% dplyr::select( all_of(miss6$variable) )
-#missing_cdna = HS_DATA_pred5 %>% filter( is.na(UP_cdna.AAA_Lys_K) ) %>% pull(uniprot)
+#cdna_na = HS_FEATURES.6 %>% dplyr::select( all_of(miss6$variable) )
+#missing_cdna = HS_FEATURES.6 %>% filter( is.na(UP_cdna.AAA_Lys_K) ) %>% pull(uniprot)
 #get.uniprot.proteome(9606,DNA=T)
 
-HS_PROTEOME_DATA = HS_FEATURES.6 %>%
+HS_FEATURES.7 = HS_FEATURES.6 %>%
+                mutate( ENS.cds_len = ifelse( is.na(ENS.cds_len) & !is.na(UP.cdna_len),UP.cdna_len,ENS.cds_len),
+                        ensp = ifelse(is.na(ensp), ensp_canonical, ensp),
+                        GENENAME = ifelse(is.na(GENENAME),GN,GENENAME))
+miss7 = check_missing_var(HS_FEATURES.7)
+
+
+HS_PROTEOME_DATA = HS_FEATURES.7 %>%
                      # Get out the rows with NA
                      drop_na(starts_with(c('UP_cdna.','elek2022.','D2P2.','ENS.'))) %>%
                      dplyr::select(-GENENAME) %>%
@@ -507,14 +511,14 @@ HS_ORTHOLOGS = HS_PROTEOME_DATA %>%
                 distinct()
 
 dim(HS_ORTHOLOGS)
-# All orthologs N = 13012
-miss_ortho = check_missing_var(HS_ORTHOLOGS)
+# All orthologs N = 12977
+
 
 # Define two predictions datasets with/out abundance (training/validation)
 hs_validation = HS_ORTHOLOGS %>% filter( !(uniprot %in% HS_PPM$uni) )
 hs_orthologs =  HS_ORTHOLOGS %>% filter(uniprot %in% HS_PPM$uni)
-dim(hs_validation) # n=261
-dim(orthologs) # n=12751
+dim(hs_validation) # n=263
+dim(hs_orthologs) # n=12714
 
 # Evo Rate vs. Expression -------------------------------------------------
 all_ppm_er_cor = map_dfr(hs_paxdb_datasets$id ,
@@ -558,10 +562,9 @@ ZCOL=NULL
 
 hs_ortho_predictors = hs_orthologs %>% group_by(uniprot,GN,ensp) %>%
   dplyr::select(where(is.numeric) | where(is.logical)) %>%
-  dplyr::select(-c('SV',"UP.OX", starts_with("r4s_mammals"),"has_unique_id") )
+  dplyr::select(-c('SV', starts_with("r4s_mammals"),"has_unique_id") )
 
 HS_PREDICTORS = hs_ortho_predictors %>% ungroup
-#orthologs_predictors = orthologs[, hs_predictors %>% colnames] %>% ungroup()
 
 HS_PPM$PPM = HS_PPM$PPM_WHOLE_ORGANISM
 HS_ER = left_join(hs_r4s,HS_PPM, by=c('id'='uni'))
@@ -578,8 +581,6 @@ df0=decompose_variance(fit0$LM0,T)
 spearman.toplot(fit0$P$ER,fit0$P$PPM)
 
 # Filter Dataset for prediction --------------------------------------------------
-
-
 hs_evo_all= select_variable(fit0,response='.resid', raw=T)
 saveRDS(hs_evo_all,here("output","hs-all-lm-evo.rds"))
 
