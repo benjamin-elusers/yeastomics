@@ -282,12 +282,21 @@ get_binary_col = function(df,only.names=F){
 }
 
 remove_rare_vars = function(df,min_obs=2){
+
   # Find binary variables with rare observations (preferably 0's and singletons)
   binary_vars = get_binary_col(df)
-  rare_vars = binary_vars[ colSums(binary_vars) < min_obs ]
+  rare_vars = binary_vars[ colSums(binary_vars,na.rm = T) < min_obs ]
   n_rare = length(rare_vars)
   .succ$log(sprintf("Excluding %s/%s predictors with less than %s observations\n",n_rare,ncol(df),min_obs))
-  df_fixed = df %>% dplyr::select(-all_of(names(rare_vars)))
+
+  # Find variables with near-0 variance
+  num_vars = df %>% dplyr::select(where(is.numeric)) %>% apply(., 2,var_) %>% na.omit()
+  constant_vars = num_vars[ num_vars < .Machine$double.eps ]
+  n_constant = length(constant_vars)
+  .succ$log(sprintf("Excluding %s/%s predictors with low varianace (<%.1e) \n",n_constant,ncol(df), .Machine$double.eps))
+
+  .succ$log(sprintf("Excluded %s/%s useless (rare/low variance) predictors\n",n_constant+n_rare,ncol(df)))
+  df_fixed = df %>% dplyr::select(-all_of(c(names(rare_vars),names(constant_vars))))
   return(df_fixed)
 }
 
@@ -333,7 +342,7 @@ fix_missing_codons = function(df,col_prefix='cat_transcriptomics.sgd.'){
 }
 
 #### 2. protein length / Average Molecular Weight ####
-fix_missing_peptide_stats = function(df,
+fix_missing_peptide_stats = function(df,id='ORF', taxon=4932,
                                      col_len='cat_transcriptomics.sgd.prot_size',
                                      col_mw='cat_biophysics.pepstats.mw',
                                      col_mw_avg='cat_transcriptomics.pepstats.mean_MW',
@@ -341,33 +350,40 @@ fix_missing_peptide_stats = function(df,
                                      col_pi='cat_biophysics.pepstats.pI'
                                      ){
   col_pep = c(col_len,col_mw,col_mw_avg,col_charge,col_pi)
-  # Replace orf with missing values for average molecular weight
-  orf_missing = df %>% column_to_rownames('ORF') %>% dplyr::select(all_of(col_pep)) %>% find_na_rows() %>% rownames()
+
+  df$has_unique_id = !is.na(df[[id]]) & !duplicated(df[[id]])
+  df_unique = df %>% drop_na(id) %>% rowwise %>% filter(has_unique_id) %>% column_to_rownames(id)
+  orf_missing =  df_unique %>% dplyr::select(all_of(col_pep)) %>% find_na_rows() %>% rownames()
   if(length(orf_missing)==0){
     .warn$log("No missing values found for any of the peptide stats columns!")
     return(df)
   }
   .warn$log("Replace columns with missing values for protein length / average molecular weight...\n")
-  prot_missing = load.sgd.proteome()[orf_missing] %>% as.character
+  if(taxon==4932){
+    prot_missing = load.sgd.proteome()[orf_missing] %>% as.character
+  }else if(taxon==9606){
+    prot_missing = get.uniprot.proteome(taxid = 9606,DNA = F,fulldesc = F)[orf_missing] %>% as.character
+  }
 
   library(Peptides)
-  df_na_pep = tibble(orf_missing,
+  df_na_pep = tibble(id=orf_missing,
                     missing_len = Peptides::lengthpep(prot_missing),
                     missing_mw  = Peptides::mw(prot_missing),
                     missing_mw_avg = missing_mw / missing_len,
                     missing_charge = Peptides::charge(prot_missing),
                     missing_pi = Peptides::pI(prot_missing),
-                    cat_transcriptomics.pepstats.AA_costly = missing_mw_avg > 118,
-                    cat_transcriptomics.pepstats.AA_cheap = missing_mw_avg <= 105) %>%
-    dplyr::rename(ORF := orf_missing,
-                  !!col_len:=missing_len,
+                    PEPSTATS.AA_costly = missing_mw_avg > 118,
+                    PEPSTATS.AA_cheap = missing_mw_avg <= 105) %>%
+    dplyr::rename(!!col_len:=missing_len,
                   !!col_mw:=missing_mw,
                   !!col_mw_avg:=missing_mw_avg,
                   !!col_charge:=missing_charge,
                   !!col_pi:=missing_pi
                   )
-
-  df_fixed = coalesce_join(x = df, y=df_na_pep, by = "ORF")
+  if(taxon == 9606){
+    df_na_pep = df_na_pep %>% dplyr::rename(uniprot=id)
+  }
+  df_fixed = coalesce_join(x = df, y=df_na_pep, by = c('uniprot'))
   return(df_fixed)
 }
 
@@ -788,7 +804,7 @@ decompose_variance = function(MODEL,to.df=F){
   D = MODEL$model %>% as_tibble()
 
   N=sum(complete.cases(D))
-  TSS = var( D[,1] ) * (N-1)
+  TSS = var( D[,1,drop=T] ) * (N-1)
   df.var = broom::tidy(aov(MODEL))
 
   df.ss = df.var %>% dplyr::filter(term != "Residuals")
@@ -797,13 +813,13 @@ decompose_variance = function(MODEL,to.df=F){
   RSS = sum(df.res$sumsq) # sum( residuals(LM)^2 )
 
   rss =  deviance(MODEL)
-  if( RSS != rss ){ warning("RSS not equal to deviance of the model...") }
+  if( !all.equal(RSS,rss) ){ warning(sprintf("RSS (%.2f) not equal to deviance of the model (%.2f)...",RSS,rss)) }
 
   ess = TSS-RSS
   ESS = sum(df.ss$sumsq)
   # Maximum ESS (Fitted - Ymean)
   ess.max = sum( (fitted(MODEL) - mean_(D[,1]))^2 )
-  if( ESS != ess ){ warning("ESS not equal to sum of squares from individual variables...") }
+  if( !all.equal(ESS,ess) ){ warning(sprintf("ESS (%.2f) not equal to sum of squares from individual variables (%.2f)...",ESS,ess)) }
 
   ESS.pc =100*ESS/TSS
   RSS.pc =100*RSS/TSS
@@ -833,6 +849,8 @@ decompose_variance = function(MODEL,to.df=F){
 fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
                                  PREDVAR=PREDICTORS, xcor_max=0.6, ycor_max=0.6,
                                  ADD.VARIABLES = 'log10.SNP.FULL',
+                                 key_id=c("ORF","UNIPROT"),
+                                 key_filter=c("IS_FUNGI","IS_STRAINS"),
                                  force_elim_x=T,
                                  min_obs=5){
   txt_section_break = repchar("-",50)
@@ -840,10 +858,8 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   #Y = "log10.EVO.FULL" # mean Evolutionary rate (full sequence)
   #X = "MPC" # median Molecules Per Cell
   #X = "PPM" # Protein Abundance (log10 ppm) # ALTERNATIVELY
-  key_id=c("ORF","UNIPROT")
-  key_filter=c("IS_FUNGI","IS_STRAINS")
 
-  LINREG = INPUT %>% dplyr::select(all_of(c(key_id,key_filter,X,Y,ADD.VARIABLES)))
+  LINREG = INPUT %>% dplyr::select(all_of(c(X,Y,ADD.VARIABLES)),any_of(c(key_id,key_filter)))
 
   XYDATA = get_XY_data(INPUT,x=X,y=Y)
   YY = XYDATA$YY
@@ -853,9 +869,11 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   var.y = XYDATA$var['y']
   input = XYDATA$df
   rg.y = range_(YY)
-  var_names = starting(colnames(PREDVAR),'cat_')
+
+ #starting(colnames(PREDVAR),'cat_')
 
   Y_X=make_linear_fit(LINREG ,x=X, y=Y, only.params = F)
+  var_names = PREDVAR %>% dplyr::select(where(is.numeric) | where(is.logical), -any_of(colnames(Y_X))) %>% colnames
   M0=left_join(Y_X,PREDVAR)
   M0$yavg   = mu.y
   M0$yvar   = var.y
@@ -863,8 +881,10 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
   M0$ymxa = rg.y[2]
   M0$nxy = n.xy
 
+
   # excluding variables with correlation to X/Y
-  cor_x = cor(x=M0[,var_names],y=M0[[X]],use = 'pairwise') %>% as_vector %>% na.omit()
+  cor_x = cor(x=M0 %>% dplyr::select(all_of(var_names)),y=M0[[X]],use = 'pairwise') %>% as_vector %>% na.omit()
+
   x_control_var = rownames(cor_x)[abs(cor_x) >= xcor_max]
   cat("controlling variables correlated to ",X,"...\n")
   x_excluded_var=c()
@@ -903,7 +923,7 @@ fit_linear_regression = function(INPUT=EVOLUTION, X='PPM', Y="log10.EVO.FULL",
 }
 
 # CHECK EACH VARIABLE
-fit_lm_one_var = function(varname,target='.resid',inputdata,verbose=F,.pb=NULL, .pb.toprint){
+fit_lm_one_var = function(varname,target='.resid',inputdata, verbose=F, .pb=NULL, .pb.toprint=NULL){
   if(verbose){ catn(varname) }
   if(!is.null(.pb) && !.pb$finished){ .pb$tick(tokens=list(what=.pb.toprint)) }
   shortname = str_split_fixed(pattern='\\.',varname,n = 2)[,2]
@@ -920,6 +940,17 @@ fit_lm_one_var = function(varname,target='.resid',inputdata,verbose=F,.pb=NULL, 
   ESS = TSS - RSS
   rss_rel = 100*RSS/TSS
   ess_rel = 100*ESS/TSS
+
+  #if(is.na(n_var) | n_var<10){
+  #  return(NULL)
+    # return(
+    #   tibble(var=shortname, nprot_var=n_var,
+    #          tss=TSS,rss=RSS,ess=ESS,
+    #          pc_ess=ess_rel, pc_rss=rss_rel,
+    #          tss_var=NA,rss_var=NA,ess_var=NA,
+    #          pc_ess_var=NA, pc_rss_var=NA)
+    # )
+  #}
 
   linreg_var = lm(formula_var, data=inputdata[not_na & not_0,])
   #decompose_variance(linreg_var)
@@ -946,59 +977,76 @@ fit_lm_one_var = function(varname,target='.resid',inputdata,verbose=F,.pb=NULL, 
 
 # 5. NULL-MODEL AND VARIABLE SELECTION -----------------------------------------
 
-fit_m0 = function(orthologs,XCOL,YCOL,PREDICTORS,ZCOL,IDCOLS,
+fit_m0 = function(INPUT_LM,XCOL,YCOL,PREDICTORS,ZCOL,IDCOLS,
                   MAX_XCOR = 0.6, MAX_YCOR=0.8, MIN_N = 1){
 
-  m0_vars = c(".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid","ESS","TSS","RSS","s2","s2.y","RS","RSE","AIC","BIC","LL","model")
-  m0 = fit_linear_regression(INPUT=orthologs, X=XCOL,Y=YCOL, PREDVAR=PREDICTORS,
-                             ADD.VARIABLES =ZCOL,
-                             xcor_max = MAX_XCOR,ycor_max = MAX_YCOR, min_obs=MIN_N, force_elim_x = T
-  ) %>% remove_rare_vars()
-  #"brar2012.TE","paxdb","rna_exp","coRdon","barton2010"
-  predictors = m0 %>%
-    dplyr::select(all_of(c(IDCOLS,m0_vars)), starts_with('cat_'),
-                  XCOL,YCOL, ZCOL,
-                  -c("cat_biophysics.leuenberger2017.LIP_npep"),
-                  -contains(c("peter2018","byrne2005","lahtvee2017","brar2012.TE","paxdb")) ) %>%
-    mutate(across(.cols = where(is.numeric), .fns=~na_if(., is.infinite(.))))
-  npred_sel = predictors %>% dplyr::select(starts_with('cat_')) %>% colnames %>% n_distinct()
+  # Remove rare and low-variance predictors/data
+  LMDATA = INPUT_LM %>% remove_rare_vars()
+  PRED = PREDICTORS %>% remove_rare_vars()
 
-  message("predictor type of variables:")
-  print(table(sapply(predictors,class)))
+  m0_vars = c(".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid","ESS","TSS","RSS","s2","s2.y","RS","RSE","AIC","BIC","LL","model")
+  xy_vars = c("yavg","yvar","ymin","ymxa","nxy")
+  m0 = fit_linear_regression(INPUT=LMDATA, X=XCOL,Y=YCOL, PREDVAR=PRED,
+                             ADD.VARIABLES=ZCOL,key_id = IDCOLS,
+                             xcor_max = MAX_XCOR,ycor_max = MAX_YCOR, min_obs=MIN_N, force_elim_x = T
+  )
+
+
+  pred_vars = m0 %>% dplyr::select(where(is.numeric) | where(is.logical), -any_of(c(m0_vars,xy_vars))) %>%
+    colnames %>% setdiff(NA)
+  if( str_detect( hutils::longest_prefix(pred_vars), 'cat_') ){
+    pred_vars = str_subset(pred_vars,'^cat_')
+  }
+
+  predictors = m0 %>%
+    dplyr::select(all_of(c(IDCOLS,m0_vars,XCOL,YCOL, ZCOL)), all_of(pred_vars))%>%
+    mutate(across(.cols = where(is.numeric), .fns=~na_if(., is.infinite(.)))) %>%
+    distinct()
+
+
+  npred = pred_vars %>% n_distinct()
+  ngene = predictors[,IDCOLS] %>% distinct() %>% nrow
+  message("Number of genes | Number of predictors")
+  print(c(ngene,npred))
+  message("Type of predictor variables:")
+  print(sapply(predictors[pred_vars],class) %>% janitor::tabyl())
 
   # LINEAR MODEL M0
-  predictors = predictors %>% dplyr::filter( !is.na(YCOL) & !is.na(XCOL) & !is.na(ZCOL))
-  message("Number of genes | Number of predictors")
-  print(dim(predictors))
+  predictors = predictors %>% dplyr::filter( !is.na(YCOL) & !is.na(XCOL) )
+  if(!is.null(ZCOL)){ predictors %>% dplyr::filter( !is.na(ZCOL) )  }
 
   formula_M0=reformulate(response = YCOL, termlabels = XCOL, intercept = T )
   LM0 = lm(data=predictors, formula_M0)
   df0=decompose_variance(LM0,T)
 
   coef0=coef(LM0)
-  pred_vars = colnames(predictors) %>% str_extract("cat_.+") %>% setdiff(NA)
+  #pred_vars = colnames(predictors) %>% str_extract("cat_.+")
   x0 = sprintf("offset(%s*%s)",coef0[2],names(coef0)[2])
 
-  formula_SNP=reformulate(response = YCOL, termlabels = ZCOL, intercept = T )
+  if(!is.null(ZCOL)){
+    formula_SNP=reformulate(response = YCOL, termlabels = ZCOL, intercept = T )
 
-  LM_SNP = lm(data=predictors,formula_SNP)
-  decompose_variance(LM_SNP)
-  coef_snp=coef(LM_SNP)
+    LM_SNP = lm(data=predictors,formula_SNP)
+    decompose_variance(LM_SNP)
+    coef_snp=coef(LM_SNP)
 
-  predictors_snp = predictors
+    predictors_snp = predictors
 
-  formula_M0_SNP =  reformulate(response = YCOL, termlabels =c(XCOL,ZCOL), intercept = T )
-  LM0_SNP = lm(data=predictors_snp,formula_M0_SNP)
-  decompose_variance(LM0_SNP)
-  coef0_snp=coef(LM0_SNP)
-  x0_snp = paste0( sprintf("offset(%s*%s)",coef0_snp[2:3],names(coef0_snp)[2:3]), collapse=' + ')
-  return(lst(P=predictors,m0=m0,LM0=LM0))
+    formula_M0_SNP =  reformulate(response = YCOL, termlabels =c(XCOL,ZCOL), intercept = T )
+    LM0_SNP = lm(data=predictors_snp,formula_M0_SNP)
+    decompose_variance(LM0_SNP)
+    coef0_snp=coef(LM0_SNP)
+    x0_snp = paste0( sprintf("offset(%s*%s)",coef0_snp[2:3],names(coef0_snp)[2:3]), collapse=' + ')
+  }
+  return(lst(P=predictors,P_vars=pred_vars,m0=m0,LM0=LM0))
 }
 
 select_variable = function(fitted_data=fit0, response='.resid',
                            raw=F, min_ess = 1, min_ess_frac = 1){
 
-  n_pred_vars = colnames(fitted_data$P) %>% str_extract("cat_.+") %>% setdiff(NA) %>% n_distinct()
+  pred_vars= fitted_data$P_vars %>% setdiff(NA)
+  n_pred_vars = pred_vars  %>%  n_distinct()
+
   message(sprintf('testing each of the %s predictors for the correlation with y-residuals (%s)...',n_pred_vars,response))
   task='test variable prediction...'
   tic(msg = task)
@@ -1008,14 +1056,23 @@ select_variable = function(fitted_data=fit0, response='.resid',
   TSS = var( fitted_data$LM0$model[[YCOL]] ) * (nrow(fitted_data$LM0$model)-1)
   RSS = deviance(LM0)
   ESS = TSS-RSS
-  mu_y  = mean_(predictors[[YCOL]])
+  mu_y  = mean_(fit0$P[[YCOL]])
+  #response='ER'
 
   lm_single=tibble(variable=pred_vars,tss0=TSS,rss0=RSS,ess0=ESS) %>%
     group_by(variable) %>%
-    mutate( fit_lm_one_var(variable,response,x$P,.pb=pb, .pb.toprint=task) ) %>%
+    mutate( fit_lm_one_var(inputdata = fitted_data$P , variable,response,.pb=pb, .pb.toprint=task) ) %>%
     ungroup() %>%
     mutate(pc_ess0 = 100*ess_var / tss0,
            pc_rss0 = 100*rss_var / tss0)
+
+  # res=list()
+  # for(i in 4:nrow(lm_single)){
+  #    res[[i]] = fit_lm_one_var(inputdata = fitted_data$P , varname = lm_single$variable[i], target = response)
+  #    if(i %% 100 == 0){
+  #      print(i)
+  #    }
+  # }
 
   var_name = str_split_fixed(pattern="[_\\.]",lm_single$variable,n=4)
   lm_single =  lm_single %>% ungroup %>%
