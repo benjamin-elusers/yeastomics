@@ -2255,13 +2255,14 @@ query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
     att_ortho = intersect(sprintf("%s_homolog_%s",ortho,att_species), listAttributes(ens,page='homologs')[,1])
     cat(sprintf("Trying to fetch orthologs '%s' VS. '%s'...",species,ortho))
 
-    filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
-    if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
-
     Q=getBM(mart=ens,
             attributes=c(att_gene,att_ortho),
-            filters=names(filters), values=as.list(filters),
+            filters="", values="",
             uniqueRows = T, bmHeader = F)
+
+    ortho_ensp = att_ortho[3]
+    Q$no_ortholog = is.na(Q[[ortho_ensp]]) | (Q[[ortho_ensp]] == "")
+
     return(Q)
   },
   error=function(cond) {
@@ -2277,6 +2278,47 @@ query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
   )
   return(out)
 }
+
+query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T) {
+  if(verbose){ tictoc::tic('query Ensembl transcript length') }
+  t0 = proc.time()
+  out <- tryCatch({
+    dataset_name = sprintf('%s_gene_ensembl',Sp)
+    if(verbose){
+      cat(sprintf("Trying to fetch structure of genes from '%s' [%s]...",dataset_name,ORG))
+    }
+    Ma=useEnsembl("ensembl",dataset_name,mirror=ENS_MIRROR)
+
+    att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
+    att_struct = c('cds_length','transcript_length')
+    att_valid = intersect(c(att_gene,att_struct),listAttributes(Ma)[,1])
+
+    if(!missing(Fi) && !missing(Va)){
+      Q=getBM(attributes=att_valid, mart=Ma, filters = Fi,  values = Va, uniqueRows = T, bmHeader = F) %>%
+        group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
+      return(Q)
+    }else{
+      Q=getBM(attributes=att_valid, mart=Ma, uniqueRows = T, filters="", values="", bmHeader = F) %>%
+        group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
+      return(Q)
+    }
+  },
+  error=function(cond) {
+    cat(sprintf('Failed to retrieve transcript length for current species: %s!\n',ORG))
+    message(cond)
+    return(NULL)
+  },
+  finally={
+    if(verbose){
+      cat(sprintf('done [%s]\n',COUNTER))
+      elapsed=(proc.time()-t0)['elapsed']
+      if(elapsed>5){ tictoc::toc() }
+    }
+  }
+  )
+  return(out)
+}
+
 
 ##### NCBI Taxonomy #####
 find_ncbi_lineage = function(){
