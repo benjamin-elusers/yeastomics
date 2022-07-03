@@ -1054,7 +1054,7 @@ select_variable = function(fitted_data=fit0, response='.resid',
                                   format = " (:spin) :what [:bar] :percent (:current/:total # :elapsed eta: ~:eta)")
 
   TSS = var( fitted_data$LM0$model[[YCOL]] ) * (nrow(fitted_data$LM0$model)-1)
-  RSS = deviance(LM0)
+  RSS = deviance(fitted_data$LM0)
   ESS = TSS-RSS
   mu_y  = mean_(fit0$P[[YCOL]])
   #response='ER'
