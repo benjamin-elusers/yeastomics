@@ -97,18 +97,35 @@ ggsave(F1, path = here::here('plots'), scale=1,
 }
 
 #### FILTERING PREDICTORS ####
-## TARGET = ER
-fit_ER = fit_m0(orthologs,XCOL,YCOL,PREDICTORS,ZCOL,IDCOLS)
-P_evo_all = select_variable(fit_ER,response = Y_RESID, min_ess = 0, min_ess_frac = 0)
-#sum(P_evo$pc_ess_var > 1e-2 & P_evo$pc_ess0 > 1e-2)
+SC_PREDICTORS = PREDICTORS %>% filter(ORF %in% orthologs$ORF)
 
-P_evo = P_evo_all %>% dplyr::filter(pc_ess  > 1 )
-evo_pred = fit_ER$P[,c(XCOL, YCOL, Y_RESID, ZCOL, P_evo$variable)]
-n_evo = n_distinct(P_evo$variable)
+## TARGET = ER
+fit_ER = fit_m0(orthologs,XCOL,YCOL,SC_PREDICTORS,ZCOL,IDCOLS)
+sc_evo_all = select_variable(fit_ER,response = Y_RESID, raw = T)#min_ess = 0, min_ess_frac = 0)
+saveRDS(sc_evo_all,here("output","sc-all-lm-evo.rds"))
+# Most explicative variables for evolution
+sc_evo = sc_evo_all %>%
+  dplyr::filter(pc_ess  > 1 & !variable %in% c(XCOL,YCOL,ZCOL) &
+                !str_detect(variable,pattern = 'byrne2005') &
+                !str_detect(variable,pattern = 'peter2018.snp_') &
+                !str_detect(variable,pattern = 'paxdb.ortho') &
+                !str_detect(variable,pattern = 'brar2012') &
+                !str_detect(variable,pattern = 'barton2010')
+  )
+
+dim(sc_evo)
+
+sc_evo_pred = fit_ER$P[,c(XCOL, YCOL, Y_RESID, ZCOL, sc_evo$variable)]
+n_sc_evo = n_distinct(sc_evo$variable)
 
 ## TARGET = MPC
 fit_EXP = fit_m0(orthologs,YCOL,XCOL,PREDICTORS,ZCOL,IDCOLS,MAX_YCOR = 0.6)
-P_mpc = select_variable(fit_EXP,response = XCOL, min_ess = 2, min_ess_frac = 2)
+sc_mpc_all = select_variable(fit_EXP,response = XCOL, min_ess = 2, min_ess_frac = 2)
+saveRDS(sc_mpc_all,here("output","sc-all-lm-mpc.rds"))
+# Most explicative variables for abundance
+P_mpc = P_mpc_all %>% dplyr::filter(pc_ess  > 2 )
+dim(P_mpc)
+
 mpc_pred = fit_EXP$P[,c(XCOL, YCOL, Y_RESID, ZCOL, P_mpc$variable)]
 n_mpc  = n_distinct(P_mpc$variable)
 
@@ -129,19 +146,31 @@ pheatmap::pheatmap( cor_mpc_pred  )
 set.seed(01052022)
 #### STEPWISE REGRESSION ####
 formula_null_ER = reformulate(response=YCOL,termlabels = "1",intercept = T)
-LM1_ER = lm(data=evo_pred, formula_null)
-decompose_variance(LM1_ER)
+LM_ER = lm(data=sc_evo_pred, formula_null)
+decompose_variance(LM_ER)
 
-formula_best_ER=paste0(YCOL," ~ ",paste0( P_evo$variable,collapse=" + "))
-m_best_ER = step(object=LM1_ER, scope = as.formula(formula_best_ER), direction = 'forward',k=log(n_evo)*2,trace = -1)
-formula_best_ppm_ER=paste0(YCOL," ~ ", XCOL," + ",paste0(P_evo$variable,collapse=" + "))
-m_best_ppm_ER = step(object=LM1_ER, scope = as.formula(formula_best_ppm_ER), direction = 'forward', k=log(n_evo)*2,trace = -1)
-formula_best_snp_ER=paste0(YCOL," ~ ",ZCOL," + ",paste0( P_evo$variable,collapse=" + "))
-m_best_snp_ER = step(object=LM1_ER, scope = as.formula(formula_best_snp_ER), direction = 'forward',k=log(n_evo)*2,na.action=na.omit,trace = -1)
+#formula_best_ER=paste0(YCOL," ~ ",paste0( P_evo$variable,collapse=" + "))
+formula_sc_best_ER=reformulate(response = YCOL, termlabels = sc_evo$variable)
+m_best_ER = step(object=LM_ER, scope = as.formula(formula_sc_best_ER), direction = 'forward',k=log(n_sc_evo)*2,trace=0)
 
-decompose_variance(m_best_ER)
-decompose_variance(m_best_ppm_ER)
-decompose_variance(m_best_snp_ER)
+formula_sc_best_ppm_ER=reformulate(response = YCOL, termlabels = c(XCOL,sc_evo$variable))
+#formula_best_ppm_ER=paste0(YCOL," ~ ", XCOL," + ",paste0(P_evo$variable,collapse=" + "))
+m_best_ppm_ER = step(object=LM_ER, scope = formula_sc_best_ppm_ER, direction = 'forward', k=log(n_sc_evo+1)*2,trace=0)
+
+formula_sc_best_snp_ER=reformulate(response = YCOL, termlabels = c(ZCOL,sc_evo$variable))
+#formula_best_snp_ER=paste0(YCOL," ~ ",ZCOL," + ",paste0( P_evo$variable,collapse=" + "))
+m_best_snp_ER = step(object=LM_ER, scope = formula_sc_best_snp_ER, direction = 'forward',k=log(n_sc_evo+1)*2,na.action=na.omit,trace=0)
+
+bind_rows(
+  decompose_variance(m_best_ER,T),
+  decompose_variance(m_best_ppm_ER,T),
+  decompose_variance(m_best_snp_ER,T)
+)
+
+sc_best_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),data=sc_evo_pred)
+print(labels(m_best_ER))
+decompose_variance(sc_best_lm,to.df = T)
+
 
 #### ELASTIC NET (LASSO/RIDGE) REGRESSION ####
 library(glmnet)
