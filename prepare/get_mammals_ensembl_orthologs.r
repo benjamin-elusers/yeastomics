@@ -115,7 +115,8 @@ hs_uniref = get.uniprot.proteome('9606',DNA = T,fulldesc = T) %>% names
 ensp_uniref = hs_uniref %>% str_extract(ENSEMBL.nomenclature()) %>% na.omit() %>% as.vector
 n_distinct(ensp_uniref)
 ensg_hgnc = load.hgnc(with_protein = T,all_fields = T) %>% drop_na(ensg) %>% pull(ensg)
-hs_tx = get_ensembl_tx(ENSG = ensg_hgnc, ENSP = ensp_uniref)
+hs_tx = get_ensembl_tx(ENSG = ensg_hgnc, ENSP = ensp_uniref) %>%
+        dplyr::rename_with(.cols = ends_with('_len'), .fn = Pxx, 'hs', s='_')
 
 
 # 4. Query Ensembl biomart for human orthologuous proteins in mammals ----------
@@ -128,15 +129,16 @@ ens_hs_orthologs = get_ens_filter_ortho() # species with human orthologs data
 hs_mammals = left_join(ens_mammals_info,ens_hs_orthologs, by=c('organism'='org')) %>%
              dplyr::rename(filter = name, ens_dataset = sp)
 
-HS_QUERY = read_rds("/data/benjamin/Orthologs/results-query-ens-hs_ortho.rds")
-
 #hs_ali = list.files("/data/benjamin/Evolution/HUMAN/fasta", pattern = '\\.mu',full.names = T)
 #file.rename(hs_ali, hs_ali %>% str_replace('\\.mu','\\.fasta'))
-
 att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide',
                 'canonical_transcript_protein','subtype',
                 'perc_id','perc_id_r1','goc_score',
                 'wga_coverage','orthology_confidence')
+
+hs_cols = c('ensg','enst','ensp',"is_enspref","has_ensp","is_canonical","canonical",
+            "hs_gene_len","hs_transcript_len", 'hs_cds_len',
+            "has_introns","n_transcripts","n_proteins","n_exons","n_exons_mini")
 
 HS_QUERY = list()
 for( f in 1:nrow(hs_mammals) ){
@@ -145,10 +147,16 @@ for( f in 1:nrow(hs_mammals) ){
   sp =  hs_mammals$ens_dataset[f]
   sp_att = sprintf("%s_homolog_%s",sp,att_species)
 
+  if( org == "Human"){
+    message('Skip homo sapiens (human) for orthologs...')
+    next;
+  }
+
   QORTHO = tryCatch({
+      id_hs = c('ensg','enst','ensp')
       Q1.0 = query_ens_ortho(species = 'hsapiens',ortho=sp,COUNTER=f) %>% as_tibble() %>%
              dplyr::rename(ensg=ensembl_gene_id,ensp=ensembl_peptide_id,enst=ensembl_transcript_id) %>%
-             filter(!no_orthologs)
+             filter(!no_ortholog)
 
       col_ortho_conf = grep('orthology_confidence',sp_att,v=T)
       Q1.1 = Q1.0[ Q1.0[[col_ortho_conf]] == 1,]
@@ -156,22 +164,35 @@ for( f in 1:nrow(hs_mammals) ){
 
       col_ortho_prot = grep('homolog_ensembl_peptide',colnames(Q1.1),v=T)
       sp_txlen = query_ens_txlen(Sp = sp,ORG=org,COUNTER = f,verbose=F) %>%
-                 filter(ensembl_peptide_id != "" & !is.na(ensembl_peptide_id))
+                 filter(ensembl_peptide_id != "" & !is.na(ensembl_peptide_id)) %>%
+                 dplyr::rename(ensg=ensembl_gene_id, enst=ensembl_transcript_id, ensp=ensembl_peptide_id) %>%
+                 dplyr::rename_with(.cols=!ends_with('length'), .fn = Pxx, sp, s='_') %>%
+                 dplyr::rename(cds_len_ortho=cds_length, tx_len_ortho = transcript_length)
       if( is.null(sp_txlen) ){ next }
 
-      id_hs = c('ensg','enst','ensp')
-      id_ortho = set_names(c('ensembl_gene_id','ensembl_peptide_id'),sp_att[c(1,3)])
+      id_ortho = set_names(paste0(sp,"_",id_hs[c(1,3)]),sp_att[c(1,3)])
       Q1.2 = inner_join(Q1.1,hs_tx, by=id_hs) %>%
-             inner_join(sp_txlen,by=id_ortho,suffix=c('',".ortho")) %>%
-              dplyr::rename(cds_len.ortho=cds_length,transcript_len.ortho=transcript_length) %>%
-              as_tibble() %>% distinct()
-
+             inner_join(sp_txlen,by=id_ortho) %>%
+             as_tibble() %>% distinct()
       message("--> keep orthologs with cds closest in length")
+
+      col_pid = str_subset(colnames(Q1.2),'perc_id$')
+      col_canonical = str_subset(colnames(Q1.2),'canonical_transcript_protein')
+
       Q1.3 = Q1.2 %>%
-             filter(!is.na(cds_len-cds_len.ortho)) %>%
+             dplyr::filter(!is.na(hs_cds_len-cds_len_ortho)) %>%
              group_by(ensg,enst,ensp) %>%
-             mutate(cds_diff = abs(cds_len - cds_len.ortho)) %>%
-              dplyr::filter( cds_diff == min(cds_diff))
+             mutate(cds_diff = abs(hs_cds_len - cds_len_ortho)) %>%
+             mutate(tx_diff = abs(hs_transcript_len - tx_len_ortho)) %>%
+             dplyr::filter( cds_diff == min(cds_diff)) %>%
+             # in case there are >2 orthologs for a human protein, pick the one with the highest pid
+             group_by(ensp) %>% dplyr::filter( .data[[col_pid]] == max_(.data[[col_pid]]) ) %>%
+             dplyr::filter( tx_diff == min(tx_diff) ) %>%
+             relocate(all_of(hs_cols)) %>%
+             dplyr::rename(cds_len=cds_len_ortho,tx_len=tx_len_ortho) %>%
+             dplyr::rename_with(.cols = !starts_with(sp) & -any_of(hs_cols), .fn = Pxx, sp, s='_' ) %>%
+             ungroup() %>% distinct()
+
       count_ens_id(Q1.3)
       Q1.3
   },
@@ -184,5 +205,81 @@ for( f in 1:nrow(hs_mammals) ){
   saveRDS(QORTHO,here::here('output','ens_hs_ortho',paste0(f,'-',sp,'-',orgname,'.rds')))
   HS_QUERY[[sp]] = QORTHO
 }
-saveRDS(HS_QUERY,ere::here('output','ens_hs_ortho','hs_mammals_ortho.rds'))
+
+
+# Save all ensembl queries to get human-mammals orthologs
+saveRDS(HS_QUERY,here::here('output','ens_hs_ortho','hs_mammals_ortho.rds'))
+HS_QUERY = read_rds(here::here('output','ens_hs_ortho','hs_mammals_ortho.rds'))
+
+# 5. Combine orthologs data of human-to-mammals  --------------------------
+#HS_MAMMALS = HS_QUERY
+#HS_MAMMALS
+
+HS_MAMMALS = hs_mammals %>%
+             dplyr::filter( !is.na(ens_dataset) ) %>%
+             group_by(ens_dataset) %>%
+             mutate(
+               n_orthologs = n_distinct(HS_QUERY[[ens_dataset]][,c('ensp',paste0(ens_dataset,"_homolog_ensembl_peptide"))]),
+               qq_pid = toString( round(quantile(x=HS_QUERY[[ens_dataset]][paste0(ens_dataset,"_homolog_perc_id")],c(0.01,0.05,0.25,0.75,0.95,0.99),na.rm=T),1) ),
+               md_pid = median_(HS_QUERY[[ens_dataset]][paste0(ens_dataset,"_homolog_perc_id")]),
+               md_cds_diff = median_(HS_QUERY[[ens_dataset]] %>% dplyr::select(contains("cds_diff")))
+               ) %>%
+            mutate(f_orthologs = n_orthologs/n_protein_coding, n_uniprot = n_swissprot+n_trembl) %>%
+            arrange(n_orthologs)
+
+mammals = seq_along(HS_QUERY)
+mammals_sp = names(HS_QUERY)
+mammals_pep = paste0( names(HS_QUERY), '_homolog_ensembl_peptide')
+HS_ORTHO = hs_tx
+id_hs = c('ensg','enst','ensp')
+
+for( s in mammals ){ #
+  sp = mammals_sp[s]
+  cat(sprintf("%3s %-20s\n",s,sp))
+  col_ortho_pep = mammals_pep[s]
+  count_ens_id( HS_QUERY[[s]] )
+  HS_ORTHO = left_join(HS_ORTHO, HS_QUERY[[s]] , by=colnames(hs_tx) ) %>%
+             dplyr::select(-contains(c('goc_score','wga_coverage','no_ortholog','_homolog_ensembl_gene'))) %>%
+             distinct()
+  print(dim(HS_ORTHO))
+}
+
+dim(HS_ORTHO)
+head(HS_ORTHO)
+colnames(HS_ORTHO)
+
+HS_ORTHO %>%
+  group_by(all_of(id_hs)) %>% mutate( tx_diff = hs_transcript_len - .data[[mspretus_tx_len]])
+  filter( !is.na() )
+
+# group_by(ensp,.data[[col_ortho_pep]]) %>%
+#   mutate(one2one= n() == 1) %>%
+#   dplyr::filter(one2one)
+
+hs_ortho_count = HS_ORTHO %>%
+  group_by(ensg,enst,ensp) %>%
+  mutate(n_ortholog = sum(!is.na(c_across(ends_with('homolog_ensembl_peptide')))))
+#saveRDS(hs_ortho_count,here("output",'hs_ortho_count.rds'))
+quantile(hs_ortho_count$n_ortholog)
+
+test = hs_ortho_count %>%
+        dplyr::select(1:15, c("ensembl_transcript_id","one2one","no_ortholog",'n_ortholog'),
+                      c("cds_len.ortho","transcript_len.ortho","cds_diff"),
+                      ends_with('_homolog_ensembl_peptide')) %>%
+        filter(n_ortholog == max(n_ortholog)) %>%
+        ungroup() %>% dplyr::filter(!is.na(ensg) & !is.dup(ensp) )
+table(test$n_ortholog)
+
+na_rows=find_na_rows(max_ortho,as.indices = T)
+ortho_prefix = max_ortho %>%
+  ungroup() %>%
+  dplyr::filter(!row_number() %in% na_rows) %>%
+  dplyr::select(ends_with('homolog_ensembl_peptide')) %>%
+  summarise( unique(across(everything(),function(x){str_extract(x,'^[^0-9]+') })) ) %>%
+  bind_rows %>%
+  pivot_longer(cols=everything(),names_to='sp_col',values_to='sp_peptide_ens_prefix') %>%
+  mutate(ens_sp = str_replace(sp_col,'_homolog_ensembl_peptide',''))
+
+
+
 
