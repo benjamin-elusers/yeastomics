@@ -131,6 +131,23 @@ hs_pepstats = load.dubreuil2019.data(8) %>%
               dplyr::filter(UP.prot_len > 50) %>%
               mutate(PEPSTATS.AA_costly = PEPSTATS.mean_MW > 118, PEPSTATS.AA_cheap=PEPSTATS.mean_MW <= 105)
 
+IUP_cols = c("L.IUP20" = 'IUP20_L',"L.IUP30" = 'IUP30_L',"L.IUP40" = 'IUP40_L',
+             "f.IUP20" = 'IUP20_f',"f.IUP30" = 'IUP30_f',"f.IUP40" = 'IUP40_f')
+subset_cols = c('standard'='iupred_standard','medium'='iupred_medium','high'='iupred_high',
+                'average'='uniprot_average','large'='uniprot_long')
+hs_dubreuil = load.dubreuil2019.data(8) %>%
+         dplyr::select('UNIPROT',
+                      contains('IUP'),
+                      ends_with(c('dom','iup40')),
+                      c('standard','medium','high','small','average','large'),
+                      ) %>%
+         dplyr::rename(set_names(names(IUP_cols),IUP_cols),
+                        set_names(names(subset_cols),subset_cols)) %>%
+         dplyr::rename_with(.cols= ends_with(c('.dom','.iup40')), .fn = str_replace_all, "\\.", "_" ) %>%
+         dplyr::rename_with(.cols=-UNIPROT, .fn = Pxx, 'dubreuil2019', s='.')
+
+
+
 ### Amino-acid interactions propensities
 # fullsti = tibble( uni=AA.COUNT$id,
 #                   uniprot.sti_full = AACOUNT2SCORE(COUNT=AA.COUNT[,1:20],SCORE=get.stickiness()) )
@@ -160,11 +177,13 @@ hs_pfam=load.pfam(tax = 9606) %>%
 #summary(pf_ol)
 #pf_ol %>% filter( seq_id %in% pf_ol$seq_id[pf_ol$overlap & pf_ol$no_overlap])
 
-hs_pfam_count = hs_pfam %>% group_by(seq_id) %>%
-             summarize( pfam.HMM_none=pfam.ndom==0,
-                        pfam.HMM_single=pfam.ndom==1,
-                        pfam.HMM_pair=pfam.ndom==2,
-                        pfam.HMM_multi=pfam.ndom>=3)%>% distinct()
+hs_pfam_count = left_join(hs_ref,hs_pfam, by=c('AC'='seq_id')) %>%
+             group_by(AC) %>%
+             summarize( pfam.HMM_none= is.na(pfam.ndom) | pfam.ndom==0,
+                        pfam.HMM_single= !is.na(pfam.ndom) & pfam.ndom==1,
+                        pfam.HMM_pair= !is.na(pfam.ndom) & pfam.ndom==2,
+                        pfam.HMM_multi=!is.na(pfam.ndom) & pfam.ndom>=3) %>% distinct()
+
 hs_pfam_dom = pivot_wider(hs_pfam %>% mutate(pfam_val=T), id_cols=seq_id,
                           names_from = 'hmm_name',names_prefix = 'pfam.dom_',
                           values_from = 'pfam_val', values_fill = F, values_fn = sum ) %>%
@@ -177,7 +196,9 @@ hs_pfam_clan = pivot_wider(hs_pfam %>% mutate(pfam_val=T), id_cols=seq_id,
               mutate(across(where(is.integer), as.logical)) %>%
               dplyr::select(seq_id,where(~ is.logical(.x) && sum(.x) >9 ))%>% distinct()
 
-HS_PFAM = left_join(hs_pfam_count,hs_pfam_dom) %>% left_join(hs_pfam_clan) %>% distinct()
+HS_PFAM = left_join(hs_pfam_count,hs_pfam_dom,by=c('AC'='seq_id')) %>%
+          left_join(hs_pfam_clan,by=c('AC'='seq_id')) %>%
+          distinct()
 
 hs_supfam=load.superfamily(tax = 'hs') %>%
           dplyr::rename(seqid = "sequence_id") %>%
@@ -186,11 +207,11 @@ hs_supfam=load.superfamily(tax = 'hs') %>%
           group_by(seqid) %>% mutate(superfamily.ndom=n_distinct(superfamily_id)) %>%
           add_count(superfamily_id,name="pfam.repeat")
 
-hs_supfam_count = hs_supfam %>% group_by(seqid) %>%
-                 summarize(superfamily.supfam_none=superfamily.ndom==0,
-                 superfamily.supfam_single=superfamily.ndom==1,
-                 superfamily.supfam_pair=superfamily.ndom==2,
-                 superfamily.supfam_multi =superfamily.ndom>=3)
+hs_supfam_count = left_join(hs_ref,hs_supfam, by=c('AC'='seqid')) %>% group_by(AC) %>%
+                 summarize(superfamily.supfam_none= is.na(superfamily.ndom) | superfamily.ndom==0 ,
+                 superfamily.supfam_single= !is.na(superfamily.ndom) & superfamily.ndom==1,
+                 superfamily.supfam_pair= !is.na(superfamily.ndom) & superfamily.ndom==2,
+                 superfamily.supfam_multi = !is.na(superfamily.ndom) & superfamily.ndom>=3)
 hs_superfamilies = pivot_wider(hs_supfam %>% mutate(supfam_val=T), id_cols=seqid,
                           names_from = 'superfamily_description',names_prefix = 'superfamily.SF_',
                           values_from = 'supfam_val', values_fill = F, values_fn = sum ) %>%
@@ -204,7 +225,9 @@ hs_families = pivot_wider(hs_supfam %>% mutate(supfam_val=T), id_cols=seqid,
   dplyr::select(seqid,where(~ is.logical(.x) && sum(.x) >9 ))%>% distinct()
 
 
-HS_SUPFAM = left_join(hs_supfam_count,hs_superfamilies) %>% left_join(hs_families) %>% distinct()
+HS_SUPFAM = left_join(hs_supfam_count,hs_superfamilies,by=c('AC'='seqid')) %>%
+            left_join(hs_families,by=c('AC'='seqid')) %>%
+            distinct()
 
 
 # Folding energy and stability -------------------------------------------------
@@ -288,8 +311,26 @@ hs_string_centralities$superhub_func = between(hs_string_centralities$cent_deg,1
 hs_string_centralities = hs_string_centralities %>% type_convert() %>%
   dplyr::rename_with(.cols = -ids, .fn = str_replace_all, pattern='string.',replacement="") %>%
   dplyr::rename_with(-ids,.fn=Pxx, 'STRING')
-#Biological pathways -----------------------------------------------------------
 
+# Biological functions (GO) ----------------------------------------------------
+
+UNIGO = get.uniprot.go(hs_uniref,taxon = 9606)  # Uniprot-based GO annotation
+hs_unigo = UNIGO %>%
+  mutate( go = paste0(ONTOLOGY,"_", str_replace_all(goterm,pattern="[^A-Za-z0-9\\.]+","_"))) %>%
+  filter(!obsolete & shared > 10 & ONTOLOGY != "CC") %>%
+  arrange(go)
+
+# Convert to a matrix format (columns = GO term, rows=proteome)
+HS_UNIGO  = hs_unigo %>%  mutate(seen=1) %>%
+           pivot_wider( id_cols = c('UNIPROT'), names_from = 'go', values_from = 'seen',
+               values_fn=list(seen = sum),values_fill = list(seen=0)) %>%
+           dplyr::rename_with(.cols = -UNIPROT,.fn = Pxx, 'go.', s='')
+
+go =  split(unigo$UNIPROT,unigo$go)
+names(go) = paste0("go.", make_clean_names(names(go),case='none') )
+
+
+# Biological pathways (KEGG) ---------------------------------------------------
 human_pathways.rds = here('output','hs-kegg-pathways.rds')
 hs_pathways=preload(human_pathways.rds,
                     get.KEGG(sp='hsa',type='pathway',as.df=T,to_uniprot = T)) %>%
@@ -324,6 +365,7 @@ dim(HS_CODING)
 colnames(HS_CODING)
 dim(HS_COUNT)
 dim(hs_CU)
+dim(hs_dubreuil)
 dim(hs_pepstats)
 dim(HS_PFAM)
 dim(hs_d2p2)
@@ -336,6 +378,7 @@ dim(HS_COMPLEX)
 
 HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
   left_join(hs_CU,by=c('uniprot'='ID')) %>%
+  left_join(hs_dubreuil,by=c('uniprot'='UNIPROT')) %>%
   left_join(hs_pepstats,by=c('uniprot'='UNIPROT','UP.prot_len')) %>%
   left_join(HS_PFAM,by=c('uniprot'='seq_id')) %>%
   left_join(hs_d2p2,by=c('uniprot')) %>%
@@ -582,12 +625,15 @@ spearman.toplot(fit0$P$ER,fit0$P$PPM)
 
 # Filter Dataset for prediction --------------------------------------------------
 hs_evo_all= select_variable(fit0,response='.resid', raw=T)
-saveRDS(hs_evo_all,here("output","hs-all-lm-evo.rds"))
+saveRDS(hs_evo_all,here("output","lm-evo-hs.rds"))
 
+hs_best= hs_evo_all %>% filter(pc_ess > 0.1 & variable != YCOL)
 hs_best= hs_evo_all %>% filter(pc_ess > 0.5 & variable != YCOL)
+hs_best= hs_evo_all %>% filter(pc_ess > 1 & variable != YCOL)
+
+
 hs_best_pred = fit0$P[,c(XCOL, YCOL, '.resid', ZCOL, hs_best$variable)]
 hs_nbest = n_distinct(hs_best$variable)
-
 
 formula_null = reformulate(response=YCOL,termlabels = "1",intercept = T)
 LM_ER = lm(data=hs_best_pred, formula_null)
@@ -597,10 +643,35 @@ decompose_variance(LM_ER)
 formula_hs_best = reformulate(hs_best$variable, response =  '.resid')
 
 m_best_ER = step(object=LM_ER, scope = as.formula(formula_hs_best), direction = 'forward',k=log(hs_nbest)*2,trace=0)
+decompose_variance(m_best_ER,to.df = T)
 
 hs_best_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),data=hs_best_pred)
-print(labels(m_best_ER))
+print(labels(hs_best_lm))
 decompose_variance(hs_best_lm,to.df = T)
+
+## Validate
+hs_valid = left_join(hs_validation,HS_ER,by=c('uniprot'='id')) %>%
+  filter(!is.na(uniprot) & !is.dup(uniprot)) %>%
+  distinct()
+
+LM_validation_ER = lm(data=hs_valid, formula_null)
+decompose_variance(LM_validation_ER,to.df = T)
+
+hs_validation_lm = lm(reformulate(response = YCOL, termlabels = labels(hs_best_lm)),data=hs_valid)
+print(labels(hs_validation_lm))
+print(coefficients(hs_validation_lm)[is.na(coefficients(hs_validation_lm))])
+
+decompose_variance(hs_validation_lm,to.df = T)
+
+
+sc_evo_var = readRDS(here::here('output','sc_features_ess_over_0.5.rds'))
+library(stringdist)
+sim_var = stringsimmatrix(sc_evo_var,colnames(HS_LMDATA), method='jw',p=0.1,useNames='strings')
+maxS= apply(sim_var,1,max_)
+i_maxS= apply(sim_var,1,which.max)
+matched = tibble(sc_var=rownames(sim_var), hs_var = colnames(sim_var)[i_maxS], similarity=maxS)
+
+write_delim(matched,here::here('output','sc-hs-features.tsv'),delim = '\t')
 
 
 # Additional datasets (human specific) ------------------------------------
