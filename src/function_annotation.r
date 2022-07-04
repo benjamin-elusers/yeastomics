@@ -86,17 +86,25 @@ get.uniprot.pmid = function(uniprot) {
   return(pmid)
 }
 
-get.uniprot.go = function(uniprot) {
+get.uniprot.go = function(uniprot,taxon=4932) {
   library(DBI)
   library(AnnotationDbi)
   library(org.Sc.sgd.db)
+  library(org.Hs.eg.db)
   library(dplyr)
   library(tidyr)
   library(GO.db)
-  go = AnnotationDbi::select(x = org.Sc.sgd.db,
+  if(taxon==4932){
+    go = AnnotationDbi::select(x = org.Sc.sgd.db,
                              columns = c('GO', 'ONTOLOGY', 'EVIDENCE'),
-                             keys = uniprot, keytype = 'UNIPROT'
-  ) %>%
+                             keys = uniprot, keytype = 'UNIPROT')
+  }else if(taxon == 9606){
+    go = AnnotationDbi::select(x = org.Hs.eg.db,
+                               columns = c('GO', 'ONTOLOGY', 'EVIDENCE'),
+                               keys = uniprot, keytype = 'UNIPROT')
+  }
+
+  go = go %>%
     mutate(obsolete = GO %in% keys(GOOBSOLETE)) %>%
     filter(!obsolete & !is.na(GO)) %>%
     mutate(goterm = Term(GO), onto=ONTOLOGY) %>% arrange(UNIPROT,GO) %>%
