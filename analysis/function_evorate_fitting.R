@@ -399,7 +399,7 @@ retrieve_missing_centrality = function(orf_missing,type='string',taxon=4932){
   centrality_low.rds = here::here('data',paste0(taxon,'-',type,'-low_stringency_centrality.rds'))
   centrality_low = preload(saved.file = centrality_low.rds,
                             loading.call = {
-                              cent=interactions %>%
+                              interactions %>%
                               #filter(ORF1 %in% orf_missing | ORF2 %in% orf_missing) %>%
                               dplyr::select(protein1,protein2) %>%
                               network.centrality(fromTo = ., namenet = toupper(type)) %>%
