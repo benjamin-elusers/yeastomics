@@ -1852,7 +1852,7 @@ load.uniprot.proteome = function(species='yeast') { # Older version of get.unipr
   return(UNI)
 }
 
-query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=500){
+query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=500, todf=T){
   .org=''
   .accession=''
   if(missing(uniprot) & missing(taxon) ){ stop('Requires a list of uniprot or a taxon id...')  }
@@ -1891,6 +1891,17 @@ query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=500){
 
   subloc = df_subloc  %>% dplyr::filter(!is.na(SUBCELLULAR_LOCATION)) %>% deframe()
   uni.loc = parse.uniprot.subcellular_locations(subloc)
+
+  if( todf ){
+    uni.isloc  = uni.loc %>%  mutate(seen=1) %>%
+      pivot_wider( id_cols = c('id','HAS_FOCI','HAS_ISOFORM'),
+                   names_from = 'loc', values_from = 'seen',
+                   values_fn=list(seen = sum),values_fill = list(seen=0))
+    return(uni.isloc)
+  }
+  return(uni.loc)
+}
+
   return(uni.loc)
 }
 

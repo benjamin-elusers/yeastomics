@@ -168,9 +168,7 @@ hs_pfam=load.pfam(tax = 9606) %>%
 
 #dup_dom = hs_pfam %>% filter(duplicated(seq_id,hmm_acc)) %>% pull(seq_id)
 # pfam_dup = hs_pfam %>% filter(is.dup(seq_id)) %>% arrange(seq_id,alignment_start,alignment_end)
-# pf_ol_list = pbmcapply::pbmclapply(X= unique(pfam_dup$seq_id),
-#                               FUN = calculate_pfam_overlap,
-#                              pf=pfam_dup, verbose=F,
+# pf_ol_list = pbmcapply::pbmclapply(X= unique(pfam_dup$seq_id),FUN = calculate_pfam_overlap,  pf=pfam_dup, verbose=F,
 #                               mc.cores =  14)
 #
 # pf_ol = pf_ol_list %>% bind_rows()
@@ -245,7 +243,6 @@ hs_stab = load.leuenberger2017.data("Human HeLa Cells",rawdata = F) %>%
                         leuenberger2017.LIP_measured_domains,
                         leuenberger2017.LIP_theoretical_number_of_domain,
                         leuenberger2017.LIP_nres))
-
 
 hs_tm = load.jarzab2020.data(org = "H.sapiens") %>%
         dplyr::select(UNIPROT,GENENAME,Tm_celsius,Tm_type,AUC) %>%
@@ -326,8 +323,19 @@ HS_UNIGO  = hs_unigo %>%  mutate(seen=1) %>%
                values_fn=list(seen = sum),values_fill = list(seen=0)) %>%
            dplyr::rename_with(.cols = -UNIPROT,.fn = Pxx, 'go.', s='')
 
-go =  split(unigo$UNIPROT,unigo$go)
-names(go) = paste0("go.", make_clean_names(names(go),case='none') )
+
+file.uniprot.feature=here("data","hs-uniprot-features.rds")
+UNI = preload(file.uniprot.feature,loading.call = load.uniprot.features(9606),"Load uniprot features")
+UNILOC = get.uniprot.localization(annot=UNI,loc_to_columns = T) # as a wide dataframe
+THR.LOC.SIZE = 50 # MINIMUM NUMBER OF PROTEINS PER COMPARTMENT
+LOC.size = sort(colSums(UNILOC[,-c(1:3)]))
+LOC50 = sort( names( LOC.size[LOC.size>THR.LOC.SIZE] ) )
+
+PHENOTYPES$uniprot.phase_separate = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
+PHENOTYPES$uniprot.isoform  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
+loc = split(uniloc$id,uniloc$loc)
+subloc = keep(loc,function(X){ length(X)>NMINI })
+names(subloc) = paste0("uniprot.loc_", make_clean_names(names(subloc),case='none',))
 
 
 # Biological pathways (KEGG) ---------------------------------------------------
@@ -364,25 +372,27 @@ hs_orthologs = unique(hs_r4s$id)
 dim(HS_CODING)
 colnames(HS_CODING)
 dim(HS_COUNT)
+dim(HS_PFAM)
+dim(HS_SUPFAM)
 dim(hs_CU)
 dim(hs_dubreuil)
 dim(hs_pepstats)
-dim(HS_PFAM)
 dim(hs_d2p2)
+dim(HS_UNIGO)
 dim(hs_string_centralities)
-dim(HS_SUPFAM)
 dim(HS_KEGG)
 dim(HS_FOLD)
 dim(HS_COMPLEX)
 
 
 HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
+  left_join(HS_PFAM,by=c('uniprot'='AC')) %>%
+  left_join(HS_SUPFAM,by=c('ensp'='AC')) %>%
   left_join(hs_CU,by=c('uniprot'='ID')) %>%
   left_join(hs_dubreuil,by=c('uniprot'='UNIPROT')) %>%
   left_join(hs_pepstats,by=c('uniprot'='UNIPROT','UP.prot_len')) %>%
-  left_join(HS_PFAM,by=c('uniprot'='seq_id')) %>%
   left_join(hs_d2p2,by=c('uniprot')) %>%
-  left_join(HS_SUPFAM,by=c('ensp'='seqid')) %>%
+  left_join(HS_UNIGO,by=c('uniprot'='UNIPROT')) %>%
   left_join(hs_string_centralities,by=c('ensp'='ids')) %>%
   left_join(HS_KEGG,by=c('uniprot'='id')) %>%
   left_join(HS_FOLD,by=c('uniprot'='UNIPROT')) %>%
