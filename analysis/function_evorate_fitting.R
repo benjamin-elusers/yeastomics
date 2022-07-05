@@ -407,7 +407,7 @@ retrieve_missing_centrality = function(orf_missing,type='string',taxon=4932){
                             },
                             doing = 'retrieving centrality with min score 700')
 
-  return(cent)
+  return(centrality_low)
 }
 
 fix_missing_centrality = function(df,id='ORF',col_prefix='cat_interactions.string.',taxon=4932){
