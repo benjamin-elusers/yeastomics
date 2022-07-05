@@ -72,7 +72,6 @@ HS_CODING = left_join(hs_ref,hs_transcript, by='ensg', suffix=c('','_canonical')
             dplyr::rename_with(all_of(ens_col),.fn = Pxx, 'ENS')
 
 # Codons -----------------------------------------------------------------------
-#hs_codons = read_delim("/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/codonR/CODON-COUNTS/9606_hs-uniprot.ffn")
 library(coRdon)
 codon_table = get_codon_table()
 hs_codon = bind_cols(uniprot=names(hs_cdna),hs_codon_freq) %>%
@@ -104,6 +103,7 @@ hs_aa_class = AACLASS.FR %>% purrr::reduce(full_join,by='id') %>%
 
 HS_COUNT = left_join(hs_aa,hs_aa_class) %>% left_join(hs_codon,by=c('id'='uniprot')) %>%
             dplyr::rename(uniprot=id) %>% relocate(uniprot)
+
 # Conservation -----------------------------------------------------------------
 #hs_r4s = load.evorate(resdir = "/data/benjamin/Evolution/HUMAN",ref = NULL,ext.r4s = '.r4s')
 hs_r4s = read_rds(here("data","RESIDUE-EVORATE-HUMAN.rds")) %>% group_by(id) %>%
@@ -114,8 +114,6 @@ hs_r4s = read_rds(here("data","RESIDUE-EVORATE-HUMAN.rds")) %>% group_by(id) %>%
                        rate_norm = abs(2*min_(r4s_rate)) + mean_(r4s_rate)) %>%
              dplyr::filter(!is.na(rate)) %>%
              dplyr::rename_with(-id, .fn = Pxx, 'r4s_mammals')
-
-
 #plot(density(x = hs_r4s_prot$r4s_mammals))
 
 # Disorder ---------------------------------------------------------------------
@@ -124,17 +122,19 @@ hs_d2p2 =  read_rds(here("data","d2p2-human-uniprotKB.rds")) %>%
             summarize.d2p2() %>%
             mutate(uniprot = str_extract(d2p2.id, UNIPROT.nomenclature())) %>%
             dplyr::select(-d2p2.id)
-
+# Peptide stats ----------------------------------------------------------------
 hs_pepstats = load.dubreuil2019.data(8) %>%
               dplyr::select(UNIPROT,PEPSTATS.netcharge=netcharge,PEPSTATS.mw=MW,PEPSTATS.pI=pI,UP.prot_len=prot.size) %>%
               group_by(UNIPROT) %>% mutate(PEPSTATS.mean_MW = PEPSTATS.mw/UP.prot_len) %>%
               dplyr::filter(UP.prot_len > 50) %>%
               mutate(PEPSTATS.AA_costly = PEPSTATS.mean_MW > 118, PEPSTATS.AA_cheap=PEPSTATS.mean_MW <= 105)
 
+# Dubreuil et al 2019 (Disorder/Stickiness) ------------------------------------
 IUP_cols = c("L.IUP20" = 'IUP20_L',"L.IUP30" = 'IUP30_L',"L.IUP40" = 'IUP40_L',
              "f.IUP20" = 'IUP20_f',"f.IUP30" = 'IUP30_f',"f.IUP40" = 'IUP40_f')
 subset_cols = c('standard'='iupred_standard','medium'='iupred_medium','high'='iupred_high',
                 'average'='uniprot_average','large'='uniprot_long')
+fullsti = tibble( UNIPROT=hs_aa_count$id, UP.sti_full = AACOUNT2SCORE(COUNT=hs_aa_count[,1:20],SCORE=get.stickiness()) )
 hs_dubreuil = load.dubreuil2019.data(8) %>%
          dplyr::select('UNIPROT',
                       contains('IUP'),
@@ -144,20 +144,8 @@ hs_dubreuil = load.dubreuil2019.data(8) %>%
          dplyr::rename(set_names(names(IUP_cols),IUP_cols),
                         set_names(names(subset_cols),subset_cols)) %>%
          dplyr::rename_with(.cols= ends_with(c('.dom','.iup40')), .fn = str_replace_all, "\\.", "_" ) %>%
+         left_join(fullsti,by=c('UNIPROT')) %>%
          dplyr::rename_with(.cols=-UNIPROT, .fn = Pxx, 'dubreuil2019', s='.')
-
-
-
-### Amino-acid interactions propensities
-# fullsti = tibble( uni=AA.COUNT$id,
-#                   uniprot.sti_full = AACOUNT2SCORE(COUNT=AA.COUNT[,1:20],SCORE=get.stickiness()) )
-# df.aascales = DUB %>%
-#   mutate(has_iup = !is.na(L.IUP20) | !is.na(L.IUP30) | !is.na(L.IUP40),
-#          has_dom = !is.na(L.domain) ) %>%
-#   dplyr::filter(has_iup | has_dom) %>%
-#   dplyr::select(UNIPROT,ends_with(c('.dom','.iup20'),ignore.case = F)) %>%
-#   rename_with(.fn=str_replace, pattern="(.+)\\.(.+)",replacement = 'dubreuil2019.\\1_\\2') %>%
-#   left_join(fullsti,by=c('UNIPROT'='uni'))
 
 # Domains ----------------------------------------------------------------------
 hs_pfam=load.pfam(tax = 9606) %>%
@@ -222,11 +210,9 @@ hs_families = pivot_wider(hs_supfam %>% mutate(supfam_val=T), id_cols=seqid,
   mutate(across(where(is.integer), as.logical)) %>%
   dplyr::select(seqid,where(~ is.logical(.x) && sum(.x) >9 ))%>% distinct()
 
-
 HS_SUPFAM = left_join(hs_supfam_count,hs_superfamilies,by=c('AC'='seqid')) %>%
             left_join(hs_families,by=c('AC'='seqid')) %>%
             distinct()
-
 
 # Folding energy and stability -------------------------------------------------
 hs_stab = load.leuenberger2017.data("Human HeLa Cells",rawdata = F) %>%
@@ -236,13 +222,9 @@ hs_stab = load.leuenberger2017.data("Human HeLa Cells",rawdata = F) %>%
                   Tm_stable = protinfo=="Stable",
                   Tm_medium = protinfo=="Medium",
                   Tm_unstable = protinfo=="Unstable") %>%
-          rename_with(.fn=Pxx, px='leuenberger2017.LIP',s='_',.cols=-protein_id) %>%
-          dplyr::select(-c(leuenberger2017.LIP_protinfo,
-                        leuenberger2017.LIP_protein_coverage,
-                        leuenberger2017.LIP_length,
-                        leuenberger2017.LIP_measured_domains,
-                        leuenberger2017.LIP_theoretical_number_of_domain,
-                        leuenberger2017.LIP_nres))
+          dplyr::select(-c(protinfo,protein_coverage,length,
+                           measured_domains,theoretical_number_of_domain,nres)) %>%
+          rename_with(.fn=Pxx, px='leuenberger2017.LIP',s='_',.cols=-protein_id)
 
 hs_tm = load.jarzab2020.data(org = "H.sapiens") %>%
         dplyr::select(UNIPROT,GENENAME,Tm_celsius,Tm_type,AUC) %>%
@@ -310,11 +292,10 @@ hs_string_centralities = hs_string_centralities %>% type_convert() %>%
   dplyr::rename_with(-ids,.fn=Pxx, 'STRING')
 
 # Biological functions (GO) ----------------------------------------------------
-UNIGO = get.uniprot.go(hs_uniref,taxon = 9606)  # Uniprot-based GO annotation
-hs_unigo = UNIGO %>%
-  mutate( go = paste0(ONTOLOGY,"_", str_replace_all(goterm,pattern="[^A-Za-z0-9\\.]+","_"))) %>%
-  filter(!obsolete & shared > 10 & ONTOLOGY != "CC") %>%
-  arrange(go)
+hs_unigo = get.uniprot.go(hs_uniref,taxon = 9606) %>%  # Uniprot-based GO annotation
+        mutate( go = paste0(ONTOLOGY,"_", str_replace_all(goterm,pattern="[^A-Za-z0-9\\.]+","_"))) %>%
+        filter(!obsolete & shared > 10 & ONTOLOGY != "CC") %>%
+        arrange(go)
 
 # Convert to a matrix format (columns = GO term, rows=proteome)
 HS_UNIGO  = hs_unigo %>%  mutate(seen=1) %>%
@@ -322,9 +303,8 @@ HS_UNIGO  = hs_unigo %>%  mutate(seen=1) %>%
                values_fn=list(seen = sum),values_fill = list(seen=0)) %>%
            dplyr::rename_with(.cols = -UNIPROT,.fn = Pxx, 'go.', s='')
 
-
 # Subcellular locations (Uniprot) ----------------------------------------------
-UNILOC = query_uniprot_subloc(uniprot = hs_uniref,todf=T) # as a wide dataframe
+hs_uniloc = query_uniprot_subloc(uniprot = hs_uniref,todf=T) # as a wide dataframe
 HS_UNILOC = UNILOC %>%
             group_by(id) %>%
             dplyr::select(id, where(~is.numeric(.x) && sum(.x) >50 ) ) %>%
