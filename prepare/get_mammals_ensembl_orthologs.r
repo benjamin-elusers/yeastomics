@@ -105,7 +105,7 @@ MAMMALS = ggtree(ens_mammals_tree,ladderize = T,right = T,branch.length = 'none'
   scale_color_metro_d() + theme(legend.position = 'none')
 ggsave(MAMMALS, filename='~/Desktop/MAMMALS_TREE.pdf', scale=2.5)
 
-# 3. Retrieve reference genome/transcriptome/proteome from ensembl -------------
+# 3. retrieve reference genome/transcriptome/proteome from ensembl -------------
 
 # Get reference identifiers (Uniprot/ENSP = proteome, ENSG = Genome, ENST=Transcriptome)
 hs_uniref = get.uniprot.proteome('9606',DNA = T,fulldesc = T) %>% names
@@ -116,7 +116,7 @@ hs_tx = get_ensembl_tx(ENSG = ensg_hgnc, ENSP = ensp_uniref) %>%
         dplyr::rename_with(.cols = ends_with('_len'), .fn = Pxx, 'hs', s='_')
 
 
-# 4. Query Ensembl biomart for human orthologuous proteins in mammals ----------
+# 4. query Ensembl biomart for human orthologuous proteins in mammals ----------
 library(biomaRt)
 ENS_MIRROR='uswest' # if asia fails
 ens=useEnsembl('ensembl',mirror = ENS_MIRROR)
@@ -212,7 +212,7 @@ for( f in 1:nrow(hs_mammals) ){
 saveRDS(HS_QUERY,here::here('output','ens_hs_ortho','hs_mammals_ortho.rds'))
 HS_QUERY = read_rds(here::here('output','ens_hs_ortho','hs_mammals_ortho.rds'))
 
-# 5. Combine orthologs data of human-to-mammals  --------------------------
+# 5. combine orthologs data of human-to-mammals  -------------------------------
 HS_MAMMALS = hs_mammals %>%
              dplyr::filter( !is.na(ens_dataset) ) %>%
              group_by(ens_dataset) %>%
@@ -244,12 +244,15 @@ for( s in mammals ){ #
 #dim(HS_ORTHO)
 #colnames(HS_ORTHO)
 
+# 6. get 1-to-1 orthologs human ------------------------------------------------
 hs_ortho_1to1 = HS_ORTHO %>%
   dplyr::filter(!is.na(ensg) & !is.dup(ensp) ) %>%
   group_by(ensg,enst,ensp) %>%
   mutate(n_ortholog = sum(!is.na(c_across(ends_with('homolog_ensembl_peptide'))))) %>%
   filter(n_ortholog == max(n_ortholog) & n_ortholog != 0 ) %>%
-  dplyr::select( all_of(colnames(hs_tx)), 'n_ortholog',ends_with('_homolog_ensembl_peptide'))
+  dplyr::select( all_of(colnames(hs_tx)), 'n_ortholog',ends_with('_homolog_ensembl_peptide')) %>%
+  ungroup()
+
 dim(hs_ortho_1to1)
 quantile(hs_ortho_1to1$n_ortholog)
 
@@ -260,17 +263,26 @@ ggplot(count_hs_ortho ) +
   geom_line(aes(x=1:41,y=cumsum(n_ortholog)/sum(n_ortholog)),col='red') +
   xlab('# orthologuous proteins to human among 41 species from eutherian mammals')
 
+# 7. Download ortholog fasta sequences and prepare orthogroups alignments ------
+ortho_prefix = hs_ortho_1to1 %>%
+               dplyr::select(ends_with('homolog_ensembl_peptide')) %>%
+               drop_na() %>%
+               summarise( unique(across(everything(),function(x){str_extract(x,'^[^0-9]+') })) ) %>%
+               distinct() %>%
+               pivot_longer(cols=everything(),names_to='sp_col',values_to='sp_peptide_ens_prefix') %>%
+               mutate(ens_sp = str_replace(sp_col,'_homolog_ensembl_peptide',''))
 
-na_rows=find_na_rows(hs_ortho_1to1,as.indices = T)
-ortho_prefix = max_ortho %>%
-  ungroup() %>%
-  dplyr::filter(!row_number() %in% na_rows) %>%
-  dplyr::select(ends_with('homolog_ensembl_peptide')) %>%
-  summarise( unique(across(everything(),function(x){str_extract(x,'^[^0-9]+') })) ) %>%
-  bind_rows %>%
-  pivot_longer(cols=everything(),names_to='sp_col',values_to='sp_peptide_ens_prefix') %>%
-  mutate(ens_sp = str_replace(sp_col,'_homolog_ensembl_peptide',''))
-
-
+hs_ortho_1to1 %>% dplyr::select(ends_with('homolog_ensembl_peptide'))
 
 
+mammals_seq = list()
+for( m in 1:nrow(ortho_prefix)){
+  sp = ortho_prefix$ens_sp[m]
+  id_col =ortho_prefix$sp_col[m]
+  ids = hs_ortho_1to1[[id_col]] %>% na.omit() %>% as.vector()
+
+  mart <- useEnsembl("ensembl", dataset=paste0(sp,"_gene_ensembl"),mirror = ENS_MIRROR)
+  fasta_ortho = getSequence(id = ids, type = "ensembl_peptide_id", seqType = "peptide", mart = mart)
+  fasta_ortho$ensembl_peptide_id
+  test = Biostrings::AAString(fasta_ortho$ensembl_peptide_id )
+  mammals_seq[[m]] = fasta_ortho
