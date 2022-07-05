@@ -105,10 +105,7 @@ MAMMALS = ggtree(ens_mammals_tree,ladderize = T,right = T,branch.length = 'none'
   scale_color_metro_d() + theme(legend.position = 'none')
 ggsave(MAMMALS, filename='~/Desktop/MAMMALS_TREE.pdf', scale=2.5)
 
-
-
 # 3. Retrieve reference genome/transcriptome/proteome from ensembl -------------
-
 
 # Get reference identifiers (Uniprot/ENSP = proteome, ENSG = Genome, ENST=Transcriptome)
 hs_uniref = get.uniprot.proteome('9606',DNA = T,fulldesc = T) %>% names
@@ -216,9 +213,6 @@ saveRDS(HS_QUERY,here::here('output','ens_hs_ortho','hs_mammals_ortho.rds'))
 HS_QUERY = read_rds(here::here('output','ens_hs_ortho','hs_mammals_ortho.rds'))
 
 # 5. Combine orthologs data of human-to-mammals  --------------------------
-#HS_MAMMALS = HS_QUERY
-#HS_MAMMALS
-
 HS_MAMMALS = hs_mammals %>%
              dplyr::filter( !is.na(ens_dataset) ) %>%
              group_by(ens_dataset) %>%
@@ -236,7 +230,6 @@ mammals_sp = names(HS_QUERY)
 mammals_pep = paste0( names(HS_QUERY), '_homolog_ensembl_peptide')
 HS_ORTHO = hs_tx
 id_hs = c('ensg','enst','ensp')
-
 for( s in mammals ){ #
   sp = mammals_sp[s]
   cat(sprintf("%3s %-20s\n",s,sp))
@@ -255,24 +248,20 @@ hs_ortho_1to1 = HS_ORTHO %>%
   dplyr::filter(!is.na(ensg) & !is.dup(ensp) ) %>%
   group_by(ensg,enst,ensp) %>%
   mutate(n_ortholog = sum(!is.na(c_across(ends_with('homolog_ensembl_peptide'))))) %>%
-  filter(n_ortholog == max(n_ortholog)) %>%
+  filter(n_ortholog == max(n_ortholog) & n_ortholog != 0 ) %>%
   dplyr::select( all_of(colnames(hs_tx)), 'n_ortholog',ends_with('_homolog_ensembl_peptide'))
 dim(hs_ortho_1to1)
-
-quantile(hs_ortho_count$n_ortholog)
+quantile(hs_ortho_1to1$n_ortholog)
 
 library(ggplot2)
-
-ggplot(hs_ortho_1to1) +
-  geom_bar(aes(x=n_ortholog)) +
-  geom_line(aes(x=1:41,y=cumsum(n_ortholog))) +
+count_hs_ortho = hs_ortho_1to1 %>% group_by(n_ortholog) %>% summarize(total=n())
+ggplot(count_hs_ortho ) +
+  geom_col(aes(y=total,x=n_ortholog)) +
+  geom_line(aes(x=1:41,y=cumsum(n_ortholog)/sum(n_ortholog)),col='red') +
   xlab('# orthologuous proteins to human among 41 species from eutherian mammals')
-barplot( table(hs_ortho_count$n_ortholog), las=2,
-         title = )
 
-###saveRDS(hs_ortho_count,here("output",'hs_ortho_count.rds'))
 
-na_rows=find_na_rows(max_ortho,as.indices = T)
+na_rows=find_na_rows(hs_ortho_1to1,as.indices = T)
 ortho_prefix = max_ortho %>%
   ungroup() %>%
   dplyr::filter(!row_number() %in% na_rows) %>%
