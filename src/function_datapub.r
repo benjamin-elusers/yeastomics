@@ -1855,8 +1855,9 @@ load.uniprot.proteome = function(species='yeast') { # Older version of get.unipr
 query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=500, todf=T){
   .org=''
   .accession=''
-  if( missing(taxon) ){ stop('Query requires  a taxon id (also accepts an optional list of uniprot)...')  }
-  if(missing(uniprot) & !missing(taxon)){
+  if( missing(taxon) ){
+    stop('Query requires  a taxon id (also accepts an optional list of uniprot)...')
+  }else if(missing(uniprot) & !missing(taxon)){
     uniprot = get.uniprot.proteome(taxon,DNA=F) %>% names %>% unique
     .org = paste0('organism_id:',taxon,'&')
     message(sprintf('Using the uniprot acession from taxon %s \n',taxon))
@@ -1881,7 +1882,7 @@ query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=500, todf=T){
     uni_subloc = pbmcapply::pbmclapply(X=1:n_queries, FUN=prepare_url_query,  mc.cores=ncores, mc.silent=F, mc.cleanup = T)
   }else{
     message("NOT PARALLEL! This may take a while (>20mn)")
-    uni_subloc = lapply(1:n_queries, prepare_url_query, debug=T)
+    uni_subloc = lapply(1:n_queries, prepare_url_query, debug=F)
   }
   tictoc::toc()
 
@@ -1899,9 +1900,6 @@ query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=500, todf=T){
                    values_fn=list(seen = sum),values_fill = list(seen=0))
     return(uni.isloc)
   }
-  return(uni.loc)
-}
-
   return(uni.loc)
 }
 
