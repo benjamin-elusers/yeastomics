@@ -103,6 +103,7 @@ SC_PREDICTORS = PREDICTORS %>% filter(ORF %in% orthologs$ORF)
 fit_ER = fit_m0(orthologs,XCOL,YCOL,SC_PREDICTORS,ZCOL,IDCOLS)
 sc_evo_all = select_variable(fit_ER,response = Y_RESID, raw = T)#min_ess = 0, min_ess_frac = 0)
 saveRDS(sc_evo_all,here("output","sc-all-lm-evo.rds"))
+
 # Most explicative variables for evolution
 sc_evo = sc_evo_all %>%
   dplyr::filter(pc_ess  > 1 & !variable %in% c(XCOL,YCOL,ZCOL) &
@@ -114,6 +115,11 @@ sc_evo = sc_evo_all %>%
   )
 
 dim(sc_evo)
+
+sc_evo = sc_evo_all %>%
+  dplyr::filter(pc_ess  > 0.5 & !variable %in% c(XCOL,YCOL,ZCOL)  )
+
+saveRDS(sc_evo$var,file = here::here('output','sc_features_ess_over_0.5.rds'))
 
 sc_evo_pred = fit_ER$P[,c(XCOL, YCOL, Y_RESID, ZCOL, sc_evo$variable)]
 n_sc_evo = n_distinct(sc_evo$variable)
@@ -171,6 +177,10 @@ sc_best_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),dat
 print(labels(m_best_ER))
 decompose_variance(sc_best_lm,to.df = T)
 
+
+sc_validation_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),data=validation)
+print(labels(sc_validation_lm))
+decompose_variance(sc_validation_lm,to.df = T)
 
 #### ELASTIC NET (LASSO/RIDGE) REGRESSION ####
 library(glmnet)

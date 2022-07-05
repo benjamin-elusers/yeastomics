@@ -298,17 +298,18 @@ hs_unigo = get.uniprot.go(hs_uniref,taxon = 9606) %>%  # Uniprot-based GO annota
         arrange(go)
 
 # Convert to a matrix format (columns = GO term, rows=proteome)
-HS_UNIGO  = hs_unigo %>%  mutate(seen=1) %>%
+HS_UNIGO  = hs_unigo %>%  mutate(seen=T) %>%
            pivot_wider( id_cols = c('UNIPROT'), names_from = 'go', values_from = 'seen',
-               values_fn=list(seen = sum),values_fill = list(seen=0)) %>%
+               values_fn=list(seen = unique),values_fill = list(seen=F)) %>%
            dplyr::rename_with(.cols = -UNIPROT,.fn = Pxx, 'go.', s='')
 
 # Subcellular locations (Uniprot) ----------------------------------------------
 hs_uniloc = query_uniprot_subloc(uniprot = hs_uniref,todf=T) # as a wide dataframe
-HS_UNILOC = UNILOC %>%
+HS_UNILOC = hs_uniloc %>%
             group_by(id) %>%
             dplyr::select(id, where(~is.numeric(.x) && sum(.x) >50 ) ) %>%
-            dplyr::rename_with(-id,.fn=Pxx, 'UP.loc', s='_')
+            dplyr::rename_with(-id,.fn=Pxx, 'UP.loc', s='_') %>%
+            mutate( across(.cols=everything(),.fns= as.logical))
 
 # Biological pathways (KEGG) ---------------------------------------------------
 human_pathways.rds = here('output','hs-kegg-pathways.rds')
@@ -369,16 +370,15 @@ HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
   left_join(hs_string_centralities,by=c('ensp'='ids')) %>%
   left_join(HS_KEGG,by=c('uniprot'='id')) %>%
   left_join(HS_FOLD,by=c('uniprot'='UNIPROT')) %>%
-#  left_join(hs_stab,by=c('uniprot'='protein_id')) %>%
   left_join(HS_COMPLEX,by=c('uniprot')) %>%
   left_join(hs_r4s,by=c('uniprot'='id')) %>%
   ungroup %>%
   distinct() #%>%
   #relocate(uniprot,UP.is_uniref,ensg,ensp,gname, GENENAME, gene_biotype)
 
-
 # Replace missing values  ------------------------------------------------------
 miss0 = check_missing_var(HS_DATA)
+
 
 #### 1. Fix logical variables (NA replaced by FALSE) ####
 HS_FEATURES.1 = HS_DATA %>%
@@ -389,6 +389,9 @@ HS_FEATURES.1 = HS_DATA %>%
   mutate( across( where(is.logical) & starts_with('meldal2019.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('jarzab2020.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('leuenberger2017.LIP'), ~replace_na(., F)) ) %>%
+  mutate( across( where(is.logical) & starts_with('go.MF'), ~replace_na(., F)) ) %>%
+  mutate( across( where(is.logical) & starts_with('go.BP'), ~replace_na(., F)) ) %>%
+  mutate( across( where(is.logical) & starts_with('UP.loc'), ~replace_na(., F)) ) %>%
   #mutate( across( where(is.logical) & starts_with('paxdb.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('ENS.'), ~replace_na(., F)) ) %>%
   mutate( ENS.canonical = fct_explicit_na(ENS.canonical,'ensp') ) %>%
@@ -402,7 +405,6 @@ miss1 = check_missing_var(HS_FEATURES.1)
 
 #### 2. Remove rare variables  (less than 2 occurrences in proteome) ####
 HS_FEATURES.2 = remove_rare_vars(df=HS_FEATURES.1,min_obs=2)
-
 miss2 = check_missing_var(HS_FEATURES.2)
 
 #### 3. Fix network centrality (lower confidence + random forest) ####

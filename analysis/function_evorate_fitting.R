@@ -396,11 +396,17 @@ get_centrality_col = function(df,col_prefix="cat_interactions.string."){
 
 retrieve_missing_centrality = function(orf_missing,type='string',taxon=4932){
   interactions=load.network(type,taxon)
-  cent=interactions %>%
-        #filter(ORF1 %in% orf_missing | ORF2 %in% orf_missing) %>%
-        dplyr::select(protein1,protein2) %>%
-        network.centrality(fromTo = ., namenet = toupper(type)) %>%
-        filter(ids %in% orf_missing)
+  centrality_low.rds = here::here('data',paste0(taxon,'-',type,-'low_stringency_centrality.rds'))
+  centrality_low = preload(saved.file = centrality_low.rds,
+                            loading.call = {
+                              cent=interactions %>%
+                              #filter(ORF1 %in% orf_missing | ORF2 %in% orf_missing) %>%
+                              dplyr::select(protein1,protein2) %>%
+                              network.centrality(fromTo = ., namenet = toupper(type)) %>%
+                              filter(ids %in% orf_missing)
+                            },
+                            doing = 'retrieving centrality with min score 700')
+
   return(cent)
 }
 
