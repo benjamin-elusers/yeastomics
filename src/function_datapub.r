@@ -1852,6 +1852,47 @@ load.uniprot.proteome = function(species='yeast') { # Older version of get.unipr
   return(UNI)
 }
 
+query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=500){
+  .org=''
+  .accession=''
+  if(missing(uniprot) & missing(taxon) ){ stop('Requires a list of uniprot or a taxon id...')  }
+  if(missing(uniprot) & !missing(taxon)){
+    uniprot = get.uniprot.proteome(taxon,DNA=F) %>% names %>% unique
+    .org = paste0('organism_id:',taxon,'&')
+    message(sprintf('Using the uniprot acession from taxon %s \n',taxon))
+  }
+
+  n_uni = n_distinct(uniprot)
+  n_queries = ceiling(n_uni / MAX_QUERY)
+
+  UNIPROT_REST = "https://rest.uniprot.org/uniprotkb/search?query="
+  tictoc::tic()
+  message(sprintf("Retrieving subcellular locations from a list of uniprot (n=%s)...",n_uni))
+  if (require('pbmcapply')) {
+    ncores=parallelly::availableCores(which='max')-1
+    message(sprintf("using 'pbmcapply' in parallel with %s cpus",ncores))
+    prepare_url_query = function(q,debug=F){
+      num = seq((q-1)*MAX_QUERY+1,len=MAX_QUERY)
+      .accession = paste0('accession:',str_c(uniprot[num],collapse=','),"&")
+      url_query = sprintf('%s%s%sfields=accession,cc_subcellular_location&size=%s&format=tsv',UNIPROT_REST,.org,.accession,MAX_QUERY)
+      if(debug){ print(url_query)}
+      return(read_delim(url_query,delim = '\t'))
+    }
+    uni_subloc = pbmcapply::pbmclapply(X=1:n_queries, FUN=prepare_url_query,  mc.cores=ncores, mc.silent=F, mc.cleanup = T)
+  }else{
+    message("NOT PARALLEL! This may take a while (>20mn)")
+    uni_subloc = lapply(1:n_queries, prepare_url_query, debug=F)
+  }
+  tictoc::toc()
+
+  df_subloc = uni_subloc %>%
+    bind_rows() %>%
+    dplyr::rename('UNIPROT'='Entry','SUBCELLULAR_LOCATION'='Subcellular location [CC]')
+
+  subloc = df_subloc  %>% dplyr::filter(!is.na(SUBCELLULAR_LOCATION)) %>% deframe()
+  uni.loc = parse.uniprot.subcellular_locations(subloc)
+  return(uni.loc)
+}
 
 ##### Ensembl #####
 ENS_MIRROR='asia'
