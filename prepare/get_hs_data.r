@@ -310,7 +310,6 @@ hs_string_centralities = hs_string_centralities %>% type_convert() %>%
   dplyr::rename_with(-ids,.fn=Pxx, 'STRING')
 
 # Biological functions (GO) ----------------------------------------------------
-
 UNIGO = get.uniprot.go(hs_uniref,taxon = 9606)  # Uniprot-based GO annotation
 hs_unigo = UNIGO %>%
   mutate( go = paste0(ONTOLOGY,"_", str_replace_all(goterm,pattern="[^A-Za-z0-9\\.]+","_"))) %>%
@@ -324,12 +323,13 @@ HS_UNIGO  = hs_unigo %>%  mutate(seen=1) %>%
            dplyr::rename_with(.cols = -UNIPROT,.fn = Pxx, 'go.', s='')
 
 
-file.uniprot.feature=here("data","hs-uniprot-features.rds")
-UNI = preload(file.uniprot.feature,loading.call = load.uniprot.features(9606),"Load uniprot features")
-UNILOC = get.uniprot.localization(annot=UNI,loc_to_columns = T) # as a wide dataframe
+# Subcellular locations (Uniprot) ----------------------------------------------
+UNILOC = query_uniprot_subloc(uniprot = hs_uniref,todf=T) # as a wide dataframe
 THR.LOC.SIZE = 50 # MINIMUM NUMBER OF PROTEINS PER COMPARTMENT
 LOC.size = sort(colSums(UNILOC[,-c(1:3)]))
 LOC50 = sort( names( LOC.size[LOC.size>THR.LOC.SIZE] ) )
+
+dim(UNILOC)
 
 PHENOTYPES$uniprot.phase_separate = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
 PHENOTYPES$uniprot.isoform  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
