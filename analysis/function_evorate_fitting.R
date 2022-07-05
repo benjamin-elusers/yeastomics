@@ -395,11 +395,10 @@ get_centrality_col = function(df,col_prefix="cat_interactions.string."){
 }
 
 retrieve_missing_centrality = function(orf_missing,type='string',taxon=4932){
-  interactions=load.network(type,taxon)
   centrality_low.rds = here::here('data',paste0(taxon,'-',type,'-low_stringency_centrality.rds'))
   centrality_low = preload(saved.file = centrality_low.rds,
                             loading.call = {
-                              interactions %>%
+                              load.network(type,taxon) %>%
                               #filter(ORF1 %in% orf_missing | ORF2 %in% orf_missing) %>%
                               dplyr::select(protein1,protein2) %>%
                               network.centrality(fromTo = ., namenet = toupper(type)) %>%
@@ -462,6 +461,92 @@ fix_missing_paxdb = function(df){
   df_impute = coalesce_join(x = df, y=df_na_paxdb, by = 'ORF')
   return(df_impute)
 }
+
+#### 4. Disorder/Domain propensity scores ####
+retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
+  hs_regions = fetch.mobidb(uni_missing) # Took 100 sec. for 3153 uniprot identifiers
+  dom  = hs_regions %>% filter( feature == 'domain' & source == 'merge')
+  iupl = hs_regions %>% filter( feature == 'disorder' & source == 'iupl')
+  iups = hs_regions %>% filter( feature == 'disorder' & source == 'iups')
+
+  merge_iup = subsetByOverlaps( IRanges(start=iupl$S, end=iupl$E, names=iupl$acc),
+                                IRanges(start=iups$S, end=iups$E, names=iups$acc),
+                                minoverlap = 0L, maxgap=5L, type='any')
+  iupred = tibble(acc = names(merge_iup),
+                  S=start(merge_iup),
+                  E=end(merge_iup),
+                  feat_len=E-S+1 ) %>%
+    left_join(hs_regions %>% dplyr::select(acc,length)) %>% distinct()
+
+  # Preparing data for accessing feature sequences
+  ACC = iupred$acc
+  START = iupred$S %>% as.integer()
+  END = iupred$E %>% as.integer()
+  irows=1:nrow(iupred)
+
+  # pbmclapply to loop across rows of mobidb features in parallel on (n-2) cpus
+  diso_seq <- pbmcapply::pbmclapply(
+    X=irows,
+    # extract subsequence of mobidb feature from uniprot protein using positions
+    FUN = function(x){
+      SEQ = uni_seq[[ACC[x]]]
+      if(length(SEQ) == iupred$length[x]){
+        feature_seq = subseq(x=SEQ, start=START[x],end=END[x]) %>% as.character
+      }else{
+        feature_seq = ""
+      }
+    }, mc.cores = 14)
+
+  ACC = dom$acc
+  START = dom$S %>% as.integer()
+  END = dom$E %>% as.integer()
+  irows=1:nrow(dom)
+
+  dom_seq <- pbmcapply::pbmclapply(
+    X=irows,
+    # extract subsequence of mobidb feature from uniprot protein using positions
+    FUN = function(x){
+      SEQ = uni_seq[[ACC[x]]]
+      if(length(SEQ) == dom$length[x]){
+        feature_seq = subseq(x=SEQ, start=START[x],end=END[x]) %>% as.character
+      }else{
+        feature_seq = ""
+      }
+    }, mc.cores = 14)
+
+  iupred$iup_seq = unlist(diso_seq)
+  dom$dom_seq = unlist(dom_seq)
+
+
+  iseq = 1:length(diso_seq)
+  diso_score <- pbmcapply::pbmclapply(
+    X=iseq,
+    # Using subsequence of mobidb features, compute sum of residue propensities
+    FUN = function(x){ if( !is.na(diso_seq[[x]]) ){ get_aa_score(string = diso_seq[[x]]) }else{ NA } },
+    mc.cores = 14)
+  iseq = 1:length(dom_seq)
+  dom_score <- pbmcapply::pbmclapply(
+    X=iseq,
+    # Using subsequence of mobidb features, compute sum of residue propensities
+    FUN = function(x){ if( !is.na(dom_seq[[x]]) ){ get_aa_score(string = dom_seq[[x]]) }else{ NA } },
+    mc.cores = 14)
+
+  iupred_scores = iupred %>% bind_cols( bind_rows(diso_score) ) %>%
+    group_by(acc,length) %>%
+    summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
+    distinct()
+
+  dom_scores = dom %>% bind_cols( bind_rows(dom_score) ) %>%
+    group_by(acc,feature_len,length) %>%
+    summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
+    distinct()
+
+  na_aascore =  left_join(iupred_scores,dom_scores,by=c('acc'),suffix=c('_iup40','_dom')) %>%
+    dplyr::select(acc, ends_with(c('iup40','dom')), -starts_with('length')) %>% ungroup()
+  return(na_aascore)
+}
+
+
 ### WORKFLOW PROCESSING MISSING VALUES
 PROCESS_MISSING_VALUES = function(MAT, IDS, taxon=4932){
 

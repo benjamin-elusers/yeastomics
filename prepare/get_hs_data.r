@@ -134,7 +134,7 @@ IUP_cols = c("L.IUP20" = 'IUP20_L',"L.IUP30" = 'IUP30_L',"L.IUP40" = 'IUP40_L',
              "f.IUP20" = 'IUP20_f',"f.IUP30" = 'IUP30_f',"f.IUP40" = 'IUP40_f')
 subset_cols = c('standard'='iupred_standard','medium'='iupred_medium','high'='iupred_high',
                 'average'='uniprot_average','large'='uniprot_long')
-fullsti = tibble( UNIPROT=hs_aa_count$id, UP.sti_full = AACOUNT2SCORE(COUNT=hs_aa_count[,1:20],SCORE=get.stickiness()) )
+fullsti = tibble( UNIPROT=hs_aa_count$id, stickiness_full = AACOUNT2SCORE(COUNT=hs_aa_count[,1:20],SCORE=get.stickiness()) )
 hs_dubreuil = load.dubreuil2019.data(8) %>%
          dplyr::select('UNIPROT',
                       contains('IUP'),
@@ -386,6 +386,7 @@ HS_FEATURES.1 = HS_DATA %>%
   mutate( across( where(is.logical) & starts_with('pfam.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('superfamily.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('PEPSTATS.'), ~replace_na(., F)) ) %>%
+  mutate( across( where(is.logical) & starts_with('dubreuil2019.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('meldal2019.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('jarzab2020.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('leuenberger2017.LIP'), ~replace_na(., F)) ) %>%
@@ -408,7 +409,7 @@ HS_FEATURES.2 = remove_rare_vars(df=HS_FEATURES.1,min_obs=2)
 miss2 = check_missing_var(HS_FEATURES.2)
 
 #### 3. Fix network centrality (lower confidence + random forest) ####
-# Take a long time (@!30mn!@)
+# Take a long time (@! ~50mn for human !@)
 HS_FEATURES.3 = fix_missing_centrality(df=HS_FEATURES.2, id='ensp', col_prefix="STRING.", taxon=9606)
 HS_FEATURES.3 = HS_FEATURES.3 %>% mutate(across(starts_with("STRING.cent_"), .fns = min_))
 
@@ -474,20 +475,33 @@ HS_FEATURES.6 = coalesce_join(HS_FEATURES.5,uni_d2p2_nona,by=c('uniprot')) %>%
 
 miss6 = check_missing_var(HS_FEATURES.6)
 
-#### 7. Fix missing cDNA sequences ####
+save.image(here('output','checkpoint-hs-data.rdata'))
+#### 7. Fix missing amino acid propensities ####
+uni_na_aascore = HS_FEATURES.6 %>%
+                    dplyr::select(AC,starts_with('dubreuil2019')) %>%
+                    dplyr::filter(row_number() %in% find_na_rows(.,as.indices = T)) %>%
+                    pull(AC)
+na_aascore = retrieve_missing_aascore(uni_na_aascore,hs_prot)
+HS_FEATURES.7 = coalesce_join(HS_FEATURES.6,na_aascore,by=c('uniprot'='acc'))
 
-#cdna_na = HS_FEATURES.6 %>% dplyr::select( all_of(miss6$variable) )
-#missing_cdna = HS_FEATURES.6 %>% filter( is.na(UP_cdna.AAA_Lys_K) ) %>% pull(uniprot)
+miss7 = check_missing_var(HS_FEATURES.7)
+
+#### 8. Fix missing cDNA sequences ####
+
+#cdna_na = HS_FEATURES.7 %>% dplyr::select( all_of(miss7$variable) )
+#missing_cdna = HS_FEATURES.7 %>% filter( is.na(UP_cdna.AAA_Lys_K) ) %>% pull(uniprot)
 #get.uniprot.proteome(9606,DNA=T)
 
-HS_FEATURES.7 = HS_FEATURES.6 %>%
+HS_FEATURES.8 = HS_FEATURES.7 %>%
+                rowwise() %>%
+                mutate( across(.cols = ends_with('_L'), .fns = replace_na, replace=D2P2.diso_len ) ) %>%
+                mutate( across(.cols = ends_with('_f'), .fns = replace_na, replace=D2P2.diso_frac) ) %>%
                 mutate( ENS.cds_len = ifelse( is.na(ENS.cds_len) & !is.na(UP.cdna_len),UP.cdna_len,ENS.cds_len),
                         ensp = ifelse(is.na(ensp), ensp_canonical, ensp),
                         GENENAME = ifelse(is.na(GENENAME),GN,GENENAME))
-miss7 = check_missing_var(HS_FEATURES.7)
+miss8 = check_missing_var(HS_FEATURES.8 %>% ungroup)
 
-
-HS_PROTEOME_DATA = HS_FEATURES.7 %>%
+HS_PROTEOME_DATA = HS_FEATURES.8 %>%
                      # Get out the rows with NA
                      drop_na(starts_with(c('UP_cdna.','elek2022.','D2P2.','ENS.'))) %>%
                      dplyr::select(-GENENAME) %>%
