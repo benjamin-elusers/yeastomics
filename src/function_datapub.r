@@ -1854,6 +1854,8 @@ load.uniprot.proteome = function(species='yeast') { # Older version of get.unipr
 
 query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=200, todf=T){
   #.org=''
+  UNIPROT_REST = "https://rest.uniprot.org/uniprotkb/search?query="
+
   .accession=''
   if( missing(uniprot) & missing(taxon) ){
     stop('Query requires  a taxon id (also accepts an optional list of uniprot)...')
@@ -1870,22 +1872,19 @@ query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=200, todf=T){
   for(i in 1:n_queries){
     i0 = (i-1)*MAX_QUERY+1
     num = seq(i0,len=MAX_QUERY)
-    num_max = num[ num < n_uni]
-    uni_query = uniprot[num_max]
+    uni_query = uniprot[num] %>% na.omit() %>% as.vector
     .accession = paste0("%28",str_c('accession:',uni_query,collapse='+OR+'),"%29&")
     url_query = sprintf('%s%sfields=accession,cc_subcellular_location&size=%s&format=tsv',UNIPROT_REST,.accession,MAX_QUERY)
     queries[i] =url_query
   }
 
   run_uniprot_tsvquery = function(tsv_query){
-    print(tsv_query)
+    #print(tsv_query)
     query_res = read_delim(tsv_query,delim = '\t')
-    #Sys.sleep(3)
     return(query_res)
   }
 
 
-  UNIPROT_REST = "https://rest.uniprot.org/uniprotkb/search?query="
   tictoc::tic('retrieve subcellular locations from uniprotKB...')
   message(sprintf("Retrieving subcellular locations from a list of uniprot (n=%s)...",n_uni))
   if (require('pbmcapply')) {
