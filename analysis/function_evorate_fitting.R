@@ -396,7 +396,7 @@ get_centrality_col = function(df,col_prefix="cat_interactions.string."){
 
 retrieve_missing_centrality = function(orf_missing,type='string',taxon=4932){
   interactions=load.network(type,taxon)
-  centrality_low.rds = here::here('data',paste0(taxon,'-',type,-'low_stringency_centrality.rds'))
+  centrality_low.rds = here::here('data',paste0(taxon,'-',type,'-low_stringency_centrality.rds'))
   centrality_low = preload(saved.file = centrality_low.rds,
                             loading.call = {
                               cent=interactions %>%
