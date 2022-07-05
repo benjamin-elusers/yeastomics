@@ -190,6 +190,8 @@ for( f in 1:nrow(hs_mammals) ){
              group_by(ensp) %>% dplyr::filter( .data[[col_pid]] == max_(.data[[col_pid]]) ) %>%
              # in case there are >2 orthologs for a human protein, pick the one with the gene name
              dplyr::filter( .data[[col_gname]] != "" ) %>%
+             # in case there are >2 orthologs for a human protein, pick the one with closest transcript length
+             dplyr::filter( tx_diff == min(tx_diff) ) %>%
              relocate(all_of(hs_cols)) %>%
              dplyr::rename(cds_len=cds_len_ortho,tx_len=tx_len_ortho) %>%
              dplyr::rename_with(.cols = !starts_with(sp) & -any_of(hs_cols), .fn = Pxx, sp, s='_' ) %>%
