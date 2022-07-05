@@ -176,6 +176,7 @@ for( f in 1:nrow(hs_mammals) ){
              as_tibble() %>% distinct()
       message("--> keep orthologs with cds closest in length")
 
+      col_gname = str_subset(colnames(Q1.2),'homolog_associated_gene_name$')
       col_pid = str_subset(colnames(Q1.2),'perc_id$')
       col_canonical = str_subset(colnames(Q1.2),'canonical_transcript_protein')
 
@@ -187,7 +188,8 @@ for( f in 1:nrow(hs_mammals) ){
              dplyr::filter( cds_diff == min(cds_diff)) %>%
              # in case there are >2 orthologs for a human protein, pick the one with the highest pid
              group_by(ensp) %>% dplyr::filter( .data[[col_pid]] == max_(.data[[col_pid]]) ) %>%
-             dplyr::filter( tx_diff == min(tx_diff) ) %>%
+             # in case there are >2 orthologs for a human protein, pick the one with the gene name
+             dplyr::filter( .data[[col_gname]] != "" ) %>%
              relocate(all_of(hs_cols)) %>%
              dplyr::rename(cds_len=cds_len_ortho,tx_len=tx_len_ortho) %>%
              dplyr::rename_with(.cols = !starts_with(sp) & -any_of(hs_cols), .fn = Pxx, sp, s='_' ) %>%
@@ -244,31 +246,29 @@ for( s in mammals ){ #
   print(dim(HS_ORTHO))
 }
 
-dim(HS_ORTHO)
-head(HS_ORTHO)
-colnames(HS_ORTHO)
+#dim(HS_ORTHO)
+#colnames(HS_ORTHO)
 
-HS_ORTHO %>%
-  group_by(all_of(id_hs)) %>% mutate( tx_diff = hs_transcript_len - .data[[mspretus_tx_len]])
-  filter( !is.na() )
-
-# group_by(ensp,.data[[col_ortho_pep]]) %>%
-#   mutate(one2one= n() == 1) %>%
-#   dplyr::filter(one2one)
-
-hs_ortho_count = HS_ORTHO %>%
+hs_ortho_1to1 = HS_ORTHO %>%
+  dplyr::filter(!is.na(ensg) & !is.dup(ensp) ) %>%
   group_by(ensg,enst,ensp) %>%
-  mutate(n_ortholog = sum(!is.na(c_across(ends_with('homolog_ensembl_peptide')))))
-#saveRDS(hs_ortho_count,here("output",'hs_ortho_count.rds'))
+  mutate(n_ortholog = sum(!is.na(c_across(ends_with('homolog_ensembl_peptide'))))) %>%
+  filter(n_ortholog == max(n_ortholog)) %>%
+  dplyr::select( all_of(colnames(hs_tx)), 'n_ortholog',ends_with('_homolog_ensembl_peptide'))
+dim(hs_ortho_1to1)
+
 quantile(hs_ortho_count$n_ortholog)
 
-test = hs_ortho_count %>%
-        dplyr::select(1:15, c("ensembl_transcript_id","one2one","no_ortholog",'n_ortholog'),
-                      c("cds_len.ortho","transcript_len.ortho","cds_diff"),
-                      ends_with('_homolog_ensembl_peptide')) %>%
-        filter(n_ortholog == max(n_ortholog)) %>%
-        ungroup() %>% dplyr::filter(!is.na(ensg) & !is.dup(ensp) )
-table(test$n_ortholog)
+library(ggplot2)
+
+ggplot(hs_ortho_1to1) +
+  geom_bar(aes(x=n_ortholog)) +
+  geom_line(aes(x=1:41,y=cumsum(n_ortholog))) +
+  xlab('# orthologuous proteins to human among 41 species from eutherian mammals')
+barplot( table(hs_ortho_count$n_ortholog), las=2,
+         title = )
+
+###saveRDS(hs_ortho_count,here("output",'hs_ortho_count.rds'))
 
 na_rows=find_na_rows(max_ortho,as.indices = T)
 ortho_prefix = max_ortho %>%
