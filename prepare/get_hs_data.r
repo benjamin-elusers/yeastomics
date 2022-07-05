@@ -325,18 +325,10 @@ HS_UNIGO  = hs_unigo %>%  mutate(seen=1) %>%
 
 # Subcellular locations (Uniprot) ----------------------------------------------
 UNILOC = query_uniprot_subloc(uniprot = hs_uniref,todf=T) # as a wide dataframe
-THR.LOC.SIZE = 50 # MINIMUM NUMBER OF PROTEINS PER COMPARTMENT
-LOC.size = sort(colSums(UNILOC[,-c(1:3)]))
-LOC50 = sort( names( LOC.size[LOC.size>THR.LOC.SIZE] ) )
-
-dim(UNILOC)
-
-PHENOTYPES$uniprot.phase_separate = UNILOC %>% filter(HAS_FOCI) %>% pull(id)
-PHENOTYPES$uniprot.isoform  = UNILOC %>% filter(HAS_ISOFORM) %>% pull(id)
-loc = split(uniloc$id,uniloc$loc)
-subloc = keep(loc,function(X){ length(X)>NMINI })
-names(subloc) = paste0("uniprot.loc_", make_clean_names(names(subloc),case='none',))
-
+HS_UNILOC = UNILOC %>%
+            group_by(id) %>%
+            dplyr::select(id, where(~is.numeric(.x) && sum(.x) >50 ) ) %>%
+            dplyr::rename_with(-id,.fn=Pxx, 'UP.loc', s='_')
 
 # Biological pathways (KEGG) ---------------------------------------------------
 human_pathways.rds = here('output','hs-kegg-pathways.rds')
@@ -379,11 +371,11 @@ dim(hs_dubreuil)
 dim(hs_pepstats)
 dim(hs_d2p2)
 dim(HS_UNIGO)
+dim(HS_UNILOC)
 dim(hs_string_centralities)
 dim(HS_KEGG)
 dim(HS_FOLD)
 dim(HS_COMPLEX)
-
 
 HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
   left_join(HS_PFAM,by=c('uniprot'='AC')) %>%
@@ -393,6 +385,7 @@ HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
   left_join(hs_pepstats,by=c('uniprot'='UNIPROT','UP.prot_len')) %>%
   left_join(hs_d2p2,by=c('uniprot')) %>%
   left_join(HS_UNIGO,by=c('uniprot'='UNIPROT')) %>%
+  left_join(HS_UNILOC,by=c('uniprot'='id')) %>%
   left_join(hs_string_centralities,by=c('ensp'='ids')) %>%
   left_join(HS_KEGG,by=c('uniprot'='id')) %>%
   left_join(HS_FOLD,by=c('uniprot'='UNIPROT')) %>%
