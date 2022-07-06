@@ -477,7 +477,7 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
     left_join(hs_regions %>% dplyr::select(acc,length,)) %>% distinct() %>%
     group_by(acc) %>% mutate(content_count = sum(feature_len))
 
-  #rm(hs_regions,iupl,iups);gc();
+  rm(hs_regions,iupl,iups);gc();
 
   # Preparing data for accessing feature sequences
   ACC = iupred$acc
@@ -541,7 +541,7 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
 
   iseq = 1:length(uni_seq)
   full_score <- pbmcapply::pbmclapply(
-    X=iseq,  FUN = function(x){ get_aa_score(string = uni_seq[[x]]) },
+    X=iseq,  FUN = function(x){ get_aa_score(string = as.character(uni_seq[[x]]) ) },
     mc.cores = 14,mc.cleanup = T)
   full_scores = tibble(acc=uni_missing, length=widths(uni_seq)) %>% bind_cols(bind_rows(full_score)) %>%
                 group_by(acc,length) %>%
