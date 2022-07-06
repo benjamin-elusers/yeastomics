@@ -134,16 +134,18 @@ IUP_cols = c("L.IUP20" = 'IUP20_L',"L.IUP30" = 'IUP30_L',"L.IUP40" = 'IUP40_L',
              "f.IUP20" = 'IUP20_f',"f.IUP30" = 'IUP30_f',"f.IUP40" = 'IUP40_f')
 subset_cols = c('standard'='iupred_standard','medium'='iupred_medium','high'='iupred_high',
                 'average'='uniprot_average','large'='uniprot_long')
+
 iseq = 1:length(hs_prot)
 full_score <- pbmcapply::pbmclapply(
-  X=iseq,  FUN = function(x){ get_aa_score(string = hs_prot[[x]]) },
+  X=iseq,  FUN = function(x){ get_aa_score(string = as.character(hs_prot[[x]]) ) },
   mc.cores = 14,mc.cleanup = T)
-hs_fullscore = tibble(acc=hs_uniref, length=widths(hs_prot)) %>%
+
+hs_fullscore = tibble(uniprot=hs_uniref, length=widths(hs_prot)) %>%
                 bind_cols(bind_rows(full_score)) %>%
-                group_by(acc,length) %>%
+                group_by(uniprot,length) %>%
                 summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
                 distinct() %>%
-                dplyr::rename_with(.cols = -c(acc,length), .fn = xxS, 'full',s='_' )
+                dplyr::rename_with(.cols = -c(uniprot,length), .fn = xxS, 'full',s='_' )
 
 
 hs_dubreuil = load.dubreuil2019.data(8) %>%
@@ -155,7 +157,7 @@ hs_dubreuil = load.dubreuil2019.data(8) %>%
          dplyr::rename(set_names(names(IUP_cols),IUP_cols),
                         set_names(names(subset_cols),subset_cols)) %>%
          dplyr::rename_with(.cols= ends_with(c('.dom','.iup40')), .fn = str_replace_all, "\\.", "_" ) %>%
-         right_join(hs_fullscore,by=c('UNIPROT'='acc')) %>%
+         right_join(hs_fullscore,by=c('UNIPROT'='uniprot')) %>%
          dplyr::select(-contains(c('ratioR_RK'))) %>%
          dplyr::rename_with(.cols=-UNIPROT, .fn = Pxx, 'dubreuil2019', s='.')
 
@@ -357,10 +359,10 @@ hs_orthologs = unique(hs_r4s$id)
 dim(HS_CODING)
 colnames(HS_CODING)
 dim(HS_COUNT)
+dim(hs_dubreuil)
 dim(HS_PFAM)
 dim(HS_SUPFAM)
 dim(hs_CU)
-dim(hs_dubreuil)
 dim(hs_pepstats)
 dim(hs_d2p2)
 dim(HS_UNIGO)
@@ -371,10 +373,10 @@ dim(HS_FOLD)
 dim(HS_COMPLEX)
 
 HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
+  left_join(hs_dubreuil,by=c('uniprot'='UNIPROT')) %>%
   left_join(HS_PFAM,by=c('uniprot'='AC')) %>%
   left_join(HS_SUPFAM,by=c('ensp'='AC')) %>%
   left_join(hs_CU,by=c('uniprot'='ID')) %>%
-  left_join(hs_dubreuil,by=c('uniprot'='UNIPROT')) %>%
   left_join(hs_pepstats,by=c('uniprot'='UNIPROT','UP.prot_len')) %>%
   left_join(hs_d2p2,by=c('uniprot')) %>%
   left_join(HS_UNIGO,by=c('uniprot'='UNIPROT')) %>%
@@ -496,17 +498,43 @@ uni_na_aascore = HS_FEATURES.6 %>%
                     pull(AC) %>% unique
 seq_aa_score = hs_prot[uni_na_aascore]
 na_aascore = retrieve_missing_aascore(uni_na_aascore,seq_aa_score)
-
-
-na_fullsti = tibble( UNIPROT=hs_aa_count$id[hs_aa_count$id %in% uni_na_aascore],
-                     dubreuil2019.stickiness_full = AACOUNT2SCORE(COUNT=hs_aa_count[hs_aa_count$id %in% uni_na_aascore ,1:20],SCORE=get.aascales()) )
 df_na_aascore = na_aascore %>%
                 dplyr::rename_with(.cols=-acc, .fn=str_replace_all, 'pawar_', 'pawar_ph7_' ) %>%
-                dplyr::select(-contains(c('pawar_ph7','voronoi'))) %>%
+                dplyr::select(-contains(c('voronoi'))) %>%
                 dplyr::rename_with(.cols=-acc, .fn=Pxx, 'dubreuil2019', s='.' ) %>%
-                left_join(na_fullsti,by=c('acc'='UNIPROT')) %>%
                 dplyr::rename(uniprot='acc')
-HS_FEATURES.7 = coalesce_join(HS_FEATURES.6,df_na_aascore,by='uniprot')
+
+
+iup40_cols = str_subset(colnames(HS_FEATURES.6),'^dubreuil.+iup40$') %>% sort
+dom_cols = str_subset(colnames(HS_FEATURES.6),'^dubreuil.+dom$') %>% sort
+full_cols = str_subset(colnames(HS_FEATURES.6),'^dubreuil.+full$') %>% sort %>% setdiff("dubreuil2019.voronoi_sickiness_full")
+
+HS_FEATURES.7 = coalesce_join(HS_FEATURES.6,df_na_aascore,by='uniprot') %>%
+                rowwise() %>%
+                mutate(dubreuil2019.stickiness_iup40  = coalesce(dubreuil2019.stickiness_iup40   , dubreuil2019.stickiness_full)) %>%
+                mutate(dubreuil2019.aggrescan_iup40   = coalesce(dubreuil2019.aggrescan_iup40    , dubreuil2019.aggrescan_full     )) %>%
+                mutate(dubreuil2019.foldamyloid_iup40 = coalesce(dubreuil2019.foldamyloid_iup40  , dubreuil2019.foldamyloid_full   )) %>%
+                mutate(dubreuil2019.pawar_ph7_iup40   = coalesce(dubreuil2019.pawar_ph7_iup40    , dubreuil2019.pawar_ph7_full     )) %>%
+                mutate(dubreuil2019.camsol_iup40      = coalesce(dubreuil2019.camsol_iup40       , dubreuil2019.camsol_full        )) %>%
+                mutate(dubreuil2019.wimleywhite_iup40 = coalesce(dubreuil2019.wimleywhite_iup40  , dubreuil2019.wimleywhite_full   )) %>%
+                mutate(dubreuil2019.roseman_iup40     = coalesce(dubreuil2019.roseman_iup40      , dubreuil2019.roseman_full       )) %>%
+                mutate(dubreuil2019.kytedoolittle_iup40  = coalesce(dubreuil2019.kytedoolittle_iup40, dubreuil2019.kytedoolittle_full )) %>%
+                mutate(dubreuil2019.stickiness_dom    = coalesce(dubreuil2019.stickiness_dom     , dubreuil2019.stickiness_full    )) %>%
+                mutate(dubreuil2019.aggrescan_dom     = coalesce(dubreuil2019.aggrescan_dom      , dubreuil2019.aggrescan_full     )) %>%
+                mutate(dubreuil2019.foldamyloid_dom   = coalesce(dubreuil2019.foldamyloid_dom    , dubreuil2019.foldamyloid_full   )) %>%
+                mutate(dubreuil2019.pawar_ph7_dom     = coalesce(dubreuil2019.pawar_ph7_dom      , dubreuil2019.pawar_ph7_full     )) %>%
+                mutate(dubreuil2019.camsol_dom        = coalesce(dubreuil2019.camsol_dom         , dubreuil2019.camsol_full        )) %>%
+                mutate(dubreuil2019.wimleywhite_dom   = coalesce(dubreuil2019.wimleywhite_dom    , dubreuil2019.wimleywhite_full   )) %>%
+                mutate(dubreuil2019.roseman_dom       = coalesce(dubreuil2019.roseman_dom        , dubreuil2019.roseman_full       )) %>%
+                mutate(dubreuil2019.kytedoolittle_dom = coalesce(dubreuil2019.kytedoolittle_dom  , dubreuil2019.kytedoolittle_full )) %>%
+                mutate(dubreuil2019.IUP20_L = coalesce(dubreuil2019.IUP20_L  , D2P2.diso_len )) %>%
+                mutate(dubreuil2019.IUP30_L = coalesce(dubreuil2019.IUP30_L  , D2P2.diso_len )) %>%
+                mutate(dubreuil2019.IUP40_L = coalesce(dubreuil2019.IUP40_L  , D2P2.diso_len )) %>%
+                mutate(dubreuil2019.IUP20_f = coalesce(dubreuil2019.IUP20_f  , D2P2.diso_frac )) %>%
+                mutate(dubreuil2019.IUP30_f = coalesce(dubreuil2019.IUP30_f  , D2P2.diso_frac )) %>%
+                mutate(dubreuil2019.IUP40_f = coalesce(dubreuil2019.IUP40_f  , D2P2.diso_frac)) %>%
+    ungroup %>%
+    dplyr::select(-contains(c('content_count','pawar_ph7')))
 
 miss7 = check_missing_var(HS_FEATURES.7)
 
@@ -517,17 +545,14 @@ miss7 = check_missing_var(HS_FEATURES.7)
 #get.uniprot.proteome(9606,DNA=T)
 
 HS_FEATURES.8 = HS_FEATURES.7 %>%
-                rowwise() %>%
-                mutate( across(.cols = ends_with('_L'), .fns = replace_na, replace=D2P2.diso_len ) ) %>%
-                mutate( across(.cols = ends_with('_f'), .fns = replace_na, replace=D2P2.diso_frac) ) %>%
-                mutate( ENS.cds_len = ifelse( is.na(ENS.cds_len) & !is.na(UP.cdna_len),UP.cdna_len,ENS.cds_len),
-                        ensp = ifelse(is.na(ensp), ensp_canonical, ensp),
-                        GENENAME = ifelse(is.na(GENENAME),GN,GENENAME))
+                mutate( ENS.cds_len = coalesce( ENS.cds_len, UP.cdna_len),
+                        ensp = coalesce(ensp, ensp_canonical),
+                        GENENAME = coalesce(GENENAME),GN)
 miss8 = check_missing_var(HS_FEATURES.8 %>% ungroup)
 
 HS_PROTEOME_DATA = HS_FEATURES.8 %>%
                      # Get out the rows with NA
-                     drop_na(starts_with(c('UP_cdna.','elek2022.','D2P2.','ENS.'))) %>%
+                     drop_na(starts_with(c('UP_cdna.','elek2022.','D2P2.','ENS.','dubreuil2019.'))) %>%
                      dplyr::select(-GENENAME) %>%
                      # RENAME VARIABLES NON-ALPHANUMERIC CHARACTERS (NOT VALID FOR FORMULA)
                      dplyr::rename_with(.cols = everything(), .fn = str_replace_all, pattern="[^A-Za-z0-9\\.]+", replacement="_")
@@ -578,7 +603,6 @@ HS_ORTHOLOGS = HS_PROTEOME_DATA %>%
 
 dim(HS_ORTHOLOGS)
 # All orthologs N = 12977
-
 
 # Define two predictions datasets with/out abundance (training/validation)
 hs_validation = HS_ORTHOLOGS %>% filter( !(uniprot %in% HS_PPM$uni) )
@@ -670,6 +694,7 @@ decompose_variance(m_best_ER,to.df = T)
 
 hs_best_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),data=hs_best_pred)
 print(labels(hs_best_lm))
+print(hs_nbest)
 decompose_variance(hs_best_lm,to.df = T)
 
 ## Validate
@@ -685,7 +710,6 @@ print(labels(hs_validation_lm))
 print(coefficients(hs_validation_lm)[is.na(coefficients(hs_validation_lm))])
 
 decompose_variance(hs_validation_lm,to.df = T)
-
 
 sc_evo_var = readRDS(here::here('output','sc_features_ess_over_0.5.rds'))
 library(stringdist)
