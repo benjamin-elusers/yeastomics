@@ -192,9 +192,15 @@ get_codon_table = function(){
 get_aa_score = function(string,score){
   aa_scores = get.aascales()
   scores = names(aa_scores)[-1]
+
   if(!missing(score)){
     scores = match.arg(score,all_scores,several.ok = T)
     aa_scores = aa_scores[,c('AA',scores)]
+  }
+
+  if(string == "" | is.na(string)){
+    df_scores = set_names(rep(as.numeric(NA),length(scores)),scores) %>% as_tibble_row()
+    return(df_scores)
   }
 
   BS = Biostrings::AAString(string)
