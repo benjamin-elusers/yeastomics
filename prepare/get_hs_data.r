@@ -489,8 +489,8 @@ HS_FEATURES.6 = coalesce_join(HS_FEATURES.5,uni_d2p2_nona,by=c('uniprot')) %>%
 
 miss6 = check_missing_var(HS_FEATURES.6)
 
-#save.image(here('output','checkpoint-hs-data.rdata'))
-#load(here::here('output','checkpoint-hs-data.rdata'))
+#save.image(here('output','checkpoint-6-hs-data.rdata'))
+#load(here::here('output','checkpoint-6-hs-data.rdata'))
 #### 7. Fix missing amino acid propensities ####
 uni_na_aascore = HS_FEATURES.6 %>%
                     dplyr::select(AC,starts_with('dubreuil2019')) %>%
@@ -670,14 +670,17 @@ fit0 = fit_m0(INPUT_LM = HS_LMDATA,PREDICTORS = HS_PREDICTORS,
 df0=decompose_variance(fit0$LM0,T)
 spearman.toplot(fit0$P$ER,fit0$P$PPM)
 
-# Filter Dataset for prediction --------------------------------------------------
-hs_evo_all= select_variable(fit0,response='.resid', raw=T)
-saveRDS(hs_evo_all,here("output","lm-evo-hs.rds"))
 
+#save.image(here('output','checkpoint-hs-orthologs-data.rdata'))
+load(here::here('output','checkpoint-hs-orthologs-data.rdata'))
+
+# Filter Dataset for prediction --------------------------------------------------
+
+
+hs_evo_all= preload(here("output","lm-evo-hs.rds"), select_variable(fit0,response='.resid', raw=T))
 hs_best= hs_evo_all %>% filter(pc_ess > 0.1 & variable != YCOL)
 hs_best= hs_evo_all %>% filter(pc_ess > 0.5 & variable != YCOL)
 hs_best= hs_evo_all %>% filter(pc_ess > 1 & variable != YCOL)
-
 
 hs_best_pred = fit0$P[,c(XCOL, YCOL, '.resid', ZCOL, hs_best$variable)]
 hs_nbest = n_distinct(hs_best$variable)

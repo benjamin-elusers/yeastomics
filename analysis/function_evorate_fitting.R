@@ -464,11 +464,12 @@ fix_missing_paxdb = function(df){
 
 #### 4. Disorder/Domain propensity scores ####
 retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
+
   hs_regions = fetch.mobidb(uni_missing) # Took 100 sec. for 3153 uniprot identifiers
   dom  = hs_regions %>% filter( feature == 'domain' & source == 'merge')
   iupl = hs_regions %>% filter( feature == 'disorder' & source == 'iupl')
   iups = hs_regions %>% filter( feature == 'disorder' & source == 'iups')
-
+  message('iupred short and long predictions...')
   merge_iup = subsetByOverlaps( IRanges(start=iupl$S, end=iupl$E, names=iupl$acc),
                                 IRanges(start=iups$S, end=iups$E, names=iups$acc),
                                 minoverlap = 0L, maxgap=5L, type='any')
@@ -478,6 +479,8 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
     group_by(acc) %>% mutate(content_count = sum(feature_len))
 
   rm(hs_regions,iupl,iups);gc();
+
+  message('get iupred sequences...')
 
   # Preparing data for accessing feature sequences
   ACC = iupred$acc
@@ -499,6 +502,8 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
     }, mc.cores = 14,mc.cleanup = T)
 
 
+  message('compute aa score on iupred sequences...')
+
   iseq = 1:length(diso_seq)
   diso_score <- pbmcapply::pbmclapply(
     X=iseq, FUN = function(x){ get_aa_score(string = diso_seq[[x]])  },
@@ -510,6 +515,8 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
     group_by(acc,length,content_count) %>%
     summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
     distinct()
+
+  message('get domain sequences...')
 
   ACC = dom$acc
   START = dom$S %>% as.integer()
@@ -529,6 +536,8 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
 
   # dom$dom_seq = unlist(dom_seq)
 
+  message('compute aa score on domain sequences...')
+
   iseq = 1:length(dom_seq)
   dom_score <- pbmcapply::pbmclapply(
     X=iseq,  FUN = function(x){ get_aa_score(string = dom_seq[[x]]) },
@@ -539,15 +548,19 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
     summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
     distinct()
 
+  message('compute aa score on full sequences...')
   iseq = 1:length(uni_seq)
   full_score <- pbmcapply::pbmclapply(
     X=iseq,  FUN = function(x){ get_aa_score(string = as.character(uni_seq[[x]]) ) },
     mc.cores = 14,mc.cleanup = T)
-  full_scores = tibble(acc=uni_missing, length=widths(uni_seq)) %>% bind_cols(bind_rows(full_score)) %>%
+
+  full_scores = tibble(acc=uni_missing, length=widths(uni_seq)) %>%
+                bind_cols(bind_rows(full_score)) %>%
                 group_by(acc,length) %>%
                 summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
                 distinct() %>% dplyr::rename_with(.cols = -c(acc,length), .fn = xxS, 'full',s='_' )
 
+  message('merge all aa score on sequences...')
   na_aascore =  left_join(iupred_scores,dom_scores,by=c('acc','length'),suffix=c('_iup40','_dom')) %>%
                 left_join(full_scores,by=c('acc','length'),suffix=c('','_full')) %>%
                 dplyr::select(acc, ends_with(c('iup40','dom','full'))) %>% ungroup()
