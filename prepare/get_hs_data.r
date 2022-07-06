@@ -134,7 +134,18 @@ IUP_cols = c("L.IUP20" = 'IUP20_L',"L.IUP30" = 'IUP30_L',"L.IUP40" = 'IUP40_L',
              "f.IUP20" = 'IUP20_f',"f.IUP30" = 'IUP30_f',"f.IUP40" = 'IUP40_f')
 subset_cols = c('standard'='iupred_standard','medium'='iupred_medium','high'='iupred_high',
                 'average'='uniprot_average','large'='uniprot_long')
-fullsti = tibble( UNIPROT=hs_aa_count$id, stickiness_full = AACOUNT2SCORE(COUNT=hs_aa_count[,1:20],SCORE=get.stickiness()) )
+iseq = 1:length(hs_prot)
+full_score <- pbmcapply::pbmclapply(
+  X=iseq,  FUN = function(x){ get_aa_score(string = hs_prot[[x]]) },
+  mc.cores = 14,mc.cleanup = T)
+hs_fullscore = tibble(acc=hs_uniref, length=widths(hs_prot)) %>%
+                bind_cols(bind_rows(full_score)) %>%
+                group_by(acc,length) %>%
+                summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
+                distinct() %>%
+                dplyr::rename_with(.cols = -c(acc,length), .fn = xxS, 'full',s='_' )
+
+
 hs_dubreuil = load.dubreuil2019.data(8) %>%
          dplyr::select('UNIPROT',
                       contains('IUP'),
@@ -144,7 +155,8 @@ hs_dubreuil = load.dubreuil2019.data(8) %>%
          dplyr::rename(set_names(names(IUP_cols),IUP_cols),
                         set_names(names(subset_cols),subset_cols)) %>%
          dplyr::rename_with(.cols= ends_with(c('.dom','.iup40')), .fn = str_replace_all, "\\.", "_" ) %>%
-         left_join(fullsti,by=c('UNIPROT')) %>%
+         right_join(hs_fullscore,by=c('UNIPROT'='acc')) %>%
+         dplyr::select(-contains(c('ratioR_RK'))) %>%
          dplyr::rename_with(.cols=-UNIPROT, .fn = Pxx, 'dubreuil2019', s='.')
 
 # Domains ----------------------------------------------------------------------
@@ -475,14 +487,26 @@ HS_FEATURES.6 = coalesce_join(HS_FEATURES.5,uni_d2p2_nona,by=c('uniprot')) %>%
 
 miss6 = check_missing_var(HS_FEATURES.6)
 
-save.image(here('output','checkpoint-hs-data.rdata'))
+#save.image(here('output','checkpoint-hs-data.rdata'))
+#load(here::here('output','checkpoint-hs-data.rdata'))
 #### 7. Fix missing amino acid propensities ####
 uni_na_aascore = HS_FEATURES.6 %>%
                     dplyr::select(AC,starts_with('dubreuil2019')) %>%
                     dplyr::filter(row_number() %in% find_na_rows(.,as.indices = T)) %>%
-                    pull(AC)
-na_aascore = retrieve_missing_aascore(uni_na_aascore,hs_prot)
-HS_FEATURES.7 = coalesce_join(HS_FEATURES.6,na_aascore,by=c('uniprot'='acc'))
+                    pull(AC) %>% unique
+seq_aa_score = hs_prot[uni_na_aascore]
+na_aascore = retrieve_missing_aascore(uni_na_aascore,seq_aa_score)
+
+
+na_fullsti = tibble( UNIPROT=hs_aa_count$id[hs_aa_count$id %in% uni_na_aascore],
+                     dubreuil2019.stickiness_full = AACOUNT2SCORE(COUNT=hs_aa_count[hs_aa_count$id %in% uni_na_aascore ,1:20],SCORE=get.aascales()) )
+df_na_aascore = na_aascore %>%
+                dplyr::rename_with(.cols=-acc, .fn=str_replace_all, 'pawar_', 'pawar_ph7_' ) %>%
+                dplyr::select(-contains(c('pawar_ph7','voronoi'))) %>%
+                dplyr::rename_with(.cols=-acc, .fn=Pxx, 'dubreuil2019', s='.' ) %>%
+                left_join(na_fullsti,by=c('acc'='UNIPROT')) %>%
+                dplyr::rename(uniprot='acc')
+HS_FEATURES.7 = coalesce_join(HS_FEATURES.6,df_na_aascore,by='uniprot')
 
 miss7 = check_missing_var(HS_FEATURES.7)
 
