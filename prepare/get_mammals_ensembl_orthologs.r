@@ -97,6 +97,11 @@ ens_mammals_df= groupClade(ens_mammals_tree,.node = ens_mammals_4clades) %>% as_
                 left_join(ens_mammals_info,by=c('label'='mammals_tree')) %>%
                 mutate(num_label = paste0(node,".",organism))
 
+# mammals_four = ens_mammals_df %>%  filter(is_leaf) %>%
+#                 dplyr::select(group,label,organism,species)# %>%
+              #  mutate(ens_sp = get_sp(species)) %>%
+               # left_join( match_species_names(.$ens_sp,ortho_prefix$ens_sp), by=c('ens_sp'='sp_tree'))
+
 ens_mammals_tree$tip.label =  ens_mammals_df$num_label[ens_mammals_df$is_leaf]
 MAMMALS = ggtree(ens_mammals_tree,ladderize = T,right = T,branch.length = 'none') %<+% ens_mammals_df  +
   ggtree::geom_nodelab(mapping = aes(x=branch,color=group), size=2.5, geom='label',node = 'internal', nudge_y = 0.7) +
@@ -223,7 +228,9 @@ HS_MAMMALS = hs_mammals %>%
                md_cds_diff = median_(HS_QUERY[[ens_dataset]] %>% dplyr::select(contains("cds_diff")))
                ) %>%
             mutate(f_orthologs = n_orthologs/n_protein_coding, n_uniprot = n_swissprot+n_trembl) %>%
-            arrange(n_orthologs)
+            arrange(n_orthologs) %>%
+            left_join(ens_mammals_df)
+
 
 mammals = seq_along(HS_QUERY)
 mammals_sp = names(HS_QUERY)
@@ -270,10 +277,8 @@ ortho_prefix = hs_ortho_1to1 %>%
                summarise( unique(across(everything(),function(x){str_extract(x,'^[^0-9]+') })) ) %>%
                distinct() %>%
                pivot_longer(cols=everything(),names_to='sp_col',values_to='sp_peptide_ens_prefix') %>%
-               mutate(ens_sp = str_replace(sp_col,'_homolog_ensembl_peptide',''))
-
-hs_ortho_1to1 %>% dplyr::select(ends_with('homolog_ensembl_peptide'))
-
+               mutate(ens_sp = str_replace(sp_col,'_homolog_ensembl_peptide','')) %>%
+               left_join(HS_MAMMALS %>% dplyr::select(ens_dataset,species,organism,group,label,num_label,filter),by=c('ens_sp'='ens_dataset'))
 
 mammals_seq = list()
 for( m in 1:nrow(ortho_prefix)){
@@ -293,6 +298,24 @@ for( m in 1:nrow(ortho_prefix)){
 
 mammals_orthologs =AAStringSetList(mammals_seq)
 names(mammals_orthologs) = ortho_prefix$ens_sp
-ens_mammals_df
-hs_ortho_1to1
-count_hs_ortho
+save.image(here::here('output','ens_hs_ortho','checkpoint-mammals-orthologs-sequence.rdata'))
+
+table(HS_MAMMALS$group)
+
+glires_prefix = str_c(ortho_prefix$sp_peptide_ens_prefix[ortho_prefix$group=='Glires'],collapse = "|")
+carnivora_prefix = str_c(ortho_prefix$sp_peptide_ens_prefix[ortho_prefix$group=='Carnivora'],collapse = "|")
+laurasiatheria_prefix = str_c(ortho_prefix$sp_peptide_ens_prefix[ortho_prefix$group=='Laurasiatheria.1'],collapse = "|")
+primates_prefix =  str_c(ortho_prefix$sp_peptide_ens_prefix[ortho_prefix$group=='Primates'],collapse = "|")
+
+col_ortho_prot = str_subset(colnames(hs_ortho_1to1),"homolog_ensembl_peptide")
+
+sum_(str_count(hs_ortho_1to1[1,col_ortho_prot], pattern = glires_prefix))
+hs_ortho_1to1 = hs_ortho_1to1 %>%
+  rowwise() %>%
+  mutate(n_glires = sum_(str_count(c_across(col_ortho_prot), paste0("^(",glires_prefix,")"))),
+         n_carnivora = sum_(str_count(c_across(col_ortho_prot), paste0("^(",carnivora_prefix,")"))),
+         n_laurasiatheria = sum_(str_count(c_across(col_ortho_prot), paste0("^(",laurasiatheria_prefix,")"))),
+         n_primates = sum_(str_count(c_across(col_ortho_prot), paste0("^(",primates_prefix,")"))) ) %>%
+  ungroup()
+
+
