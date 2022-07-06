@@ -278,11 +278,21 @@ hs_ortho_1to1 %>% dplyr::select(ends_with('homolog_ensembl_peptide'))
 mammals_seq = list()
 for( m in 1:nrow(ortho_prefix)){
   sp = ortho_prefix$ens_sp[m]
+  message(sprintf('%2s %s',m,sp))
   id_col =ortho_prefix$sp_col[m]
   ids = hs_ortho_1to1[[id_col]] %>% na.omit() %>% as.vector()
 
   mart <- useEnsembl("ensembl", dataset=paste0(sp,"_gene_ensembl"),mirror = ENS_MIRROR)
-  fasta_ortho = getSequence(id = ids, type = "ensembl_peptide_id", seqType = "peptide", mart = mart)
-  fasta_ortho$ensembl_peptide_id
-  test = Biostrings::AAString(fasta_ortho$ensembl_peptide_id )
-  mammals_seq[[m]] = fasta_ortho
+  ortho_seq = getSequence(id=ids, type = "ensembl_peptide_id", seqType = "peptide", mart = mart) %>%
+              dplyr::select(ensembl_peptide_id,peptide)
+  ortho_fasta = Biostrings::AAStringSet(x=ortho_seq %>% deframe())
+  star = Biostrings::subseq(ortho_fasta,start=-1) == '*'
+  ortho_fasta_prot = Biostrings::subseq(ortho_fasta,start=1,  end=Biostrings::width(ortho_fasta)-star)
+  mammals_seq[[m]] = ortho_fasta_prot
+}
+
+mammals_orthologs =AAStringSetList(mammals_seq)
+names(mammals_orthologs) = ortho_prefix$ens_sp
+ens_mammals_df
+hs_ortho_1to1
+count_hs_ortho
