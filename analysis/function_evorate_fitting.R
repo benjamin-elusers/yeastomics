@@ -472,11 +472,12 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
   merge_iup = subsetByOverlaps( IRanges(start=iupl$S, end=iupl$E, names=iupl$acc),
                                 IRanges(start=iups$S, end=iups$E, names=iups$acc),
                                 minoverlap = 0L, maxgap=5L, type='any')
-  iupred = tibble(acc = names(merge_iup),
-                  S=start(merge_iup),
-                  E=end(merge_iup),
-                  feat_len=E-S+1 ) %>%
-    left_join(hs_regions %>% dplyr::select(acc,length)) %>% distinct()
+
+  iupred = tibble(acc = names(merge_iup), S=start(merge_iup), E=end(merge_iup), feature_len=E-S+1) %>%
+    left_join(hs_regions %>% dplyr::select(acc,length,)) %>% distinct() %>%
+    group_by(acc) %>% mutate(content_count = sum(feature_len))
+
+  #rm(hs_regions,iupl,iups);gc();
 
   # Preparing data for accessing feature sequences
   ACC = iupred$acc
@@ -495,13 +496,25 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
       }else{
         feature_seq = ""
       }
-    }, mc.cores = 14)
+    }, mc.cores = 14,mc.cleanup = T)
+
+
+  iseq = 1:length(diso_seq)
+  diso_score <- pbmcapply::pbmclapply(
+    X=iseq, FUN = function(x){ get_aa_score(string = diso_seq[[x]])  },
+    mc.cores = 14,mc.cleanup = T)
+
+  #iupred$iup_seq = unlist(diso_seq)
+
+  iupred_scores = iupred %>% bind_cols( bind_rows(diso_score) ) %>%
+    group_by(acc,length,content_count) %>%
+    summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
+    distinct()
 
   ACC = dom$acc
   START = dom$S %>% as.integer()
   END = dom$E %>% as.integer()
   irows=1:nrow(dom)
-
   dom_seq <- pbmcapply::pbmclapply(
     X=irows,
     # extract subsequence of mobidb feature from uniprot protein using positions
@@ -512,37 +525,32 @@ retrieve_missing_aascore = function(uni_missing,uni_seq=hs_prot){
       }else{
         feature_seq = ""
       }
-    }, mc.cores = 14)
+    }, mc.cores = 14,mc.cleanup = T)
 
-  iupred$iup_seq = unlist(diso_seq)
-  dom$dom_seq = unlist(dom_seq)
+  # dom$dom_seq = unlist(dom_seq)
 
-
-  iseq = 1:length(diso_seq)
-  diso_score <- pbmcapply::pbmclapply(
-    X=iseq,
-    # Using subsequence of mobidb features, compute sum of residue propensities
-    FUN = function(x){ if( !is.na(diso_seq[[x]]) ){ get_aa_score(string = diso_seq[[x]]) }else{ NA } },
-    mc.cores = 14)
   iseq = 1:length(dom_seq)
   dom_score <- pbmcapply::pbmclapply(
-    X=iseq,
-    # Using subsequence of mobidb features, compute sum of residue propensities
-    FUN = function(x){ if( !is.na(dom_seq[[x]]) ){ get_aa_score(string = dom_seq[[x]]) }else{ NA } },
-    mc.cores = 14)
-
-  iupred_scores = iupred %>% bind_cols( bind_rows(diso_score) ) %>%
-    group_by(acc,length) %>%
-    summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
-    distinct()
+    X=iseq,  FUN = function(x){ get_aa_score(string = dom_seq[[x]]) },
+    mc.cores = 14,mc.cleanup = T)
 
   dom_scores = dom %>% bind_cols( bind_rows(dom_score) ) %>%
-    group_by(acc,feature_len,length) %>%
+    group_by(acc,length,content_count) %>%
     summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
     distinct()
 
-  na_aascore =  left_join(iupred_scores,dom_scores,by=c('acc'),suffix=c('_iup40','_dom')) %>%
-    dplyr::select(acc, ends_with(c('iup40','dom')), -starts_with('length')) %>% ungroup()
+  iseq = 1:length(uni_seq)
+  full_score <- pbmcapply::pbmclapply(
+    X=iseq,  FUN = function(x){ get_aa_score(string = uni_seq[[x]]) },
+    mc.cores = 14,mc.cleanup = T)
+  full_scores = tibble(acc=uni_missing, length=widths(uni_seq)) %>% bind_cols(bind_rows(full_score)) %>%
+                group_by(acc,length) %>%
+                summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
+                distinct() %>% dplyr::rename_with(.cols = -c(acc,length), .fn = xxS, 'full',s='_' )
+
+  na_aascore =  left_join(iupred_scores,dom_scores,by=c('acc','length'),suffix=c('_iup40','_dom')) %>%
+                left_join(full_scores,by=c('acc','length'),suffix=c('','_full')) %>%
+                dplyr::select(acc, ends_with(c('iup40','dom','full'))) %>% ungroup()
   return(na_aascore)
 }
 
