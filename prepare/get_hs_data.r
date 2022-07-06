@@ -133,7 +133,8 @@ hs_pepstats = load.dubreuil2019.data(8) %>%
 IUP_cols = c("L.IUP20" = 'IUP20_L',"L.IUP30" = 'IUP30_L',"L.IUP40" = 'IUP40_L',
              "f.IUP20" = 'IUP20_f',"f.IUP30" = 'IUP30_f',"f.IUP40" = 'IUP40_f')
 subset_cols = c('standard'='iupred_standard','medium'='iupred_medium','high'='iupred_high',
-                'average'='uniprot_average','large'='uniprot_long')
+                'average'='uniprot_average','large'='uniprot_long','small'='uniprot_small',
+                'isMB'='topcons_membrane')
 
 iseq = 1:length(hs_prot)
 full_score <- pbmcapply::pbmclapply(
@@ -152,13 +153,12 @@ hs_dubreuil = load.dubreuil2019.data(8) %>%
          dplyr::select('UNIPROT',
                       contains('IUP'),
                       ends_with(c('dom','iup40')),
-                      c('standard','medium','high','small','average','large'),
+                      c('standard','medium','high','small','average','large','isMB'),
                       ) %>%
          dplyr::rename(set_names(names(IUP_cols),IUP_cols),
                         set_names(names(subset_cols),subset_cols)) %>%
          dplyr::rename_with(.cols= ends_with(c('.dom','.iup40')), .fn = str_replace_all, "\\.", "_" ) %>%
          right_join(hs_fullscore,by=c('UNIPROT'='uniprot')) %>%
-         dplyr::select(-contains(c('ratioR_RK'))) %>%
          dplyr::rename_with(.cols=-UNIPROT, .fn = Pxx, 'dubreuil2019', s='.')
 
 # Domains ----------------------------------------------------------------------
@@ -198,6 +198,7 @@ hs_pfam_clan = pivot_wider(hs_pfam %>% mutate(pfam_val=T), id_cols=seq_id,
 
 HS_PFAM = left_join(hs_pfam_count,hs_pfam_dom,by=c('AC'='seq_id')) %>%
           left_join(hs_pfam_clan,by=c('AC'='seq_id')) %>%
+          ungroup() %>%
           distinct()
 
 hs_supfam=load.superfamily(tax = 'hs') %>%
@@ -207,7 +208,7 @@ hs_supfam=load.superfamily(tax = 'hs') %>%
           group_by(seqid) %>% mutate(superfamily.ndom=n_distinct(superfamily_id)) %>%
           add_count(superfamily_id,name="pfam.repeat")
 
-hs_supfam_count = left_join(hs_ref,hs_supfam, by=c('AC'='seqid')) %>% group_by(AC) %>%
+hs_supfam_count = left_join(hs_ref,hs_supfam, by=c('ensp'='seqid')) %>% group_by(ensp) %>%
                  summarize(superfamily.supfam_none= is.na(superfamily.ndom) | superfamily.ndom==0 ,
                  superfamily.supfam_single= !is.na(superfamily.ndom) & superfamily.ndom==1,
                  superfamily.supfam_pair= !is.na(superfamily.ndom) & superfamily.ndom==2,
@@ -224,8 +225,9 @@ hs_families = pivot_wider(hs_supfam %>% mutate(supfam_val=T), id_cols=seqid,
   mutate(across(where(is.integer), as.logical)) %>%
   dplyr::select(seqid,where(~ is.logical(.x) && sum(.x) >9 ))%>% distinct()
 
-HS_SUPFAM = left_join(hs_supfam_count,hs_superfamilies,by=c('AC'='seqid')) %>%
-            left_join(hs_families,by=c('AC'='seqid')) %>%
+HS_SUPFAM = left_join(hs_supfam_count,hs_superfamilies,by=c('ensp'='seqid')) %>%
+            left_join(hs_families,by=c('ensp'='seqid')) %>%
+            ungroup() %>%
             distinct()
 
 # Folding energy and stability -------------------------------------------------
@@ -306,10 +308,13 @@ hs_string_centralities = hs_string_centralities %>% type_convert() %>%
   dplyr::rename_with(-ids,.fn=Pxx, 'STRING')
 
 # Biological functions (GO) ----------------------------------------------------
-hs_unigo = get.uniprot.go(hs_uniref,taxon = 9606) %>%  # Uniprot-based GO annotation
-        mutate( go = paste0(ONTOLOGY,"_", str_replace_all(goterm,pattern="[^A-Za-z0-9\\.]+","_"))) %>%
-        filter(!obsolete & shared > 10 & ONTOLOGY != "CC") %>%
-        arrange(go)
+unigo.rds = here::here('output','hs-uniprot-go.rds')
+
+unigo = preload(unigo.rds, get.uniprot.go(hs_uniref,taxon = 9606) )
+hs_unigo = unigo %>%  # Uniprot-based GO annotation
+           mutate( go = paste0(ONTOLOGY,"_", str_replace_all(goterm,pattern="[^A-Za-z0-9\\.]+","_"))) %>%
+           filter(!obsolete & shared > 10 & ONTOLOGY != "CC") %>%
+           arrange(go)
 
 # Convert to a matrix format (columns = GO term, rows=proteome)
 HS_UNIGO  = hs_unigo %>%  mutate(seen=T) %>%
@@ -714,15 +719,26 @@ print(coefficients(hs_validation_lm)[is.na(coefficients(hs_validation_lm))])
 
 decompose_variance(hs_validation_lm,to.df = T)
 
-sc_evo_var = readRDS(here::here('output','sc_features_ess_over_0.5.rds'))
+###
+###
+###
+sc_evo_var = readRDS(here::here('output','sc_features_ess_over_0.2.rds'))
 library(stringdist)
-sim_var = stringsimmatrix(sc_evo_var,colnames(HS_LMDATA), method='jw',p=0.1,useNames='strings')
+sim_var = stringsimmatrix(sc_evo_var,colnames(HS_LMDATA), method='jw',p=1e-5,useNames='strings')
 maxS= apply(sim_var,1,max_)
 i_maxS= apply(sim_var,1,which.max)
 matched = tibble(sc_var=rownames(sim_var), hs_var = colnames(sim_var)[i_maxS], similarity=maxS)
 
+View(matched)
 write_delim(matched,here::here('output','sc-hs-features.tsv'),delim = '\t')
 
+### YEAST TO HUMAN
+sc2hs = readr::read_delim('/home/benjamin/Downloads/sc-hs-features - Sheet1.tsv',na = 'NA')
+sc2hs$hs_var[sc2hs$sc_var=='sgd.pGC'] = 'UP.GC_cdna'
+sc2hs$hs_var[str_detect(sc2hs$sc_var,'pu2008')] = NA
+nomatch = sc2hs %>% filter( similarity < 1 & !is.na(hs_var) & hs_var == "" )
+
+str_subset(colnames(HS_LMDATA),'super')
 
 # Additional datasets (human specific) ------------------------------------
 load.mcshane2016.data = function(){
