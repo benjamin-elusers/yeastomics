@@ -380,7 +380,7 @@ dim(HS_COMPLEX)
 HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
   left_join(hs_dubreuil,by=c('uniprot'='UNIPROT')) %>%
   left_join(HS_PFAM,by=c('uniprot'='AC')) %>%
-  left_join(HS_SUPFAM,by=c('ensp'='AC')) %>%
+  left_join(HS_SUPFAM,by=c('ensp'='ensp')) %>%
   left_join(hs_CU,by=c('uniprot'='ID')) %>%
   left_join(hs_pepstats,by=c('uniprot'='UNIPROT','UP.prot_len')) %>%
   left_join(hs_d2p2,by=c('uniprot')) %>%
@@ -397,7 +397,6 @@ HS_DATA = left_join(HS_CODING,HS_COUNT,by=c('uniprot')) %>%
 
 # Replace missing values  ------------------------------------------------------
 miss0 = check_missing_var(HS_DATA)
-
 
 #### 1. Fix logical variables (NA replaced by FALSE) ####
 HS_FEATURES.1 = HS_DATA %>%
@@ -552,7 +551,8 @@ miss7 = check_missing_var(HS_FEATURES.7)
 HS_FEATURES.8 = HS_FEATURES.7 %>%
                 mutate( ENS.cds_len = coalesce( ENS.cds_len, UP.cdna_len),
                         ensp = coalesce(ensp, ensp_canonical),
-                        GENENAME = coalesce(GENENAME),GN)
+                        GENENAME = coalesce(GENENAME),GN) %>%
+                dplyr::select(-contains('ratioR_RK'))
 miss8 = check_missing_var(HS_FEATURES.8 %>% ungroup)
 
 HS_PROTEOME_DATA = HS_FEATURES.8 %>%
@@ -561,7 +561,6 @@ HS_PROTEOME_DATA = HS_FEATURES.8 %>%
                      dplyr::select(-GENENAME) %>%
                      # RENAME VARIABLES NON-ALPHANUMERIC CHARACTERS (NOT VALID FOR FORMULA)
                      dplyr::rename_with(.cols = everything(), .fn = str_replace_all, pattern="[^A-Za-z0-9\\.]+", replacement="_")
-
 
 miss = check_missing_var(HS_PROTEOME_DATA)
 dim(HS_PROTEOME_DATA)
