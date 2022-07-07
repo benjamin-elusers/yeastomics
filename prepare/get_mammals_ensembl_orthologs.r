@@ -229,7 +229,9 @@ HS_MAMMALS = hs_mammals %>%
                ) %>%
             mutate(f_orthologs = n_orthologs/n_protein_coding, n_uniprot = n_swissprot+n_trembl) %>%
             arrange(n_orthologs) %>%
-            left_join(ens_mammals_df)
+            left_join(ens_mammals_df) %>%
+            group_by(group) %>% mutate( num_group = paste0(group, " (n=", n_distinct(species), ")") )
+
 
 
 mammals = seq_along(HS_QUERY)
@@ -270,7 +272,7 @@ ggplot(count_hs_ortho ) +
   geom_line(aes(x=1:41,y=cumsum(n_ortholog)/sum(n_ortholog)),col='red') +
   xlab('# orthologuous proteins to human among 41 species from eutherian mammals')
 
-# 7. Download ortholog fasta sequences and prepare orthogroups alignments ------
+# 7. Download ortholog fasta sequences -----------------------------------------
 ortho_prefix = hs_ortho_1to1 %>%
                dplyr::select(ends_with('homolog_ensembl_peptide')) %>%
                drop_na() %>%
@@ -300,8 +302,6 @@ mammals_orthologs =AAStringSetList(mammals_seq)
 names(mammals_orthologs) = ortho_prefix$ens_sp
 save.image(here::here('output','ens_hs_ortho','checkpoint-mammals-orthologs-sequence.rdata'))
 
-table(HS_MAMMALS$group)
-
 glires_prefix = str_c(ortho_prefix$sp_peptide_ens_prefix[ortho_prefix$group=='Glires'],collapse = "|")
 carnivora_prefix = str_c(ortho_prefix$sp_peptide_ens_prefix[ortho_prefix$group=='Carnivora'],collapse = "|")
 laurasiatheria_prefix = str_c(ortho_prefix$sp_peptide_ens_prefix[ortho_prefix$group=='Laurasiatheria.1'],collapse = "|")
@@ -316,6 +316,126 @@ hs_ortho_1to1 = hs_ortho_1to1 %>%
          n_carnivora = sum_(str_count(c_across(col_ortho_prot), paste0("^(",carnivora_prefix,")"))),
          n_laurasiatheria = sum_(str_count(c_across(col_ortho_prot), paste0("^(",laurasiatheria_prefix,")"))),
          n_primates = sum_(str_count(c_across(col_ortho_prot), paste0("^(",primates_prefix,")"))) ) %>%
-  ungroup()
+  ungroup() %>%
+  rowwise() %>%
+  mutate( is_best = mean(!is.na(c_across(HS_MAMMALS_best$sp_col))) >0.95 )
 
 
+HS_MAMMALS$f_human = HS_MAMMALS$n_orthologs / n_distinct(hs_ortho_1to1$ensp)
+HS_MAMMALS = left_join(HS_MAMMALS,ortho_prefix)
+
+
+HS_MAMMALS_best = HS_MAMMALS %>%
+    filter(f_human >0.79) %>%
+    group_by(group) %>%
+    mutate( num_group = paste0(group, " (n=", n_distinct(species), ")") ) %>%
+    ungroup
+
+ggplot(HS_MAMMALS_best, aes(y=reorder(organism,f_human),x=f_human, fill=num_group)) +
+  geom_point(shape=21,size=3) + ylab('Mammals Orthologuous species') +
+  theme( axis.text.y = element_text(size=8)) +
+  scale_color_metro_d() + scale_fill_metro_d()
+
+# 8. Download human fasta sequences --------------------------------------------
+mart <- useEnsembl("ensembl", dataset="hsapiens_gene_ensembl",mirror = ENS_MIRROR)
+hs_seq = getSequence(id=hs_ortho_1to1$ensp, type="ensembl_peptide_id", seqType="peptide", mart=mart)
+df_hs_seq = hs_seq %>% dplyr::select(ensembl_peptide_id,peptide) %>% deframe()
+hs_fasta = Biostrings::AAStringSet(x=df_hs_seq)
+star = Biostrings::subseq(hs_fasta,start=-1) == '*'
+hs_fasta_prot = Biostrings::subseq(hs_fasta,start=1,  end=Biostrings::width(hs_fasta)-star)
+
+all_seq=hs_fasta_prot
+for( i in 1:length(mammals_seq) ){ all_seq = AAStringSet(c(all_seq,mammals_seq[[i]])) }
+
+
+# 9. Write the fasta for mammals and subphylum ---------------------------------
+
+best_glires = HS_MAMMALS_best$sp_col[HS_MAMMALS_best$group=='Glires']
+best_primates= HS_MAMMALS_best$sp_col[HS_MAMMALS_best$group=='Primates']
+best_carnivora = HS_MAMMALS_best$sp_col[HS_MAMMALS_best$group=='Carnivora']
+best_laurasiatheria = HS_MAMMALS_best$sp_col[HS_MAMMALS_best$group=='Laurasiatheria.1']
+
+hs_ortho_best = hs_ortho_1to1 %>%
+                filter(is_best) %>%
+                rowwise() %>%
+                mutate(n_glires = sum.na(c_across(all_of(best_glires)),notNA = T),
+                       n_carnivora = sum.na(c_across(all_of(best_carnivora)),notNA = T),
+                       n_laurasiatheria = sum.na(c_across(all_of(best_laurasiatheria)),notNA = T),
+                       n_primates = sum.na(c_across(all_of(best_primates)),notNA = T)) %>%
+                ungroup()
+
+make_mammals_fasta  = function(irow,ortho=hs_ortho_1to1){
+
+  og = ortho[irow,]
+  ENSP = og$ensp
+  hs.fa = all_seq[ ENSP ]
+
+  ids_mammals = og[,col_ortho_prot] %>% unlist() %>% na.omit() %>% as.vector()
+  valid_ids = intersect(ids_mammals,names(all_seq))
+
+  ## MAMMALS (all)
+  peptide2sp_all = strfind(valid_ids,HS_MAMMALS$sp_peptide_ens_prefix) %>%
+    enframe('sp_prefix','id_peptide') %>%
+    unnest(id_peptide ) %>%
+    left_join(HS_MAMMALS,by=c('sp_prefix'='sp_peptide_ens_prefix')) %>%
+    dplyr::select(id_peptide,ens_dataset,sp_prefix,mammals_tree,group,label) %>%
+    filter( id_peptide %in% names(all_seq) )
+
+  mammals0.fa = all_seq[ peptide2sp_all$id_peptide ]
+  mammals0.path = here::here('output','ens_hs_ortho','hs_mammals_all',paste0(ENSP,'.fa'))
+  names(mammals0.fa) = peptide2sp_all$mammals_tree
+  writeXStringSet(c(hs.fa,mammals0.fa),mammals0.path,format="fasta")
+
+  if(og$is_best){
+
+    peptide2sp = strfind(valid_ids,HS_MAMMALS_best$sp_peptide_ens_prefix) %>%
+      enframe('sp_prefix','id_peptide') %>%
+      unnest(id_peptide ) %>%
+      left_join(HS_MAMMALS_best,by=c('sp_prefix'='sp_peptide_ens_prefix')) %>%
+      dplyr::select(id_peptide,ens_dataset,sp_prefix,mammals_tree,group,label) %>%
+      filter( id_peptide %in% names(all_seq) )
+
+    ## MAMMALS (best)
+    mammals.id = peptide2sp$id_peptide
+    mammals.fa = all_seq[ mammals.id ]
+    mammals.path = here::here('output','ens_hs_ortho','hs_mammals',paste0(ENSP,'.fa'))
+    names(mammals.fa) = peptide2sp$mammals_tree
+    writeXStringSet(c(hs.fa,mammals.fa),mammals.path,format="fasta")
+
+    ## GLIRES
+    glires.df= peptide2sp %>% filter(peptide2sp$group=='Glires')  %>% arrange(id_peptide)
+    glires.fa = all_seq[ glires.df$id_peptide]
+    glires.path = here::here('output','ens_hs_ortho','hs_glires',paste0(ENSP,'.fa'))
+    glires.treename = HS_MAMMALS_best$mammals_tree[HS_MAMMALS_best$group=='Glires']
+    names(glires.fa) = glires.df$mammals_tree
+    writeXStringSet(c(hs.fa,glires.fa),glires.path,format="fasta")
+
+    ## LAURASIATHERIA
+    laura.df= peptide2sp %>% filter(peptide2sp$group=='Laurasiatheria.1')  %>% arrange(id_peptide)
+    laura.fa = all_seq[laura.df$id_peptide]
+    laura.path = here::here('output','ens_hs_ortho','hs_laurasiatheria',paste0(ENSP,'.fa'))
+    names(laura.fa) = laura.df$mammals_tree
+    writeXStringSet(c(hs.fa,laura.fa),laura.path,format="fasta")
+
+    ## PRIMATES
+    primates.df= peptide2sp %>% filter(peptide2sp$group=='Primates')  %>% arrange(id_peptide)
+    primates.fa = all_seq[primates.df$id_peptide]
+    primates.path = here::here('output','ens_hs_ortho','hs_primates',paste0(ENSP,'.fa'))
+    names(primates.fa) =  primates.df$mammals_tree
+    writeXStringSet(c(hs.fa,primates.fa),primates.path,format="fasta")
+
+    ## CARNIVORA
+    carnivora.df= peptide2sp %>% filter(peptide2sp$group=='Carnivora')  %>% arrange(id_peptide)
+    carnivora.fa = all_seq[carnivora.df$id_peptide]
+    carnivora.path = here::here('output','ens_hs_ortho','hs_carnivora',paste0(ENSP,'.fa'))
+    names(carnivora.fa) = carnivora.df$mammals_tree
+    writeXStringSet(c(hs.fa,carnivora.fa),carnivora.path,format="fasta")
+  }
+}
+
+iseq = 1:length(hs_ortho_1to1)
+full_score <- pbmcapply::pbmclapply(
+  X=iseq,  FUN = function(x){ make_mammals_fasta(x) },
+  mc.cores = 14,mc.cleanup = T)
+
+# 10. Align orthologs of mammals and subphylum ---------------------------------
