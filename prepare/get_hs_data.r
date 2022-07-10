@@ -565,6 +565,8 @@ HS_PROTEOME_DATA = HS_FEATURES.8 %>%
 miss = check_missing_var(HS_PROTEOME_DATA)
 dim(HS_PROTEOME_DATA)
 
+saveRDS(HS_PROTEOME_DATA,here::here('released-dataset','humanOmics-v0.rds'))
+
 # Retrieve human abundance -----------------------------------------------------
 # hs_ppm_uni = readRDS(here::here("data","paxdb_integrated_human.rds"))
 hs_uni = hs_map_uni %>% filter(extdb=='UniProtKB-ID') %>% dplyr::select(uni,extid)
@@ -664,6 +666,8 @@ HS_PPM$PPM = HS_PPM$PPM_WHOLE_ORGANISM
 HS_ER = left_join(hs_r4s,HS_PPM, by=c('id'='uni'))
 HS_ER$ER = log10(HS_ER$r4s_mammals.rate_norm)
 
+#HS_PPM$PPM = HS_PPM$PPM_BRAIN
+
 HS_LMDATA = left_join(HS_PREDICTORS,HS_ER,by=c('uniprot'='id')) %>% drop_na(PPM) %>%
             filter(!is.na(uniprot) & !is.dup(uniprot)) %>%
             distinct()
@@ -671,22 +675,21 @@ HS_LMDATA = left_join(HS_PREDICTORS,HS_ER,by=c('uniprot'='id')) %>% drop_na(PPM)
 fit0 = fit_m0(INPUT_LM = HS_LMDATA,PREDICTORS = HS_PREDICTORS,
               XCOL = XCOL,YCOL = YCOL, ZCOL=NULL, IDCOLS=ID_COLS,
               MAX_XCOR = 0.5, MAX_YCOR=0.5, MIN_N = 2)
+
 df0=decompose_variance(fit0$LM0,T)
 spearman.toplot(fit0$P$ER,fit0$P$PPM)
-
 
 #save.image(here('output','checkpoint-hs-orthologs-data.rdata'))
 load(here::here('output','checkpoint-hs-orthologs-data.rdata'))
 
 # Filter Dataset for prediction --------------------------------------------------
-
-
 hs_evo_all= preload(here("output","lm-evo-hs.rds"), select_variable(fit0,response='.resid', raw=T))
 hs_best= hs_evo_all %>% filter(pc_ess > 0.1 & variable != YCOL)
 hs_best= hs_evo_all %>% filter(pc_ess > 0.5 & variable != YCOL)
 hs_best= hs_evo_all %>% filter(pc_ess > 1 & variable != YCOL)
 
-hs_best_pred = fit0$P[,c(XCOL, YCOL, '.resid', ZCOL, hs_best$variable)]
+#uni_brain = HS_PPM$uni[!is.na(HS_PPM$PPM_BRAIN)]
+hs_best_pred = fit0$P[,c(XCOL, YCOL, '.resid', ZCOL, intersect(hs_best$variable, colnames(fit0$P)))] #fit0$P$uniprot %in% uni_brain
 hs_nbest = n_distinct(hs_best$variable)
 
 formula_null = reformulate(response=YCOL,termlabels = "1",intercept = T)
@@ -704,9 +707,13 @@ print(labels(hs_best_lm))
 print(hs_nbest)
 decompose_variance(hs_best_lm,to.df = T)
 
+formula_m0 = reformulate(response=YCOL,termlabels = "PPM",intercept = T)
+LM0 = lm(data=hs_best_pred, formula_m0)
+decompose_variance(LM0,T)
+
 ## Validate
-hs_valid = left_join(hs_validation,HS_ER,by=c('uniprot'='id')) %>%
-  filter(!is.na(uniprot) & !is.dup(uniprot)) %>%
+hs_valid = left_join(hs_orthologs,HS_ER,by=c('uniprot'='id')) %>%
+  filter(!is.na(uniprot) & !is.dup(uniprot) & !(uniprot %in% uni_brain)) %>%
   distinct()
 
 LM_validation_ER = lm(data=hs_valid, formula_null)
@@ -715,13 +722,14 @@ decompose_variance(LM_validation_ER,to.df = T)
 hs_validation_lm = lm(reformulate(response = YCOL, termlabels = labels(hs_best_lm)),data=hs_valid)
 print(labels(hs_validation_lm))
 print(coefficients(hs_validation_lm)[is.na(coefficients(hs_validation_lm))])
-
 decompose_variance(hs_validation_lm,to.df = T)
 
 ###
 ###
 ###
-sc_evo_var = readRDS(here::here('output','sc_features_ess_over_0.2.rds'))
+#sc_evo_var = readRDS(here::here('output','sc_features_ess_over_0.2.rds'))
+sc_evo_var = readRDS(here::here('output','sc_features_ess_over_2.rds'))
+
 library(stringdist)
 sim_var = stringsimmatrix(sc_evo_var,colnames(HS_LMDATA), method='jw',p=1e-5,useNames='strings')
 maxS= apply(sim_var,1,max_)
@@ -737,7 +745,19 @@ sc2hs$hs_var[sc2hs$sc_var=='sgd.pGC'] = 'UP.GC_cdna'
 sc2hs$hs_var[str_detect(sc2hs$sc_var,'pu2008')] = NA
 nomatch = sc2hs %>% filter( similarity < 1 & !is.na(hs_var) & hs_var == "" )
 
-str_subset(colnames(HS_LMDATA),'super')
+
+sc_matched = sc2hs %>% filter(similarity == 1 | !is.na(hs_var) & hs_var != "" & hs_var %in% hs_evo_all$variable)
+nvar = n_distinct(sc_matched$hs_var)
+formula_sc2hs_best = reformulate(sc_matched$hs_var, response =  '.resid')
+
+m_best_ER = step(object=LM_ER, scope = as.formula(formula_sc2hs_best), direction = 'forward',k=log(nvar)*2,trace=0)
+decompose_variance(m_best_ER,to.df = T)
+sc_best = labels(m_best_ER)
+
+hs_best_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),data=hs_best_pred)
+print(intersect(labels(hs_best_lm),sc_best)
+print(hs_nbest)
+decompose_variance(hs_best_lm,to.df = T)
 
 # Additional datasets (human specific) ------------------------------------
 load.mcshane2016.data = function(){
