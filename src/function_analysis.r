@@ -216,6 +216,7 @@ network.centrality = function(fromTo,namenet=''){
 }
 
 # Find the specific quantiles
+QQ = function(x,p){ quantile(x,p,na.rm=T) }
 q25 = function(x){ quantile(x,0.25,na.rm=T) }
 q75 = function(x){ quantile(x,0.75,na.rm=T) }
 d10 = function(x){ quantile(x,0.1,na.rm=T) }
