@@ -125,6 +125,8 @@ find_orthologs = function(x,ortho=ens_mammals_df){
   QORTHO$id_ortho = QORTHO[[paste0(sp,"_homolog_ensembl_peptide")]]
   QORTHO$pid_ortho = QORTHO[[paste0(sp,"_homolog_perc_id")]]
   QORTHO$cds_delta = QORTHO[[paste0(sp,'_cds_diff')]]
+  QORTHO$tx_delta = QORTHO[[paste0(sp,'_tx_diff')]]
+  QORTHO$gname_ortho = QORTHO[[paste0(sp,'_homolog_associated_gene_name')]]
   QORTHO$two = phylum.2
   QORTHO$four = phylum.4
   QORTHO$num_label =numlab
@@ -132,22 +134,58 @@ find_orthologs = function(x,ortho=ens_mammals_df){
   saveRDS(QORTHO,file.path(path_ortho,paste0(x,'-',sp,'-',orgname,'.rds')))
   return(QORTHO)
 }
-make_mammals_fasta  = function(irow,ortho=hs_ortho_1to1){
+
+
+prepare_phylodata = function(id_hs, path_group, group_data, sp_seq=all_seq, add_human=T, overwrite=F){
+
+  sptree =  get_ensembl_sptree('43_eutherian_mammals_EPO_default')
+  sptree$node.label = NULL
+  sptree$tip.label = tolower(sptree$tip.label)
+
+  fasta_file = file.path(path_group,'fasta',paste0(id_hs,'.fa'))
+  ali_file = file.path(path_group,'ali',paste0(id_hs,'.mu'))
+  tree_file = file.path(path_group,'tree',paste0(id_hs,'.nh'))
+  human.fa = sp_seq[ id_hs ]
+  human.name = "homo_sapiens_grch38"
+
+  group.id = group_data$id_peptide
+  if(add_human){
+    group.fa = setNames(c(human.fa,sp_seq[ group.id ]),c(human.name,group_data$mammals_tree))
+  }else{
+    group.fa = setNames(sp_seq[ group.id ],group_data$mammals_tree)
+  }
+
+  # FASTA
+  if(!file.exists(fasta_file) || overwrite ){  writeXStringSet(group.fa,fasta_file,format="fasta") }
+
+  # ALIGNMENT
+  group.ali = muscle::muscle(group.fa,quiet=T)
+  if(!file.exists(ali_file) || overwrite ){  writeXStringSet(as(group.ali, "AAStringSet"),ali_file,format="fasta") }
+
+  # TREE
+  group.tree=ape::keep.tip(sptree, tip = rownames(group.ali))
+  if(!file.exists(tree_file) || overwrite ){ write.tree(group.tree,file = tree_file) }
+
+}
+
+make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
+#  irow=15
 
   library(muscle)
+  library(ape)
   og = ortho[irow,]
   ENSP = og$ensp
-  hs.fa = all_seq[ ENSP ]
-  hs_name = "homo_sapiens_grch38"
+
+  twos = hs_closest_two %>% filter(ensp == ENSP)
+  fours = hs_closest_four %>% filter(ensp == ENSP)
 
   if(og$n_ortholog<20){ return(NULL) }
   col_ortho_prot = str_subset(colnames(ortho),"homolog_ensembl_peptide")
   ids_mammals = og[,col_ortho_prot] %>% unlist() %>% na.omit() %>% as.vector()
   valid_ids = intersect(ids_mammals,names(all_seq))
-  fasta_name = file.path('fasta',paste0(ENSP,'.fa'))
-  ali_name = file.path('ali',paste0(ENSP,'.mu'))
 
-  ## MAMMALS (all)
+
+
   peptide2sp_all = strfind(valid_ids,ortho_prefix$prefix) %>%
     enframe('prefix','id_peptide') %>%
     unnest(id_peptide ) %>%
@@ -155,14 +193,21 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho_1to1){
     dplyr::select(id_peptide,ens_dataset,prefix,mammals_tree,two,four) %>%
     filter( id_peptide %in% names(all_seq) )
 
-  mammals0.fa = all_seq[ peptide2sp_all$id_peptide ]
-  names(mammals0.fa) = peptide2sp_all$mammals_tree
-  if(!file.exists(file.path(mammals0.path,fasta_name))){
-    writeXStringSet(c(hs.fa,mammals0.fa),file.path(mammals0.path,fasta_name),format="fasta")
-  }
-  ali_input = setNames(c(hs.fa,mammals0.fa),c(hs_name,peptide2sp_all$mammals_tree))
-  mammals0.ali = muscle::muscle(ali_input,quiet=T)
-  writeXStringSet(as(mammals0.ali, "AAStringSet"),file.path(mammals0.path,ali_name),format="fasta")
+  ## MAMMALS (all)
+  prepare_phylodata(id_hs = ENSP, path_group = mammals0.path, group_data = peptide2sp_all, sp_seq = all_seq,
+                    add_human = T, overwrite = T)
+
+  # mammals0.fa = all_seq[ peptide2sp_all$id_peptide ]
+  # names(mammals0.fa) = peptide2sp_all$mammals_tree
+  # if(!file.exists(file.path(mammals0.path,fasta_name)) || force.overwrite){
+  #   writeXStringSet(c(hs.fa,mammals0.fa),file.path(mammals0.path,fasta_name),format="fasta")
+  # }
+  # ali_input = setNames(c(hs.fa,mammals0.fa),c(hs_name,peptide2sp_all$mammals_tree))
+  # mammals0.ali = muscle::muscle(ali_input,quiet=T)
+  # writeXStringSet(as(mammals0.ali, "AAStringSet"),file.path(mammals0.path,ali_name),format="fasta")
+  #
+  # mammals0.tree=ape::keep.tip(sptree,tip = rownames(mammals0.ali))
+  # write.tree(mammals0.tree,file = file.path(mammals0.path,tree_file))
 
   if(og$is_best){
 
@@ -174,81 +219,133 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho_1to1){
       filter( id_peptide %in% names(all_seq) )
 
     ## MAMMALS (best)
-    mammals.id = peptide2sp$id_peptide
-    mammals.fa = all_seq[ mammals.id ]
-    names(mammals.fa) = peptide2sp$mammals_tree
-    if(!file.exists(file.path(mammals.path,fasta_name))){
-      writeXStringSet(c(hs.fa,mammals.fa),file.path(mammals.path,fasta_name),format="fasta")
-    }
-    ali_input = setNames(c(hs.fa,mammals.fa),c(hs_name,peptide2sp$mammals_tree))
-    mammals.ali = muscle::muscle(ali_input,quiet=T)
-    writeXStringSet(as(mammals.ali, "AAStringSet"),file.path(mammals.path,ali_name),format="fasta")
+    prepare_phylodata(id_hs = ENSP, path_group = mammals.path, group_data = peptide2sp, sp_seq = all_seq,
+                      add_human = T, overwrite = T)
+
+    # mammals.id = peptide2sp$id_peptide
+    # mammals.fa = all_seq[ mammals.id ]
+    # names(mammals.fa) = peptide2sp$mammals_tree
+    # if(!file.exists(file.path(mammals.path,fasta_name)) || force.overwrite ){
+    #   writeXStringSet(c(hs.fa,mammals.fa),file.path(mammals.path,fasta_name),format="fasta")
+    # }
+    # ali_input = setNames(c(hs.fa,mammals.fa),c(hs_name,peptide2sp$mammals_tree))
+    # mammals.ali = muscle::muscle(ali_input,quiet=T)
+    # writeXStringSet(as(mammals.ali, "AAStringSet"),file.path(mammals.path,ali_name),format="fasta")
+    #
+    # mammals.tree=ape::keep.tip(sptree,tip = rownames(mammals.ali))
+    # write.tree(mammals.tree,file = file.path(mammals.path,tree_file))
 
     ## EUARCHONTOGLIRES
-    euarcho.df= peptide2sp %>% filter(peptide2sp$two=='Euarchontoglires')  %>% arrange(id_peptide)
-    euarcho.fa = all_seq[  euarcho.df$id_peptide ]
-    names(euarcho.fa) =  euarcho.df$mammals_tree
-    if(!file.exists(file.path(euarcho.path,fasta_name))){
-      writeXStringSet(c(hs.fa,euarcho.fa),file.path(euarcho.path,fasta_name),format="fasta")
-    }
-    #ali_input = setNames(c(hs.fa,euarcho.fa),c(hs_name,euarcho.df$mammals_tree))
-    euarcho.ali = muscle::muscle(euarcho.fa,quiet=T)
-    writeXStringSet(as(euarcho.ali, "AAStringSet"),file.path(euarcho.path,ali_name),format="fasta")
+    euarcho.df= peptide2sp %>% filter(two=='Euarchontoglires')  %>% arrange(id_peptide)
+
+    prepare_phylodata(id_hs = ENSP, path_group = euarcho.path, group_data = euarcho.df, sp_seq = all_seq,
+                      add_human = T, overwrite = T)
+
+    # euarcho.fa = all_seq[  euarcho.df$id_peptide ]
+    # names(euarcho.fa) =  euarcho.df$mammals_tree
+    # if(!file.exists(file.path(euarcho.path,fasta_name)) || force.overwrite){
+    #   writeXStringSet(c(hs.fa,euarcho.fa),file.path(euarcho.path,fasta_name),format="fasta")
+    # }
+    # ali_input = setNames(c(hs.fa,euarcho.fa),c(hs_name,euarcho.df$mammals_tree))
+    # euarcho.ali = muscle::muscle(ali_input,quiet=T)
+    # writeXStringSet(as(euarcho.ali, "AAStringSet"),file.path(euarcho.path,ali_name),format="fasta")
+    #
+    # euarcho.tree=ape::keep.tip(sptree,tip = rownames(euarcho.ali))
+    # write.tree(euarcho.tree,file = file.path(euarcho.path,tree_file))
 
     ## GLIRES
-    glires.df= peptide2sp %>% filter(peptide2sp$four=='Glires')  %>% arrange(id_peptide)
-    glires.fa = all_seq[ glires.df$id_peptide]
-    names(glires.fa) = glires.df$mammals_tree
-    if(!file.exists(file.path(glires.path,fasta_name))){
-      writeXStringSet(c(hs.fa,glires.fa),file.path(glires.path,fasta_name),format="fasta")
-    }
-    #ali_input = setNames(c(hs.fa,glires.fa),c(hs_name,glires.df$mammals_tree))
-    glires.ali = muscle::muscle(glires.fa,quiet=T)
-    writeXStringSet(as(glires.ali, "AAStringSet"),file.path(glires.path,ali_name),format="fasta")
+    glires.df= peptide2sp %>% filter(four=='Glires') %>%
+               left_join(fours, by=c('id_peptide'='id_ortho','ens_dataset','mammals_tree','two','four')) %>% arrange(rk_four)
+
+    prepare_phylodata(id_hs = ENSP, path_group = glires.path, group_data = glires.df, sp_seq = all_seq,
+                      add_human = F, overwrite = T)
+
+    # glires.fa = all_seq[ glires.df$id_peptide]
+    # names(glires.fa) = glires.df$mammals_tree
+    # if(!file.exists(file.path(glires.path,fasta_name)) || force.overwrite){
+    #   writeXStringSet(c(hs.fa,glires.fa),file.path(glires.path,fasta_name),format="fasta")
+    # }
+    # #ali_input = setNames(c(hs.fa,glires.fa),c(hs_name,glires.df$mammals_tree))
+    # glires.ali = muscle::muscle(glires.fa,quiet=T)
+    # writeXStringSet(as(glires.ali, "AAStringSet"),file.path(glires.path,ali_name),format="fasta")
+    #
+    # glires.tree=ape::keep.tip(sptree,tip = rownames(glires.ali))
+    # write.tree(glires.tree,file = file.path(glires.path,tree_file))
 
     ## LAURASIATHERIA
-    laura.df= peptide2sp %>% filter(peptide2sp$two=='Laurasiatheria')  %>% arrange(id_peptide)
-    laura.fa = all_seq[laura.df$id_peptide]
-    names(laura.fa) = laura.df$mammals_tree
-    if(!file.exists(file.path(laura.path,fasta_name))){
-      writeXStringSet(c(hs.fa,laura.fa),file.path(laura.path,fasta_name),format="fasta")
-    }
-    #ali_input = setNames(c(hs.fa,laura.fa),c(hs_name,laura.df$mammals_tree))
-    laura.ali = muscle::muscle(laura.fa,quiet=T)
-    writeXStringSet(as(laura.ali, "AAStringSet"),file.path(laura.path,ali_name),format="fasta")
+    laura.df= peptide2sp %>% filter(two=='Laurasiatheria') %>%
+              left_join(twos, by=c('id_peptide'='id_ortho', 'ens_dataset','mammals_tree','two','four')) %>% arrange(rk_two)
+
+    prepare_phylodata(id_hs = ENSP, path_group = laura.path, group_data = laura.df, sp_seq = all_seq,
+                      add_human = F, overwrite = T)
+
+    # laura.fa = all_seq[laura.df$id_peptide]
+    # names(laura.fa) = laura.df$mammals_tree
+    # if(!file.exists(file.path(laura.path,fasta_name)) || force.overwrite){
+    #   writeXStringSet(c(hs.fa,laura.fa),file.path(laura.path,fasta_name),format="fasta")
+    # }
+    # #ali_input = setNames(c(hs.fa,laura.fa),c(hs_name,laura.df$mammals_tree))
+    # laura.ali = muscle::muscle(laura.fa,quiet=T)
+    # writeXStringSet(as(laura.ali, "AAStringSet"),file.path(laura.path,ali_name),format="fasta")
+    #
+    # laura.tree=ape::keep.tip(sptree,tip = rownames(laura.ali))
+    # write.tree(laura.tree,file = file.path(laura.path,tree_file))
 
     ## LAURASIATHERIA
-    laura1.df= peptide2sp %>% filter(peptide2sp$four=='Laurasiatheria.1')  %>% arrange(id_peptide)
-    laura1.fa = all_seq[laura1.df$id_peptide]
-    names(laura.fa) = laura1.df$mammals_tree
-    if(!file.exists(file.path(laura1.path,fasta_name))){
-      writeXStringSet(c(hs.fa,laura1.fa),file.path(laura1.path,fasta_name),format="fasta")
-    }
-    #ali_input = setNames(c(hs.fa,laura1.fa),c(hs_name,laura1.df$mammals_tree))
-    laura1.ali = muscle::muscle(laura1.fa,quiet=T)
-    writeXStringSet(as(laura1.ali, "AAStringSet"),file.path(laura1.path,ali_name),format="fasta")
+    laura1.df= peptide2sp %>% filter(four=='Laurasiatheria.1') %>%
+               left_join(fours, by=c('id_peptide'='id_ortho','ens_dataset','mammals_tree','two','four')) %>% arrange(rk_four)
+
+    prepare_phylodata(id_hs = ENSP, path_group = laura1.path, group_data = laura1.df, sp_seq = all_seq,
+                      add_human = F, overwrite = T)
+
+
+    # laura1.fa = all_seq[laura1.df$id_peptide]
+    # names(laura.fa) = laura1.df$mammals_tree
+    # if(!file.exists(file.path(laura1.path,fasta_name)) || force.overwrite ){
+    #   writeXStringSet(c(hs.fa,laura1.fa),file.path(laura1.path,fasta_name),format="fasta")
+    # }
+    # #ali_input = setNames(c(hs.fa,laura1.fa),c(hs_name,laura1.df$mammals_tree))
+    # laura1.ali = muscle::muscle(laura1.fa,quiet=T)
+    # writeXStringSet(as(laura1.ali, "AAStringSet"),file.path(laura1.path,ali_name),format="fasta")
+    #
+    # laura1.tree=ape::keep.tip(sptree,tip = rownames(laura1.ali))
+    # write.tree(laura1.tree,file = file.path(laura1.path,tree_file))
 
     ## PRIMATES
-    primates.df= peptide2sp %>% filter(peptide2sp$four=='Primates')  %>% arrange(id_peptide)
-    primates.fa = all_seq[primates.df$id_peptide]
-    names(primates.fa) =  primates.df$mammals_tree
-    if(!file.exists(file.path(primates.path,fasta_name))){
-      writeXStringSet(c(hs.fa,primates.fa),file.path(primates.path,fasta_name),format="fasta")
-    }
-    ali_input = setNames(c(hs.fa,primates.fa),c(hs_name,primates.df$mammals_tree))
-    primates.ali = muscle::muscle(ali_input,quiet=T)
-    writeXStringSet(as(primates.ali, "AAStringSet"),file.path(primates.path,ali_name),format="fasta")
+    primates.df= peptide2sp %>% filter(four=='Primates')  %>% arrange(id_peptide)
+    prepare_phylodata(id_hs = ENSP, path_group = primates.path, group_data = primates.df, sp_seq = all_seq,
+                      add_human = T, overwrite = T)
+
+    # primates.fa = all_seq[primates.df$id_peptide]
+    # names(primates.fa) =  primates.df$mammals_tree
+    # if(!file.exists(file.path(primates.path,fasta_name)) || force.overwrite){
+    #   writeXStringSet(c(hs.fa,primates.fa),file.path(primates.path,fasta_name),format="fasta")
+    # }
+    # ali_input = setNames(c(hs.fa,primates.fa),c(hs_name,primates.df$mammals_tree))
+    # primates.ali = muscle::muscle(ali_input,quiet=T)
+    # writeXStringSet(as(primates.ali, "AAStringSet"),file.path(primates.path,ali_name),format="fasta")
+    #
+    # primates.tree=ape::keep.tip(sptree,tip = rownames(primates.ali))
+    # write.tree(primates.tree,file = file.path(primates.path,tree_file))
 
     ## CARNIVORA
-    carnivora.df= peptide2sp %>% filter(peptide2sp$four=='Carnivora')  %>% arrange(id_peptide)
-    carnivora.fa = all_seq[carnivora.df$id_peptide]
-    names(carnivora.fa) = carnivora.df$mammals_tree
-    if( !file.exists(file.path(carnivora.path,fasta_name))){
-      writeXStringSet(c(hs.fa,carnivora.fa),file.path(carnivora.path,fasta_name),format="fasta")
-    }
-    #ali_input = setNames(c(hs.fa,carnivora.fa),c(hs_name,carnivora.df$mammals_tree))
-    carnivora.ali = muscle::muscle(carnivora.fa,quiet=T)
-    writeXStringSet(as(carnivora.ali, "AAStringSet"),file.path(carnivora.path,ali_name),format="fasta")
+    carnivora.df= peptide2sp %>% filter(four=='Carnivora')  %>%
+                  left_join(fours, by=c('id_peptide'='id_ortho','ens_dataset','mammals_tree','two','four')) %>% arrange(rk_four)
+
+    prepare_phylodata(id_hs = ENSP, path_group = carnivora.path, group_data = carnivora.df, sp_seq = all_seq,
+                      add_human = F, overwrite = T)
+
+    # carnivora.fa = all_seq[carnivora.df$id_peptide]
+    # names(carnivora.fa) = carnivora.df$mammals_tree
+    # if( !file.exists(file.path(carnivora.path,fasta_name)) || force.overwrite){
+    #   writeXStringSet(c(hs.fa,carnivora.fa),file.path(carnivora.path,fasta_name),format="fasta")
+    # }
+    # #ali_input = setNames(c(hs.fa,carnivora.fa),c(hs_name,carnivora.df$mammals_tree))
+    # carnivora.ali = muscle::muscle(carnivora.fa,quiet=T)
+    # writeXStringSet(as(carnivora.ali, "AAStringSet"),file.path(carnivora.path,ali_name),format="fasta")
+    # carnivora.tree=ape::keep.tip(sptree,tip = rownames(carnivora.ali))
+    # write.tree(carnivora.tree,file = file.path(carnivora.path,tree_file))
+
   }
 }
 
@@ -278,9 +375,9 @@ ens_vertebrates_clades = ape::subtrees(ens_vertebrates_tree, wait=FALSE) %>%
 library(ggtree)
 VERTEBRATES = ggtree(ens_vertebrates_tree,ladderize = T,right = T,branch.length = 'none') +
   ggtree::geom_hilight(node=307, alpha=0.2, type="rect") +
-  ggtree::geom_nodelab(size=2.0,geom='label',node = 'internal') +
-  ggtree::geom_tiplab(size=6,as_ylab = T,align = T)
-ggsave(VERTEBRATES, filename=file.path(path_ortho,'VERTEBRATES_TREE.pdf'), scale=2.5)
+  ggtree::geom_nodelab(size=3,geom='label',node = 'internal') +
+  ggtree::geom_tiplab(size=3,offset=0.5,align=T) + xlim(0,40)
+ggsave(plot=VERTEBRATES, filename=file.path(path_ortho,'VERTEBRATES_TREE.pdf'), height=25, width=25)
 
 # 2. get Ensembl Eutherian Mammals (aligned genomes) ----------------------------
 ens_mammals_tree = get_ensembl_sptree('43_eutherian_mammals_EPO_default')
@@ -356,29 +453,48 @@ hs_cols = c('ensg','enst','ensp',"is_enspref","has_ensp","is_canonical","canonic
 
 ens_ortho = ens_mammals_df %>% filter(is_leaf)
 # Save all ensembl queries to get human-mammals orthologs
-HS_QUERY = preload(file.path(path_ortho,'hs_mammals_ortho.rds'),
+HS_QUERY = preload(file.path(path_ortho,'ensembl_orthologs.rds'),
                  { lapply(X=1:nrow(ens_ortho), FUN=function(x){ find_orthologs(x,ens_ortho) }) %>% compact },
                 'retrieve mammals orthologs...')
-# find prefix
+
 col_ens_mammals = c("ens_dataset","species","mammals_tree","organism","two","four",'num_label','filter',
-                    'ensp','id_ortho','pid_ortho','cds_delta')
-ortho_prefix = map(HS_QUERY, extract, col_ens_mammals) %>% compact() %>%
-               bind_rows() %>%
+                    'ensp','id_ortho','gname_ortho','pid_ortho','cds_delta','tx_delta')
+
+df_query =  map(HS_QUERY, extract, col_ens_mammals) %>%
+            bind_rows()
+
+hs_closest_two = df_query %>%
+             filter(two != '0' ) %>%
+             group_by(two,ensp) %>%
+             arrange(cds_delta,desc(pid_ortho),tx_delta) %>%
+             mutate(rk_two = row_number()) %>%
+             ungroup() %>% arrange(ensp)
+hs_closest_four = df_query %>%
+             group_by(four,ensp) %>%
+             arrange(cds_delta,desc(pid_ortho),tx_delta) %>%
+             mutate(rk_four = row_number()) %>%
+             ungroup() %>% arrange(ensp)
+
+# find prefix
+ortho_prefix = df_query %>%
                drop_na() %>%
-               mutate( prefix = str_extract(id_ortho,'^[^0-9]+'), n_human = n_distinct(ensp) ) %>%
+               group_by(ens_dataset) %>%
+               mutate( prefix = hutils::longest_prefix(id_ortho), n_human = n_distinct(ensp) ) %>%
+               #mutate( prefix = str_extract(id_ortho,'^[^0-9]+'), n_human = n_distinct(ensp) ) %>%
                group_by(ens_dataset) %>%
                mutate(n_orthologs = n_distinct(id_ortho),
                       #f_orthologs = n_orthologs/n_protein_coding, n_uniprot = n_swissprot+n_trembl,
                       f_human = n_orthologs/n_human,
                       qq_pid = toString( round(quantile(pid_ortho,c(0.01,0.05,0.25,0.75,0.95,0.99),na.rm=T)) ),
                       md_cds_diff = median_(cds_delta)) %>%
-               dplyr::select(-id_ortho,-pid_ortho,-cds_delta,-ensp) %>%
+               dplyr::select(-id_ortho,-pid_ortho,-cds_delta,-tx_delta,-gname_ortho,-ensp) %>%
                group_by(two) %>% mutate( num_two= paste0(two, " (n=", n_distinct(species), ")") ) %>%
                group_by(four) %>% mutate( num_four = paste0(four, " (n=", n_distinct(species), ")") ) %>%
                distinct() %>%
                mutate(col_peptide = paste0(ens_dataset,'_homolog_ensembl_peptide')) %>%
                mutate( num_four = factor(num_four, c('out',sort(unique(num_four)))),
                        num_two = factor(num_two, c('out',sort(unique(num_two)))) )
+
 
 # 5. combine orthologs data of human-to-mammals  -------------------------------
 mammals = seq_along(HS_QUERY)
@@ -391,12 +507,13 @@ for( s in mammals ){ #
   cat(sprintf("%3s %-20s\n",s,sp))
   col_ortho_pep = mammals_pep[s]
   count_ens_id( HS_QUERY[[s]] )
-  HS_ORTHO = left_join(HS_ORTHO, HS_QUERY[[s]] , by=colnames(hs_tx) ) %>%
+  og_col = c('ens_dataset','organsim','species','mammals_tree','two','four','num_label','filter')
+
+  HS_ORTHO = left_join(HS_ORTHO, HS_QUERY[[s]] , by=c(colnames(hs_tx)), suffix=c('','') ) %>%
     dplyr::select(-contains(c('goc_score','wga_coverage','no_ortholog','_homolog_ensembl_gene'))) %>%
     distinct()
   print(dim(HS_ORTHO))
 }
-
 #dim(HS_ORTHO)
 #colnames(HS_ORTHO)
 
@@ -415,7 +532,9 @@ hs_ortho_1to1 = HS_ORTHO %>%
   dplyr::filter(!is.na(ensg) & !is.dup(ensp) ) %>%
   group_by(ensg,enst,ensp) %>%
   mutate(n_ortholog = sum(!is.na(c_across(ends_with('homolog_ensembl_peptide'))))) %>%
-  filter(n_ortholog == max(n_ortholog) & n_ortholog != 0 ) %>%
+  filter(n_ortholog == max(n_ortholog) & n_ortholog != 0 )
+
+hs_ortho = hs_ortho_1to1 %>%
   dplyr::select( all_of(colnames(hs_tx)), 'n_ortholog', ends_with('_homolog_ensembl_peptide')) %>%
   rowwise() %>%
   mutate( f_orthogroup =  mean(!is.na(c_across(HS_MAMMALS$col_peptide))) ) %>%
@@ -429,10 +548,11 @@ hs_ortho_1to1 = HS_ORTHO %>%
   mutate( is_best = sum(is.na(c_across(HS_MAMMALS$col_peptide))) < 4 ) %>%
   ungroup() %>% mutate( p_top = percent_rank(f_orthogroup) )
 
+
 library(ggplot2)
-count_hs_ortho = hs_ortho_1to1 %>% group_by(n_ortholog) %>% summarize(total=n())
-count_hs_min = hs_ortho_1to1 %>% filter(n_ortholog>20) %>% group_by(n_ortholog) %>% summarize(total=n())
-count_hs_best = hs_ortho_1to1 %>% filter(is_best) %>% group_by(n_ortholog) %>% summarize(total=n())
+count_hs_ortho = hs_ortho %>% group_by(n_ortholog) %>% summarize(total=n())
+count_hs_min = hs_ortho %>% filter(n_ortholog>20) %>% group_by(n_ortholog) %>% summarize(total=n())
+count_hs_best = hs_ortho %>% filter(is_best) %>% group_by(n_ortholog) %>% summarize(total=n())
 MIN_SP = min(count_hs_min$n_ortholog)
 BEST_SP = min(count_hs_best$n_ortholog)
 
@@ -466,7 +586,7 @@ p1 = ggplot(count_hs_ortho ) +
 
 # 7. Download human fasta sequences --------------------------------------------
 mart <- useEnsembl("ensembl", dataset="hsapiens_gene_ensembl",mirror = ENS_MIRROR)
-hs_seq = getSequence(id=hs_ortho_1to1$ensp, type="ensembl_peptide_id", seqType="peptide", mart=mart) %>%
+hs_seq = getSequence(id=hs_ortho$ensp, type="ensembl_peptide_id", seqType="peptide", mart=mart) %>%
          dplyr::select(ensembl_peptide_id,peptide) %>% deframe()
 hs_fasta = Biostrings::AAStringSet(x=hs_seq)
 star = Biostrings::subseq(hs_fasta,start=-1) == '*'
@@ -478,7 +598,7 @@ get_mammals_sequence = function(x,ortho=ortho_prefix){
   sp = ortho$ens_dataset[x]
   message(sprintf('%2s %s',x,sp))
   id_col=ortho$col_peptide[x]
-  ids = hs_ortho_1to1[[id_col]] %>% na.omit() %>% as.vector()
+  ids = hs_ortho[[id_col]] %>% na.omit() %>% as.vector()
 
   mart <- useEnsembl("ensembl", dataset=paste0(sp,"_gene_ensembl"),mirror = ENS_MIRROR)
   ortho_seq = getSequence(id=ids, type = "ensembl_peptide_id", seqType = "peptide", mart = mart) %>%
@@ -529,17 +649,24 @@ ggplot2::ggsave(PP.1, height=12,width=18, filename = file.path(path_ortho,'Mamma
 
 # 9. Write the fasta for mammals and subphylum ---------------------------------
 hs_ortho_1to1.rds=file.path(path_ortho,'hs_ortho_1to1.rds')
-ortho_prefix.rds = file.path(path_ortho,'ensembl_orthologs.rds')
+hs_ortho.rds=file.path(path_ortho,'hs_orthologs.rds')
+ortho_prefix.rds = file.path(path_ortho,'ensembl_species.rds')
 HS_MAMMALS.rds=file.path(path_ortho,'ensembl_mammals.rds')
 hs_fasta.rds =file.path(path_ortho,'ensembl_human_seq.rds')
+hs_closest.rds = file.path(path_ortho,'hs_closest_ortho.rds')
+
 #saveRDS(hs_ortho_1to1, hs_ortho_1to1.rds)
+#saveRDS(hs_ortho, hs_ortho.rds)
 #saveRDS(ortho_prefix, ortho_prefix.rds)
 #saveRDS(HS_MAMMALS, HS_MAMMALS.rds)
 #saveRDS(hs_fasta_prot, hs_fasta.rds)
+#saveRDS(list(two=hs_closest_two,four=hs_closest_four),hs_closest.rds)
 
 #hs_ortho_1to1=readRDS(hs_ortho_1to1.rds)
 #HS_MAMMALS=readRDS(HS_MAMMALS.rds)
 #ortho_prefix=readRDS(ortho_prefix.rds)
+#hs_closest_two = readRDS(hs_closest.rds)$two
+#hs_closest_four = readRDS(hs_closest.rds)$four
 
 # get all sequences
 mammals_seq=readRDS(file.path(path_ortho,'ensembl_mammals_seq.rds'))
@@ -557,7 +684,7 @@ laura.path = file.path(path_ortho,'hs_laurasiatheria')
 
 
 all_paths = c(mammals0.path,mammals.path,glires.path,laura1.path,primates.path,carnivora.path,euarcho.path,laura.path)
-all_folders = c(file.path(all_paths,'fasta'),file.path(all_paths,'ali'))
+all_folders = c(file.path(all_paths,'fasta'),file.path(all_paths,'ali'),file.path(all_paths,'tree'))
 sapply(all_folders, dir.create, showWarnings = F,recursive = T)
 
 library(muscle)
@@ -589,7 +716,6 @@ check_fasta_to_ali = function(path){
 }
 
 mapply(check_fasta_to_ali,all_paths)
-
 best = hs_ortho_1to1 %>% filter( is_best)
 table(best$n_glires)
 table(best$n_carnivora)
