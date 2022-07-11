@@ -1978,6 +1978,7 @@ get.ensembl.species= function(){
 
 find_ensembl_sptree = function(){
   URL_FTP_ENSEMBL="http://ftp.ensembl.org/pub/"
+  #"http://ftp.ebi.ac.uk/ensemblgenomes/pub/fungi/current/compara/species_trees/fungi_protein-trees_default.nh"
   URL_SPTREE = paste0(URL_FTP_ENSEMBL,"current_compara/species_trees/")
   httr::set_config(httr::config(ssl_verifypeer = FALSE))
   httr::set_config(httr::config(ssl_cipher_list = "DEFAULT@SECLEVEL=1"))
