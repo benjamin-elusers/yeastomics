@@ -125,6 +125,12 @@ msa2df = function(MSA_SEQ,REF_NAME,ID,verbose=F){
   L = nchar(MSA_SEQ)
   N = length(unmasked(MSA_SEQ))
   IREF = which(rownames(MSA_SEQ) %in% REF_NAME)
+  if(length(IREF) == 0){
+    IREF = 1
+    warning(sprintf('Reference name %s not found.\n',REF_NAME))
+    warning(sprintf('First sequences used as reference %s...',rownames(MSA_SEQ)[IREF]))
+  }
+
   if(verbose)
     message(ID)
 
