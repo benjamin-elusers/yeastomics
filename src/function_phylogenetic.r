@@ -421,7 +421,6 @@ get_r4s = function(r4s_files, as_df=T){
     return(read.R4S(file,verbose = F))
   }
 
-
   nfiles = length(r4s_files)
   r4s_type = hutils::longest_suffix(r4s_files)
   pb_r4s=  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading r4s (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",r4s_type))
@@ -436,6 +435,15 @@ get_r4s = function(r4s_files, as_df=T){
   }
 }
 
+find_leisr = function(leisr_resdir="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain/",
+                      filetype = "LEISR.json"){
+  leisr_type = match.arg(arg=filetype, choices = c("LEISR.json",".leisr"),several.ok = F)
+  leisr_files = list.files(path=leisr_resdir,pattern = leisr_type,full.names = T)
+  nfiles = length(leisr_files)
+  message(sprintf('Found %s LEISR files (ext=%s)',nfiles,leisr_type))
+  return(leisr_files)
+}
+
 
 read_leisr = function(json){
   content = do.call(rbind,json$MLE$content[[1]])
@@ -447,9 +455,7 @@ read_leisr = function(json){
   return(df)
 }
 
-get_leisr = function(leisr_resdir="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain/",
-                     filetype = "LEISR.json",
-                     as_df=T){
+get_leisr = function(leisr_files,  as_df=T){
 
   progress_leisr_tsv = function(file,.pb=NULL){
     if(!.pb$finished){ .pb$tick() }
@@ -460,59 +466,63 @@ get_leisr = function(leisr_resdir="/data/benjamin/NonSpecific_Interaction/Data/E
     if(!.pb$finished){ .pb$tick() }
     return(read_leisr(RJSONIO::fromJSON(file)))
   }
-  leisr_type = match.arg(arg=filetype, choices = c("LEISR.json",".leisr"),several.ok = F)
-  leisr_files = list.files(path=leisr_resdir,pattern = leisr_type,full.names = T)
+
   nfiles = length(leisr_files)
+  iqtree_type = hutils::longest_suffix(leisr_files) %>% file_ext  %>% paste0(".",.)
+  nms = basename(leisr_files) %>% tools::file_path_sans_ext(.)
+  leisr_type = hutils::longest_suffix(leisr_files) %>% paste0(".",file_ext(.))
+
   pb_leisr =  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading leisr (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",leisr_type))
   if(leisr_type == "LEISR.json"){
-    leisr_data = purrr::pmap(list(leisr_files),progress_leisr_json,pb_leisr)
+    leisr_data = purrr::pmap(list(leisr_files),progress_leisr_json,pb_leisr) %>% set_names(nms)
   }else if(leisr_type == ".leisr"){
-    leisr_data = purrr::pmap(list(leisr_files),progress_leisr_tsv,pb_leisr)
+    leisr_data = purrr::pmap(list(leisr_files),progress_leisr_tsv,pb_leisr) %>% set_names(nms)
   }
-  orfs = str_extract_all(leisr_files,SGD.nomenclature()) %>% unlist
-  names(leisr_data) = orfs
 
   if(as_df){
-    df_leisr = do.call(rbind,leisr_data) %>% as_tibble
+    df_leisr = leisr_data %>% bind_rows
     return(df_leisr)
   }else{
     return(leisr_data)
   }
 }
 
-get_iqtree = function(iqtree_resdir="/media/WEXAC_data/FUNGI/IQTREE/",
-                      filetype = ".rate",
-                      as_df=T){
-  progress_iqtree_tsv = function(file,.pb=NULL){
-    if(!.pb$finished){ .pb$tick() }
-    res = read_delim(file, progress=F,show_col_types=F,delim='\t',comment="#")
-    orf = str_extract(file,SGD.nomenclature())
-    res$orf = orf
-    return(res)
-  }
-
+find_iqtree = function(iqtree_resdir="/media/WEXAC_data/FUNGI/IQTREE/",
+                       filetype = ".rate"){
   iqtree_type = match.arg(arg=filetype, choices = c(".mlrate",".rate"),several.ok = F)
   iqtree_files = list.files(path=iqtree_resdir,pattern = paste0('\\',iqtree_type),full.names = T)
   nfiles = length(iqtree_files)
-  pb_iqtree =  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading iqtree (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",iqtree_type))
-  if(iqtree_type == ".mlrate"){
-    iqtree_data = purrr::pmap(list(iqtree_files),progress_iqtree_tsv,pb_iqtree)
-  }else if(iqtree_type == ".rate"){
-    iqtree_data = purrr::pmap(list(iqtree_files),progress_iqtree_tsv,pb_iqtree)
+  message(sprintf('Found %s IQTREE files (ext=%s)',nfiles,iqtree_type))
+  return(iqtree_files)
+}
+
+get_iqtree = function(iqtree_files,  as_df=T){
+  progress_iqtree_tsv = function(file,.pb=NULL){
+    if(!.pb$finished){ .pb$tick() }
+    res = read_delim(file, progress=F,show_col_types=F,delim='\t',comment="#")
+    #orf = str_extract(file,SGD.nomenclature())
+    #res$orf = orf
+    return(res)
   }
-  orfs = str_extract_all(iqtree_files,SGD.nomenclature()) %>% unlist
-  names(iqtree_data) = orfs
+
+  nfiles = length(iqtree_files)
+  iqtree_type = hutils::longest_suffix(iqtree_files) %>% file_ext  %>% paste0(".",.)
+  nms = basename(iqtree_files) %>% tools::file_path_sans_ext(.)
+  pb_iqtree =  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading iqtree (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",iqtree_type))
+
+  if(iqtree_type == ".mlrate"){
+    iqtree_data = purrr::pmap(list(iqtree_files),progress_iqtree_tsv,pb_iqtree) %>% set_names(nms)
+  }else if(iqtree_type == ".rate"){
+    iqtree_data = purrr::pmap(list(iqtree_files),progress_iqtree_tsv,pb_iqtree) %>% set_names(nms)
+  }
 
   if(as_df){
-    df_iqtree = do.call(rbind,iqtree_data) %>% as_tibble
+    df_iqtree = bind_rows(iqtree_data,.id='id') %>% as_tibble
     return(df_iqtree)
   }else{
     return(iqtree_data)
   }
 }
-
-
-
 
 read_leisr = function(json){
   content = do.call(rbind,json$MLE$content[[1]])
@@ -708,20 +718,46 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
       dplyr::filter(!is.na(ref_pos)) %>%
       dplyr::rename(r4s_rate=SCORE) %>%
       dplyr::select(-c('QQ1','QQ2','STD','MSA'))
+
   if( dir.exists(IQTREE_DIR) ){
     message('(4.1) Add IQTREE evolutionary rate...')
-    iqtree = get_iqtree(iqtree_resdir = IQTREE_DIR,filetype = '.mlrate', as_df = T)
-    iqtree2 = get_iqtree(iqtree_resdir = IQTREE_DIR,filetype = '.rate', as_df = T)
-    evorates = evorates %>%
-        left_join(iqtree,by=c('id'='orf','msa_pos'='Site')) %>%
-        left_join(iqtree2,by=c('id'='orf','msa_pos'='Site'))
-        dplyr::rename(iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate)
+    .mlrate = find_iqtree( IQTREE_DIR,filetype = '.mlrate')
+    .rate = find_iqtree( IQTREE_DIR,filetype = '.rate')
+
+    if(require(pbmcapply)){
+      library(pbmcapply)
+      message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
+      iqtree.mlrate = pbmclapply(X = .mlrate, FUN = get_iqtree, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
+        bind_rows
+      iqtree.rate = pbmclapply(X = .rate, FUN = get_iqtree, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
+        bind_rows
+    }else{
+      iqtree.mlrate = get_iqtree( .mlrate, as_df = T)
+      iqtree.rate = get_iqtree( .rate , as_df = T)
+    }
+
+    iqtree = left_join(iqtree.mlrate,iqtree.rate,by=c('id','Site')) %>%
+             mutate(ID = coalesce(extract_id(id,id_type),id) ) %>%
+             dplyr::rename(iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate)
+
+    evorates = left_join(evorates,iqtree,by=c('id'='ID','msa_pos'='Site'))
   }
+
   if( dir.exists(LEISR_DIR) ){
     message('(4.2) Add LEISR evolutionary rate...')
-    leisr = get_leisr(leisr_resdir = LEISR_DIR, filetype = 'LEISR.json', as_df = T)
+    .leisr.json =  find_iqtree( LEISR_DIR,filetype = 'LEISR.json')
+    if(require(pbmcapply)){
+      library(pbmcapply)
+      message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
+      leisr.rate = pbmclapply(X =.leisr.json, FUN = get_leisr, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
+                  bind_rows()
+    }else{
+      leisr.rate = get_leisr(.leisr.json, as_df = T)
+    }
+
+    leisr = leisr.rate %>% mutate(ID = coalesce(extract_id(ID,id_type),ID) )
     evorates = evorates %>%
-      left_join(leisr,by=c('id','msa_pos'='pos'))
+      left_join(leisr,by=c('id'='ID','msa_pos'='pos'))
       dplyr::rename(leisr_mle = mle, leisr_up=upper, leisr_low=lower,
                     leisr_global= log_l_global, leisr_local= log_l_local  )
   }
