@@ -118,11 +118,11 @@ read.sequences = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
   #library(biomartr) # NOT library
   #library(purrr)    # NOT library
   seqtype = match.arg(type, choices=c('AA','DNA'),several.ok = F)
-
-  task="Reading fasta sequences..."
+  nseq =  length(seqfiles)
+  task=sprintf("Reading %s fasta sequences...",nseq)
   tic(msg = task)
   message(task)
-  pb = progress::progress_bar$new(total = length(seqfiles), width = 100, clear=T,
+  pb = progress::progress_bar$new(total =nseq, width = 100, clear=T,
                                   format = " (:spin) :what [:bar] :percent (:current/:total # :elapsed eta: ~:eta)")
 
   readSequence = function(file, .pb=NULL, .pb.toprint=task,.seqtype='AA'){
