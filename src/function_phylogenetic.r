@@ -694,12 +694,11 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
     library(pbmcapply)
     message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
     r4s_data = pbmclapply(X = r4s_files, FUN = get_r4s, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
-               bind_rows() %>% as_tibble() %>%
-               mutate(ID = coalesce(extract_id(ID,id_type),ID) )
+               bind_rows() %>% as_tibble()
   }else{
     r4s_data = get_r4s(r4s_files,as_df = T)
-    r4s = r4s_data %>% mutate(ID = coalesce(extract_id(ID,id_type),ID) )
   }
+  r4s = r4s_data %>% mutate(ID = coalesce(extract_id(ID,id_type),ID) )
 
   IQTREE_DIR = file.path(resdir,"IQTREE/")
   LEISR_DIR = file.path(resdir,"LEISR/")
