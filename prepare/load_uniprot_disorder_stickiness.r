@@ -25,47 +25,71 @@ UNIPROT_IDR_ATAR = c( "H0WFA5", "Q7T226", "O00444", "Q15468", "Q6UVJ0", "O95613"
 
 
 PHASESEP_DB_LLPS = readxl::read_excel("/home/benjamin/Downloads/Compressed/phasepdb/phasepdbv2_llps.xlsx")
-
-
 #PHASESEP_DB_MLO  = readxl::read_excel("/home/benjamin/Downloads/Compressed/phasepdb/phasepdbv2_mlolt_mloht.xlsx")
-colnames(PHASESEP_DB_LLPS)
+#colnames(PHASESEP_DB_LLPS)
+
+
 # 1. Find the taxon id matching your keywords (case-insensitive) ===============
-find.uniprot_refprot(c('human','homo','sapiens','eukaryota'))
 # For example, to find the bacteria E. coli
-ecoli = find.uniprot_refprot(c('bacteria','Escherichia','coli','K12'))
-print(ecoli$tax_id) # Taxon id = 83333
+#ecoli = find.uniprot_refprot(c('bacteria','Escherichia','coli','K12'))
+#print(ecoli$tax_id) # Taxon id = 83333
 
 # 2. Get the reference proteome sequences for the selected taxon ===============
 # ec_aa = get.uniprot.proteome(taxid = 83333, DNA = F)
 
-idr_prot = Biostrings::readAAStringSet("/home/benjamin/Desktop/GitHub/yeastomics/prepare/uniprot_idr.fasta")
-names(idr_prot) = str_extract(names(idr_prot),UNIPROT.nomenclature())
+IDR_prot = Biostrings::readAAStringSet("/home/benjamin/Desktop/GitHub/yeastomics/prepare/uniprot_idr.fasta")
+names(IDR_prot) = str_extract(names(IDR_prot),UNIPROT.nomenclature())
 
 # 3. Get the reference uniprot accession for the selected taxon ================
 # ec_uniref = names(ec_aa)
 
 # 4. Get all disorder predictions (from taxon id or from list of ids) ==========
+# Took 130 sec. for 4402 identifiers from e. coli
 # ------> With uniprot accession <------
-MOBIDB = fetch.mobidb(UNIPROT_IDR_ATAR) %>% # Took 130 sec. for 4402 identifiers from e. coli
-          group_by(acc) %>%
-          mutate(feature_maxlen = max_(content_count),
-            longest_idr = feature == 'disorder' & content_count == feature_maxlen ) %>%
-        left_join(PHASESEP_DB_LLPS, by=c('acc'='uniprot_entry'))
+MOBIDB = fetch.mobidb(UNIPROT_IDR_ATAR)
+        #left_join(PHASESEP_DB_LLPS, by=c('acc'='uniprot_entry'))
 PHASESEP_DB_LLPS[ PHASESEP_DB_LLPS$uniprot_entry %in% UNIPROT_IDR_ATAR,]
-MOBIDB
 
-n_distinct(ec_mobidb$acc)
+# PHASE SEPARATION FEATURES
+phasepro = MOBIDB %>% filter(feature == 'phase_separation') %>%  mutate(PS_acc_pos = paste0(acc,"_",S,"-",E))
+phasepro_wide = phasepro %>%
+                pivot_wider(id_cols=c('acc','PS_acc_pos'), names_from='source', values_from = c('S','E'))
+
+MOBIDB_PS = MOBIDB %>% ungroup() %>%
+  filter( feature != 'phase_separation') %>%
+  left_join(phasepro_wide, by = 'acc') %>%
+  mutate(PS_overlap_cter = (S_phasepro <= E & S < S_phasepro & E_phasepro > E),
+         PS_overlap_nter = (S_phasepro <= S & (E_phasepro > S & E_phasepro < E)),
+         PS_overlap_nested = (S <= S_phasepro & E_phasepro <= E),
+         PS_overlap_inside = (S >= S_phasepro & E <= E_phasepro),
+         PS_overlap = PS_overlap_cter | PS_overlap_nter | PS_overlap_inside | PS_overlap_nested
+  ) %>%
+  group_by(acc) %>% mutate(has_PS_features = !is.na(PS_overlap))
+
+
+# ALL DISORDER FEATURES
+idr_hiconf=c("mobidb_lite",'priority','th_50','merge','disprot')
+MOBIDB_DISO = MOBIDB_PS %>%
+              filter( feature == 'disorder' & source %in% idr_hiconf) %>%
+              group_by(acc,length,source,content_fraction,content_count) %>%
+              mutate(is_longest_feature = feature_len == max_(feature_len)) %>%
+              group_by(acc,length) %>% mutate(is_longest = feature_len == max_(feature_len))
+
+# LONGEST DISORDER FEATURES
+MOBIDB_LONGDISO = MOBIDB_DISO %>%
+        filter( (is_longest & feature_len > 35) | PS_overlap ) %>%
+        arrange(acc,has_PS_features,evidence,feature,source,S,E,is_longest_feature,is_longest) %>%
+        relocate(acc,has_PS_features,evidence,feature,source,S,E,feature_len,is_longest_feature,is_longest)
+table(MOBIDB_LONGDISO$acc)
 
 
 # ------> With ncbi taxon id <------
-ec_mobidb = load.mobidb(83333) %>% # Took 20 sec. for the protein identifiers of the taxon
-            dplyr::filter(acc %in% ec_uniref) %>% # Only use uniprot in reference proteome
-            group_by(acc) %>%
-            mutate(feature_maxlen = max_(content_count),
-                   longest_idr = feature == 'disorder' & content_count == feature_maxlen )
-n_distinct(ec_mobidb$acc)
-
-get.uniprot.proteome()
+# ec_mobidb = load.mobidb(83333) %>% # Took 20 sec. for the protein identifiers of the taxon
+#             dplyr::filter(acc %in% ec_uniref) %>% # Only use uniprot in reference proteome
+#             group_by(acc) %>%
+#             mutate(feature_maxlen = max_(content_count),
+#                    longest_idr = feature == 'disorder' & content_count == feature_maxlen )
+# n_distinct(ec_mobidb$acc)
 
 # 5. Get the sequence for disorder stretches ===================================
 ## Might be slow on single-cpu depending on no. of (features+proteins) to process
@@ -73,23 +97,23 @@ get.uniprot.proteome()
 
 tic('retrieve regions sequence...') # Time the task of retrieving feature sequences
 #message('get sequences of mobidb features/regions...')
-irows=1:nrow(MOBIDB)
+irows=1:nrow(MOBIDB_LONGDISO)
 
 # Preparing data for accessing feature sequences
-ACC = MOBIDB$acc
-START = MOBIDB$S %>% as.integer()
-END = MOBIDB$E %>% as.integer()
+ACC = MOBIDB_LONGDISO$acc
+START = MOBIDB_LONGDISO$S %>% as.integer()
+END = MOBIDB_LONGDISO$E %>% as.integer()
 
 # pbmclapply to loop across rows of mobidb features in parallel on (n-2) cpus
 diso_seq <- pbmcapply::pbmclapply(
                 X=irows,
                 # extract subsequence of mobidb feature from uniprot protein using positions
                 FUN = function(x){
-                        feature_seq = subseq(x=idr_prot[[ACC[x]]], start=START[x],end=END[x]) %>% as.character
+                        feature_seq = subseq(x=IDR_prot[[ACC[x]]], start=START[x],end=END[x]) %>% as.character
                 }, mc.cores = NCPUS)
 
-MOBIDB$feature_seq = unlist(diso_seq)
-
+MOBIDB_LONGDISO$feature_seq = unlist(diso_seq)
+toc()
 ### TOOK ~20 SECONDS with pbmcapply() (parallel on (n-2) cpus)
 
 # 6. Compute residue propensities on sequence of mobidb features ==================
@@ -114,16 +138,28 @@ toc(log=T)
 # 7. Get average residue propensity for all proteins ===========================
 # Average propensity = sum aa score / feature length
 names(diso_seq) = iseq
-mobidb_scores = MOBIDB %>%
-                    bind_cols( bind_rows(diso_score) ) %>%
-                    group_by(acc,evidence,feature,source,length,S,E,feature_len,feature_maxlen) %>%
-                    distinct() %>%
-                    summarize( is_longest_idr = longest_idr,
-                               feat_seq   = str_c(feature_seq),
-                               feat_count = unique(content_count),
-                               feat_frac  = unique(content_fraction),
-                               across(aggrescan:wimleywhite, ~ sum(.x)/feature_len))
-n_distinct(mobidb_scores$acc)
+# AA count
+aacount = lapply(diso_seq, function(x){ alphabetFrequency(Biostrings::AAString(x),as.prob = F)[AA_STANDARD] }) %>%
+          bind_rows %>%
+          dplyr::rename(setNames(get.AA1(),get.AA3()))
+
+aacount %>%
+  rowwise() %>%
+  mutate( AA1 = colnames(.)[which.max(c_across(1:20))],
+          AA2 = colnames(.)[which.max(c_across(-AA1))],
+          AA3 = colnames(.)[which.max(c_across(-c(AA1,AA2)))],
+          AA4 = colnames(.)[which.max(c_across(-c(AA1,AA2,AA3)))]
+          )
+
+
+mobidb_scores = MOBIDB_LONGDISO %>% dplyr::select(-S_merge,-E_merge,-is_longest_feature) %>%
+                  bind_cols( aacount ) %>%
+                  bind_cols( bind_rows(diso_score) ) %>%
+                  group_by(acc,length,evidence,feature,source,is_longest,feature_len,S,E,
+                             has_PS_features,PS_overlap,S_phasepro,E_phasepro,
+                             PS_overlap_cter,PS_overlap_nter,PS_overlap_nested,PS_overlap_inside) %>%
+                  distinct() %>%
+                  mutate( across(aggrescan:wimleywhite, ~ sum(.x)/feature_len))
 
 # 8. YOUR OWN FILTER ===========================================================
 # ... You can add your own code here to filter the data ...
@@ -145,12 +181,10 @@ mobidb_scores %>% filter(source == 'phasepro')
 
 
 # RULE1 : TAKE ALL FEATURES THAT OVERLAP PHASESEPDB or PHASEPRO
-phasepro = mobidb_scores %>% filter(source == 'phasepro') %>%
-            mutate(acc_pos = paste0(acc,"_",S,"-",E))
 
-phasepro_wide = phasepro %>% pivot_wider(id_cols=c('acc','acc_pos'), names_from='source', values_from = c('S','E'))
-
+mobidb_scores %>% filter(is_longest_idr)
 RULE1 = mobidb_scores %>%
+  ungroup() %>%
   filter( source != 'phasepro') %>%
   left_join(phasepro_wide, by = 'acc') %>%
   mutate(overlap_phasepro_cter = (S_phasepro <= E & S < S_phasepro),
@@ -170,10 +204,24 @@ n_distinct(RULE2$acc)
 #       mutate(acc_pos = paste0(acc,"_",S,"-",E))
 
 
- pivot_wider(id_cols=c('acc','acc_pos'), names_from='source', values_from = c('S','E'))
+pivot_wider(id_cols=c('acc','acc_pos'), names_from='source', values_from = c('S','E'))
 RULE3 = RULE2 %>% group_by(acc) %>% mutate(
 
 # RULE4 : LONGEST FEATURE OR MORE ABUNDANT STRETCHES
 # RULE5 : CHECK IF IN TOP/BOTTOM 5/10% OF AVERAGE STICKINESS
 # RULE6 : CHECK THE ENRICHMENT FOR MobiDB-lite sub regions
 
+
+
+
+  # 1. longest region, boundaries
+  # 2. protein size
+  # 2. region size,
+  # 3-6. Four most frequent AA and frequency
+  # 7-10. Four most over-represented AA and fold increase relative to mean
+  # 11. number of + charges
+  # 12. number of - charges
+  # 13. number of his
+  # 14. stickiness
+  # 15. MOBI info (phase separation, zzz)
+  # 16. sequence
