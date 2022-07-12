@@ -669,10 +669,14 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   seqfiles = list.files(normalizePath(alndir), pattern=paste0('.',ext.seq,'$'), full.names = T)
   if(length(seqfiles)==0){ stop(sprintf('No sequence found (format=%s)',ext.seq)) }
   message("(1) Reading fasta sequences...")
+
   sequences = read.sequences(seqfiles,type='AA', strip.fname = T)
   # rename sequences
   ids = names(sequences) %>% coalesce(extract_id(.,id_type),.)
   names(sequences) = ids
+  # check if sequences are aligned
+  aligned = sapply(sequences,function(x){ n_distinct(width(x)) == 1})
+  sequences = sequence[!aligned]
 
   tictoc::tic("Compute alignment statistics...")
   message('(2) Compute statistics from sequence alignment...')
