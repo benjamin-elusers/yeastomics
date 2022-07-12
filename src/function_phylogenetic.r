@@ -685,7 +685,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   if(require(pbmcapply)){
     library(pbmcapply)
     message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
-    list_df_seq = pbmclapply(X = ids, FUN = id_msa2df, SEQLIST=sequences,
+    list_df_seq = pbmclapply(X = names(sequences), FUN = id_msa2df, SEQLIST=sequences,
                              mc.cores = ncores, mc.silent=F, mc.cleanup = T)
   }else{
     i=1
