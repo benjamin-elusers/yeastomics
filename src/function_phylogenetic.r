@@ -657,15 +657,14 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   tictoc::tic("load evolutionary rate...")
   seqfiles = list.files(normalizePath(alndir), pattern=paste0('.',ext.seq,'$'), full.names = T)
   if(length(seqfiles)==0){ stop(sprintf('No sequence found (format=%s)',ext.seq)) }
-  message(sprintf('Found %s sequences',length(seqfiles)))
+  message("(1) Reading fasta sequences...")
   sequences = read.sequences(seqfiles,type='AA', strip.fname = T)
-
   # rename sequences
   ids = names(sequences) %>% coalesce(extract_id(.,id_type),.)
   names(sequences) = ids
 
   tictoc::tic("Compute alignment statistics...")
-  message('Compute statistics from sequence alignment...')
+  message('(2) Compute statistics from sequence alignment...')
   message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
   id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
   list_df_seq=list()
@@ -687,7 +686,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
   tictoc::toc()
 
-  message('Read evolutionary rate inference...')
+  message('(3) Read evolutionary rate inference...')
   r4s_files = find_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = ext.r4s)
   r4s_data = get_r4s(r4s_files,as_df = T)
   r4s = r4s_data %>% mutate(ID = coalesce(extract_id(ID,id_type),ID) )
@@ -695,20 +694,23 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   IQTREE_DIR = file.path(resdir,"IQTREE/")
   LEISR_DIR = file.path(resdir,"LEISR/")
 
+  message('(4) Merge sequence to evolutionary rate...')
   evorates = left_join(df_seq,r4s, by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
       dplyr::filter(!is.na(ref_pos)) %>%
       dplyr::rename(r4s_rate=SCORE) %>%
       dplyr::select(-c('QQ1','QQ2','STD','MSA'))
   if( dir.exists(IQTREE_DIR) ){
-    iqtree = get_iqtree(iqtree_resdir = file.path(resdir,"IQTREE/"),filetype = '.mlrate', as_df = T)
-    iqtree2 = get_iqtree(iqtree_resdir = file.path(resdir,"IQTREE/"),filetype = '.rate', as_df = T)
+    message('(4.1) Add IQTREE evolutionary rate...')
+    iqtree = get_iqtree(iqtree_resdir = IQTREE_DIR,filetype = '.mlrate', as_df = T)
+    iqtree2 = get_iqtree(iqtree_resdir = IQTREE_DIR,filetype = '.rate', as_df = T)
     evorates = evorates %>%
         left_join(iqtree,by=c('id'='orf','msa_pos'='Site')) %>%
         left_join(iqtree2,by=c('id'='orf','msa_pos'='Site'))
         dplyr::rename(iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate)
   }
   if( dir.exists(LEISR_DIR) ){
-    leisr = get_leisr(leisr_resdir = file.path(resdir,"LEISR/"),filetype = 'LEISR.json', as_df = T)
+    message('(4.2) Add LEISR evolutionary rate...')
+    leisr = get_leisr(leisr_resdir = LEISR_DIR, filetype = 'LEISR.json', as_df = T)
     evorates = evorates %>%
       left_join(leisr,by=c('id','msa_pos'='pos'))
       dplyr::rename(leisr_mle = mle, leisr_up=upper, leisr_low=lower,
