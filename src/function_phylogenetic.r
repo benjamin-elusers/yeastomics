@@ -659,7 +659,8 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
     names(sequences) = ensp
   }
 
-  tictoc::tic("convert sequences to dataframe... (with multithreads)")
+  tictoc::tic("Compute alignment statistics...")
+  message('Compute statistics from sequence alignment...')
   message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
   id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
   list_df_seq=list()
@@ -671,7 +672,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
     NSEQ=length(sequences)
     for( x in names(sequences)){
       perc = (100 * i / NSEQ) %>% round(d=2)
-      cat(sprintf('[%20s] %s%% %s/%s\n',x,perc,i,NSEQ))
+      cat(sprintf('[%20s] %s%% %s/%s    \r',x,perc,i,NSEQ))
        list_df_seq[[x]] = id_msa2df(x,sequences)
        i=i+1
     }
@@ -680,6 +681,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
   tictoc::toc()
 
+  message('Read evolutionary rate inference...')
   r4s = get_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = ext.r4s, as_df = T)
   r4s = r4s %>% mutate(ID=str_remove(ID,".r4s"))
 
