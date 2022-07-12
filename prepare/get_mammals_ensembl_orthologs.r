@@ -197,18 +197,6 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
   prepare_phylodata(id_hs = ENSP, path_group = mammals0.path, group_data = peptide2sp_all, sp_seq = all_seq,
                     add_human = T, overwrite = T)
 
-  # mammals0.fa = all_seq[ peptide2sp_all$id_peptide ]
-  # names(mammals0.fa) = peptide2sp_all$mammals_tree
-  # if(!file.exists(file.path(mammals0.path,fasta_name)) || force.overwrite){
-  #   writeXStringSet(c(hs.fa,mammals0.fa),file.path(mammals0.path,fasta_name),format="fasta")
-  # }
-  # ali_input = setNames(c(hs.fa,mammals0.fa),c(hs_name,peptide2sp_all$mammals_tree))
-  # mammals0.ali = muscle::muscle(ali_input,quiet=T)
-  # writeXStringSet(as(mammals0.ali, "AAStringSet"),file.path(mammals0.path,ali_name),format="fasta")
-  #
-  # mammals0.tree=ape::keep.tip(sptree,tip = rownames(mammals0.ali))
-  # write.tree(mammals0.tree,file = file.path(mammals0.path,tree_file))
-
   if(og$is_best){
 
     peptide2sp = strfind(valid_ids,HS_MAMMALS$prefix) %>%
@@ -222,36 +210,11 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
     prepare_phylodata(id_hs = ENSP, path_group = mammals.path, group_data = peptide2sp, sp_seq = all_seq,
                       add_human = T, overwrite = T)
 
-    # mammals.id = peptide2sp$id_peptide
-    # mammals.fa = all_seq[ mammals.id ]
-    # names(mammals.fa) = peptide2sp$mammals_tree
-    # if(!file.exists(file.path(mammals.path,fasta_name)) || force.overwrite ){
-    #   writeXStringSet(c(hs.fa,mammals.fa),file.path(mammals.path,fasta_name),format="fasta")
-    # }
-    # ali_input = setNames(c(hs.fa,mammals.fa),c(hs_name,peptide2sp$mammals_tree))
-    # mammals.ali = muscle::muscle(ali_input,quiet=T)
-    # writeXStringSet(as(mammals.ali, "AAStringSet"),file.path(mammals.path,ali_name),format="fasta")
-    #
-    # mammals.tree=ape::keep.tip(sptree,tip = rownames(mammals.ali))
-    # write.tree(mammals.tree,file = file.path(mammals.path,tree_file))
-
     ## EUARCHONTOGLIRES
     euarcho.df= peptide2sp %>% filter(two=='Euarchontoglires')  %>% arrange(id_peptide)
 
     prepare_phylodata(id_hs = ENSP, path_group = euarcho.path, group_data = euarcho.df, sp_seq = all_seq,
                       add_human = T, overwrite = T)
-
-    # euarcho.fa = all_seq[  euarcho.df$id_peptide ]
-    # names(euarcho.fa) =  euarcho.df$mammals_tree
-    # if(!file.exists(file.path(euarcho.path,fasta_name)) || force.overwrite){
-    #   writeXStringSet(c(hs.fa,euarcho.fa),file.path(euarcho.path,fasta_name),format="fasta")
-    # }
-    # ali_input = setNames(c(hs.fa,euarcho.fa),c(hs_name,euarcho.df$mammals_tree))
-    # euarcho.ali = muscle::muscle(ali_input,quiet=T)
-    # writeXStringSet(as(euarcho.ali, "AAStringSet"),file.path(euarcho.path,ali_name),format="fasta")
-    #
-    # euarcho.tree=ape::keep.tip(sptree,tip = rownames(euarcho.ali))
-    # write.tree(euarcho.tree,file = file.path(euarcho.path,tree_file))
 
     ## GLIRES
     glires.df= peptide2sp %>% filter(four=='Glires') %>%
@@ -260,36 +223,12 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
     prepare_phylodata(id_hs = ENSP, path_group = glires.path, group_data = glires.df, sp_seq = all_seq,
                       add_human = F, overwrite = T)
 
-    # glires.fa = all_seq[ glires.df$id_peptide]
-    # names(glires.fa) = glires.df$mammals_tree
-    # if(!file.exists(file.path(glires.path,fasta_name)) || force.overwrite){
-    #   writeXStringSet(c(hs.fa,glires.fa),file.path(glires.path,fasta_name),format="fasta")
-    # }
-    # #ali_input = setNames(c(hs.fa,glires.fa),c(hs_name,glires.df$mammals_tree))
-    # glires.ali = muscle::muscle(glires.fa,quiet=T)
-    # writeXStringSet(as(glires.ali, "AAStringSet"),file.path(glires.path,ali_name),format="fasta")
-    #
-    # glires.tree=ape::keep.tip(sptree,tip = rownames(glires.ali))
-    # write.tree(glires.tree,file = file.path(glires.path,tree_file))
-
     ## LAURASIATHERIA
     laura.df= peptide2sp %>% filter(two=='Laurasiatheria') %>%
               left_join(twos, by=c('id_peptide'='id_ortho', 'ens_dataset','mammals_tree','two','four')) %>% arrange(rk_two)
 
     prepare_phylodata(id_hs = ENSP, path_group = laura.path, group_data = laura.df, sp_seq = all_seq,
                       add_human = F, overwrite = T)
-
-    # laura.fa = all_seq[laura.df$id_peptide]
-    # names(laura.fa) = laura.df$mammals_tree
-    # if(!file.exists(file.path(laura.path,fasta_name)) || force.overwrite){
-    #   writeXStringSet(c(hs.fa,laura.fa),file.path(laura.path,fasta_name),format="fasta")
-    # }
-    # #ali_input = setNames(c(hs.fa,laura.fa),c(hs_name,laura.df$mammals_tree))
-    # laura.ali = muscle::muscle(laura.fa,quiet=T)
-    # writeXStringSet(as(laura.ali, "AAStringSet"),file.path(laura.path,ali_name),format="fasta")
-    #
-    # laura.tree=ape::keep.tip(sptree,tip = rownames(laura.ali))
-    # write.tree(laura.tree,file = file.path(laura.path,tree_file))
 
     ## LAURASIATHERIA
     laura1.df= peptide2sp %>% filter(four=='Laurasiatheria.1') %>%
@@ -298,35 +237,10 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
     prepare_phylodata(id_hs = ENSP, path_group = laura1.path, group_data = laura1.df, sp_seq = all_seq,
                       add_human = F, overwrite = T)
 
-
-    # laura1.fa = all_seq[laura1.df$id_peptide]
-    # names(laura.fa) = laura1.df$mammals_tree
-    # if(!file.exists(file.path(laura1.path,fasta_name)) || force.overwrite ){
-    #   writeXStringSet(c(hs.fa,laura1.fa),file.path(laura1.path,fasta_name),format="fasta")
-    # }
-    # #ali_input = setNames(c(hs.fa,laura1.fa),c(hs_name,laura1.df$mammals_tree))
-    # laura1.ali = muscle::muscle(laura1.fa,quiet=T)
-    # writeXStringSet(as(laura1.ali, "AAStringSet"),file.path(laura1.path,ali_name),format="fasta")
-    #
-    # laura1.tree=ape::keep.tip(sptree,tip = rownames(laura1.ali))
-    # write.tree(laura1.tree,file = file.path(laura1.path,tree_file))
-
     ## PRIMATES
     primates.df= peptide2sp %>% filter(four=='Primates')  %>% arrange(id_peptide)
     prepare_phylodata(id_hs = ENSP, path_group = primates.path, group_data = primates.df, sp_seq = all_seq,
                       add_human = T, overwrite = T)
-
-    # primates.fa = all_seq[primates.df$id_peptide]
-    # names(primates.fa) =  primates.df$mammals_tree
-    # if(!file.exists(file.path(primates.path,fasta_name)) || force.overwrite){
-    #   writeXStringSet(c(hs.fa,primates.fa),file.path(primates.path,fasta_name),format="fasta")
-    # }
-    # ali_input = setNames(c(hs.fa,primates.fa),c(hs_name,primates.df$mammals_tree))
-    # primates.ali = muscle::muscle(ali_input,quiet=T)
-    # writeXStringSet(as(primates.ali, "AAStringSet"),file.path(primates.path,ali_name),format="fasta")
-    #
-    # primates.tree=ape::keep.tip(sptree,tip = rownames(primates.ali))
-    # write.tree(primates.tree,file = file.path(primates.path,tree_file))
 
     ## CARNIVORA
     carnivora.df= peptide2sp %>% filter(four=='Carnivora')  %>%
@@ -334,18 +248,6 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
 
     prepare_phylodata(id_hs = ENSP, path_group = carnivora.path, group_data = carnivora.df, sp_seq = all_seq,
                       add_human = F, overwrite = T)
-
-    # carnivora.fa = all_seq[carnivora.df$id_peptide]
-    # names(carnivora.fa) = carnivora.df$mammals_tree
-    # if( !file.exists(file.path(carnivora.path,fasta_name)) || force.overwrite){
-    #   writeXStringSet(c(hs.fa,carnivora.fa),file.path(carnivora.path,fasta_name),format="fasta")
-    # }
-    # #ali_input = setNames(c(hs.fa,carnivora.fa),c(hs_name,carnivora.df$mammals_tree))
-    # carnivora.ali = muscle::muscle(carnivora.fa,quiet=T)
-    # writeXStringSet(as(carnivora.ali, "AAStringSet"),file.path(carnivora.path,ali_name),format="fasta")
-    # carnivora.tree=ape::keep.tip(sptree,tip = rownames(carnivora.ali))
-    # write.tree(carnivora.tree,file = file.path(carnivora.path,tree_file))
-
   }
 }
 
@@ -478,8 +380,9 @@ hs_closest_four = df_query %>%
 # find prefix
 ortho_prefix = df_query %>%
                drop_na() %>%
+               mutate(n_human = n_distinct(ensp)) %>%
                group_by(ens_dataset) %>%
-               mutate( prefix = hutils::longest_prefix(id_ortho), n_human = n_distinct(ensp) ) %>%
+               mutate( prefix = hutils::longest_prefix(id_ortho) ) %>%
                #mutate( prefix = str_extract(id_ortho,'^[^0-9]+'), n_human = n_distinct(ensp) ) %>%
                group_by(ens_dataset) %>%
                mutate(n_orthologs = n_distinct(id_ortho),
@@ -494,7 +397,6 @@ ortho_prefix = df_query %>%
                mutate(col_peptide = paste0(ens_dataset,'_homolog_ensembl_peptide')) %>%
                mutate( num_four = factor(num_four, c('out',sort(unique(num_four)))),
                        num_two = factor(num_two, c('out',sort(unique(num_two)))) )
-
 
 # 5. combine orthologs data of human-to-mammals  -------------------------------
 mammals = seq_along(HS_QUERY)
@@ -545,7 +447,7 @@ hs_ortho = hs_ortho_1to1 %>%
          n_laurasiatheria =sum.na(c_across(all_of(phylums$Laurasiatheria$col_peptide)),notNA=T),
          n_euarchontoglires = sum.na(c_across(all_of(phylums$Euarchontoglires$col_peptide)),notNA=T) ) %>%
   # Best orthogroups have less than 4 of the selected species (over 78% orthologs w/r to human)
-  mutate( is_best = sum(is.na(c_across(HS_MAMMALS$col_peptide))) < 4 ) %>%
+  mutate( is_best = sum(is.na(c_across(HS_MAMMALS$col_peptide))) < 3 ) %>%
   ungroup() %>% mutate( p_top = percent_rank(f_orthogroup) )
 
 
@@ -703,25 +605,27 @@ check_fasta_to_ali = function(path){
 
   fasta = list.files(file.path(path,'ali'),pattern='.mu$') %>% str_replace("\\.mu",'')
   ali = list.files(file.path(path,'fasta'),pattern='.fa$') %>% str_replace("\\.fa",'')
+  trees = list.files(file.path(path,'tree'),pattern='.nh$') %>% str_replace("\\.nh",'')
+
   n_ali = n_distinct(ali)
   n_fa = n_distinct(fasta)
+  n_tr = n_distinct(trees)
   message(sprintf("alignments : %10s",n_fa))
   message(sprintf("fasta      : %10s",n_ali))
+  message(sprintf("trees      : %10s",n_tr))
 
   f2a = setdiff(fasta,ali)
   a2f = setdiff(ali,fasta)
   if( n_ali < n_fa){ message( paste0(f2a,"\n") ) ; return(f2a) }
   if( n_ali > n_fa){ message( paste0(a2f,"\n") ); return(a2f) }
-  return()
+
 }
 
 mapply(check_fasta_to_ali,all_paths)
-best = hs_ortho_1to1 %>% filter( is_best)
+best = hs_ortho %>% filter( is_best)
 table(best$n_glires)
 table(best$n_carnivora)
 table(best$n_laura.1)
 table(best$n_primates)
 table(best$n_laurasiatheria)
 table(best$n_euarchontoglires)
-
-
