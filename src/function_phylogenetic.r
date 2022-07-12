@@ -629,12 +629,19 @@ get_phylo_data = function(data, include.wgd=T,  include.ali=T,
   return(res)
 }
 
-load.evorate = function(resdir="/media/WEXAC_data/1011G/",
-                        ext.r4s = 'raw.r4s',
+load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
+                        ext.seq='fasta', ext.r4s = 'raw.r4s',
                         ref='S288C',ID="ORF", ncores=parallelly::availableCores(which='max')-2){
-  tictoc::tic("load evolutionary rate...")
 
-  sequences = read.sequences(seqfiles = list.files(file.path(resdir,'fasta'),pattern='.fasta$',full.names = T),type='AA',strip.fname = T)
+  if(missing(resdir)){ resdir = path.expand(file.path(alndir,'../')) }
+  message(sprintf('Alignment directory : %s',alndir))
+  message(sprintf('Result directory    : %s',resdir))
+
+  tictoc::tic("load evolutionary rate...")
+  seqfiles = list.files(path.expand(alndir), pattern=paste0('.',ext.seq,'$'), full.names = T)
+  if(length(seqfiles)==0){ stop(sprintf('No sequence found (format=%s)',ext.seq)) }
+
+  sequences = read.sequences(seqfiles,type='AA', strip.fname = T)
 
   if(ID == "ORF" ){
     orf = get.orf(names(sequences))
@@ -644,13 +651,17 @@ load.evorate = function(resdir="/media/WEXAC_data/1011G/",
     uni = names(sequences) %>% str_extract(UNIPROT.nomenclature())
     uni[is.na(uni)]=names(sequences)[is.na(uni)]
     names(sequences) = uni
+  }else if(ID == "ENSEMBL" ){
+    ensp = names(sequences) %>% str_extract(ENSEMBL.nomenclature())
+    ensp[is.na(ensp)]=names(sequences)[is.na(ensp)]
+    names(sequences) = ensp
   }
 
   tictoc::tic("convert sequences to dataframe... (with multithreads)")
   message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
   id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
   list_df_seq = pbmcapply::pbmclapply(X = names(sequences), FUN = id_msa2df, SEQLIST=sequences,
-                                       mc.cores = ncores, mc.silent=F, mc.cleanup = T)
+                                      mc.cores = ncores, mc.silent=F, mc.cleanup = T)
   list_df_seq=list()
   i=1
   NSEQ=length(sequences)
@@ -692,3 +703,4 @@ load.evorate = function(resdir="/media/WEXAC_data/1011G/",
   tictoc::toc()
   return(evorates)
 }
+
