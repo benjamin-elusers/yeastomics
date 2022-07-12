@@ -468,11 +468,11 @@ get_leisr = function(leisr_files,  as_df=T){
   }
 
   nfiles = length(leisr_files)
-  nms = basename(leisr_files) %>% tools::file_path_sans_ext(.)
-  leisr_type = hutils::longest_suffix(leisr_files) %>% paste0(".",file_ext(.))
+  nms = basename(leisr_files) %>% subname(sep = '\\.')
+  leisr_type = hutils::longest_suffix(basename(leisr_files)) %>% file_ext %>% paste0(".",.)
   pb_leisr =  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading leisr (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",leisr_type))
 
-  if(leisr_type == "LEISR.json"){
+  if(leisr_type == ".json"){
     leisr_data = purrr::pmap(list(leisr_files),progress_leisr_json,pb_leisr) %>% set_names(nms)
   }else if(leisr_type == ".leisr"){
     leisr_data = purrr::pmap(list(leisr_files),progress_leisr_tsv,pb_leisr) %>% set_names(nms)
@@ -751,7 +751,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
       leisr.rate = pbmclapply(X =.leisr.json, FUN = get_leisr, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
                   bind_rows()
     }else{
-      leisr.rate = get_leisr(.leisr.json, as_df = T)
+      leisr.rate = get_leisr(.leisr.json[1:5], as_df = T)
     }
 
     leisr = leisr.rate %>% mutate(ID = coalesce(extract_id(ID,id_type),ID) )
