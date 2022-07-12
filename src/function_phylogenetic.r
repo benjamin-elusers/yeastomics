@@ -393,7 +393,7 @@ read.R4S.param = function(r4s, as.df=F){
 }
 
 get_r4s = function(r4s_resdir="/media/elusers/users/benjamin/A-PROJECTS/03_PostDoc/EvoRate-paper/data/r4s-fungi",
-                   filetype = "raw.r4s",
+                   filetype = "raw.r4s", with_orf=T,
                    as_df=T){
 
   progress_r4s_res = function(file,.pb=NULL){
@@ -406,8 +406,10 @@ get_r4s = function(r4s_resdir="/media/elusers/users/benjamin/A-PROJECTS/03_PostD
   pb_r4s=  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading r4s (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",r4s_type))
 
   r4s_data = purrr::pmap(list(r4s_files),progress_r4s_res,pb_r4s)
-  orfs = str_extract_all(r4s_files,SGD.nomenclature()) %>% unlist
-  names(r4s_data) = orfs
+  if(with_orf){
+    orfs = str_extract_all(r4s_files,SGD.nomenclature()) %>% unlist
+    names(r4s_data) = orfs
+  }
 
   if(as_df){
     df_r4s = do.call(rbind,r4s_data) %>% as_tibble
@@ -660,16 +662,19 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   tictoc::tic("convert sequences to dataframe... (with multithreads)")
   message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
   id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
-  list_df_seq = pbmcapply::pbmclapply(X = names(sequences), FUN = id_msa2df, SEQLIST=sequences,
-                                      mc.cores = ncores, mc.silent=F, mc.cleanup = T)
   list_df_seq=list()
-  i=1
-  NSEQ=length(sequences)
-  for( x in names(sequences)){
-    perc = (100 * i / NSEQ) %>% round(d=2)
-    cat(sprintf('[%20s] %s%% %s/%s\n',x,perc,i,NSEQ))
-     list_df_seq[[x]] = id_msa2df(x,sequences)
-     i=i+1
+  if(require(pbmcapply)){
+    list_df_seq = pbmcapply::pbmclapply(X = names(sequences), FUN = id_msa2df, SEQLIST=sequences,
+                                      mc.cores = ncores, mc.silent=F, mc.cleanup = T)
+  }else{
+    i=1
+    NSEQ=length(sequences)
+    for( x in names(sequences)){
+      perc = (100 * i / NSEQ) %>% round(d=2)
+      cat(sprintf('[%20s] %s%% %s/%s\n',x,perc,i,NSEQ))
+       list_df_seq[[x]] = id_msa2df(x,sequences)
+       i=i+1
+    }
   }
 
   df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
