@@ -141,15 +141,12 @@ names(diso_seq) = iseq
 # AA count
 aacount = lapply(diso_seq, function(x){ alphabetFrequency(Biostrings::AAString(x),as.prob = F)[AA_STANDARD] }) %>%
           bind_rows %>%
-          dplyr::rename(setNames(get.AA1(),get.AA3()))
+          dplyr::rename(setNames(get.AA1(),get.AA3())) %>%
+          mutate(irow=row_number())
 
-aacount %>%
-  rowwise() %>%
-  mutate( AA1 = colnames(.)[which.max(c_across(1:20))],
-          AA2 = colnames(.)[which.max(c_across(-AA1))],
-          AA3 = colnames(.)[which.max(c_across(-c(AA1,AA2)))],
-          AA4 = colnames(.)[which.max(c_across(-c(AA1,AA2,AA3)))]
-          )
+tmp = aacount %>%
+  pivot_longer(cols = 1:20) %>%
+  group_by(irow) %>% slice_max(order_by = value,n = 4) %>% add_count() %>%  mutate(rk = rank(-value))
 
 
 mobidb_scores = MOBIDB_LONGDISO %>% dplyr::select(-S_merge,-E_merge,-is_longest_feature) %>%
