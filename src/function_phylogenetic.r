@@ -676,7 +676,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   names(sequences) = ids
   # check if sequences are aligned
   aligned = sapply(sequences,function(x){ n_distinct(width(x)) == 1})
-  sequences = sequence[!aligned]
+  sequences = sequence[[ aligned ]]
 
   tictoc::tic("Compute alignment statistics...")
   message('(2) Compute statistics from sequence alignment...')
