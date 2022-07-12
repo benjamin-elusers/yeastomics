@@ -479,7 +479,7 @@ get_leisr = function(leisr_files,  as_df=T){
   }
 
   if(as_df){
-    df_leisr = leisr_data %>% bind_rows
+    df_leisr =  bind_rows(leisr_data,.id='id') %>% as_tibble()
     return(df_leisr)
   }else{
     return(leisr_data)
@@ -749,12 +749,12 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
       library(pbmcapply)
       message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
       leisr.rate = pbmclapply(X =.leisr.json, FUN = get_leisr, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
-                  bind_rows()
+                  bind_rows(.id='id')
     }else{
-      leisr.rate = get_leisr(.leisr.json[1:5], as_df = T)
+      leisr.rate = get_leisr(.leisr.json, as_df = T)
     }
 
-    leisr = leisr.rate %>% mutate(ID = coalesce(extract_id(ID,id_type),ID) )
+    leisr = leisr.rate %>% mutate(ID = coalesce(extract_id(id,id_type),id) )
     evorates = evorates %>%
       left_join(leisr,by=c('id'='ID','msa_pos'='pos'))
       dplyr::rename(leisr_mle = mle, leisr_up=upper, leisr_low=lower,
