@@ -735,11 +735,11 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
       iqtree.rate = get_iqtree( .rate , as_df = T)
     }
 
-    iqtree = left_join(iqtree.mlrate,iqtree.rate,by=c('id','Site'),suffix=c('','_iqtree')) %>%
+    iqtree = left_join(iqtree.mlrate,iqtree.rate,by=c('id','Site')) %>%
              mutate(ID = coalesce(extract_id(id,id_type),id) ) %>%
              dplyr::rename(iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate)
 
-    evorates = left_join(evorates,iqtree,by=c('id'='ID','msa_pos'='Site'))
+    evorates = left_join(evorates,iqtree,by=c('id'='ID','msa_pos'='Site'),suffix=c('','_iqtree'))
   }
 
   if( dir.exists(LEISR_DIR) ){
