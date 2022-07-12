@@ -688,7 +688,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
     NSEQ=length(sequences)
     for( x in names(sequences)){
       perc = (100 * i / NSEQ) %>% round(d=2)
-      cat(sprintf('[%20s] %s%% %s/%s    \r',x,perc,i,NSEQ))
+      cat(sprintf('[%10s] %s%% %s/%s    \r',x,perc,i,NSEQ))
        list_df_seq[[x]] = id_msa2df(x,sequences)
        i=i+1
     }
