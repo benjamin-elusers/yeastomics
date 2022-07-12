@@ -392,24 +392,39 @@ read.R4S.param = function(r4s, as.df=F){
   return(r4s.param)
 }
 
-get_r4s = function(r4s_resdir="/media/elusers/users/benjamin/A-PROJECTS/03_PostDoc/EvoRate-paper/data/r4s-fungi",
-                   filetype = "raw.r4s", with_orf=T,
-                   as_df=T){
+extract_id = function(x,ID){
+  if(ID == "ORF" ){
+   X= str_extract(x,SGD.nomenclature())
+  }else if(ID == "UNIPROT"){
+   X= str_extract(x,UNIPROT.nomenclature())
+  }else if(ID == "ENSEMBL" ){
+   X= str_extract(x,ENSEMBL.nomenclature())
+  }else{
+   X= basename(x)
+  }
+  return(X)
+}
+
+find_r4s = function(r4s_resdir="/media/elusers/users/benjamin/A-PROJECTS/03_PostDoc/EvoRate-paper/data/r4s-fungi",
+                    filetype = "raw.r4s"){
+  r4s_type = match.arg(arg=filetype, choices = c("raw.r4s","norm.r4s",".r4s"),several.ok = F)
+  r4s_files = list.files(path=r4s_resdir,pattern = r4s_type,full.names = T)
+  nfiles = length(r4s_files)
+  message(sprintf('Found %s rate4site files (ext=%s)',nfiles,r4s_type))
+  return(r4s_files)
+}
+
+get_r4s = function(r4s_files, as_df=T){
 
   progress_r4s_res = function(file,.pb=NULL){
     if(!.pb$finished){ .pb$tick() }
     return(read.R4S(file,verbose = F))
   }
-  r4s_type = match.arg(arg=filetype, choices = c("raw.r4s","norm.r4s",".r4s"),several.ok = F)
-  r4s_files = list.files(path=r4s_resdir,pattern = r4s_type,full.names = T)
+
   nfiles = length(r4s_files)
   pb_r4s=  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading r4s (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",r4s_type))
 
   r4s_data = purrr::pmap(list(r4s_files),progress_r4s_res,pb_r4s)
-  if(with_orf){
-    orfs = str_extract_all(r4s_files,SGD.nomenclature()) %>% unlist
-    names(r4s_data) = orfs
-  }
 
   if(as_df){
     df_r4s = do.call(rbind,r4s_data) %>% as_tibble
@@ -633,7 +648,7 @@ get_phylo_data = function(data, include.wgd=T,  include.ali=T,
 
 load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
                         ext.seq='fasta', ext.r4s = 'raw.r4s',
-                        ref='S288C',ID="ORF", ncores=parallelly::availableCores(which='max')-2){
+                        ref='S288C',id_type="ORF", ncores=parallelly::availableCores(which='max')-2){
 
   if(missing(resdir)){ resdir = normalizePath(file.path(alndir,'../')) }
   message(sprintf('Alignment directory : %s',alndir))
@@ -645,19 +660,9 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   message(sprintf('Found %s sequences',length(seqfiles)))
   sequences = read.sequences(seqfiles,type='AA', strip.fname = T)
 
-  if(ID == "ORF" ){
-    orf = get.orf(names(sequences))
-    orf[is.na(orf)]=names(sequences)[is.na(orf)]
-    names(sequences) = orf
-  }else if(ID == "UNIPROT"){
-    uni = names(sequences) %>% str_extract(UNIPROT.nomenclature())
-    uni[is.na(uni)]=names(sequences)[is.na(uni)]
-    names(sequences) = uni
-  }else if(ID == "ENSEMBL" ){
-    ensp = names(sequences) %>% str_extract(ENSEMBL.nomenclature())
-    ensp[is.na(ensp)]=names(sequences)[is.na(ensp)]
-    names(sequences) = ensp
-  }
+  # rename sequences
+  ids = names(sequences) %>% coalesce(extract_id(.,id_type),.)
+  names(sequences) = ids
 
   tictoc::tic("Compute alignment statistics...")
   message('Compute statistics from sequence alignment...')
@@ -665,8 +670,9 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
   list_df_seq=list()
   if(require(pbmcapply)){
-    list_df_seq = pbmcapply::pbmclapply(X = names(sequences), FUN = id_msa2df, SEQLIST=sequences,
-                                      mc.cores = ncores, mc.silent=F, mc.cleanup = T)
+    library(pbmcapply)
+    list_df_seq = pbmclapply(X = ids, FUN = id_msa2df, SEQLIST=sequences,
+                             mc.cores = ncores, mc.silent=F, mc.cleanup = T)
   }else{
     i=1
     NSEQ=length(sequences)
@@ -682,8 +688,9 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   tictoc::toc()
 
   message('Read evolutionary rate inference...')
-  r4s = get_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = ext.r4s, as_df = T)
-  r4s = r4s %>% mutate(ID=str_remove(ID,".r4s"))
+  r4s_files = find_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = ext.r4s)
+  r4s_data = get_r4s(r4s_files,as_df = T)
+  r4s = r4s_data %>% mutate(ID = coalesce(extract_id(ID,id_type),ID) )
 
   IQTREE_DIR = file.path(resdir,"IQTREE/")
   LEISR_DIR = file.path(resdir,"LEISR/")
