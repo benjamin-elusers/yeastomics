@@ -421,7 +421,9 @@ get_r4s = function(r4s_files, as_df=T){
     return(read.R4S(file,verbose = F))
   }
 
+
   nfiles = length(r4s_files)
+  r4s_type = hutils::longest_suffix(r4s_files)
   pb_r4s=  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading r4s (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",r4s_type))
 
   r4s_data = purrr::pmap(list(r4s_files),progress_r4s_res,pb_r4s)
