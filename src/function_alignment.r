@@ -120,7 +120,14 @@ count_pair_ali = function(ali){
 
 msa2df = function(MSA_SEQ,REF_NAME,ID,verbose=F){
 
-  if(is(MSA_SEQ,"AAStringSet")){ MSA_SEQ = AAMultipleAlignment(MSA_SEQ)}
+  if(is(MSA_SEQ,"AAStringSet")){
+    if( n_distinct(widths(MSA_SEQ)) != 1){
+      warning('Sequences not aligned! Aligning them with muscle...')
+      MSA_SEQ = muscle::muscle(MSA_SEQ,quiet = T,diags=T)
+    }else{
+      MSA_SEQ = AAMultipleAlignment(MSA_SEQ)
+    }
+  }
   if(is.null(REF_NAME)){ REF_NAME=ID }
   L = nchar(MSA_SEQ)
   N = length(unmasked(MSA_SEQ))
