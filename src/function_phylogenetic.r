@@ -468,11 +468,10 @@ get_leisr = function(leisr_files,  as_df=T){
   }
 
   nfiles = length(leisr_files)
-  iqtree_type = hutils::longest_suffix(leisr_files) %>% file_ext  %>% paste0(".",.)
   nms = basename(leisr_files) %>% tools::file_path_sans_ext(.)
   leisr_type = hutils::longest_suffix(leisr_files) %>% paste0(".",file_ext(.))
-
   pb_leisr =  progress::progress_bar$new(total = nfiles, width = 70, format = sprintf(" (:spin) reading leisr (%s) [:bar] :percent (elapsed: :elapsed # eta: :eta)",leisr_type))
+
   if(leisr_type == "LEISR.json"){
     leisr_data = purrr::pmap(list(leisr_files),progress_leisr_json,pb_leisr) %>% set_names(nms)
   }else if(leisr_type == ".leisr"){
@@ -745,7 +744,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
 
   if( dir.exists(LEISR_DIR) ){
     message('(4.2) Add LEISR evolutionary rate...')
-    .leisr.json =  find_iqtree( LEISR_DIR,filetype = 'LEISR.json')
+    .leisr.json =  find_leisr( LEISR_DIR,filetype = 'LEISR.json')
     if(require(pbmcapply)){
       library(pbmcapply)
       message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
