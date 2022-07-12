@@ -633,14 +633,14 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
                         ext.seq='fasta', ext.r4s = 'raw.r4s',
                         ref='S288C',ID="ORF", ncores=parallelly::availableCores(which='max')-2){
 
-  if(missing(resdir)){ resdir = path.expand(file.path(alndir,'../')) }
+  if(missing(resdir)){ resdir = normalizePath(file.path(alndir,'../')) }
   message(sprintf('Alignment directory : %s',alndir))
   message(sprintf('Result directory    : %s',resdir))
 
   tictoc::tic("load evolutionary rate...")
-  seqfiles = list.files(path.expand(alndir), pattern=paste0('.',ext.seq,'$'), full.names = T)
+  seqfiles = list.files(normalizePath(alndir), pattern=paste0('.',ext.seq,'$'), full.names = T)
   if(length(seqfiles)==0){ stop(sprintf('No sequence found (format=%s)',ext.seq)) }
-
+  message(sprintf('Found %s sequences',length(seqfiles)))
   sequences = read.sequences(seqfiles,type='AA', strip.fname = T)
 
   if(ID == "ORF" ){
