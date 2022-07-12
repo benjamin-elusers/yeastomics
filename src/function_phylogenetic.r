@@ -735,7 +735,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
       iqtree.rate = get_iqtree( .rate , as_df = T)
     }
 
-    iqtree = left_join(iqtree.mlrate,iqtree.rate,by=c('id','Site')) %>%
+    iqtree = left_join(iqtree.mlrate,iqtree.rate,by=c('id','Site'),suffix=c('','_iqtree')) %>%
              mutate(ID = coalesce(extract_id(id,id_type),id) ) %>%
              dplyr::rename(iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate)
 
@@ -749,14 +749,14 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
       library(pbmcapply)
       message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
       leisr.rate = pbmclapply(X =.leisr.json, FUN = get_leisr, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
-                  bind_rows(.id='id')
+                  bind_rows()
     }else{
       leisr.rate = get_leisr(.leisr.json, as_df = T)
     }
 
     leisr = leisr.rate %>% mutate(ID = coalesce(extract_id(id,id_type),id) )
     evorates = evorates %>%
-      left_join(leisr,by=c('id'='ID','msa_pos'='pos'))
+      left_join(leisr,by=c('id'='ID','msa_pos'='pos'),suffix=c('','_leisr')) %>%
       dplyr::rename(leisr_mle = mle, leisr_up=upper, leisr_low=lower,
                     leisr_global= log_l_global, leisr_local= log_l_local  )
   }
