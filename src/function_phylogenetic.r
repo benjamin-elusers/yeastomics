@@ -665,11 +665,11 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
 
   tictoc::tic("Compute alignment statistics...")
   message('(2) Compute statistics from sequence alignment...')
-  message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
   id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
   list_df_seq=list()
   if(require(pbmcapply)){
     library(pbmcapply)
+    message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
     list_df_seq = pbmclapply(X = ids, FUN = id_msa2df, SEQLIST=sequences,
                              mc.cores = ncores, mc.silent=F, mc.cleanup = T)
   }else{
@@ -688,7 +688,13 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
 
   message('(3) Read evolutionary rate inference...')
   r4s_files = find_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = ext.r4s)
-  r4s_data = get_r4s(r4s_files,as_df = T)
+  if(require(pbmcapply)){
+    library(pbmcapply)
+    message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
+    r4s_data = pbmclapply(X = r4s_files, FUN = get_r4s, mc.cores = ncores, mc.silent=F, mc.cleanup = T)
+  }else{
+    r4s_data = get_r4s(r4s_files,as_df = T)
+  }
   r4s = r4s_data %>% mutate(ID = coalesce(extract_id(ID,id_type),ID) )
 
   IQTREE_DIR = file.path(resdir,"IQTREE/")
