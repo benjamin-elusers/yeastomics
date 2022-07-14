@@ -1993,7 +1993,7 @@ find_ensembl_sptree = function(){
 get_ensembl_sptree = function(treename){
   url_sptrees = find_ensembl_sptree()
   file_sptrees = basename(url_sptrees)
-  urltools::url_parse(url_sptrees)
+  #urltools::url_parse(url_sptrees)
   if(missing(treename)){
     sptree_choice =menu(title = 'choose an Ensembl species tree file...',graphics = F,choices = file_sptrees)
     url_tree = url_sptrees[sptree_choice]
@@ -2004,9 +2004,9 @@ get_ensembl_sptree = function(treename){
   # First time the tree is read, it is saved to 'data/ensembl/' with the same filename
   yeastomics_tree = here::here('data','ensembl',treename)
   sptree = preload(file.path(yeastomics_tree,'.rds'),
-                   {sptree = ape::read.tree(url_tree)},
+                   { url_tree=get('url_tree'); ape::read.tree(url_tree) },
                    'get Ensembl species tree...')
-  write.tree(sptree,yeastomics_tree)
+  write.tree(sptree,file.path(yeastomics_tree,'.nh'))
   return(sptree)
 }
 
