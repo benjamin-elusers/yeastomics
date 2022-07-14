@@ -199,14 +199,14 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
 
   if(og$is_best){
 
-    peptide2sp = strfind(valid_ids,HS_MAMMALS$prefix) %>%
+    peptide2sp = strfind(valid_ids,HS_BOREOEUTHERIA$prefix) %>%
       enframe('prefix','id_peptide') %>%
       unnest(id_peptide ) %>%
-      left_join(HS_MAMMALS,by=c('prefix')) %>%
+      left_join(HS_BOREOEUTHERIA,by=c('prefix')) %>%
       dplyr::select(id_peptide,ens_dataset,prefix,mammals_tree,two,four) %>%
       filter( id_peptide %in% names(all_seq) )
 
-    ## MAMMALS (best)
+    ## BOREOEUTHERIA
     prepare_phylodata(id_hs = ENSP, path_group = mammals.path, group_data = peptide2sp, sp_seq = all_seq,
                       add_human = T, overwrite = T)
 
@@ -260,6 +260,9 @@ ens_hs_orthologs = preload(saved.file = file.path(path_ortho,'ensembl_hsapiens_f
 library(treeio)
 # Ensembl Vertebrates
 ens_vertebrates_tree = get_ensembl_sptree('vertebrates_species-tree_Ensembl')
+#write.tree(ens_vertebrates_tree, file = here::here('data','ensembl','vertebrates_species-tree_Ensembl.nh'))
+ens_vertebrates_tree = read.tree('vertebrates_species-tree_Ensembl')
+
 ens_vertebrates_nodes = make.unique(ens_vertebrates_tree$node.label)
 ens_vertebrates_df = ens_vertebrates_tree %>% as_tibble() %>%
   mutate(is_leaf = label %in% ens_vertebrates_tree$tip.label)
@@ -282,8 +285,15 @@ VERTEBRATES = ggtree(ens_vertebrates_tree,ladderize = T,right = T,branch.length 
 ggsave(plot=VERTEBRATES, filename=file.path(path_ortho,'VERTEBRATES_TREE.pdf'), height=25, width=25)
 
 # 2. get Ensembl Eutherian Mammals (aligned genomes) ----------------------------
-ens_mammals_tree = get_ensembl_sptree('43_eutherian_mammals_EPO_default')
-ens_mammals_nodes = make.unique(ens_mammals_tree$node.label)
+# ens_mammals_tree = preload(here::here('data','43_eutherian_mammals_EPO_default.rds'),
+#                            get_ensembl_sptree('43_eutherian_mammals_EPO_default'),
+#                            'read the eutherian mammals (43 species)...')
+
+#ens_mammals_tree = read.tree(here::here('data','ensembl','43_eutherian_mammals_EPO_default.nh'))
+#write.tree(ens_mammals_tree, file = here::here('data','43_eutherian_mammals_EPO_default.nh'))
+ens_mammals_tree = get_ensembl_sptree("91_eutherian_mammals_EPO-Extended_default") # new in release 107
+write.tree(ens_mammals_tree, file = here::here('data','data/91_eutherian_mammals_EPO_default.nh'))
+ens_mammals_tree$node.label = make.unique(ens_mammals_tree$node.label)
 
 ens_mammals_info = ens_vertebrates_info %>%
   # compute similarity between species tree names and ensembl species
@@ -296,14 +306,14 @@ ens_mammals_clades = ape::subtrees(ens_mammals_tree, wait=FALSE) %>%
 
 # Get lineage from root node (common ancestor to eutherian mammals)
 ens_mammals_lineages = ape::nodepath(ens_mammals_tree, from = treeio::rootnode(ens_mammals_tree)) %>%
-  set_names(c(ens_mammals_nodes,last(ens_mammals_nodes)))
+  set_names(c(ens_mammals_nodes,"out"))
 
 # Find the nodes 4 degrees below root (4 largest divisions)
 mammals_4 = map(ens_mammals_lineages,pluck(4,.default=NA)) %>% unlist() %>% unique %>%
-  set_names( ens_mammals_nodes[.-ens_mammals_tree$Nnode-1] )
+            set_names(treeio::nodelab(ens_mammals_tree,.))
 
 mammals_2 = map(ens_mammals_lineages,pluck(3,.default=NA)) %>% unlist() %>% unique %>%
-  set_names( ens_mammals_nodes[.-ens_mammals_tree$Nnode-1] )
+            set_names(treeio::nodelab(ens_mammals_tree,.))
 
 four= groupClade(ens_mammals_tree,.node = mammals_4) %>% as_tibble() %>% dplyr::rename(four=group)
 two = groupClade(ens_mammals_tree,.node = mammals_2) %>% as_tibble() %>% dplyr::rename(two=group)
@@ -420,7 +430,7 @@ for( s in mammals ){ #
 #colnames(HS_ORTHO)
 
 # 6. get 1-to-1 orthologs human ------------------------------------------------
-HS_MAMMALS = ortho_prefix %>%
+HS_BOREOEUTHERIA = ortho_prefix %>%
   filter(f_human >0.78) %>%
   group_by(two) %>% mutate(num_two = sprintf("%s (n=%s)",two,n_distinct(ens_dataset))  ) %>%
   group_by(four) %>% mutate(num_four = sprintf("%s (n=%s)",four,n_distinct(ens_dataset)) ) %>%
@@ -428,7 +438,7 @@ HS_MAMMALS = ortho_prefix %>%
   mutate( num_four = factor(num_four, c('out',sort(unique(num_four)))),
           num_two = factor(num_two, c('out',sort(unique(num_two)))) )
 
-phylums = split(HS_MAMMALS, HS_MAMMALS$two) %>% append(split(HS_MAMMALS, HS_MAMMALS$four)) %>% compact
+phylums = split(HS_BOREOEUTHERIA, HS_BOREOEUTHERIA$two) %>% append(split(HS_BOREOEUTHERIA, HS_BOREOEUTHERIA$four)) %>% compact
 
 hs_ortho_1to1 = HS_ORTHO %>%
   dplyr::filter(!is.na(ensg) & !is.dup(ensp) ) %>%
@@ -439,7 +449,7 @@ hs_ortho_1to1 = HS_ORTHO %>%
 hs_ortho = hs_ortho_1to1 %>%
   dplyr::select( all_of(colnames(hs_tx)), 'n_ortholog', ends_with('_homolog_ensembl_peptide')) %>%
   rowwise() %>%
-  mutate( f_orthogroup =  mean(!is.na(c_across(HS_MAMMALS$col_peptide))) ) %>%
+  mutate( f_orthogroup =  mean(!is.na(c_across(HS_BOREOEUTHERIA$col_peptide))) ) %>%
   mutate(n_glires = sum.na(c_across(all_of(phylums$Glires$col_peptide)),notNA=T),
          n_carnivora = sum.na(c_across(all_of(phylums$Carnivora$col_peptide)),notNA=T),
          n_laura.1 =sum.na(c_across(all_of(phylums$Laurasiatheria.1$col_peptide)),notNA=T),
@@ -447,7 +457,7 @@ hs_ortho = hs_ortho_1to1 %>%
          n_laurasiatheria =sum.na(c_across(all_of(phylums$Laurasiatheria$col_peptide)),notNA=T),
          n_euarchontoglires = sum.na(c_across(all_of(phylums$Euarchontoglires$col_peptide)),notNA=T) ) %>%
   # Best orthogroups have less than 4 of the selected species (over 78% orthologs w/r to human)
-  mutate( is_best = sum(is.na(c_across(HS_MAMMALS$col_peptide))) < 3 ) %>%
+  mutate( is_best = sum(is.na(c_across(HS_BOREOEUTHERIA$col_peptide))) < 3 ) %>%
   ungroup() %>% mutate( p_top = percent_rank(f_orthogroup) )
 
 
@@ -520,7 +530,7 @@ p2 = ggplot(ortho_prefix, aes(y=reorder(organism,f_human),x=f_human, fill=num_tw
   theme( axis.text.y = element_text(size=9), axis.title = element_text(size=10))+
   geom_vline(xintercept=0.78, linetype='dashed') +
   scale_color_metro_d() + scale_fill_metro_d()
-p3 = ggplot(HS_MAMMALS, aes(y=reorder(organism,f_human),x=f_human, fill=num_two)) +
+p3 = ggplot(HS_BOREOEUTHERIA, aes(y=reorder(organism,f_human),x=f_human, fill=num_two)) +
   geom_point(shape=21,size=3,color=BEST_COL) + ylab('Mammals Orthologuous species') +
   theme( axis.text.y = element_text(size=9), axis.title = element_text(size=10)) +
   scale_color_metro_d() + scale_fill_metro_d()
@@ -531,7 +541,7 @@ p2.1 = ggplot(ortho_prefix, aes(y=reorder(organism,f_human),x=f_human, fill=num_
   theme( axis.text.y = element_text(size=9), axis.title = element_text(size=10))+
   geom_vline(xintercept=0.78, linetype='dashed') +
   scale_color_metro_d() + scale_fill_metro_d()
-p3.1 = ggplot(HS_MAMMALS, aes(y=reorder(organism,f_human),x=f_human, fill=num_four)) +
+p3.1 = ggplot(HS_BOREOEUTHERIA, aes(y=reorder(organism,f_human),x=f_human, fill=num_four)) +
   geom_point(shape=21,size=3,color=BEST_COL) + ylab('Mammals Orthologuous species') +
   theme( axis.text.y = element_text(size=9), axis.title = element_text(size=10)) +
   scale_color_metro_d() + scale_fill_metro_d()
@@ -539,10 +549,10 @@ p3.1 = ggplot(HS_MAMMALS, aes(y=reorder(organism,f_human),x=f_human, fill=num_fo
 library(patchwork)
 graphics.off()
 MAMMALS_2 = MAMMALS_2 +
-  geom_tippoint(data = . %>% filter(label %in% HS_MAMMALS$num_label), color=BEST_COL,size=3)
+  geom_tippoint(data = . %>% filter(label %in% HS_BOREOEUTHERIA$num_label), color=BEST_COL,size=3)
 
 MAMMALS_4 = MAMMALS_4 +
-  geom_tippoint(data = . %>% filter(label %in% HS_MAMMALS$num_label), color=BEST_COL,size=3)
+  geom_tippoint(data = . %>% filter(label %in% HS_BOREOEUTHERIA$num_label), color=BEST_COL,size=3)
 
 PP = ((p1) | (MAMMALS_2)) / (p2 | p3)
 ggplot2::ggsave(PP, height=12,width=18, filename = file.path(path_ortho,'Mammals-orthologs-2_phylum.pdf'))
@@ -553,19 +563,19 @@ ggplot2::ggsave(PP.1, height=12,width=18, filename = file.path(path_ortho,'Mamma
 hs_ortho_1to1.rds=file.path(path_ortho,'hs_ortho_1to1.rds')
 hs_ortho.rds=file.path(path_ortho,'hs_orthologs.rds')
 ortho_prefix.rds = file.path(path_ortho,'ensembl_species.rds')
-HS_MAMMALS.rds=file.path(path_ortho,'ensembl_mammals.rds')
+HS_BOREOEUTHERIA.rds=file.path(path_ortho,'ensembl_mammals.rds')
 hs_fasta.rds =file.path(path_ortho,'ensembl_human_seq.rds')
 hs_closest.rds = file.path(path_ortho,'hs_closest_ortho.rds')
 
 #saveRDS(hs_ortho_1to1, hs_ortho_1to1.rds)
 #saveRDS(hs_ortho, hs_ortho.rds)
 #saveRDS(ortho_prefix, ortho_prefix.rds)
-#saveRDS(HS_MAMMALS, HS_MAMMALS.rds)
+#saveRDS(HS_BOREOEUTHERIA, HS_BOREOEUTHERIA.rds)
 #saveRDS(hs_fasta_prot, hs_fasta.rds)
 #saveRDS(list(two=hs_closest_two,four=hs_closest_four),hs_closest.rds)
 
 #hs_ortho_1to1=readRDS(hs_ortho_1to1.rds)
-#HS_MAMMALS=readRDS(HS_MAMMALS.rds)
+#HS_BOREOEUTHERIA=readRDS(HS_BOREOEUTHERIA.rds)
 #ortho_prefix=readRDS(ortho_prefix.rds)
 #hs_closest_two = readRDS(hs_closest.rds)$two
 #hs_closest_four = readRDS(hs_closest.rds)$four
