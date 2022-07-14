@@ -2365,7 +2365,8 @@ query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T) {
     Ma=useEnsembl("ensembl",dataset_name,mirror=ENS_MIRROR)
 
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
-    att_struct = c('cds_length','transcript_length')
+    att_struct = c('cds_start','cds_end','cds_length',
+                   'transcript_start','transcript_end','transcript_length')
     att_valid = intersect(c(att_gene,att_struct),listAttributes(Ma)[,1])
 
     if(!missing(Fi) && !missing(Va)){
