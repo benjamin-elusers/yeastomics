@@ -2365,9 +2365,15 @@ query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T) {
     Ma=useEnsembl("ensembl",dataset_name,mirror=ENS_MIRROR)
 
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
-    att_struct = c('cds_start','cds_end','cds_length',
-                   'transcript_start','transcript_end','transcript_length')
+    att_struct = c('cds_length','transcript_length')
     att_valid = intersect(c(att_gene,att_struct),listAttributes(Ma)[,1])
+    no_len = any(!att_struct %in% att_valid)
+    if(no_len){
+      pos_name = c("%s_position","transcript_%s","exon_chrom_%s")
+      att_pos = c('ensembl_exon_id', 'is_constitutive',sprintf(pos_name,'start'), sprintf(pos_name,'end')) %>% sort
+      warning('gene/transcript length unavailable!')
+      att_valid = intersect(c(att_gene,att_pos),listAttributes(Ma)[,1])
+    }
 
     if(!missing(Fi) && !missing(Va)){
       Q=getBM(attributes=att_valid, mart=Ma, filters = Fi,  values = Va, uniqueRows = T, bmHeader = F) %>%
@@ -2376,6 +2382,18 @@ query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T) {
     }else{
       Q=getBM(attributes=att_valid, mart=Ma, uniqueRows = T, filters="", values="", bmHeader = F) %>%
         group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
+
+      if(no_len){
+        Qtx = Q %>% filter(ensembl_peptide_id != "" & !is.na(ensembl_peptide_id) & is_constitutive==1) %>%
+          mutate(gene_len = end_position-start_position+1,
+                 transcript_len = transcript_end-transcript_start+1,
+                 exon_len = exon_chrom_end-exon_chrom_start+1 ) %>%
+          dplyr::select(-contains(c('start','end'))) %>% ungroup() %>% distinct() %>%
+          group_by(ensembl_gene_id,ensembl_transcript_id,ensembl_peptide_id) %>%
+          mutate(cds_len = sum_(exon_len)) %>%
+          dplyr::select(-contains('exon')) %>% ungroup() %>% distinct()
+        return(Qtx)
+      }
       return(Q)
     }
   },
@@ -2394,7 +2412,6 @@ query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T) {
   )
   return(out)
 }
-
 
 ##### NCBI Taxonomy #####
 find_ncbi_lineage = function(){
