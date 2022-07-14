@@ -475,7 +475,7 @@ find_keywords = function(df,keywords,strict=T){
   library(tidyverse)
   row_keywords = purrr::map(unique(keywords), get_rows_by_keyword, df=df) %>%
                  bind_rows %>%
-                 group_by(proteome_id) %>% mutate(keyword_matched = n()) %>%
+                 rowwise() %>% mutate(keyword_matched = n()) %>%
                  distinct() %>%
                  arrange(desc(keyword_matched)) %>% ungroup()
  if(strict){
