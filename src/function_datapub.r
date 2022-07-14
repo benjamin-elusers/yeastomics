@@ -2003,10 +2003,11 @@ find_ensembl_sptree = function(treename=""){
 get_ensembl_sptree = function(treename=NULL){
 
   url_tree = find_ensembl_sptree(treename)
-
   treefile = basename(url_tree) %>% fs::path_ext_set('.nh')
   yeastomics_tree = here::here('data','ensembl',treefile)
+
   if( !file.exists(yeastomics_tree) ){
+    dir.create(dirname(yeastomics_tree),showWarnings = F,recursive = T)
     download.file(url_tree,yeastomics_tree)
   }
 
