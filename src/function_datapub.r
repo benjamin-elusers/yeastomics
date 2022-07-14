@@ -2373,6 +2373,10 @@ query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T) {
       att_pos = c('ensembl_exon_id', 'is_constitutive',sprintf(pos_name,'start'), sprintf(pos_name,'end')) %>% sort
       warning('gene/transcript length unavailable!')
       att_valid = intersect(c(att_gene,att_pos),listAttributes(Ma)[,1])
+      if(any(!att_pos %in% att_valid)){
+        warning('No information about gene length available')
+        return(NULL)
+      }
     }
 
     if(!missing(Fi) && !missing(Va)){
@@ -2384,14 +2388,16 @@ query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T) {
         group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
 
       if(no_len){
-        Qtx = Q %>% filter(ensembl_peptide_id != "" & !is.na(ensembl_peptide_id) & is_constitutive==1) %>%
-          mutate(gene_len = end_position-start_position+1,
-                 transcript_len = transcript_end-transcript_start+1,
-                 exon_len = exon_chrom_end-exon_chrom_start+1 ) %>%
+        Qtx = Q %>%
+          filter(ensembl_peptide_id != "" & !is.na(ensembl_peptide_id) & is_constitutive==1) %>%
+          mutate(gene_length = end_position-start_position+1,
+                 transcript_length = transcript_end-transcript_start+1,
+                 exon_length = exon_chrom_end-exon_chrom_start+1 ) %>%
           dplyr::select(-contains(c('start','end'))) %>% ungroup() %>% distinct() %>%
           group_by(ensembl_gene_id,ensembl_transcript_id,ensembl_peptide_id) %>%
-          mutate(cds_len = sum_(exon_len)) %>%
-          dplyr::select(-contains('exon')) %>% ungroup() %>% distinct()
+          mutate(cds_length = sum_(exon_length)) %>%
+          dplyr::select(-contains('exon')) %>% ungroup() %>% distinct() %>%
+          dplyr::select(-is_constitutive,-gene_length)
         return(Qtx)
       }
       return(Q)
