@@ -2011,8 +2011,8 @@ get_ensembl_sptree = function(treename=NULL){
     download.file(url_tree,yeastomics_tree)
   }
 
-  # First time the tree is read, it is saved to 'data/ensembl/' with the same filename
-  sptree = preload(fs::path_ext_set(yeastomics_tree,'.rds'),ape::read.tree(yeastomics_tree),'get Ensembl species tree...')
+  sptree=ape::read.tree(yeastomics_tree)
+
   return(sptree)
 }
 
