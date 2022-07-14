@@ -55,6 +55,10 @@ preload = function(saved.file,loading.call,doing='create data...'){
     cat(doing,"\n")
     tic(doing)
     res = eval(substitute(loading.call))
+    if( !dir.exists(dirname(saved.file)) ){
+      warning('No such directory! Recursively making the path...')
+      dir.create(dirname(saved.file),recursive = T,showWarnings = T)
+    }
     saveRDS(res,saved.file)
     toc()
   }else{
