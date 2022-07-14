@@ -1997,6 +1997,7 @@ get_ensembl_sptree = function(treename){
   if(missing(treename)){
     sptree_choice =menu(title = 'choose an Ensembl species tree file...',graphics = F,choices = file_sptrees)
     url_tree = url_sptrees[sptree_choice]
+    treename = basename(url_tree) %>% fs::path_ext_remove()
   }else{
     url_tree = str_subset(url_sptrees, pattern = treename)
   }
