@@ -1976,7 +1976,7 @@ get.ensembl.species= function(){
   return(ss_table_links)
 }
 
-find_ensembl_sptree = function(){
+find_ensembl_sptree = function(treename=""){
   URL_FTP_ENSEMBL="http://ftp.ensembl.org/pub/"
   #"http://ftp.ebi.ac.uk/ensemblgenomes/pub/fungi/current/compara/species_trees/fungi_protein-trees_default.nh"
   URL_SPTREE = paste0(URL_FTP_ENSEMBL,"current_compara/species_trees/")
@@ -1987,27 +1987,31 @@ find_ensembl_sptree = function(){
     rvest::html_nodes("a") %>%
     rvest::html_text(trim = T) %>%
     str_subset(pattern = "/$",negate = T)
-  return(paste0(URL_SPTREE,sptrees))
-}
 
-get_ensembl_sptree = function(treename){
-  url_sptrees = find_ensembl_sptree()
-  file_sptrees = basename(url_sptrees)
-  #urltools::url_parse(url_sptrees)
-  if(missing(treename)){
+  file_sptrees = basename(sptrees)
+  if( is.null(treename) ){ treename = "" }
+  url_tree = str_subset(file_sptrees, pattern = treename)
+
+  if( length(url_tree) != 1 ){
     sptree_choice =menu(title = 'choose an Ensembl species tree file...',graphics = F,choices = file_sptrees)
-    url_tree = url_sptrees[sptree_choice]
-  }else{
-    url_tree = str_subset(url_sptrees, pattern = treename)
+    url_tree = sptrees[sptree_choice]
   }
 
-  treename = basename(url_tree) %>% fs::path_ext_remove()
+  return(paste0(URL_SPTREE,url_tree))
+}
+
+get_ensembl_sptree = function(treename=NULL){
+
+  url_tree = find_ensembl_sptree(treename)
+
+  treefile = basename(url_tree) %>% fs::path_ext_set('.nh')
+  yeastomics_tree = here::here('data','ensembl',treefile)
+  if( !file.exists(yeastomics_tree) ){
+    download.file(url_tree,yeastomics_tree)
+  }
+
   # First time the tree is read, it is saved to 'data/ensembl/' with the same filename
-  yeastomics_tree = here::here('data','ensembl',treename)
-  sptree = preload(paste0(yeastomics_tree,'.rds'),
-                   { ape::read.tree(url_tree) },
-                   'get Ensembl species tree...')
-  write.tree(sptree,paste0(yeastomics_tree,'.nh'))
+  sptree = preload(fs::path_ext_set(yeastomics_tree,'.rds'),ape::read.tree(yeastomics_tree),'get Ensembl species tree...')
   return(sptree)
 }
 
