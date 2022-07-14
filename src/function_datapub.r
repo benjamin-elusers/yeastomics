@@ -1997,17 +1997,17 @@ get_ensembl_sptree = function(treename){
   if(missing(treename)){
     sptree_choice =menu(title = 'choose an Ensembl species tree file...',graphics = F,choices = file_sptrees)
     url_tree = url_sptrees[sptree_choice]
-    treename = basename(url_tree) %>% fs::path_ext_remove()
   }else{
     url_tree = str_subset(url_sptrees, pattern = treename)
   }
 
+  treename = basename(url_tree) %>% fs::path_ext_remove()
   # First time the tree is read, it is saved to 'data/ensembl/' with the same filename
   yeastomics_tree = here::here('data','ensembl',treename)
-  sptree = preload(file.path(yeastomics_tree,'.rds'),
-                   { url_tree=get('url_tree'); ape::read.tree(url_tree) },
+  sptree = preload(paste0(yeastomics_tree,'.rds'),
+                   { ape::read.tree(url_tree) },
                    'get Ensembl species tree...')
-  write.tree(sptree,file.path(yeastomics_tree,'.nh'))
+  write.tree(sptree,paste0(yeastomics_tree,'.nh'))
   return(sptree)
 }
 
