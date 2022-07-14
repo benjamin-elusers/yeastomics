@@ -2001,7 +2001,12 @@ get_ensembl_sptree = function(treename){
     url_tree = str_subset(url_sptrees, pattern = treename)
   }
 
-  sptree = ape::read.tree(url_tree)
+  # First time the tree is read, it is saved to 'data/ensembl/' with the same filename
+  yeastomics_tree = here::here('data','ensembl',treename)
+  sptree = preload(file.path(yeastomics_tree,'.rds'),
+                   tree = ape::read.tree(url_tree),
+                   'get Ensembl species tree...')
+  write.tree(sptree,yeastomics_tree)
   return(sptree)
 }
 
