@@ -1706,6 +1706,14 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
 
 ##### Uniprot #####
 
+get_uniprot_id = function(accession){
+  UNIPROT_URL = sprintf("https://rest.uniprot.org/uniprotkb/%s.tsv",accession)
+  #OX   NCBI_TaxID=7955 {ECO:0000312|Proteomes:UP000000437};
+  if( httr::http_error(UNIPROT_URL) ){ return(NULL) }
+  res = readr::read_delim(UNIPROT_URL,show_col_types = FALSE, progress = F)
+  return(res)
+}
+
 parse_uniprot_fasta_header = function(fasta_header){
 #  uni_desc = get.uniprot.proteome(9606,DNA = F,fulldesc = T) %>% names
 
