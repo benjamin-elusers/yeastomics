@@ -473,10 +473,23 @@ get_rows_by_keyword = function(word,df){
 
 find_keywords = function(df,keywords,strict=T){
   library(tidyverse)
+
+  count_keywords = list()
+  for( kw in  unique(keywords) ){
+    count_kw = sapply(df,
+                function(x){ str_count( string=tolower(x), pattern=paste0("(?i)",as.character(kw))) }) %>%
+      rowSums
+    count_keywords[[kw]]=count_kw
+  }
+  df_count_keywords = bind_cols(count_keywords) %>%
+    rowwise() %>%
+    mutate(keyword_matched=sum(c_across(everything()))) %>%
+    filter(keyword_matched>0)
+
   row_keywords = purrr::map(unique(keywords), get_rows_by_keyword, df=df) %>%
-                 bind_rows %>%
-                 rowwise() %>% mutate(keyword_matched = n()) %>%
+                 bind_rows() %>%
                  distinct() %>%
+                 bind_cols(df_count_keywords) %>%
                  arrange(desc(keyword_matched)) %>% ungroup()
  if(strict){
    MAX_K = max(row_keywords$keyword_matched)

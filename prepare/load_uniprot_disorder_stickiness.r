@@ -34,8 +34,13 @@ writeLines(IDR_ATAR$UNIPROT)
 #ecoli = find.uniprot_refprot(c('bacteria','Escherichia','coli','K12'))
 #print(ecoli$tax_id) # Taxon id = 83333
 
+human = find.uniprot_refprot(c('9606','HUMAN','homo sapiens'))  %>%
+        arrange(desc(keyword_matched))
+
+
 # 2. Get the reference proteome sequences for the selected taxon ===============
 # ec_aa = get.uniprot.proteome(taxid = 83333, DNA = F)
+hs_aa = get.uniprot.proteome(taxid = human$tax_id, DNA = F)
 
 IDR_prot = Biostrings::readAAStringSet(here::here("prepare","IDR_Candidate_new.fasta"))
 #IDR_prot = Biostrings::readAAStringSet("/home/benjamin/Desktop/GitHub/yeastomics/prepare/uniprot_idr.fasta")
@@ -43,6 +48,7 @@ names(IDR_prot) = str_extract(names(IDR_prot),UNIPROT.nomenclature())
 
 # 3. Get the reference uniprot accession for the selected taxon ================
 # ec_uniref = names(ec_aa)
+hs_uniref = names(hs_aa)
 
 # 4. Get all disorder predictions (from taxon id or from list of ids) ==========
 # Took 130 sec. for 4402 identifiers from e. coli
@@ -100,6 +106,17 @@ table(MOBIDB_LONGDISO$acc)
 #             mutate(feature_maxlen = max_(content_count),
 #                    longest_idr = feature == 'disorder' & content_count == feature_maxlen )
 # n_distinct(ec_mobidb$acc)
+
+hs_mobidb = load.mobidb(human$tax_id) %>% dplyr::filter(acc %in% hs_uniref)
+irows=1:nrow(hs_mobidb)
+
+hs_diso_seq_list <- pbmcapply::pbmclapply(
+  X=irows,
+  # extract subsequence of mobidb feature from uniprot protein using positions
+  FUN = function(x){
+    feature_seq = subseq(x=hs_prot[[hs_mobidb$acc[x]]], start=hs_mobidb$S[x],end=hs_mobidb$E[x]) %>% as.character
+  }, mc.cores = NCPUS)
+
 
 # 5. Get the sequence for disorder stretches ===================================
 ## Might be slow on single-cpu depending on no. of (features+proteins) to process
