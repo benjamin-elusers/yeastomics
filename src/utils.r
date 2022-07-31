@@ -481,21 +481,18 @@ find_keywords = function(df,keywords,strict=T){
       rowSums
     count_keywords[[kw]]=count_kw
   }
-  df_count_keywords = bind_cols(count_keywords) %>%
-    rowwise() %>%
-    mutate(keyword_matched=sum(c_across(everything()))) %>%
-    filter(keyword_matched>0)
 
-  row_keywords = purrr::map(unique(keywords), get_rows_by_keyword, df=df) %>%
-                 bind_rows() %>%
-                 distinct() %>%
-                 bind_cols(df_count_keywords) %>%
-                 arrange(desc(keyword_matched)) %>% ungroup()
- if(strict){
-   MAX_K = max(row_keywords$keyword_matched)
-   return( row_keywords %>% dplyr::filter( keyword_matched == MAX_K) )
+  df_count_keywords = df %>% bind_cols(count_keywords) %>%
+    rowwise() %>%
+    mutate(keyword_matched=sum(c_across(all_of(keywords)))) %>%
+    filter(keyword_matched>0) %>%
+    arrange(desc(keyword_matched)) %>% ungroup()
+
+  if(strict){
+   MAX_K = max(df_count_keywords$keyword_matched)
+   return( df_count_keywords %>% dplyr::filter( keyword_matched == MAX_K) )
  }
-  return( row_keywords )
+  return( df_count_keywords )
 }
 
 get_match = function(x,y){ x[match(x,y)] }
