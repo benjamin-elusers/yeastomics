@@ -1715,14 +1715,16 @@ get_uniprot_id = function(accession){
 }
 
 get_uniprot_ids = function(accessions){
+  msg = sprintf("Retrieve %s uniprot ids from URL...",n_distinct(accessions))
   if(require(pbmcapply)){
     ncpus=parallel::detectCores()-1
-    message(sprintf("Retrieve %s uniprot ids from URL in parallel using %s CPUs...",n_distinct(accesssions),ncpus))
+    msg = paste0(msg, sprintf("\n using %s CPUs in parallel",ncpus))
+    message(msg)
     df_uniprot = pbmcapply::pbmclapply(X=accessions, get_uniprot_id, mc.cores = ncpus) %>%
       purrr::compact() %>%
       bind_rows()
   }else{
-    message("Retrieve uniprot ids from URL...")
+    message(msg)
     warning('NOT IN PARALLEL (might be long depending on number of IDS)')
     df_uniprot = lapply(accessions,get_uniprot_id) %>% purrr::compact() %>% bind_rows()
   }
