@@ -1714,6 +1714,21 @@ get_uniprot_id = function(accession){
   return(res)
 }
 
+get_uniprot_ids = function(accessions){
+  if(require(pbmcapply)){
+    ncpus=parallel::detectCores()-1
+    message(sprintf("Retrieve %s uniprot ids from URL in parallel using %s CPUs...",n_distinct(accesssions),ncpus))
+    df_uniprot = pbmcapply::pbmclapply(X=accessions, get_uniprot_id, mc.cores = ncpus) %>%
+      purrr::compact() %>%
+      bind_rows()
+  }else{
+    message("Retrieve uniprot ids from URL...")
+    warning('NOT IN PARALLEL (might be long depending on number of IDS)')
+    df_uniprot = lapply(accessions,get_uniprot_id) %>% purrr::compact() %>% bind_rows()
+  }
+  return(df_uniprot)
+}
+
 parse_uniprot_fasta_header = function(fasta_header){
 #  uni_desc = get.uniprot.proteome(9606,DNA = F,fulldesc = T) %>% names
 
