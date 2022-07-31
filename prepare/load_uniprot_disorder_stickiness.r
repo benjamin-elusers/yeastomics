@@ -36,8 +36,6 @@ writeLines(IDR_ATAR$UNIPROT)
 
 human = find.uniprot_refprot(c('9606','HUMAN','homo sapiens'))  %>%
         arrange(desc(keyword_matched))
-
-
 # 2. Get the reference proteome sequences for the selected taxon ===============
 # ec_aa = get.uniprot.proteome(taxid = 83333, DNA = F)
 hs_aa = get.uniprot.proteome(taxid = human$tax_id, DNA = F)
@@ -107,16 +105,39 @@ table(MOBIDB_LONGDISO$acc)
 #                    longest_idr = feature == 'disorder' & content_count == feature_maxlen )
 # n_distinct(ec_mobidb$acc)
 
-hs_mobidb = load.mobidb(human$tax_id) %>% dplyr::filter(acc %in% hs_uniref)
-irows=1:nrow(hs_mobidb)
+hs_mobidb = load.mobidb(human$tax_id)
 
+df_hs_diso = hs_mobidb %>%
+  dplyr::filter(acc %in% hs_uniref & feature == 'disorder' & source %in% 'th_50') %>%
+  mutate(ID_region = paste0(acc,"_",S,"..",E))
+
+irows=1:nrow(df_hs_diso)
 hs_diso_seq_list <- pbmcapply::pbmclapply(
   X=irows,
   # extract subsequence of mobidb feature from uniprot protein using positions
   FUN = function(x){
-    feature_seq = subseq(x=hs_prot[[hs_mobidb$acc[x]]], start=hs_mobidb$S[x],end=hs_mobidb$E[x]) %>% as.character
+    feature_seq = tryCatch(
+      subseq(x=hs_aa[[df_hs_diso$acc[x]]], start=df_hs_diso$S[x],end=df_hs_diso$E[x]) %>% as.character,
+      error = function(e){ finally = print(paste0(df_hs_diso$acc[x],df_hs_diso$S[x],df_hs_diso$E[x])); return(NA) })
   }, mc.cores = NCPUS)
 
+df_hs_diso$feature_seq = unlist(hs_diso_seq_list)
+
+hs_diso_seq = AAStringSet(df_hs_diso$feature_seq[!is.na(df_hs_diso$feature_seq)])
+names(hs_diso_seq) = unique(df_hs_diso$ID_region[!is.na(df_hs_diso$feature_seq)])
+HS_AA.FR = (letterFrequency(hs_diso_seq,as.prob = F,letters = get.AA1()) ) %>%
+  bind_cols( ID_region=names(hs_diso_seq)) %>%
+  dplyr::rename(setNames(get.AA1(),get.AA3()))
+
+hs_mobidb_aa = left_join(df_hs_diso , HS_AA.FR, by='ID_region')
+tot_aa_hs=sum(widths(hs_aa[unique(df_hs_diso$acc)]))
+
+HS_DISO_AACOUNT = test = hs_mobidb_aa %>% group_by(source) %>%
+  summarize( across(.cols=get.AA3(), .fns = sum_ ),
+             total_count = sum_(c_across(get.AA3())),
+             total_freq =total_count/ tot_aa_hs) %>%
+  dplyr::rename(setNames(get.AA1(),get.AA3()))
+HS_DISO_AAFREQ = (HS_DISO_AACOUNT[,get.AA3()] / HS_DISO_AACOUNT$total_count) %>% as.double()
 
 # 5. Get the sequence for disorder stretches ===================================
 ## Might be slow on single-cpu depending on no. of (features+proteins) to process
@@ -125,7 +146,6 @@ hs_diso_seq_list <- pbmcapply::pbmclapply(
 tic('retrieve regions sequence...') # Time the task of retrieving feature sequences
 #message('get sequences of mobidb features/regions...')
 irows=1:nrow(MOBIDB_LONGDISO)
-
 # Preparing data for accessing feature sequences
 ACC = MOBIDB_LONGDISO$acc
 START = MOBIDB_LONGDISO$S %>% as.integer()
@@ -174,6 +194,22 @@ AA.FR = (letterFrequency(diso_seq,as.prob = T,letters = get.AA1()) * 100) %>%
         bind_cols( ID_region=names(diso_seq)) %>%
           dplyr::rename(setNames(get.AA1(),get.AA3()))
 
+hs_aa_fr_diso = matrix(HS_DISO_AAFREQ , byrow=T,ncol=20,nrow=nrow(AA.FR))
+
+IDR_AAFR =  AA.FR[,get.AA3()]
+AA.FC = sweep(IDR_AAFR,2,100*HS_DISO_AAFREQ,"/")
+
+TOP4_FC = AA.FC %>% add_column(ID_region= AA.FR$ID_region) %>%
+  pivot_longer(cols = 1:20) %>%
+  group_by(ID_region) %>%
+  slice_max(order_by = value,n = 4,with_ties = F) %>%
+  mutate(rk = rank(-value,ties.method = 'first'),
+         name.val = paste0(name,":",round(value,1))) %>%
+  dplyr::select(-name,-value) %>%
+  pivot_wider(id_cols=ID_region, names_from='rk', names_glue = 'AA{rk}_fc',
+              values_from = c('name.val'))
+
+
 # COUNT CLASS OF AA
 aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>%
   append( list('Alcohol'=c('S','T'),
@@ -197,24 +233,34 @@ TOP4 = AA.FR %>%
   mutate(rk = rank(-value,ties.method = 'first'),
          name.val = paste0(name,":",round(value,1))) %>%
   dplyr::select(-name,-value) %>%
-  pivot_wider(id_cols=ID_region, names_from='rk', names_glue = 'AA{rk}',
+  pivot_wider(id_cols=ID_region, names_from='rk', names_glue = 'AA{rk}_fr',
               values_from = c('name.val'))
 
-AA.CHARGE = AA.FR %>% group_by(ID_region) %>% summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU),HIS)
+AA.CHARGE = AA.FR %>% group_by(ID_region) %>%
+  summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU))
+
 AA_feat = left_join(AA.FR,AACLASS.FR) %>%
   left_join(AA.CHARGE,by="ID_region") %>%
-  left_join(TOP4,by='ID_region')
-
+  left_join(TOP4,by='ID_region') %>%
+  left_join(TOP4_FC,by='ID_region')
 
 
 mobidb_scores = MOBIDB_LONGDISO %>% dplyr::select(-is_longest_feature) %>%
                   left_join( AA_feat, by='ID_region' ) %>%
                   bind_cols( bind_rows(diso_score) ) %>%
-                  group_by(acc,length,evidence,feature,source,is_longest,feature_len,S,E,
+                  group_by(acc,feature,source,is_longest,feature_len,S,E,
                              has_PS_features,PS_overlap,S_phasepro,E_phasepro,
                              PS_overlap_cter,PS_overlap_nter,PS_overlap_nested,PS_overlap_inside) %>%
                   distinct() %>%
-                  mutate( across(aggrescan:wimleywhite, ~ sum(.x)/feature_len))
+                  mutate( across(aggrescan:wimleywhite, ~ sum(.x)/feature_len)) %>%
+                  dplyr::select(-evidence,-length) %>%
+                 relocate(ORG,acc,prot_len,ID,reviewed,PNAME,GNAME,has_PS_features,
+                          PS_acc_pos,S_phasepro,E_phasepro, starts_with("PS_overlap"),
+                          ID_region,S,E,feature_len, is_longest, source, feature_seq,
+                          get.AA3() %>% as.vector,ends_with("_fr"),ends_with("_fc")
+                          )
+colnames(mobidb_scores)
+
 
 write_tsv(mobidb_scores, file = here::here('prepare','ATAR-IDR-FEATURES.tsv'))
 
