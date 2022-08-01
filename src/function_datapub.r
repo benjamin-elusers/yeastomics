@@ -2001,8 +2001,9 @@ get.ensembl.species= function(){
   return(ss_table_links)
 }
 
-find_ensembl_sptree = function(treename=""){
-  URL_FTP_ENSEMBL="http://ftp.ensembl.org/pub/"
+find_ensembl_sptree = function(treename="", host="http://ftp.ensembl.org/pub/"){
+
+  URL_FTP_ENSEMBL= host
   #"http://ftp.ebi.ac.uk/ensemblgenomes/pub/fungi/current/compara/species_trees/fungi_protein-trees_default.nh"
   URL_SPTREE = paste0(URL_FTP_ENSEMBL,"current_compara/species_trees/")
   httr::set_config(httr::config(ssl_verifypeer = FALSE))
@@ -2025,9 +2026,9 @@ find_ensembl_sptree = function(treename=""){
   return(paste0(URL_SPTREE,url_tree))
 }
 
-get_ensembl_sptree = function(treename=NULL){
+get_ensembl_sptree = function(treename=NULL,host="http://ftp.ensembl.org/pub/"){
 
-  url_tree = find_ensembl_sptree(treename)
+  url_tree = find_ensembl_sptree(treename,host)
   treefile = basename(url_tree) %>% fs::path_ext_set('.nh')
   yeastomics_tree = here::here('data','ensembl',treefile)
 
