@@ -2091,13 +2091,10 @@ get_ensembl_vertebrates=function(){
   return(vertebrates)
 }
 
-get_ensembl_mammals=function(){
-  # select mammals from vertebrates
-}
-
-get_ensg_dataset = function(){
+###### biomart ensembl #####
+get_ens_dataset = function(host='https://www.ensembl.org/',mart='ensembl'){
   library(biomaRt)
-  ens <- useEnsembl("ensembl",mirror=ENS_MIRROR)
+  ens <- useEnsembl(biomart = mart, host = host, mirror=ENS_MIRROR)
   ens_dataset = listDatasets(ens) %>% dplyr::as_tibble() %>%
                 dplyr::mutate(
                   sp=str_split_fixed(dataset,'_',n=3)[,1],
@@ -2127,8 +2124,13 @@ get_ensembl_hsprot = function(verbose=T){
   return(hs_ensp)
 }
 
-get_ensembl_tx = function(verbose=T,ENSG,ENSP){
+get_ensembl_tx = function(verbose=T,
+                          host='https://www.ensembl.org/',
+                          mart='ensembl',
+                          dataset='hsapiens_gene_ensembl',
+                          ENSG,ENSP){
   library(biomaRt)
+  ens <- biomaRt::useEnsembl(biomart = mart, host = host, dataset = dataset, mirror=ENS_MIRROR)
 
   ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
@@ -2194,7 +2196,7 @@ get_ensembl_tx = function(verbose=T,ENSG,ENSP){
 }
 
 
-get_ensembl_gc = function(ENSG){
+get_ensembl_gc = function(ENSG,host='https://www.ensembl.org/'){
   library(biomaRt)
   ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
 
@@ -2332,9 +2334,10 @@ get_hs_transcript = function(verbose=T,longest_transcript=F,with_uniprot=T){
   return(hs_ensg)
 }
 
-get_ens_filter_ortho = function(mart='ensembl',dat='hsapiens_gene_ensembl'){
+get_ens_filter_ortho = function(host='https://www.ensembl.org/',
+                                mart='ensembl',dat='hsapiens_gene_ensembl'){
   library(biomaRt)
-  hs_ens = useEnsembl(mart,dat,mirror=ENS_MIRROR)
+  hs_ens = useEnsembl(host = host, biomart = mart, dataset = dat, mirror=ENS_MIRROR)
   filter_ortho = searchFilters(hs_ens,'homolog') %>%
                  as_tibble %>%
                  mutate(sp=str_split_fixed(name,'_',n=3)[,2]) %>%
