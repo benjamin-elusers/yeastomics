@@ -193,7 +193,13 @@ HS_TOP4_FC = HS_AA_FC %>%
               values_from = c('name.val'))
 
 HS_AA_CHARGE = HS_AA_FR %>% group_by(ID_region,region_len) %>%
-  summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU))
+  summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU),
+            NETCHARGE=PLUS-MINUS,
+            pep_len = Peptides::lengthpep(hs_diso_seq),
+            pep_mw  = Peptides::mw(hs_diso_seq),
+            pep_avg_mw = pep_mw / pep_len,
+            pep_netcharge = Peptides::charge(hs_diso_seq),
+            pep_PI = Peptides::pI(hs_diso_seq))
 
 HS_AA_feat = left_join(HS_AA_FR,HS_AACLASS_FR) %>%
   left_join(HS_AA_CHARGE,by=c('ID_region','region_len')) %>%
@@ -294,6 +300,7 @@ toc(log=T)
 # Average propensity = sum aa score / feature length
 names(diso_seq_list) = iseq
 
+###### ATAR DISO AA FEATURES ######
 # COUNT AA
 AA.FR = (letterFrequency(diso_seq,as.prob = T,letters = get.AA1()) * 100) %>%
         bind_cols( ID_region=names(diso_seq)) %>%
@@ -330,7 +337,13 @@ TOP4 = AA.FR %>%
               values_from = c('name.val'))
 
 AA.CHARGE = AA.FR %>% group_by(ID_region) %>%
-  summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU))
+  summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU),
+            NETCHARGE=PLUS-MINUS,
+            pep_len = Peptides::lengthpep(diso_seq),
+            pep_mw  = Peptides::mw(diso_seq),
+            pep_avg_mw = pep_mw / pep_len,
+            pep_netcharge = Peptides::charge(diso_seq),
+            pep_PI = Peptides::pI(diso_seq))
 
 AA_feat = left_join(AA.FR,AACLASS.FR) %>%
   left_join(AA.CHARGE,by="ID_region") %>%
