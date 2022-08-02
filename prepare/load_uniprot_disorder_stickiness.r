@@ -17,9 +17,11 @@ aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>%
   append( list('Alcohol'=c('S','T'),
                'Turnlike'=c('A','C','D','E','G','H','K','N','Q','R','S','T'))
   )
-sum.aa.fr = function(BS,alphabet){
-  alphabet.freq = rowSums(letterFrequency(BS,as.prob = T,letters = alphabet))
+sum.aa.fr = function(BS,alphabet,to100=F){
+  alphabet.freq = rowSums(letterFrequency(BS,as.prob = F,letters = alphabet))
   prot.enrich = tibble(id=names(BS),fr=alphabet.freq)
+  if(to100){ prot.enrich$fr = 100*prot.enrich$fr }
+  return(prot.enrich)
 }
 aa.set = map_chr(aa.prop,str_c,collapse='')
 aa.class = paste0(tolower(sub(x=names(aa.set),"\\.","")),"_",aa.set)
@@ -117,7 +119,12 @@ MOBIDB_LONGDISO = MOBIDB_DISO %>%
 #             mutate(feature_maxlen = max_(content_count),
 #                    longest_idr = feature == 'disorder' & content_count == feature_maxlen )
 # n_distinct(ec_mobidb$acc)
-hs_mobidb = load.mobidb(human$tax_id)
+
+
+# 5. Get all human disorder predictions ========================================
+hs_mobidb = preload(here::here('data','mobidb-human-features.rds'),
+                    load.mobidb(human$tax_id),
+                    'retrieve human mobidb features...')
 
 df_hs_diso = hs_mobidb %>%
   dplyr::filter(acc %in% hs_uniref & feature == 'disorder' & source %in% 'th_50') %>%
@@ -137,48 +144,62 @@ df_hs_diso$feature_seq = unlist(hs_diso_seq_list)
 
 hs_diso_seq = AAStringSet(df_hs_diso$feature_seq[!is.na(df_hs_diso$feature_seq)])
 names(hs_diso_seq) = unique(df_hs_diso$ID_region[!is.na(df_hs_diso$feature_seq)])
-HS_AA.FR = (letterFrequency(hs_diso_seq,as.prob = F,letters = get.AA1()) ) %>%
-  bind_cols( ID_region=names(hs_diso_seq)) %>%
-  dplyr::rename(setNames(get.AA1(),get.AA3()))
 
-hs_mobidb_aa = left_join(df_hs_diso , HS_AA.FR, by='ID_region')
+###### HS AA DISO FEATURES #######
+AA1=get.AA1() %>% as.vector()
+AA3=get.AA3() %>% as.vector()
+
+HS_AA_COUNT = (letterFrequency(hs_diso_seq,as.prob = F,letters = get.AA1())) %>%
+  bind_cols( ID_region=names(hs_diso_seq), region_len = widths(hs_diso_seq)) %>%
+  dplyr::rename(setNames(AA1,AA3))
+HS_AA_FR = HS_AA_COUNT %>% mutate( across(AA3, ~ . / region_len) )
+
+hs_mobidb_aa = left_join(df_hs_diso , HS_AA_COUNT, by='ID_region')
 tot_aa_hs=sum(widths(hs_aa[unique(df_hs_diso$acc)]))
-
-HS_DISO_AACOUNT = hs_mobidb_aa %>% group_by(source) %>%
-  summarize( across(.cols=get.AA3(), .fns = sum_ ),
-             total_count = sum_(c_across(get.AA3())),
-             total_freq =total_count/ tot_aa_hs) %>%
-  dplyr::rename(setNames(get.AA1(),get.AA3()))
-HS_DISO_AAFREQ = (HS_DISO_AACOUNT[,get.AA3()] / HS_DISO_AACOUNT$total_count) %>% as.double()
-
-
-## HS FEATURES
-HS_AA.FR = (letterFrequency(hs_diso_seq,as.prob = T,letters = get.AA1()) * 100) %>%
-  bind_cols( ID_region=names(hs_diso_seq)) %>%
-  dplyr::rename(setNames(get.AA1(),get.AA3()))
+HS_DISO_AACOUNT = hs_mobidb_aa  %>% group_by(source) %>%
+  summarize( across(.cols=AA3, .fns = sum_ ),
+             total_count = sum_(c_across(AA3)),
+             total_freq =total_count/ tot_aa_hs)
+HS_DISO_AAFREQ = (HS_DISO_AACOUNT[,AA3] / HS_DISO_AACOUNT$total_count) %>% as.double()
 
 # COUNT CLASS OF AA
-HS_AACLASS.FR = map(aa.prop, sum.aa.fr, BS=hs_diso_seq) %>% bind_cols %>%
+HS_AACLASS_COUNT = map(aa.prop, sum.aa.fr, BS=hs_diso_seq) %>% bind_cols %>%
   rename_with(~aa.class, starts_with('fr')) %>%
   dplyr::select(-starts_with('id')) %>%
-  mutate(ID_region=names(hs_diso_seq))
+  mutate(ID_region=names(hs_diso_seq), region_len = widths(hs_diso_seq))
 
-HS_TOP4 = HS_AA.FR %>%
+HS_AACLASS_FR = HS_AACLASS_COUNT %>% mutate( across(aa.class, ~ . / region_len) )
+
+HS_TOP4 = HS_AA_FR %>% mutate( across(AA3, ~ . *100)) %>%
+  pivot_longer(cols = 1:20) %>%
+  group_by(ID_region,region_len) %>%
+  slice_max(order_by = value,n = 4,with_ties = F) %>%
+  mutate(rk = rank(-value,ties.method = 'first'),
+         name.val = paste0(name,":",round(value,2))) %>%
+  dplyr::select(-name,-value) %>%
+  pivot_wider(id_cols=c(ID_region,region_len), names_from='rk', names_glue = 'AA{rk}_fr',
+              values_from = c('name.val'))
+
+HS_AA_FC = sweep( HS_AA_FR[,AA3],2,HS_DISO_AAFREQ,"/")
+HS_TOP4_FC = HS_AA_FC %>%
+  bind_cols(ID_region= HS_AA_FR$ID_region, region_len =HS_AA_FR$region_len) %>%
   pivot_longer(cols = 1:20) %>%
   group_by(ID_region) %>%
   slice_max(order_by = value,n = 4,with_ties = F) %>%
   mutate(rk = rank(-value,ties.method = 'first'),
-         name.val = paste0(name,":",round(value,1))) %>%
+         name.val = paste0(name,":",round(value,2))) %>%
   dplyr::select(-name,-value) %>%
-  pivot_wider(id_cols=ID_region, names_from='rk', names_glue = 'AA{rk}_fr',
+  pivot_wider(id_cols=c(ID_region,region_len), names_from='rk', names_glue = 'AA{rk}_fc',
               values_from = c('name.val'))
 
-HS_AA.CHARGE = HS_AA.FR %>% group_by(ID_region) %>%
+HS_AA_CHARGE = HS_AA_FR %>% group_by(ID_region,region_len) %>%
   summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU))
 
-HS_AA_feat = left_join(HS_AA.FR,HS_AACLASS.FR) %>%
-  left_join(HS_AA.CHARGE,by="ID_region") %>%
-  left_join(HS_TOP4,by='ID_region')
+HS_AA_feat = left_join(HS_AA_FR,HS_AACLASS_FR) %>%
+  left_join(HS_AA_CHARGE,by=c('ID_region','region_len')) %>%
+  left_join(HS_TOP4,by=c('ID_region','region_len')) %>%
+  left_join(HS_TOP4_FC,by=c('ID_region','region_len'))
+
 
 tic('compute aa scores of mobidb features ...')
 #message('get amino acid scores of mobidb features/regions...')
@@ -191,8 +212,10 @@ hs_diso_score <- pbmcapply::pbmclapply(
 toc(log=T)
 ### TOOK ~340 SECONDS with pbmcapply() (parallel on (n-2) cpus)
 
+hs_uni = get_uniprot_reference(9606)
+
 hs_mobidb_scores = df_hs_diso %>%
-  left_join( HS_AA_feat, by='ID_region' ) %>%
+  left_join( HS_AA_feat, by=c('ID_region','feature_len'='region_len') ) %>%
   bind_cols( bind_rows(hs_diso_score) ) %>%
   group_by(acc,feature,source,feature_len,S,E) %>%
   distinct() %>%
@@ -200,8 +223,26 @@ hs_mobidb_scores = df_hs_diso %>%
   dplyr::select(-evidence) %>%
   relocate(acc, ID_region,S,E,feature_len, source, feature_seq,
            get.AA3() %>% as.vector,ends_with("_fr")
-  )
+  ) %>% filter(feature_len > 35)
 
+hs_diso$atar_selection = hs_diso$ID_region %in% MOBIDB_LONGDISO$ID_region
+
+hs_diso = inner_join(hs_uni,hs_mobidb_scores,by=c('AC'='acc')) %>%
+           #left_join(get.width(hs_aa),by=c('AC'='orf')) %>%
+  filter(feature_len>35) %>%
+  mutate(atar_selection = ID_region %in% MOBIDB_LONGDISO$ID_region) %>%
+  dplyr::select(-DB,-id_cdna,-OX) %>%
+  dplyr::rename(prot_len=length,idr_len=feature_len,idr_seq=feature_seq,
+                idr_frac=content_fraction,idr_count=content_count) %>%
+  relocate(OS,OS,AC,ID,GN,ensp,NAME,PE,SV,
+           prot_len,idr_frac,idr_count,
+           atar_selection,ID_region,idr_len,S,E,source,feature,idr_seq,
+           AA3,ends_with("_fr"),all_of(aa.class),PLUS,MINUS,
+           ends_with("_fc"), aggrescan:wimleywhite)
+
+
+write_tsv(hs_diso,file=here::here('prepare','HUMAN_MOBIDB_FEATURES.tsv'))
+#View(hs_diso)
 
 # 5. Get the sequence for disorder stretches ===================================
 ## Might be slow on single-cpu depending on no. of (features+proteins) to process
@@ -322,27 +363,41 @@ save.image(file = here::here('prepare', 'IDR-features-data.rdata'))
 ### UMAP + Clustering
 load(here::here('prepare', 'IDR-features-data.rdata'))
 
-hs_diso = hs_mobidb_scores %>% filter(feature_len>35)
-hs_diso$atar_selection = hs_diso$ID_region %in% mobidb_scores$ID_region
+#hs_diso = hs_mobidb_scores %>% filter(feature_len>35)
+#hs_diso$atar_selection = hs_diso$ID_region %in% mobidb_scores$ID_region
 
-hs_mobi_data = hs_diso %>% ungroup() %>% dplyr::select(where(is.numeric),-S,-E)
-mobi_id = hs_diso$acc
+hs_mobi_data = hs_diso %>% ungroup() %>% drop_na() %>% dplyr::select(where(is.numeric),-S,-E,-PE,-SV)
+mobi_id =  hs_diso %>% ungroup() %>% drop_na() %>% pull(ID_region)
+atar_selection = hs_diso %>% ungroup() %>% drop_na() %>% pull(atar_selection)
 set.seed(142)
 library(umap)
+
+umap.config = umap.defaults
+umap.config$n_neighbors = 7
 library(M3C)
 
-mobi_data_t = t(hs_mobi_data)
-colnames(hs_mobi_data) = mobi_id
-K <- M3C::M3C(mobi_data_t, method=2,maxK = 30, seed = 142)
-mobi_map <- mobi_data_t %>% scale() %>% umap(labels = as.factor(K$assignments))
-#umap_df <- mobi_map$layout %>% as.data.frame() %>%  rename(UMAP1="V1", UMAP2="V2")
+hs_scaled_mobi = t(hs_mobi_data) %>%  scale() %>% t() %>% as_tibble()
+rownames(hs_scaled_mobi) = mobi_id
+mobi_map <- hs_scaled_mobi %>% umap::umap(seed = 142, config=umap.config)
+mobi_umap = mobi_map$layout %>% set_colnames(c('X1','X2')) %>%
+            bind_cols(mobi_map$data,id=mobi_id) %>%
+            mutate(uni=str_extract(id,UNIPROT.nomenclature()))
 
-U = mobi_map$data %>%
-  ggplot(aes(x = X1,y = X2, color=as.factor(K$assignments))) +
-  geom_point(size=2, alpha=0.5) +# geom_text_repel(aes(label=mobi_id),max.overlaps = 50,size=3)+
-  geom_point(subset(mobi_map$data,atar_selection),shape=3,size=2, alpha=0.5) +# geom_text_repel(aes(label=mobi_id),max.overlaps = 50,size=3)+
-
-    #facet_wrap(~island)+
+library(ggiraph)
+UMAP = ggplot(data=mobi_umap,aes(x = X1,y = X2, tooltip=id)) +
+  geom_point(size=1, alpha=0.2, aes(color=NET)) +
+  # atar selection
+  geom_point(data=subset(mobi_umap,atar_selection), size=2, color='red') +
+  geom_text_repel(data=subset(mobi_umap,atar_selection),aes(label=id),max.overlaps = 50,size=3.5,color='red') +
+  ggiraph::geom_point_interactive(size=0.5, mapping=aes(tooltip=id)) +
   labs(x = "X1", y = "X2", subtitle="UMAP plot")+
   theme(legend.position="bottom")
-plot(U)
+
+
+plot(UMAP)
+ggiraph::girafe( code = print(UMAP) )
+
+#K <- M3C::M3C(mobi_data_t, method=2,maxK = 30, seed = 142)
+#ATAR=subset(mobi_map$data,atar_selection)
+#LOWX2 = mobi_map$data %>% group_by(AC)  %>% filter(rk_X2 < 20)
+ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human.png'), height=12,width=12, bg = 'white')
