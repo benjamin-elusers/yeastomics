@@ -11,6 +11,7 @@ head(pickle3)
 
 hs_ppi = pickle3 %>% dplyr::select(InteractorA,InteractorB) %>% arrange(InteractorA)
 pickle3.cent = network.centrality()
+saveRDS(pickle3.cent,"prepare/human_pickle3_ppi_centrality.rds")
 
 
 mean(pickle3.cent$cent_deg)
