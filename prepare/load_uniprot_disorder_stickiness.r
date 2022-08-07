@@ -12,6 +12,21 @@ library(progressr)
 library(pbmcapply)
 NCPUS=parallel::detectCores()-2 # on my workstation (16-2) = 14 CPUS
 
+## AMINO ACID CLASSES
+aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>%
+  append( list('Alcohol'=c('S','T'),
+               'Turnlike'=c('A','C','D','E','G','H','K','N','Q','R','S','T'))
+  )
+sum.aa.fr = function(BS,alphabet,to100=F){
+  alphabet.freq = rowSums(letterFrequency(BS,as.prob = F,letters = alphabet))
+  prot.enrich = tibble(id=names(BS),fr=alphabet.freq)
+  if(to100){ prot.enrich$fr = 100*prot.enrich$fr }
+  return(prot.enrich)
+}
+aa.set = map_chr(aa.prop,str_c,collapse='')
+aa.class = paste0(tolower(sub(x=names(aa.set),"\\.","")),"_",aa.set)
+
+
 # UNIPROT_IDR_ATAR = c( "H0WFA5", "Q7T226", "O00444", "Q15468", "Q6UVJ0", "O95613",
 #                       "Q14676", "P43351", "Q12888", "P23771", "P03372", "P45973",
 #                       "P15992", "P31539", "Q12329", "P27695", "Q03690", "P19097",
@@ -23,7 +38,7 @@ NCPUS=parallel::detectCores()-2 # on my workstation (16-2) = 14 CPUS
 #                       "P06748", "Q92547", "Q9NY12", "P22087", "Q13148", "P34689",
 #                       "G5EBV6", "Q95XR4", "Q9N303")
 IDR_ATAR = rio::import(here::here('prepare',"IDR_Candidate_new.xlsx"))
-writeLines(IDR_ATAR$UNIPROT)
+
 #PHASESEP_DB_LLPS = readxl::read_excel("/home/benjamin/Downloads/Compressed/phasepdb/phasepdbv2_llps.xlsx")
 #PHASESEP_DB_MLO  = readxl::read_excel("/home/benjamin/Downloads/Compressed/phasepdb/phasepdbv2_mlolt_mloht.xlsx")
 #colnames(PHASESEP_DB_LLPS)
@@ -36,8 +51,6 @@ writeLines(IDR_ATAR$UNIPROT)
 
 human = find.uniprot_refprot(c('9606','HUMAN','homo sapiens'))  %>%
         arrange(desc(keyword_matched))
-
-
 # 2. Get the reference proteome sequences for the selected taxon ===============
 # ec_aa = get.uniprot.proteome(taxid = 83333, DNA = F)
 hs_aa = get.uniprot.proteome(taxid = human$tax_id, DNA = F)
@@ -97,7 +110,7 @@ MOBIDB_LONGDISO = MOBIDB_DISO %>%
         arrange(acc,has_PS_features,evidence,ID_region,feature,source,S,E,is_longest_feature,is_longest) %>%
         relocate(acc,has_PS_features,evidence,ID_region,feature,source,S,E,feature_len,is_longest_feature,is_longest)
 
-table(MOBIDB_LONGDISO$acc)
+#table(MOBIDB_LONGDISO$acc)
 
 # ------> With ncbi taxon id <------
 # ec_mobidb = load.mobidb(83333) %>% # Took 20 sec. for the protein identifiers of the taxon
@@ -107,16 +120,135 @@ table(MOBIDB_LONGDISO$acc)
 #                    longest_idr = feature == 'disorder' & content_count == feature_maxlen )
 # n_distinct(ec_mobidb$acc)
 
-hs_mobidb = load.mobidb(human$tax_id) %>% dplyr::filter(acc %in% hs_uniref)
-irows=1:nrow(hs_mobidb)
 
+# 5. Get all human disorder predictions ========================================
+hs_mobidb = preload(here::here('data','mobidb-human-features.rds'),
+                    load.mobidb(human$tax_id),
+                    'retrieve human mobidb features...')
+
+df_hs_diso = hs_mobidb %>%
+  dplyr::filter(acc %in% hs_uniref & feature == 'disorder' & source %in% 'th_50') %>%
+  mutate(ID_region = paste0(acc,"_",S,"..",E))
+
+irows=1:nrow(df_hs_diso)
 hs_diso_seq_list <- pbmcapply::pbmclapply(
   X=irows,
   # extract subsequence of mobidb feature from uniprot protein using positions
   FUN = function(x){
-    feature_seq = subseq(x=hs_prot[[hs_mobidb$acc[x]]], start=hs_mobidb$S[x],end=hs_mobidb$E[x]) %>% as.character
+    feature_seq = tryCatch(
+      subseq(x=hs_aa[[df_hs_diso$acc[x]]], start=df_hs_diso$S[x],end=df_hs_diso$E[x]) %>% as.character,
+      error = function(e){ finally = print(paste0(df_hs_diso$acc[x],df_hs_diso$S[x],df_hs_diso$E[x])); return(NA) })
   }, mc.cores = NCPUS)
 
+df_hs_diso$feature_seq = unlist(hs_diso_seq_list)
+
+hs_diso_seq = AAStringSet(df_hs_diso$feature_seq[!is.na(df_hs_diso$feature_seq)])
+names(hs_diso_seq) = unique(df_hs_diso$ID_region[!is.na(df_hs_diso$feature_seq)])
+
+###### HS AA DISO FEATURES #######
+AA1=get.AA1() %>% as.vector()
+AA3=get.AA3() %>% as.vector()
+
+HS_AA_COUNT = (letterFrequency(hs_diso_seq,as.prob = F,letters = get.AA1())) %>%
+  bind_cols( ID_region=names(hs_diso_seq), region_len = widths(hs_diso_seq)) %>%
+  dplyr::rename(setNames(AA1,AA3))
+HS_AA_FR = HS_AA_COUNT %>% mutate( across(AA3, ~ . / region_len) )
+
+hs_mobidb_aa = left_join(df_hs_diso , HS_AA_COUNT, by='ID_region')
+tot_aa_hs=sum(widths(hs_aa[unique(df_hs_diso$acc)]))
+HS_DISO_AACOUNT = hs_mobidb_aa  %>% group_by(source) %>%
+  summarize( across(.cols=AA3, .fns = sum_ ),
+             total_count = sum_(c_across(AA3)),
+             total_freq =total_count/ tot_aa_hs)
+HS_DISO_AAFREQ = (HS_DISO_AACOUNT[,AA3] / HS_DISO_AACOUNT$total_count) %>% as.double()
+
+# COUNT CLASS OF AA
+HS_AACLASS_COUNT = map(aa.prop, sum.aa.fr, BS=hs_diso_seq) %>% bind_cols %>%
+  rename_with(~aa.class, starts_with('fr')) %>%
+  dplyr::select(-starts_with('id')) %>%
+  mutate(ID_region=names(hs_diso_seq), region_len = widths(hs_diso_seq))
+
+HS_AACLASS_FR = HS_AACLASS_COUNT %>% mutate( across(aa.class, ~ . / region_len) )
+
+HS_TOP4 = HS_AA_FR %>% mutate( across(AA3, ~ . *100)) %>%
+  pivot_longer(cols = 1:20) %>%
+  group_by(ID_region,region_len) %>%
+  slice_max(order_by = value,n = 4,with_ties = F) %>%
+  mutate(rk = rank(-value,ties.method = 'first'),
+         name.val = paste0(name,":",round(value,2))) %>%
+  dplyr::select(-name,-value) %>%
+  pivot_wider(id_cols=c(ID_region,region_len), names_from='rk', names_glue = 'AA{rk}_fr',
+              values_from = c('name.val'))
+
+HS_AA_FC = sweep( HS_AA_FR[,AA3],2,HS_DISO_AAFREQ,"/")
+HS_TOP4_FC = HS_AA_FC %>%
+  bind_cols(ID_region= HS_AA_FR$ID_region, region_len =HS_AA_FR$region_len) %>%
+  pivot_longer(cols = 1:20) %>%
+  group_by(ID_region) %>%
+  slice_max(order_by = value,n = 4,with_ties = F) %>%
+  mutate(rk = rank(-value,ties.method = 'first'),
+         name.val = paste0(name,":",round(value,2))) %>%
+  dplyr::select(-name,-value) %>%
+  pivot_wider(id_cols=c(ID_region,region_len), names_from='rk', names_glue = 'AA{rk}_fc',
+              values_from = c('name.val'))
+
+HS_AA_CHARGE = HS_AA_FR %>% group_by(ID_region,region_len) %>%
+  summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU),
+            NETCHARGE=PLUS-MINUS,
+            pep_len = Peptides::lengthpep(hs_diso_seq),
+            pep_mw  = Peptides::mw(hs_diso_seq),
+            pep_avg_mw = pep_mw / pep_len,
+            pep_netcharge = Peptides::charge(hs_diso_seq),
+            pep_PI = Peptides::pI(hs_diso_seq))
+
+HS_AA_feat = left_join(HS_AA_FR,HS_AACLASS_FR) %>%
+  left_join(HS_AA_CHARGE,by=c('ID_region','region_len')) %>%
+  left_join(HS_TOP4,by=c('ID_region','region_len')) %>%
+  left_join(HS_TOP4_FC,by=c('ID_region','region_len'))
+
+
+tic('compute aa scores of mobidb features ...')
+#message('get amino acid scores of mobidb features/regions...')
+iseq = 1:length(hs_diso_seq_list)
+hs_diso_score <- pbmcapply::pbmclapply(
+  X=iseq,
+  # Using subsequence of mobidb features, compute sum of residue propensities
+  FUN = function(x){ get_aa_score(string = hs_diso_seq_list[[x]]) },
+  mc.cores = NCPUS)
+toc(log=T)
+### TOOK ~340 SECONDS with pbmcapply() (parallel on (n-2) cpus)
+
+hs_uni = get_uniprot_reference(9606)
+
+hs_mobidb_scores = df_hs_diso %>%
+  left_join( HS_AA_feat, by=c('ID_region','feature_len'='region_len') ) %>%
+  bind_cols( bind_rows(hs_diso_score) ) %>%
+  group_by(acc,feature,source,feature_len,S,E) %>%
+  distinct() %>%
+  mutate( across(aggrescan:wimleywhite, ~ sum(.x)/feature_len)) %>%
+  dplyr::select(-evidence) %>%
+  relocate(acc, ID_region,S,E,feature_len, source, feature_seq,
+           get.AA3() %>% as.vector,ends_with("_fr")
+  ) %>% filter(feature_len > 35)
+
+hs_diso$atar_selection = hs_diso$ID_region %in% MOBIDB_LONGDISO$ID_region
+
+hs_diso = inner_join(hs_uni,hs_mobidb_scores,by=c('AC'='acc')) %>%
+           #left_join(get.width(hs_aa),by=c('AC'='orf')) %>%
+  filter(feature_len>35) %>%
+  mutate(atar_selection = ID_region %in% MOBIDB_LONGDISO$ID_region) %>%
+  dplyr::select(-DB,-id_cdna,-OX) %>%
+  dplyr::rename(prot_len=length,idr_len=feature_len,idr_seq=feature_seq,
+                idr_frac=content_fraction,idr_count=content_count) %>%
+  relocate(OS,OS,AC,ID,GN,ensp,NAME,PE,SV,
+           prot_len,idr_frac,idr_count,
+           atar_selection,ID_region,idr_len,S,E,source,feature,idr_seq,
+           AA3,ends_with("_fr"),all_of(aa.class),PLUS,MINUS,
+           ends_with("_fc"), aggrescan:wimleywhite)
+
+
+write_tsv(hs_diso,file=here::here('prepare','HUMAN_MOBIDB_FEATURES.tsv'))
+#View(hs_diso)
 
 # 5. Get the sequence for disorder stretches ===================================
 ## Might be slow on single-cpu depending on no. of (features+proteins) to process
@@ -125,7 +257,6 @@ hs_diso_seq_list <- pbmcapply::pbmclapply(
 tic('retrieve regions sequence...') # Time the task of retrieving feature sequences
 #message('get sequences of mobidb features/regions...')
 irows=1:nrow(MOBIDB_LONGDISO)
-
 # Preparing data for accessing feature sequences
 ACC = MOBIDB_LONGDISO$acc
 START = MOBIDB_LONGDISO$S %>% as.integer()
@@ -169,22 +300,27 @@ toc(log=T)
 # Average propensity = sum aa score / feature length
 names(diso_seq_list) = iseq
 
+###### ATAR DISO AA FEATURES ######
 # COUNT AA
 AA.FR = (letterFrequency(diso_seq,as.prob = T,letters = get.AA1()) * 100) %>%
         bind_cols( ID_region=names(diso_seq)) %>%
           dplyr::rename(setNames(get.AA1(),get.AA3()))
 
-# COUNT CLASS OF AA
-aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>%
-  append( list('Alcohol'=c('S','T'),
-               'Turnlike'=c('A','C','D','E','G','H','K','N','Q','R','S','T'))
-  )
-sum.aa.fr = function(BS,alphabet){
-  alphabet.freq = rowSums(letterFrequency(BS,as.prob = T,letters = alphabet))
-  prot.enrich = tibble(id=names(BS),fr=alphabet.freq)
-}
-aa.set = map_chr(aa.prop,str_c,collapse='')
-aa.class = paste0(tolower(sub(x=names(aa.set),"\\.","")),"_",aa.set)
+hs_aa_fr_diso = matrix(HS_DISO_AAFREQ , byrow=T,ncol=20,nrow=nrow(AA.FR))
+
+IDR_AAFR =  AA.FR[,get.AA3()]
+AA.FC = sweep(IDR_AAFR,2,100*HS_DISO_AAFREQ,"/")
+
+TOP4_FC = AA.FC %>% add_column(ID_region= AA.FR$ID_region) %>%
+  pivot_longer(cols = 1:20) %>%
+  group_by(ID_region) %>%
+  slice_max(order_by = value,n = 4,with_ties = F) %>%
+  mutate(rk = rank(-value,ties.method = 'first'),
+         name.val = paste0(name,":",round(value,1))) %>%
+  dplyr::select(-name,-value) %>%
+  pivot_wider(id_cols=ID_region, names_from='rk', names_glue = 'AA{rk}_fc',
+              values_from = c('name.val'))
+
 AACLASS.FR = map(aa.prop, sum.aa.fr, BS=diso_seq) %>% bind_cols %>%
              rename_with(~aa.class, starts_with('fr')) %>%
              dplyr::select(-starts_with('id')) %>%
@@ -197,109 +333,84 @@ TOP4 = AA.FR %>%
   mutate(rk = rank(-value,ties.method = 'first'),
          name.val = paste0(name,":",round(value,1))) %>%
   dplyr::select(-name,-value) %>%
-  pivot_wider(id_cols=ID_region, names_from='rk', names_glue = 'AA{rk}',
+  pivot_wider(id_cols=ID_region, names_from='rk', names_glue = 'AA{rk}_fr',
               values_from = c('name.val'))
 
-AA.CHARGE = AA.FR %>% group_by(ID_region) %>% summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU),HIS)
+AA.CHARGE = AA.FR %>% group_by(ID_region) %>%
+  summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU),
+            NETCHARGE=PLUS-MINUS,
+            pep_len = Peptides::lengthpep(diso_seq),
+            pep_mw  = Peptides::mw(diso_seq),
+            pep_avg_mw = pep_mw / pep_len,
+            pep_netcharge = Peptides::charge(diso_seq),
+            pep_PI = Peptides::pI(diso_seq))
+
 AA_feat = left_join(AA.FR,AACLASS.FR) %>%
   left_join(AA.CHARGE,by="ID_region") %>%
-  left_join(TOP4,by='ID_region')
-
+  left_join(TOP4,by='ID_region') %>%
+  left_join(TOP4_FC,by='ID_region')
 
 
 mobidb_scores = MOBIDB_LONGDISO %>% dplyr::select(-is_longest_feature) %>%
                   left_join( AA_feat, by='ID_region' ) %>%
                   bind_cols( bind_rows(diso_score) ) %>%
-                  group_by(acc,length,evidence,feature,source,is_longest,feature_len,S,E,
+                  group_by(acc,feature,source,is_longest,feature_len,S,E,
                              has_PS_features,PS_overlap,S_phasepro,E_phasepro,
                              PS_overlap_cter,PS_overlap_nter,PS_overlap_nested,PS_overlap_inside) %>%
                   distinct() %>%
-                  mutate( across(aggrescan:wimleywhite, ~ sum(.x)/feature_len))
+                  mutate( across(aggrescan:wimleywhite, ~ sum(.x)/feature_len)) %>%
+                  dplyr::select(-evidence,-length) %>%
+                 relocate(ORG,acc,prot_len,ID,reviewed,PNAME,GNAME,has_PS_features,
+                          PS_acc_pos,S_phasepro,E_phasepro, starts_with("PS_overlap"),
+                          ID_region,S,E,feature_len, is_longest, source, feature_seq,
+                          get.AA3() %>% as.vector,ends_with("_fr"),ends_with("_fc")
+                          )
+colnames(mobidb_scores)
+
 
 write_tsv(mobidb_scores, file = here::here('prepare','ATAR-IDR-FEATURES.tsv'))
 
+save.image(file = here::here('prepare', 'IDR-features-data.rdata'))
 
+# 8. CLUSTERING OF DISORDERED REGIONS ==========================================
 ### UMAP + Clustering
-mobi_data = mobidb_scores %>% ungroup() %>%dplyr::select(where(is.numeric),-S,-E,-S_phasepro,-E_phasepro,-prot_len,-length)
-mobi_id = mobidb_scores$acc
-library(umap)
+load(here::here('prepare', 'IDR-features-data.rdata'))
+
+#hs_diso = hs_mobidb_scores %>% filter(feature_len>35)
+#hs_diso$atar_selection = hs_diso$ID_region %in% mobidb_scores$ID_region
+
+hs_mobi_data = hs_diso %>% ungroup() %>% drop_na() %>% dplyr::select(where(is.numeric),-S,-E,-PE,-SV)
+mobi_id =  hs_diso %>% ungroup() %>% drop_na() %>% pull(ID_region)
+atar_selection = hs_diso %>% ungroup() %>% drop_na() %>% pull(atar_selection)
 set.seed(142)
+library(umap)
+
+umap.config = umap.defaults
+umap.config$n_neighbors = 7
 library(M3C)
 
-mobi_data_t = t(mobi_data)
-colnames(mobi_data_t) = mobi_id
-K <- M3C::M3C(mobi_data_t,method=2,maxK = 20,seed = 142)
-mobi_map <- mobi_data_t %>% scale() %>% umap(labels = as.factor(K$assignments))
-#umap_df <- mobi_map$layout %>% as.data.frame() %>%  rename(UMAP1="V1", UMAP2="V2")
+hs_scaled_mobi = t(hs_mobi_data) %>%  scale() %>% t() %>% as_tibble()
+rownames(hs_scaled_mobi) = mobi_id
+mobi_map <- hs_scaled_mobi %>% umap::umap(seed = 142, config=umap.config)
+mobi_umap = mobi_map$layout %>% set_colnames(c('X1','X2')) %>%
+            bind_cols(mobi_map$data,id=mobi_id) %>%
+            mutate(uni=str_extract(id,UNIPROT.nomenclature()))
 
-U = mobi_map$data %>%
-    ggplot(aes(x = X1,y = X2, color=as.factor(K$assignments))) +
-    geom_point(size=2, alpha=0.5) +# geom_text_repel(aes(label=mobi_id),max.overlaps = 50,size=3)+
-    #facet_wrap(~island)+
-    labs(x = "X1", y = "X2", subtitle="UMAP plot")+
-    theme(legend.position="bottom")
-plot(U)
-# 8. YOUR OWN FILTER ===========================================================
-# ... You can add your own code here to filter the data ...
-
-# EXAMPLE 1: Selecting longest disordered region in each protein
-mobidb_scores %>% filter( is_longest_idr )
-# EXAMPLE 2: get the mobidb sub-regions enriched for various characteristics such as:
-# polyampholyte
-# positive/negative electrolyte
-# G/C/P rich
-# polar
-# ...
-
-table(mobidb_scores$source)
-mobidb_scores %>% filter(source == 'mobidb_lite_sub')
-mobidb_scores %>% filter(source == 'phasepro')
-
-# Check description of features from MobiDB at: https://mobidb.bio.unipd.it/about/mobidb
+library(ggiraph)
+UMAP = ggplot(data=mobi_umap,aes(x = X1,y = X2, tooltip=id)) +
+  geom_point(size=1, alpha=0.2, aes(color=NET)) +
+  # atar selection
+  geom_point(data=subset(mobi_umap,atar_selection), size=2, color='red') +
+  geom_text_repel(data=subset(mobi_umap,atar_selection),aes(label=id),max.overlaps = 50,size=3.5,color='red') +
+  ggiraph::geom_point_interactive(size=0.5, mapping=aes(tooltip=id)) +
+  labs(x = "X1", y = "X2", subtitle="UMAP plot")+
+  theme(legend.position="bottom")
 
 
-# RULE1 : TAKE ALL FEATURES THAT OVERLAP PHASESEPDB or PHASEPRO
+plot(UMAP)
+ggiraph::girafe( code = print(UMAP) )
 
-mobidb_scores %>% filter(is_longest_idr)
-RULE1 = mobidb_scores %>%
-  ungroup() %>%
-  filter( source != 'phasepro') %>%
-  left_join(phasepro_wide, by = 'acc') %>%
-  mutate(overlap_phasepro_cter = (S_phasepro <= E & S < S_phasepro),
-         overlap_phasepro_nter = (S_phasepro <= S & E_phasepro < E),
-         overlap_phasepro_nested = (S <= S_phasepro & E_phasepro <= E),
-         overlap_phasepro_inside = (S >= S_phasepro & E <= E_phasepro),
-         overlap_phasepro = overlap_phasepro_cter | overlap_phasepro_nter | overlap_phasepro_inside | overlap_phasepro_nested
-  ) %>% filter(overlap_phasepro)
-
-n_distinct(RULE1$acc)
-
-# RULE2 : FILTER FEATURE BELOW 35 RESIDUES
-RULE2 = RULE1 %>% filter( feature_len > 35 )
-n_distinct(RULE2$acc)
-# RULE3 : CHECK IF FEATURE OVERLAP INTERACTION FROM ring
-#ring = mobidb_scores %>% filter(source == 'ring') %>%
-#       mutate(acc_pos = paste0(acc,"_",S,"-",E))
-
-
-pivot_wider(id_cols=c('acc','acc_pos'), names_from='source', values_from = c('S','E'))
-RULE3 = RULE2 %>% group_by(acc) %>% mutate(
-
-# RULE4 : LONGEST FEATURE OR MORE ABUNDANT STRETCHES
-# RULE5 : CHECK IF IN TOP/BOTTOM 5/10% OF AVERAGE STICKINESS
-# RULE6 : CHECK THE ENRICHMENT FOR MobiDB-lite sub regions
-
-
-
-
-  # 1. longest region, boundaries
-  # 2. protein size
-  # 2. region size,
-  # 3-6. Four most frequent AA and frequency
-  # 7-10. Four most over-represented AA and fold increase relative to mean
-  # 11. number of + charges
-  # 12. number of - charges
-  # 13. number of his
-  # 14. stickiness
-  # 15. MOBI info (phase separation, zzz)
-  # 16. sequence
+#K <- M3C::M3C(mobi_data_t, method=2,maxK = 30, seed = 142)
+#ATAR=subset(mobi_map$data,atar_selection)
+#LOWX2 = mobi_map$data %>% group_by(AC)  %>% filter(rk_X2 < 20)
+ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human.png'), height=12,width=12, bg = 'white')

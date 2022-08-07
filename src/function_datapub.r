@@ -1714,6 +1714,23 @@ get_uniprot_id = function(accession){
   return(res)
 }
 
+get_uniprot_ids = function(accessions){
+  msg = sprintf("Retrieve %s uniprot ids from URL...",n_distinct(accessions))
+  if(require(pbmcapply)){
+    ncpus=parallel::detectCores()-1
+    msg = paste0(msg, sprintf("\n using %s CPUs in parallel",ncpus))
+    message(msg)
+    df_uniprot = pbmcapply::pbmclapply(X=accessions, get_uniprot_id, mc.cores = ncpus) %>%
+      purrr::compact() %>%
+      bind_rows()
+  }else{
+    message(msg)
+    warning('NOT IN PARALLEL (might be long depending on number of IDS)')
+    df_uniprot = lapply(accessions,get_uniprot_id) %>% purrr::compact() %>% bind_rows()
+  }
+  return(df_uniprot)
+}
+
 parse_uniprot_fasta_header = function(fasta_header){
 #  uni_desc = get.uniprot.proteome(9606,DNA = F,fulldesc = T) %>% names
 
@@ -1927,8 +1944,7 @@ query_uniprot_subloc = function(uniprot, taxon, MAX_QUERY=200, todf=T){
 ##### Ensembl #####
 ENS_MIRROR='asia'
 
-get_ensembl_version = function(latest=T,withURL=T){
-  URL_FTP_ENSEMBL="http://ftp.ensembl.org/pub/"
+get_ensembl_version = function(latest=T,withURL=T,URL_FTP_ENSEMBL="http://ftp.ensembl.org/pub/"){
   ensembl_releases = rvest::read_html(URL_FTP_ENSEMBL) %>%
     rvest::html_nodes("a") %>%
     rvest::html_text(trim = T) %>%
@@ -1984,10 +2000,11 @@ get.ensembl.species= function(){
   return(ss_table_links)
 }
 
-find_ensembl_sptree = function(treename=""){
-  URL_FTP_ENSEMBL="http://ftp.ensembl.org/pub/"
+find_ensembl_sptree = function(treename="", URL_SPTREE="http://ftp.ensembl.org/pub/current_compara/species_trees/"){
+
+  #URL_FTP_ENSEMBL = host
   #"http://ftp.ebi.ac.uk/ensemblgenomes/pub/fungi/current/compara/species_trees/fungi_protein-trees_default.nh"
-  URL_SPTREE = paste0(URL_FTP_ENSEMBL,"current_compara/species_trees/")
+  #URL_SPTREE = paste0(URL_FTP_ENSEMBL,)
   httr::set_config(httr::config(ssl_verifypeer = FALSE))
   httr::set_config(httr::config(ssl_cipher_list = "DEFAULT@SECLEVEL=1"))
 
@@ -2008,9 +2025,9 @@ find_ensembl_sptree = function(treename=""){
   return(paste0(URL_SPTREE,url_tree))
 }
 
-get_ensembl_sptree = function(treename=NULL){
+get_ensembl_sptree = function(treename=NULL,URL_SPTREE="http://ftp.ensembl.org/pub/current_compara/species_trees/"){
 
-  url_tree = find_ensembl_sptree(treename)
+  url_tree = find_ensembl_sptree(treename,URL_SPTREE)
   treefile = basename(url_tree) %>% fs::path_ext_set('.nh')
   yeastomics_tree = here::here('data','ensembl',treefile)
 
@@ -2073,13 +2090,32 @@ get_ensembl_vertebrates=function(){
   return(vertebrates)
 }
 
-get_ensembl_mammals=function(){
-  # select mammals from vertebrates
-}
+get_ensembl_fungi=function(){
+  library(readr)
+  library(tidyverse)
+  URL_FTP_FUNGI = "http://ftp.ebi.ac.uk/ensemblgenomes/pub/fungi/current/"
+  url_ens_fungi=paste0(get_ensembl_version(URL_FTP_ENSEMBL = URL_FTP_FUNGI),"/species_EnsemblFungi.txt")
+  url_uni_fungi=paste0(get_ensembl_version(URL_FTP_ENSEMBL = URL_FTP_FUNGI),"/uniprot_report_EnsemblFungi.txt")
 
-get_ensg_dataset = function(){
+  ens_fungi=read_delim(url_ens_fungi) %>% mutate(species_id=str_replace_all(species_id,'\t',''))
+  uni_fungi=read_delim(url_uni_fungi) %>% mutate(uniprotCoverage=str_replace_all(uniprotCoverage,'\t',''))
+
+  fungi = inner_join(ens_fungi,uni_fungi,
+                           by = c("#name", "species", "division", "taxonomy_id", "genebuild",
+                                  'assembly'='assembly_name','assembly_accession'='assembly_id') ) %>%
+    readr::type_convert()
+
+  colnames(fungi) = c('organism','species','division','tax_id',
+                            'assembly_version','assembly_accession','genebuild',
+                            'variation','microarray','pan_compara','peptide_compara','genome_alignments',
+                            'other_alignments', 'cored_db','species_id','n_protein_coding','n_swissprot','n_trembl','coverage')
+
+  return(fungi)
+}
+###### biomart ensembl #####
+get_ens_dataset = function(host='https://www.ensembl.org/',mart='ensembl'){
   library(biomaRt)
-  ens <- useEnsembl("ensembl",mirror=ENS_MIRROR)
+  ens <- useEnsembl(biomart = mart, host = host, mirror=ENS_MIRROR)
   ens_dataset = listDatasets(ens) %>% dplyr::as_tibble() %>%
                 dplyr::mutate(
                   sp=str_split_fixed(dataset,'_',n=3)[,1],
@@ -2109,16 +2145,21 @@ get_ensembl_hsprot = function(verbose=T){
   return(hs_ensp)
 }
 
-get_ensembl_tx = function(verbose=T,ENSG,ENSP){
+get_ensembl_tx = function(verbose=T,
+                          host='https://www.ensembl.org/',
+                          mart='ensembl',
+                          dataset='hsapiens_gene_ensembl',
+                          ENSG,ENSP){
   library(biomaRt)
-
-  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+  ens <- biomaRt::useEnsembl(biomart = mart, host = host, dataset = dataset, mirror=ENS_MIRROR)
+  #ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
   att_struct = c('start_position','end_position','cds_length',
                  'transcript_length','transcript_start','transcript_end',
                  'ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
   filters = c('ensembl_gene_id'=list(ENSG) )
 
+  listAttributes(ens)
   ens_canonical =  getBM(mart = ens,
                      attributes = c(att_gene,'transcript_is_canonical'),
                      filters=c('ensembl_gene_id'),values=list(ENSG),
@@ -2176,7 +2217,7 @@ get_ensembl_tx = function(verbose=T,ENSG,ENSP){
 }
 
 
-get_ensembl_gc = function(ENSG){
+get_ensembl_gc = function(ENSG,host='https://www.ensembl.org/'){
   library(biomaRt)
   ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
 
@@ -2314,9 +2355,10 @@ get_hs_transcript = function(verbose=T,longest_transcript=F,with_uniprot=T){
   return(hs_ensg)
 }
 
-get_ens_filter_ortho = function(mart='ensembl',dat='hsapiens_gene_ensembl'){
+get_ens_filter_ortho = function(host='https://www.ensembl.org/',
+                                mart='ensembl',dat='hsapiens_gene_ensembl'){
   library(biomaRt)
-  hs_ens = useEnsembl(mart,dat,mirror=ENS_MIRROR)
+  hs_ens = useEnsembl(host = host, biomart = mart, dataset = dat, mirror=ENS_MIRROR)
   filter_ortho = searchFilters(hs_ens,'homolog') %>%
                  as_tibble %>%
                  mutate(sp=str_split_fixed(name,'_',n=3)[,2]) %>%

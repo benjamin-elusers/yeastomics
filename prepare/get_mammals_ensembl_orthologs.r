@@ -4,6 +4,11 @@ library(tidyverse)
 library(here)
 ENS_MIRROR='uswest'
 path_ortho = here::here('output','ens_hs_ortho')
+library(log)
+.info  = infoLog()
+.error =  errorLog()
+.warn  = warningLog()
+.succ  = successLog()
 
 #### FUNCTION ####
 count_ens_id = function(x,toprint=T){
@@ -19,12 +24,14 @@ count_ens_id = function(x,toprint=T){
 
   message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | orthologs = %6s',nr,ng,nt,np,no))
 }
+
 get_sp = function(full_name){
   spname = str_split_fixed(full_name,"_",n=3)
   first = str_sub(spname[,1],start = 1,end=1) %>% str_to_lower()
   second = spname[,2] %>% str_to_lower()
   return(paste0(first,second))
 }
+
 match_species_names = function(ens_tree, ens_sp){
 
   library(stringdist)
@@ -43,16 +50,17 @@ match_species_names = function(ens_tree, ens_sp){
 
   return(matched)
 }
+
 find_orthologs = function(x,ortho=ens_mammals_df){
-  filt_name = ortho$filter[x]
+  taxid = ortho$tax_id[x]
   org = ortho$organism[x]
   sp =  ortho$ens_dataset[x]
   spname =  ortho$species[x]
   treename = ortho$label[x]
-  phylum.2 = ortho$two[x]
-  phylum.4 = ortho$four[x]
+  # phylum.2 = ortho$two[x]
+  # phylum.4 = ortho$four[x]
   numlab = ortho$num_label[x]
-  col_filter=ortho$filter[x]
+  col_filter=ortho$ens_filter[x]
   att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide',
                   'canonical_transcript_protein','subtype',
                   'perc_id','perc_id_r1','goc_score',
@@ -60,7 +68,7 @@ find_orthologs = function(x,ortho=ens_mammals_df){
   sp_att = sprintf("%s_homolog_%s",sp,att_species)
 
   if( is.na(sp) ){
-    message(sprintf('Skip %s (%s) for orthologs...',org,spname))
+    .warn$log(sprintf('Skip %s (%s) for orthologs...',org,spname))
     return(NULL)
   }
 
@@ -72,7 +80,7 @@ find_orthologs = function(x,ortho=ens_mammals_df){
 
     col_ortho_conf = grep('orthology_confidence',sp_att,v=T)
     Q1.1 = Q1.0[ Q1.0[[col_ortho_conf]] == 1,]
-    message("--> remove low confidence orthologs")
+    .info$log("--> remove low confidence orthologs")
 
     col_ortho_prot = grep('homolog_ensembl_peptide',colnames(Q1.1),v=T)
     sp_txlen = query_ens_txlen(Sp = sp,ORG=org,COUNTER = x,verbose=F) %>%
@@ -86,7 +94,7 @@ find_orthologs = function(x,ortho=ens_mammals_df){
     Q1.2 = inner_join(Q1.1,hs_tx, by=id_hs) %>%
       inner_join(sp_txlen,by=id_ortho) %>%
       as_tibble() %>% distinct()
-    message("--> keep orthologs with cds closest in length")
+    .info$log("--> keep orthologs with cds closest in length")
 
     col_gname = str_subset(colnames(Q1.2),'homolog_associated_gene_name$')
     col_pid = str_subset(colnames(Q1.2),'perc_id$')
@@ -113,7 +121,7 @@ find_orthologs = function(x,ortho=ens_mammals_df){
     Q1.3
   },
   error=function(cond) {
-    cat(sprintf('skipping species: %s!\n',org))
+    .error$log(sprintf('skipping species: %s!\n',org))
     message(cond)
   }
   )
@@ -121,20 +129,77 @@ find_orthologs = function(x,ortho=ens_mammals_df){
   QORTHO$ens_dataset = sp
   QORTHO$organism = org
   QORTHO$species = spname
-  QORTHO$mammals_tree = treename
+  QORTHO$vertebrates_tree = treename
+  QORTHO$treename = treename
   QORTHO$id_ortho = QORTHO[[paste0(sp,"_homolog_ensembl_peptide")]]
   QORTHO$pid_ortho = QORTHO[[paste0(sp,"_homolog_perc_id")]]
   QORTHO$cds_delta = QORTHO[[paste0(sp,'_cds_diff')]]
   QORTHO$tx_delta = QORTHO[[paste0(sp,'_tx_diff')]]
   QORTHO$gname_ortho = QORTHO[[paste0(sp,'_homolog_associated_gene_name')]]
-  QORTHO$two = phylum.2
-  QORTHO$four = phylum.4
+  #QORTHO$two = phylum.2
+  #QORTHO$four = phylum.4
   QORTHO$num_label =numlab
   QORTHO$filter = col_filter
-  saveRDS(QORTHO,file.path(path_ortho,paste0(x,'-',sp,'-',orgname,'.rds')))
+  saveRDS(QORTHO,file.path(path_ortho,paste0(taxid,'-',sp,'-',orgname,'.rds')))
   return(QORTHO)
 }
 
+get_orthologs_clade =function(ens_ortho=df_query, clade_species, clade_name,
+                              only_count=T, MIN_N=4, MIN_F=0.7){
+
+  valid_species = intersect(tolower(clade_species),unique(ens_ortho$species))
+  clade_size = n_distinct(clade_species)
+  clade_nsp = n_distinct(valid_species)
+  .info$log(sprintf('clade %s (n=%s/%s)...',clade_name,clade_nsp,clade_size))
+
+  if( clade_nsp < MIN_N ){
+    .warn$log(sprintf('Clade too small (less than %s species)!',MIN_N+1))
+    cat('\n')
+    return(NULL)
+  }
+  message(sprintf(' -> orthogroup size > %s or %s%% (n=%s) clade',MIN_N,MIN_F*100,round(MIN_F*clade_nsp,0)))
+
+  hs_closest = ens_ortho %>%
+    dplyr::filter( treename %in% valid_species) %>%
+    mutate( clade_size = clade_nsp ) %>%
+    filter(!is.na(id_ortho) & gname_ortho != '') %>%
+    group_by(ensp) %>%
+    arrange(cds_delta,desc(pid_ortho),tx_delta) %>%
+    mutate(rk_pass = row_number(),northo=n_distinct(id_ortho),nsp=n_distinct(treename)) %>%
+    ungroup() %>% arrange(ensp) %>%
+    mutate(ortho_1to1 =  northo > MIN_N & northo >= MIN_F*max_(nsp) )
+
+  if(only_count){
+    clade_ortho = hs_closest %>%
+      filter(ortho_1to1) %>%
+      mutate(n_orthogroups = n_distinct(ensp),
+             f_human = n_orthogroups / n_distinct(ens_ortho$ensp),
+             clade=clade_name) %>%
+      ungroup() %>%
+      dplyr::select(clade,clade_size,species,treename,organism,nsp,n_orthogroups,f_human) %>%
+      distinct()
+    cat('\n')
+    return(clade_ortho)
+  }
+  cat('\n')
+  return(hs_closest)
+}
+
+get_mammals_sequence = function(x,ortho=ortho_prefix){
+
+  sp = ortho$ens_dataset[x]
+  message(sprintf('%2s %s',x,sp))
+  id_col=ortho$col_peptide[x]
+  ids = hs_ortho[[id_col]] %>% na.omit() %>% as.vector()
+
+  mart <- useEnsembl("ensembl", dataset=paste0(sp,"_gene_ensembl"),mirror = ENS_MIRROR)
+  ortho_seq = getSequence(id=ids, type = "ensembl_peptide_id", seqType = "peptide", mart = mart) %>%
+    dplyr::select(ensembl_peptide_id,peptide)
+  ortho_fasta = Biostrings::AAStringSet(x=ortho_seq %>% deframe())
+  star = Biostrings::subseq(ortho_fasta,start=-1) == '*'
+  ortho_fasta_prot = Biostrings::subseq(ortho_fasta,start=1,  end=Biostrings::width(ortho_fasta)-star)
+  return(ortho_fasta_prot)
+}
 
 prepare_phylodata = function(id_hs, path_group, group_data, sp_seq=all_seq, add_human=T, overwrite=F){
 
@@ -256,44 +321,129 @@ ens_hs_orthologs = preload(saved.file = file.path(path_ortho,'ensembl_hsapiens_f
                            'get ensembl homolog filter...')
 
 #### WORKFLOW ####
+# 0. retrieve reference genome/transcriptome/proteome from ensembl -------------
+# Get reference identifiers (Uniprot/ENSP = proteome, ENSG = Genome, ENST=Transcriptome)
+hs_uniref = get.uniprot.proteome('9606',DNA = T,fulldesc = T) %>% names
+ensp_uniref = hs_uniref %>% str_extract(ENSEMBL.nomenclature()) %>% na.omit() %>% as.vector
+n_distinct(ensp_uniref)
+ensg_hgnc = load.hgnc(with_protein = T,all_fields = T) %>% drop_na(ensg) %>% pull(ensg)
+hs_tx =preload( file.path(path_ortho,'ensembl_hsapiens_tx.rds'),
+                { get_ensembl_tx(ENSG = ensg_hgnc, ENSP = ensp_uniref) %>%
+                    dplyr::rename_with(.cols = ends_with('_len'), .fn = Pxx, 'hs', s='_') },
+                'get ensembl human transcripts...')
+
+
 # 1. get Ensembl vertebrates ---------------------------------------------------
 library(treeio)
 # Ensembl Vertebrates
 ens_vertebrates_tree = get_ensembl_sptree('vertebrates_species-tree_Ensembl')
-#write.tree(ens_vertebrates_tree, file = here::here('data','ensembl','vertebrates_species-tree_Ensembl.nh'))
-ens_vertebrates_tree = read.tree('vertebrates_species-tree_Ensembl')
-
-ens_vertebrates_nodes = make.unique(ens_vertebrates_tree$node.label)
-ens_vertebrates_df = ens_vertebrates_tree %>% as_tibble() %>%
-  mutate(is_leaf = label %in% ens_vertebrates_tree$tip.label)
+ens_vertebrates_tree$node.label = make.unique(ens_vertebrates_tree$node.label)
+# Save all unique node labels and replace duplicated node labels by NA in tree
+ens_vertebrates_nodes = ens_vertebrates_tree$node.label
+is_dup_nodes = str_detect(ens_vertebrates_nodes,".+\\.[0-9]+$")
+dup_nodelabels = ens_vertebrates_nodes[is_dup_nodes]
+dup_nodenums  = tidytree::nodeid(ens_vertebrates_tree,dup_nodelabels)
+#ens_vertebrates_tree$node.label[is_dup_nodes] = NA
 
 ens_vertebrates_info = get_ensembl_vertebrates() %>%
   # compute similarity between species tree names and ensembl species
   left_join(match_species_names(ens_vertebrates_tree,.$species),by=c('species'='sp_ens')) %>%
   dplyr::rename(vertebrates_tree=sp_tree, vertebrates_similarity=similarity ) %>%
-  relocate(organism,species,vertebrates_tree,vertebrates_similarity)
+  left_join(ens_hs_orthologs, by=c('organism'='org')) %>%
+  dplyr::rename(ens_filter = name, ens_dataset = sp) %>%
+  relocate(organism,species,ens_dataset,ens_filter,vertebrates_tree,vertebrates_similarity)
 
 # Get lineage from root node (common ancestor to vertebrate)
 ens_vertebrates_clades = ape::subtrees(ens_vertebrates_tree, wait=FALSE) %>%
-  set_names(ens_vertebrates_nodes)
+  set_names( ens_vertebrates_tree$node.label ) %>%
+  purrr::keep(!is_dup_nodes)
+
+ens_vertebrates = ens_vertebrates_tree %>% as_tibble() %>%
+                  mutate(depth = ape::node.depth(ens_vertebrates_tree),
+                         is_leaf = depth == 1, nodes = label %>% make.unique,
+                         label=tolower(label), Label = str_to_title(label) )
+ens_vertebrates_df = left_join(ens_vertebrates,ens_vertebrates_info,by=c('label'='vertebrates_tree')) %>%
+                     mutate(num_label = ifelse(is_leaf,paste0(node,".",organism),''))
 
 library(ggtree)
-VERTEBRATES = ggtree(ens_vertebrates_tree,ladderize = T,right = T,branch.length = 'none') +
+VERTEBRATES = ggtree(ens_vertebrates_tree,ladderize = T,right = T,branch.length = 'none')  +
   ggtree::geom_hilight(node=307, alpha=0.2, type="rect") +
-  ggtree::geom_nodelab(size=3,geom='label',node = 'internal') +
+  ggtree::geom_nodelab(aes(subset=!(node %in% dup_nodenums)),size=3,geom='label',node = 'internal') +
   ggtree::geom_tiplab(size=3,offset=0.5,align=T) + xlim(0,40)
 ggsave(plot=VERTEBRATES, filename=file.path(path_ortho,'VERTEBRATES_TREE.pdf'), height=25, width=25)
 
-# 2. get Ensembl Eutherian Mammals (aligned genomes) ----------------------------
-# ens_mammals_tree = preload(here::here('data','43_eutherian_mammals_EPO_default.rds'),
-#                            get_ensembl_sptree('43_eutherian_mammals_EPO_default'),
-#                            'read the eutherian mammals (43 species)...')
+# 1.1 query Ensembl biomart for human orthologuous proteins in vertebrates -----
+library(biomaRt)
+#ENS_MIRROR='uswest' # if asia fails
+ens=useEnsembl('ensembl')#,mirror = ENS_MIRROR)
+hs_ens=useDataset(dataset = 'hsapiens_gene_ensembl', mart = ens)
 
-#ens_mammals_tree = read.tree(here::here('data','ensembl','43_eutherian_mammals_EPO_default.nh'))
-#write.tree(ens_mammals_tree, file = here::here('data','43_eutherian_mammals_EPO_default.nh'))
+hs_cols = c('ensg','enst','ensp',"is_enspref","has_ensp","is_canonical","canonical",
+            "hs_gene_len","hs_transcript_len", 'hs_cds_len',
+            "has_introns","n_transcripts","n_proteins","n_exons","n_exons_mini")
+
+#ens_ortho = ens_mammals_df %>% filter(is_leaf)
+ens_ortho = ens_vertebrates_df %>% filter(is_leaf & !is.na(ens_filter))
+# Save all ensembl queries to get human-mammals orthologs
+HS_QUERY = preload(file.path(path_ortho,'ensembl_hs_vertebrates_orthologs.rds'),
+                   { lapply(X=1:nrow(ens_ortho), FUN=function(x){ find_orthologs(x,ens_ortho) }) %>% compact },
+                   'retrieve human to vertebrates orthologs...')
+
+col_ens = c("ens_dataset","species","organism",'treename','num_label','filter',
+                    'ensp','id_ortho','gname_ortho','pid_ortho','cds_delta','tx_delta')
+df_query =  purrr::map(HS_QUERY, magrittr::extract, col_ens) %>% bind_rows()
+
+CLADES_VERTEBRATES = map(names(ens_vertebrates_clades) %>% na.omit %>% as.vector,
+                   ~ get_orthologs_clade(clade_species=ens_vertebrates_clades[[.x]]$tip.label, clade_name=.x)) %>%
+  purrr::compact() %>%
+  bind_rows()
+
+CLADES_COUNT = CLADES_VERTEBRATES %>%
+  left_join(ens_vertebrates,by=c('clade'='Label')) %>%
+  dplyr::select(clade,n_orthogroups,f_human,clade_size,depth) %>%
+  distinct  %>%
+  arrange(f_human) %>%
+  mutate(num_node = paste0(clade,'\n',n_orthogroups))
+
+p0=ggplot(CLADES_COUNT,aes(y=n_orthogroups, x=reorder(clade,f_human),color=f_human)) +
+  geom_point() +
+  geom_text(aes(label=clade), size=3.5, hjust=-0.1,angle=90) +
+  theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
+  xlab('') + ylim(0,20000) + scale_x_discrete( expand= expansion(c(.02,.02)))
+
+t0=ggtree(ens_vertebrates_tree,ladderize = T,right = T,branch.length = 'none') %<+% CLADES_COUNT  +
+  geom_nodepoint(aes(size = f_human, color = n_orthogroups)) +
+  xlim(-10,50)
+t0.1 = t0 +   ggtree::geom_nodelab(aes(label=num_node),size=3,geom='text',node = 'internal',hjust=1.1,angle=25)
+library(patchwork)
+# Show number of orthogroups per taxonomic node
+#t0.1 | p0
+
+T0=t0
+for(i in dup_nodenums){
+  T0 = T0 %>% collapse(node = i,mode = "none")
+}
+T0.1 = T0 + ylim(1,55) + xlim(-20,50) +
+      geom_point2(aes(subset=(node %in% dup_nodenums)), shape=23, size=2, fill='red')  +
+      ggtree::geom_nodelab(aes(label=num_node),size=3,geom='text',node = 'internal',hjust=1.1,angle=0) +
+      theme(legend.position="bottom", legend.box="vertical", legend.margin=margin())
+
+#T0.1 | p0
+
+#test = read.tree( file.path(path_ortho,'ens_vertebrates_species_time_in_MYA.nwk'))
+#test %>% as_tibble
+#ggtree(test) + geom_tiplab() + geom_nodelab(geom='shadowtext') + xlim(0,1500)
+
+# 2. get Ensembl Eutherian Mammals (aligned genomes) ----------------------------
+#ens_mammals_tree = get_ensembl_sptree('43_eutherian_mammals_EPO_default')
 ens_mammals_tree = get_ensembl_sptree("91_eutherian_mammals_EPO-Extended_default") # new in release 107
-write.tree(ens_mammals_tree, file = here::here('data','data/91_eutherian_mammals_EPO_default.nh'))
 ens_mammals_tree$node.label = make.unique(ens_mammals_tree$node.label)
+# Save all unique node labels and replace duplicated node labels by NA in tree
+ens_mammals_nodes = ens_mammals_tree$node.label
+is_dup_nodes = str_detect(ens_mammals_nodes,".+\\.[0-9]+$")
+dup_nodelabels = ens_mammals_nodes[is_dup_nodes]
+dup_nodenums  = tidytree::nodeid(ens_mammals_tree,dup_nodelabels)
+#ens_mammals_tree$node.label[is_dup_nodes ] = NA
 
 ens_mammals_info = ens_vertebrates_info %>%
   # compute similarity between species tree names and ensembl species
@@ -302,17 +452,63 @@ ens_mammals_info = ens_vertebrates_info %>%
   relocate(organism,species,vertebrates_tree,vertebrates_similarity,mammals_tree,mammals_similarity)
 
 ens_mammals_clades = ape::subtrees(ens_mammals_tree, wait=FALSE) %>%
-  set_names(ens_mammals_nodes)
+                     set_names( ens_mammals_tree$node.label ) %>%
+                     purrr::keep(!is_dup_nodes)
+
+ens_mammals = ens_mammals_tree %>% as_tibble() %>%
+  mutate(depth = ape::node.depth(ens_mammals_tree),
+         height = max(depth) - depth + 1,
+         is_leaf = depth == 1, nodes = label %>% make.unique,
+         label=tolower(label), Label = str_to_title(label) )
+
+CLADES_MAMMALS = map(names(ens_mammals_clades) %>% na.omit %>% as.vector,
+                         ~ get_orthologs_clade(clade_species=ens_mammals_clades[[.x]]$tip.label, clade_name=.x)) %>%
+  purrr::compact() %>%
+  bind_rows()
+
+CLADES_COUNT = CLADES_MAMMALS %>%
+  left_join(ens_mammals,by=c('clade'='Label')) %>%
+  dplyr::select(clade,n_orthogroups,f_human,clade_size,depth,height) %>%
+  distinct  %>%
+  arrange(f_human) %>%
+  mutate(num_node = paste0(clade,'\n',n_orthogroups))
+
+p1=ggplot(CLADES_COUNT,aes(y=n_orthogroups, x=reorder(clade,f_human),color=f_human)) +
+  geom_point() +
+  geom_text(aes(label=clade), size=3.5, hjust=-0.1,angle=90) +
+  theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
+  xlab('') + ylim(0,20000) + scale_x_discrete( expand= expansion(c(.02,.02)))
+
+t1 = ggtree(ens_mammals_tree,ladderize = T,right = T,branch.length = 'none') %<+% CLADES_COUNT  +
+  geom_nodepoint(aes(size = f_human, color = n_orthogroups)) +
+  xlim(-5,16)
+
+t1.1 = t1 +   ggtree::geom_nodelab(aes(label=num_node),size=3,geom='text',node = 'internal',hjust=1.1,angle=25)
+t1.1 | p1
+
+MAMMALS = ggtree(ens_mammals_tree,ladderize = T,right = T,branch.length = 'none') +
+  ggtree::geom_nodelab(aes(subset = !(node %in% dup_nodenums)), size=3,geom='label',node = 'internal') +
+  ggtree::geom_tiplab(size=3,offset=0.5,align=T) + xlim(0,30)
+#ggsave(plot=MAMMALS, filename=file.path(path_ortho,'MAMMALS_TREE.pdf'), height=25, width=25)
 
 # Get lineage from root node (common ancestor to eutherian mammals)
 ens_mammals_lineages = ape::nodepath(ens_mammals_tree, from = treeio::rootnode(ens_mammals_tree)) %>%
-  set_names(c(ens_mammals_nodes,"out"))
+  set_names(c(ens_mammals_tree$node.label,"out"))
+
+nodenum = tidytree::nodeid(ens_mammals_tree,names(ens_mammals_clades))
+#mammals_grp = dendextend::cutree(as.dendrogram(phytools::force.ultrametric(ens_mammals_tree)),k=6)
+#table(mammals_grp)
+#set_names( ape::node.depth(ens_mammals_tree)[nodenum], names(ens_mammals_clades))
 
 # Find the nodes 4 degrees below root (4 largest divisions)
-mammals_4 = map(ens_mammals_lineages,pluck(4,.default=NA)) %>% unlist() %>% unique %>%
+mammals_4 = map(ens_mammals_lineages[ names(ens_mammals_clades) ],
+                pluck(4,.default=NA)) %>% unlist() %>% unique %>%
+            intersect(nodenum) %>%
             set_names(treeio::nodelab(ens_mammals_tree,.))
 
-mammals_2 = map(ens_mammals_lineages,pluck(3,.default=NA)) %>% unlist() %>% unique %>%
+mammals_2 = map(ens_mammals_lineages[ names(ens_mammals_clades) ],
+                pluck(3,.default=NA)) %>% unlist() %>% unique %>%
+            intersect(nodenum) %>%
             set_names(treeio::nodelab(ens_mammals_tree,.))
 
 four= groupClade(ens_mammals_tree,.node = mammals_4) %>% as_tibble() %>% dplyr::rename(four=group)
@@ -320,12 +516,11 @@ two = groupClade(ens_mammals_tree,.node = mammals_2) %>% as_tibble() %>% dplyr::
 
 # Add column for indicating which of the 2/4 largest divisions this node belongs to
 ens_mammals_df= left_join(two,four) %>%
-                mutate(is_leaf = (label  %in% ens_mammals_tree$tip.label),
-                       Label = label, label = tolower(Label) ) %>%
+                mutate( depth = ape::node.depth(ens_mammals_tree),
+                        is_leaf = depth == 1, #is_leaf = (label  %in% ens_mammals_tree$tip.label),
+                        Label = str_to_title(label), label = tolower(Label) ) %>%
   left_join(ens_mammals_info,by=c('label'='mammals_tree')) %>%
-  mutate(num_label = paste0(node,".",organism)) %>%
-  left_join(ens_hs_orthologs, by=c('organism'='org')) %>%
-  dplyr::rename(filter = name, ens_dataset = sp)
+  mutate(num_label = paste0(node,".",organism))
 
 ens_mammals_tree$tip.label =  ens_mammals_df$num_label[ens_mammals_df$is_leaf]
 MAMMALS_2 = ggtree(ens_mammals_tree,ladderize = T,right = T,branch.length = 'none') %<+% ens_mammals_df  +
@@ -341,39 +536,12 @@ MAMMALS_4 = ggtree(ens_mammals_tree,ladderize = T,right = T,branch.length = 'non
   scale_color_metro_d() + theme(legend.position = 'none')
 ggsave(MAMMALS_4, filename=file.path(path_ortho,'MAMMALS_TREE_4phylum.pdf'), scale=2)
 
-# 3. retrieve reference genome/transcriptome/proteome from ensembl -------------
 
-# Get reference identifiers (Uniprot/ENSP = proteome, ENSG = Genome, ENST=Transcriptome)
-hs_uniref = get.uniprot.proteome('9606',DNA = T,fulldesc = T) %>% names
-ensp_uniref = hs_uniref %>% str_extract(ENSEMBL.nomenclature()) %>% na.omit() %>% as.vector
-n_distinct(ensp_uniref)
-ensg_hgnc = load.hgnc(with_protein = T,all_fields = T) %>% drop_na(ensg) %>% pull(ensg)
-hs_tx =preload( file.path(path_ortho,'ensembl_hsapiens_tx.rds'),
-                { get_ensembl_tx(ENSG = ensg_hgnc, ENSP = ensp_uniref) %>%
-                  dplyr::rename_with(.cols = ends_with('_len'), .fn = Pxx, 'hs', s='_') },
-                'get ensembl human transcripts...')
+# 2.1 query Ensembl biomart for human orthologuous proteins in mammals ----------
 
-# 4. query Ensembl biomart for human orthologuous proteins in mammals ----------
-library(biomaRt)
-#ENS_MIRROR='uswest' # if asia fails
-ens=useEnsembl('ensembl')#,mirror = ENS_MIRROR)
-hs_ens=useDataset(dataset = 'hsapiens_gene_ensembl', mart = ens)
+#nodeid(ens_vertebrates_tree,unique(df_query$treename) %>% str_to_title()) %>%
 
-hs_cols = c('ensg','enst','ensp',"is_enspref","has_ensp","is_canonical","canonical",
-            "hs_gene_len","hs_transcript_len", 'hs_cds_len',
-            "has_introns","n_transcripts","n_proteins","n_exons","n_exons_mini")
 
-ens_ortho = ens_mammals_df %>% filter(is_leaf)
-# Save all ensembl queries to get human-mammals orthologs
-HS_QUERY = preload(file.path(path_ortho,'ensembl_orthologs.rds'),
-                 { lapply(X=1:nrow(ens_ortho), FUN=function(x){ find_orthologs(x,ens_ortho) }) %>% compact },
-                'retrieve mammals orthologs...')
-
-col_ens_mammals = c("ens_dataset","species","mammals_tree","organism","two","four",'num_label','filter',
-                    'ensp','id_ortho','gname_ortho','pid_ortho','cds_delta','tx_delta')
-
-df_query =  map(HS_QUERY, extract, col_ens_mammals) %>%
-            bind_rows()
 
 hs_closest_two = df_query %>%
              filter(two != '0' ) %>%
@@ -382,6 +550,7 @@ hs_closest_two = df_query %>%
              mutate(rk_two = row_number()) %>%
              ungroup() %>% arrange(ensp)
 hs_closest_four = df_query %>%
+            filter(two != '0' ) %>%
              group_by(four,ensp) %>%
              arrange(cds_delta,desc(pid_ortho),tx_delta) %>%
              mutate(rk_four = row_number()) %>%
@@ -408,7 +577,7 @@ ortho_prefix = df_query %>%
                mutate( num_four = factor(num_four, c('out',sort(unique(num_four)))),
                        num_two = factor(num_two, c('out',sort(unique(num_two)))) )
 
-# 5. combine orthologs data of human-to-mammals  -------------------------------
+# 3. combine orthologs data of human-to-mammals  -------------------------------
 mammals = seq_along(HS_QUERY)
 mammals_sp = names(HS_QUERY)
 mammals_pep = paste0( names(HS_QUERY), '_homolog_ensembl_peptide')
@@ -429,7 +598,7 @@ for( s in mammals ){ #
 #dim(HS_ORTHO)
 #colnames(HS_ORTHO)
 
-# 6. get 1-to-1 orthologs human ------------------------------------------------
+# 4. get 1-to-1 orthologs human ------------------------------------------------
 HS_BOREOEUTHERIA = ortho_prefix %>%
   filter(f_human >0.78) %>%
   group_by(two) %>% mutate(num_two = sprintf("%s (n=%s)",two,n_distinct(ens_dataset))  ) %>%
@@ -496,7 +665,7 @@ p1 = ggplot(count_hs_ortho ) +
   geom_text(data = data.frame(),aes(x=-Inf,y=Inf, label=sprintf('\nOrthogroups=%s\n',n_max_OG)),
             hjust=-.1,vjust='inward',size=4)
 
-# 7. Download human fasta sequences --------------------------------------------
+# 5. Download human fasta sequences --------------------------------------------
 mart <- useEnsembl("ensembl", dataset="hsapiens_gene_ensembl",mirror = ENS_MIRROR)
 hs_seq = getSequence(id=hs_ortho$ensp, type="ensembl_peptide_id", seqType="peptide", mart=mart) %>%
          dplyr::select(ensembl_peptide_id,peptide) %>% deframe()
@@ -504,22 +673,7 @@ hs_fasta = Biostrings::AAStringSet(x=hs_seq)
 star = Biostrings::subseq(hs_fasta,start=-1) == '*'
 hs_fasta_prot = Biostrings::subseq(hs_fasta,start=1,  end=Biostrings::width(hs_fasta)-star)
 
-# 8. Download ortholog fasta sequences -----------------------------------------
-get_mammals_sequence = function(x,ortho=ortho_prefix){
-
-  sp = ortho$ens_dataset[x]
-  message(sprintf('%2s %s',x,sp))
-  id_col=ortho$col_peptide[x]
-  ids = hs_ortho[[id_col]] %>% na.omit() %>% as.vector()
-
-  mart <- useEnsembl("ensembl", dataset=paste0(sp,"_gene_ensembl"),mirror = ENS_MIRROR)
-  ortho_seq = getSequence(id=ids, type = "ensembl_peptide_id", seqType = "peptide", mart = mart) %>%
-              dplyr::select(ensembl_peptide_id,peptide)
-  ortho_fasta = Biostrings::AAStringSet(x=ortho_seq %>% deframe())
-  star = Biostrings::subseq(ortho_fasta,start=-1) == '*'
-  ortho_fasta_prot = Biostrings::subseq(ortho_fasta,start=1,  end=Biostrings::width(ortho_fasta)-star)
-  return(ortho_fasta_prot)
-}
+# 6. Download ortholog fasta sequences -----------------------------------------
 
 mammals_seq =preload(file.path(path_ortho,'ensembl_mammals_seq.rds'),
                      { lapply(1:nrow(ortho_prefix), get_mammals_sequence) },
@@ -559,7 +713,7 @@ ggplot2::ggsave(PP, height=12,width=18, filename = file.path(path_ortho,'Mammals
 PP.1 = ((p1) | (MAMMALS_4)) / (p2.1 | p3.1)
 ggplot2::ggsave(PP.1, height=12,width=18, filename = file.path(path_ortho,'Mammals-orthologs-4_phylum.pdf'))
 
-# 9. Write the fasta for mammals and subphylum ---------------------------------
+# 7. Write the fasta for mammals and subphylum ---------------------------------
 hs_ortho_1to1.rds=file.path(path_ortho,'hs_ortho_1to1.rds')
 hs_ortho.rds=file.path(path_ortho,'hs_orthologs.rds')
 ortho_prefix.rds = file.path(path_ortho,'ensembl_species.rds')
