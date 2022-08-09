@@ -469,24 +469,19 @@ hs_mobi_num = hs_mobi_data %>% dplyr::select(where(~ is.numeric(.x))) %>%
 atar_num     = df_atar %>% dplyr::select(colnames(hs_mobi_num))
 
 hs_mobi_info = hs_mobi_data %>% dplyr::select( -colnames(hs_mobi_num) )
-atar_info = df_atar %>% dplyr::select(-colnames(atar_num)) %>% add_column(is_atar_idr = T)
+atar_info = df_atar %>% dplyr::select(-colnames(atar_num))
 
 df_num = bind_rows(hs_mobi_num,atar_num)
 colnames(df_num)
 df_info = bind_rows(hs_mobi_info,atar_info)
 
-#hs_scaled_mobi = t( ) %>% drop_na) %>% scale() %>% t() %>% as_tibble()
-#mobi_id =  hs_mobi_data$IDR_id
-#rownames(hs_scaled_mobi) = mobi_id
-
-set.seed(142)
 library(umap)
-
+set.seed(142)
 umap.config = umap.defaults
 umap.config$n_neighbors = 15
 #library(M3C)
+#K <- M3C::M3C(mobi_data_t, method=2,maxK = 30, seed = 142)
 #hs_diso %>% filter( IDR_id %in% get.dup(IDR_id) )
-
 mobi_map <- df_num %>% t() %>% scale() %>% t() %>% umap::umap(seed = 142, config=umap.config)
 
 mobi_umap = mobi_map$layout %>% set_colnames(c('X1','X2')) %>%
@@ -502,53 +497,33 @@ summary(mobi_umap[,c('X1','X2')])
 #library(ggtrace)
 library(ggalt)
 library(ggiraph)
-library(chameleon)
 library(ggforce)
 umap_data = mobi_umap %>% filter(!outliers)
 summary(umap_data[,c('X1','X2')])
 
-
-
 UMAP = ggplot(data=umap_data ,aes(x = X1,y = X2)) +
-  labs(x = "X1", y = "X2", subtitle="")+
-  #ggiraph::geom_point_interactive(size=0.5, color='white',alpha=0, mapping=aes(tooltip=IDR_id)) +
+
   geom_point(size=1.5,shape=16,color='white',alpha=0.3) +
   geom_point(data=subset(umap_data,PS_overlap ), size=3, shape=21, color='white',stroke=0.5) +
-
-  # atar selection
+  # highlight atar selection
   geom_point(data=subset(umap_data,atar_proteins & atar_overlap), aes(color=PROTEIN), shape=16, size=4,alpha=0.9) +
   geom_text_repel(data=subset(umap_data,atar_proteins & atar_overlap),aes(label=paste0(PROTEIN,"\n",S,"-",E),color=PROTEIN),max.overlaps = 50,size=4,fontface='bold') +
   geom_point(data=subset(umap_data,atar_proteins & !atar_overlap), aes(color=PROTEIN), fill='white',shape=21, stroke=1, size=4, alpha=0.7) +
   geom_text_repel(data=subset(umap_data,atar_proteins & !atar_overlap),aes(label=paste0(PROTEIN,"\n",S,"-",E),color=PROTEIN),max.overlaps = 50,size=3,fontface='italic') +
-
-
-  # geom_point(data=subset(umap_data,is_atar_idr), size=5, alpha=1, color='green',shape=16) +
-  # geom_text_repel(data=subset(umap_data,is_atar_idr),
-  #                 aes(label=paste0(PROTEIN,"_",S_atar,"-",E_atar)),
-  #                 max.overlaps = 50,size=3,color='green',force=20) +
-  #geom_point(data=subset(umap_data,atar_overlap), size=2, shape=16, alpha=1, color='white') +
-  #geom_text_repel(data=subset(umap_data,atar_overlap & atar_proteins),
-  #                aes(label=paste0(PROTEIN,"_",S,"-",E)),
-  #                max.overlaps = 50,size=3,color='white',force=20) +
-  # geom_text_repel(data=subset(umap_data,atar_proteins & PS_overlap),
-  #                 aes(label=PS_id),
-  #                 max.overlaps = 50,size=3,color='purple',force=20)
+  # graphical parameters
+  labs(x = "X1", y = "X2", subtitle="")+
   scale_color_metro(palette = 'rainbow', discrete = T) +
   theme(legend.position="bottom") + theme_blackboard()+
   ggeasy::easy_text_size(c("axis.title","axis.text.x", "axis.text.y"), size = 20)+
   ggeasy::easy_remove_legend()
-
+  # Make interactive points
+  # ggiraph::geom_point_interactive(size=0.5, color='white',alpha=0, mapping=aes(tooltip=IDR_id)) +
 plot(UMAP)
 #ggiraph::girafe( code = print(UMAP) )
 
-#K <- M3C::M3C(mobi_data_t, method=2,maxK = 30, seed = 142)
-#ATAR=subset(mobi_map$data,atar_selection)
-#LOWX2 = mobi_map$data %>% group_by(AC)  %>% filter(rk_X2 < 20)
 ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human.png'), height=12,width=12, bg = 'black')
 ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human.pdf'), height=12,width=12, bg = 'black')
 
-#subset(umap_data,atar_overlap) %>% arrange(IDR_id) %>% print(n=30)
 #subset(umap_data,atar_proteins) %>% arrange(IDR_id) %>%
 #  dplyr::relocate(PROTEIN,acc,IDR_id,S,E,S_atar,E_atar,atar_proteins,atar_overlap,PS_overlap) %>% View()
 
-idr_atar
