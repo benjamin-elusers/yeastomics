@@ -26,5 +26,5 @@ evolution-fungi-residue.tsv.gz
 evolution-snp-protein.tsv.gz
 evolution-snp-residue.tsv.gz
 evolution-yeast-protein.tsv.gz
-
 ens_hs_ortho/*
+sc-hs-features.tsv
