@@ -315,7 +315,7 @@ decompose_int = function(x){
   x_int = abs(as.integer(x)) # convert to positive integer
   nd = nchar(x_int) # number of digits
   P = seq(1,nd) # position in number
-  by10 = rev(as.integer(10^(p-1))) # power of 10
+  by10 = rev(as.integer(10^(P-1))) # power of 10
   decomposed = sapply(P, function(p){  as.integer( substring(x_int,p,p) ) * by10[p] })
   if( sum(decomposed) == x_int ){
     return(decomposed)
