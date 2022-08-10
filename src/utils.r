@@ -310,6 +310,53 @@ toUnits <- function(x){
   else if( x <= 1e-24 ){ return(c(pre="y",x=format(x/1e-24,digit=1)))  }
 }
 
+decompose_int = function(x){
+  if(!is.numeric(x)){ stop("must give a valid number (converted to postive integer)!") }
+  x_int = as.integer(x) %>% abs
+  nd = nchar(x_int)
+  p = seq(1,nd)
+  by10 = rev(as.integer(10^(p-1)))
+  decomposed = map_int(.x = p, ~str_sub(x_int,.x,.x) %>% as.integer() %>% multiply_by(by10[.x]))
+  if( sum(decomposed) == x_int ){
+    return(decomposed)
+  }else{
+    print(decomposed)
+    stop('Decomposition is wrong!')
+  }
+}
+
+toMultiplier = function(x){
+  if(!is.numeric(x)){ stop("must give a positive integer!") }
+  X = decompose_int(x)
+  #Multiplier # Number
+  iupac_multi=c(
+  "mono-" = 1, "di-" = 2, "tri-" = 3, "tetra-" = 4, "penta-" = 5, "hexa-" = 6,
+  "hepta-" = 7, "octa-" = 8, "nona-" = 9, "deca-" = 10, "undeca-" = 11, "dodeca-" = 12,"trideca-" = 13,
+  "icosa-" = 20, "henicosa-" = 21, "docosa-" = 22, "tricosa-" = 23,
+  "triaconta-" = 30, "hentriaconta-" = 31, "dotriaconta-" = 32,
+  "tetraconta-" = 40, "pentaconta-" = 50, "hexaconta-" = 60,  "heptaconta-" = 70,
+  "octaconta-" = 80, "nonaconta-" = 90,
+  "hecta-" = 100, "dicta-" = 200, "tricta-" = 300, "tetracta-" = 400,
+  "pentacta-" = 500, "hexacta-" = 600, "heptacta-" = 700, "octacta-" = 800,
+  "nonacta-" = 900,
+  "kilia-" = 1000, "dilia-" = 2000, "trilia-" = 3000, "tetralia-" = 4000,
+  "pentalia-" = 5000, "hexalia-" = 6000, "heptalia-" = 7000, "octalia-" = 8000,
+  "nonalia-" = 9000)
+  multipliers = iupac_multi[iupac_multi %in% X]
+
+  return(multipliers)
+}
+
+to_oligomer = function(nsub){
+  oligomer = toMultiplier(nsub) %>%
+                names %>%
+                str_replace('-','') %>%
+                str_c(collapse='') %>%
+                paste0('mer')
+  return(oligomer)
+}
+
+
 # Sequences --------------------------------------------------------------------
 load.proteome = function(url,nostop=T) {
   library(Biostrings)
