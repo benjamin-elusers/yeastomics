@@ -311,12 +311,12 @@ toUnits <- function(x){
 }
 
 decompose_int = function(x){
-  if(!is.numeric(x)){ stop("must give a valid number (converted to postive integer)!") }
-  x_int = as.integer(x) %>% abs
-  nd = nchar(x_int)
-  p = seq(1,nd)
-  by10 = rev(as.integer(10^(p-1)))
-  decomposed = map_int(.x = p, ~str_sub(x_int,.x,.x) %>% as.integer() %>% multiply_by(by10[.x]))
+  if(!is.numeric(x)){ stop("must give a valid number!") }
+  x_int = abs(as.integer(x)) # convert to positive integer
+  nd = nchar(x_int) # number of digits
+  P = seq(1,nd) # position in number
+  by10 = rev(as.integer(10^(p-1))) # power of 10
+  decomposed = sapply(P, function(p){  as.integer( substring(x_int,p,p) ) * by10[p] })
   if( sum(decomposed) == x_int ){
     return(decomposed)
   }else{
@@ -348,11 +348,10 @@ toMultiplier = function(x){
 }
 
 to_oligomer = function(nsub){
-  oligomer = toMultiplier(nsub) %>%
-                names %>%
-                str_replace('-','') %>%
-                str_c(collapse='') %>%
-                paste0('mer')
+  library(tidyverse)
+  multis =  toMultiplier(nsub)
+  affix = paste0(gsub(names(multi),'-',''),collapse='')
+  oligomer = paste0(affix,'mer')
   return(oligomer)
 }
 
