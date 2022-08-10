@@ -350,7 +350,7 @@ toMultiplier = function(x){
 to_oligomer = function(nsub){
   library(tidyverse)
   multis =  toMultiplier(nsub)
-  affix = paste0(gsub(names(multi),'-',''),collapse='')
+  affix = paste0(gsub(names(multis),'-',''),collapse='')
   oligomer = paste0(affix,'mer')
   return(oligomer)
 }
