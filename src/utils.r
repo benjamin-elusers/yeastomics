@@ -310,47 +310,67 @@ toUnits <- function(x){
   else if( x <= 1e-24 ){ return(c(pre="y",x=format(x/1e-24,digit=1)))  }
 }
 
-decompose_int = function(x){
+decompose_int = function(x,desc=F){
   if(!is.numeric(x)){ stop("must give a valid number!") }
   x_int = abs(as.integer(x)) # convert to positive integer
   nd = nchar(x_int) # number of digits
   P = seq(1,nd) # position in number
   by10 = rev(as.integer(10^(P-1))) # power of 10
   decomposed = sapply(P, function(p){  as.integer( substring(x_int,p,p) ) * by10[p] })
+
   if( sum(decomposed) == x_int ){
-    return(decomposed)
+    return(sort(decomposed,decreasing = desc))
   }else{
-    print(decomposed)
+    print(sort(decomposed,decreasing = desc))
     stop('Decomposition is wrong!')
   }
 }
 
-toMultiplier = function(x){
+to_iupac_multiplier = function(x){
   if(!is.numeric(x)){ stop("must give a positive integer!") }
   X = decompose_int(x)
+  N = length(X)
   #Multiplier # Number
+  # Exceptions for 11,100,1000
+  # Exceptions for 12,20,200,2000
   iupac_multi=c(
   "mono-" = 1, "di-" = 2, "tri-" = 3, "tetra-" = 4, "penta-" = 5, "hexa-" = 6,
-  "hepta-" = 7, "octa-" = 8, "nona-" = 9, "deca-" = 10, "undeca-" = 11, "dodeca-" = 12,"trideca-" = 13,
-  "icosa-" = 20, "henicosa-" = 21, "docosa-" = 22, "tricosa-" = 23,
+  "hepta-" = 7, "octa-" = 8, "nona-" = 9, "deca-" = 10,
+  "undeca-" = 11, "dodeca-" = 12, "trideca-" = 13, "tetradeca-" = 14,
+  "pentadeca-" = 15, "hexadeca-" = 16, "heptadeca-" = 17, "octadeca-" = 18,
+  "nonadeca-" = 19, "icosa-" = 20, "henicosa-" = 21, "docosa-" = 22, "tricosa-" = 23,
   "triaconta-" = 30, "hentriaconta-" = 31, "dotriaconta-" = 32,
-  "tetraconta-" = 40, "pentaconta-" = 50, "hexaconta-" = 60,  "heptaconta-" = 70,
-  "octaconta-" = 80, "nonaconta-" = 90,
+  "tetraconta-" = 40, "hentetraconta-" = 40, "dotetraconta-" = 40,
+  "pentaconta-" = 50, "henpentaconta-" = 50, "dopentaconta-" = 50,
+  "hexaconta-" = 60, "henhexaconta-" = 60, "dohexaconta-" = 60,
+  "heptaconta-" = 70, "henheptaconta-" = 70, "doheptaconta-" = 70,
+  "octaconta-" = 80, "henoctaconta-" = 80, "dooctaconta-" = 80,
+  "nonaconta-" = 90, "hennonaconta-" = 90, "dononaconta-" = 90,
   "hecta-" = 100, "dicta-" = 200, "tricta-" = 300, "tetracta-" = 400,
   "pentacta-" = 500, "hexacta-" = 600, "heptacta-" = 700, "octacta-" = 800,
   "nonacta-" = 900,
   "kilia-" = 1000, "dilia-" = 2000, "trilia-" = 3000, "tetralia-" = 4000,
   "pentalia-" = 5000, "hexalia-" = 6000, "heptalia-" = 7000, "octalia-" = 8000,
   "nonalia-" = 9000)
+
   multipliers = iupac_multi[iupac_multi %in% X]
 
+  if( max(X) > max(iupac_multi) ){
+    poly = set_names(x,sprintf('(%s)–n',x))
+    return(poly)
+  }
+
+  if( X[1] %in% c(1,2) & length(X) > 1 ){
+    first = iupac_multi[ iupac_multi == sum(X[1:2]) ]
+    multipliers = c(first,multipliers[-c(1:2)])
+  }
   return(multipliers)
 }
 
 to_oligomer = function(nsub){
-  library(tidyverse)
-  multis =  toMultiplier(nsub)
-  affix = paste0(gsub(names(multis),'-',''),collapse='')
+  multis =  to_iupac_multiplier(nsub)
+  affixes = paste0(names(multis),collapse='')
+  affix = gsub('-','',affixes)
   oligomer = paste0(affix,'mer')
   return(oligomer)
 }
