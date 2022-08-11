@@ -311,7 +311,8 @@ toUnits <- function(x){
 }
 
 decompose_int = function(x,desc=F){
-  if(!is.numeric(x)){ warning("must give a valid number!"); return(numeric(0))  }
+  if(is.na(x)){ return(NA) }
+  if(!is.numeric(x)){ stop("Input is not a valid number!") }
   x_int = abs(as.integer(x)) # convert to positive integer
   nd = nchar(x_int) # number of digits
   P = seq(1,nd) # position in number
@@ -328,6 +329,7 @@ decompose_int = function(x,desc=F){
 
 to_iupac_multiplier = function(x){
   if(!is.numeric(x)){ stop("must give a positive integer!") }
+  if(is.na(x)){ return(NA) }
   if( x==0 || x > max(iupac_multi) ){
     poly = set_names(x,sprintf('(%s)–',x))
     return(poly)
@@ -369,13 +371,13 @@ to_iupac_multiplier = function(x){
 }
 
 to_oligomer = function(nsub){
+  if(is.na(nsub)){ return(NA) }
   multis =  to_iupac_multiplier(nsub)
   affixes = paste0(names(multis),collapse='')
   affix = gsub('-','',affixes)
   oligomer = paste0(affix,'mer')
   return(oligomer)
 }
-
 
 # Sequences --------------------------------------------------------------------
 load.proteome = function(url,nostop=T) {
