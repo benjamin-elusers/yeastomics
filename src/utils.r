@@ -311,7 +311,7 @@ toUnits <- function(x){
 }
 
 decompose_int = function(x,desc=F){
-  if(!is.numeric(x)){ stop("must give a valid number!") }
+  if(!is.numeric(x)){ warning("must give a valid number!"); return(numeric(0))  }
   x_int = abs(as.integer(x)) # convert to positive integer
   nd = nchar(x_int) # number of digits
   P = seq(1,nd) # position in number
@@ -328,6 +328,11 @@ decompose_int = function(x,desc=F){
 
 to_iupac_multiplier = function(x){
   if(!is.numeric(x)){ stop("must give a positive integer!") }
+  if( x==0 || x > max(iupac_multi) ){
+    poly = set_names(x,sprintf('(%s)–',x))
+    return(poly)
+  }
+
   X = decompose_int(x)
   N = length(X)
   #Multiplier # Number
@@ -355,10 +360,6 @@ to_iupac_multiplier = function(x){
 
   multipliers = iupac_multi[iupac_multi %in% X]
 
-  if( max(X) > max(iupac_multi) ){
-    poly = set_names(x,sprintf('(%s)–n',x))
-    return(poly)
-  }
 
   if( X[1] %in% c(1,2) & length(X) > 1 ){
     first = iupac_multi[ iupac_multi == sum(X[1:2]) ]
