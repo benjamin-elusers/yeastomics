@@ -1,11 +1,17 @@
-# requires Yeastomics from my github; can be loaded directly from url
+##### SETUP #####
+# requires to load my Yeastomics function from the github url below
 url_yeastomics="https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/src/"
 source(paste0(url_yeastomics,"__setup_yeastomics__.r"))
+# Most missing packages would be installed the first time you run it
+# If you get an error, most likely a package requires dependencies that must be
+# manually installed
+
+# Installing and loading packages required for analysis
 pkg=c('here','tidyverse','dplyr','furrr','progressr','pbmcapply','Biostrings')
 xfun::pkg_load2(pkg)
-
 NCPUS=parallel::detectCores()-2 # on my workstation (16-2) = 14 CPUS
 
+##### PRECOMPUTED DATA #####
 ## AMINO ACID CLASSES
 AA1=get.AA1() %>% as.vector()
 AA3=get.AA3() %>% as.vector()
@@ -24,30 +30,37 @@ aa.set = map_chr(aa.prop,str_c,collapse='')
 aa.class = paste0(tolower(sub(x=names(aa.set),"\\.","")),"_",aa.set)
 
 # 0. Find taxon id matching keywords ===========================================
+# get human taxon based on selected keyword
 human = find.uniprot_refprot(c('9606','HUMAN','homo sapiens'))  %>%
         arrange(desc(keyword_matched))
 
+# get human uniprot reference proteome dataset and sequences
 hs_uni = get_uniprot_reference(human$tax_id)
 ## Reference proteome sequences ================================================
 hs_aa = get.uniprot.proteome(taxid = human$tax_id, DNA = F)
 ## Reference uniprot accession =================================================
 hs_uniref = names(hs_aa)
 
-#### ...................................................................... ####
+
+#### .............................IDR...................................... ####
 # A.) HUMAN --------------------------------------------------------------------
 # 1. Get all human disorder predictions ========================================
 hs_mobidb = preload(here::here('data','mobidb-human-features.rds'),
                     load.mobidb(human$tax_id),
                     'retrieve human mobidb features...')
 
+# Filter for feature corresponding to mobidb majority disorder consensus (50% agreement between IDR predictors)
+# Only keep IDS coming from protein that belongs to human reference proteome
+# Make a unique identifier for each IDR based on protein accession + boundaries of IDR (start-stop)
 df_hs_diso = hs_mobidb %>%
   dplyr::filter(acc %in% hs_uniref & feature == 'disorder' & source %in% 'th_50') %>%
   mutate(IDR_id = paste0(acc,"_",S,"..",E))
 
+# extract subsequence of mobidb consensus disorder from uniprot reference protein
 irows=1:nrow(df_hs_diso)
 hs_diso_seq_list <- pbmcapply::pbmclapply(
   X=irows,
-  # extract subsequence of mobidb feature from uniprot protein using positions
+
   FUN = function(x){
     feature_seq = tryCatch(
       subseq(x=hs_aa[[df_hs_diso$acc[x]]], start=df_hs_diso$S[x],end=df_hs_diso$E[x]) %>% as.character,
@@ -68,6 +81,7 @@ hs_diso_score <- pbmcapply::pbmclapply(
 toc(log=T)
 ### TOOK ~340 SECONDS with pbmcapply() (parallel on (n-2) cpus)
 
+# Add the amino acid propensity scores to the dataframe of human IDR
 df_hs_mobidb = df_hs_diso %>%
   bind_cols( bind_rows(hs_diso_score) ) %>%
   group_by(acc,feature,source,feature_len,S,E) %>%
@@ -80,27 +94,35 @@ hs_diso_seq = AAStringSet(df_hs_mobidb$feature_seq)
 names(hs_diso_seq) = unique(df_hs_mobidb$IDR_id)
 
 # 3. Molecular features for human disorder =====================================
+# counts of amino acid in IDR
 HS_AA_COUNT = letterFrequency(hs_diso_seq,as.prob = F,letters = AA1) %>%
   bind_cols( IDR_id=names(hs_diso_seq), IDR_len = widths(hs_diso_seq)) %>%
   dplyr::rename(setNames(AA1,AA3))
+# frequency of amino acid in IDR
 HS_AA_FR = HS_AA_COUNT %>% mutate( across(AA3, ~ . / IDR_len) )
-
 hs_mobidb_aa = left_join(df_hs_diso , HS_AA_COUNT, by='IDR_id')
+
+# human proteome total length
 tot_aa_hs=sum(widths(hs_aa[unique(df_hs_diso$acc)]))
+
+# total count of amino acids across all human IDRs
 HS_DISO_AACOUNT = hs_mobidb_aa  %>% group_by(source) %>%
   summarize( across(.cols=AA3, .fns = sum_ ),
              total_count = sum_(c_across(AA3)),
              total_freq =total_count/ tot_aa_hs)
+# amino acid enrichment (%AA IDR / %AA human IDR)
 HS_DISO_AAFREQ = (HS_DISO_AACOUNT[,AA3] / HS_DISO_AACOUNT$total_count) %>% as.double()
 
-# COUNT CLASS OF AA
+# Counts for classes of amino acids
+# (tiny,small,polar,non-polar,charged,acidic,basic,alcohol...)
 HS_AACLASS_COUNT = map(aa.prop, sum.aa.fr, BS=hs_diso_seq) %>% bind_cols %>%
   rename_with(~aa.class, starts_with('fr')) %>%
   dplyr::select(-starts_with('id')) %>%
   mutate(IDR_id=names(hs_diso_seq), IDR_len = widths(hs_diso_seq))
-
+# Frequencies of amino acid classes
 HS_AACLASS_FR = HS_AACLASS_COUNT %>% mutate( across(aa.class, ~ . / IDR_len) )
 
+# Top 4 most frequent amino acids in IDR (with their frequency in IDR)
 HS_TOP4 = HS_AA_FR %>% mutate( across(AA3, ~ . *100)) %>%
   pivot_longer(cols = 1:20) %>%
   group_by(IDR_id,IDR_len) %>%
@@ -111,6 +133,7 @@ HS_TOP4 = HS_AA_FR %>% mutate( across(AA3, ~ . *100)) %>%
   pivot_wider(id_cols=c(IDR_id,IDR_len), names_from='rk', names_glue = 'AA{rk}_fr',
               values_from = c('name.val'))
 
+# Top 4 most enriched amino acids in IDR (with their foldchange compared to all human IDRS)
 HS_AA_FC = sweep( HS_AA_FR[,AA3],2,HS_DISO_AAFREQ,"/")
 HS_TOP4_FC = HS_AA_FC %>%
   bind_cols(IDR_id= HS_AA_FR$IDR_id, IDR_len =HS_AA_FR$IDR_len) %>%
@@ -123,10 +146,15 @@ HS_TOP4_FC = HS_AA_FC %>%
   pivot_wider(id_cols=c(IDR_id,IDR_len), names_from='rk', names_glue = 'AA{rk}_fc',
               values_from = c('name.val'))
 
+# counts for charged residue and netcharge
 HS_AA_CHARGE = HS_AA_COUNT %>% group_by(IDR_id,IDR_len) %>%
   summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU),
-            NETCHARGE=(PLUS-MINUS), PLUS=PLUS/IDR_len, MINUS=MINUS/IDR_len)
+            NETCHARGE=(PLUS-MINUS)/IDR_len, PLUS=PLUS/IDR_len, MINUS=MINUS/IDR_len)
 
+# peptide characteristics
+# length, molecular weight, average molecular weight,
+# netcharge per residue with isotopes
+# Isoelectric point
 HS_PEP = df_hs_diso %>% ungroup %>%
   dplyr::select(IDR_id, IDR_len = feature_len,feature_seq) %>%
   rowwise %>%
@@ -134,10 +162,11 @@ HS_PEP = df_hs_diso %>% ungroup %>%
     PEP_len = Peptides::lengthpep(feature_seq),
     PEP_mw  = Peptides::mw(feature_seq),
     PEP_avg_mw = PEP_mw / PEP_len,
-    PEP_netcharge = Peptides::charge(feature_seq),
+    PEP_netcharge = Peptides::charge(feature_seq)/PEP_len,
     PEP_PI = Peptides::pI(feature_seq)) %>%
   dplyr::select(-feature_seq)
 
+# All combined molecular features of IDRs
 HS_AA_feat = left_join(HS_AA_FR,HS_AACLASS_FR) %>%
   left_join(HS_AA_CHARGE,by=c('IDR_id','IDR_len')) %>%
   left_join(HS_PEP,by=c('IDR_id','IDR_len')) %>%
@@ -145,26 +174,33 @@ HS_AA_feat = left_join(HS_AA_FR,HS_AACLASS_FR) %>%
   left_join(HS_TOP4_FC,by=c('IDR_id','IDR_len'))
 
 # 4. Phase-separation features for human =======================================
-# Phasepro
+## Phasepro from source database
 # phasepro = RJSONIO::fromJSON("https://phasepro.elte.hu/download_full.json") %>%
 #   bind_rows %>% type_convert()
+## Phasepro from mobidb
 phasepro = hs_mobidb %>%
   filter(feature == 'phase_separation') %>%
   mutate(PS_id = paste0(acc,"_",S,"..",E))
+# Turn phasepro as molecular features (columns)
 phasepro_wide = phasepro %>%
   filter(source=='phasepro') %>%
   pivot_wider(id_cols=c('acc','PS_id'),
               names_from='source',
               values_from = c('S','E'), values_fn=unique) %>%
   dplyr::rename(PS_S=S_phasepro,PS_E=E_phasepro) %>% mutate(PS_db='phasepro')
-# Phasepdb
+
+# Phasepdb from source database (for LLPS involved regions)
 phasesep_db_llps = rio::import("http://db.phasep.pro/static/db/database/phaseodbv2_1_llps.xlsx", na = c("","_")) %>%
   mutate(region = str_replace(region,"–","-") )%>%
+  # Keep only human
   filter(str_detect(organism,'Homo sapiens')) %>%
+  # split regions to rows
   separate_rows(region,sep=',') %>%
+  # Split region boundaries between start and end positions
   separate(region,remove = F, into=c('PS_S','PS_E'),sep='-') %>%
   rowwise() %>%
-  mutate( PS_S = ifelse(is_number(PS_S),parse_integer(PS_S),NA),
+  # Some regions may be indicated by a domain name or a loose indication (e.g. C-terminal)
+    mutate( PS_S = ifelse(is_number(PS_S),parse_integer(PS_S),NA),
           PS_E = ifelse(is_number(PS_E),parse_integer(PS_E),NA)) %>%
   type_convert() %>%
   mutate(PS_db='phasepdb',
@@ -172,19 +208,24 @@ phasesep_db_llps = rio::import("http://db.phasep.pro/static/db/database/phaseodb
                          paste0(uniprot_entry,"_",PS_S,"..",PS_E),
                          paste0(uniprot_entry,"_",str_replace_all(region," ","-")))
   ) %>%
+  # remove phase separating regions with undefined or loosely defined boundaries
   filter( !is.na(PS_S) & !is.na(PS_E) | !is.na(region))  %>%
   arrange(PS_id)
 
+# Turn phasepdb as molecular features (columns)
 phasesep_wide = phasesep_db_llps %>%
   dplyr::select(acc=uniprot_entry,PS_db,PS_id,PS_S,PS_E,region)
 
+# Combine human phase-separation regions
 PS_raw = bind_rows(phasepro_wide,phasesep_wide)
 
+# get uniprot data about proteins with phase-separation regions
 uni_ps = pbmcapply::pbmclapply(PS_raw$acc,get_uniprot_id,mc.cores = 14) %>%
          purrr::compact() %>%
          bind_rows() %>%
          dplyr::select(AC=Entry,PROT_len = Length)
 
+# make a dataset with only phase separation regions
 PS_all  = PS_raw %>%
           left_join(uni_ps,by=c('acc'='AC')) %>%
           mutate(PS_len = PS_E-PS_S+1, PS_full = PROT_len == PS_len) %>%
@@ -193,6 +234,8 @@ PS_all  = PS_raw %>%
           ungroup() %>%
           mutate(row=row_number())
 
+# Many phase-separation regions are overlapping or consecutive
+# The following code try to merge overlapping regions or those separated by only 1 residue
 library(GenomicRanges)
 g0 = PS_all %>% filter(PS_full | PS_n==1 )
 g1 = PS_all %>% filter(!(PS_full | PS_n==1 ))
@@ -202,13 +245,14 @@ g1 = PS_all %>% filter(!(PS_full | PS_n==1 ))
 g1.1 = g1 %>%
        dplyr::select(db=PS_db,seqnames=acc,start=PS_S,end=PS_E) %>%
        as("GRanges") %>%
-       reduce() %>%
+       reduce(min.gapwidth=1L) %>% # maximum gap for merging two intervals
        as_tibble() %>%
        dplyr::select(-strand) %>%
        dplyr::rename(acc=seqnames, PS_S=start,PS_E=end,PS_len=width) %>%
        mutate(PS_db ='merged',PS_id = paste0(acc,"_",PS_S,"..",PS_E)) %>%
        mutate(region = paste0(PS_S,"-",PS_E))
 
+# Merged phase-separation regions
 PS_merged = bind_rows(g1.1,g0) %>%
   dplyr::select(-c(PROT_len,PS_full,PS_n,row) ) %>%
   left_join(uni_ps,by=c('acc'='AC')) %>%
@@ -219,6 +263,7 @@ PS_merged = bind_rows(g1.1,g0) %>%
   dplyr::select(-PROT_len) %>%
   mutate(PS_n = PS_n - ((PS_n>1)*PS_full) )
 
+# make a human dataset of all IDRs and check if they overlap phase-separating regions
 df_hs_diso = df_hs_mobidb %>% ungroup() %>%
   filter( feature != 'phase_separation') %>%
   left_join(PS_merged, by = 'acc') %>%
@@ -230,6 +275,8 @@ df_hs_diso = df_hs_mobidb %>% ungroup() %>%
   ) %>%
   group_by(acc) %>% mutate(has_PS_features = !is.na(PS_overlap))
 
+# Subset human IDR based on length (at least 35 residues)
+# Rename and reorganize the columns
 hs_diso = inner_join(hs_uni,df_hs_diso,by=c('AC'='acc')) %>%
   left_join( HS_AA_feat, by=c('IDR_id','feature_len'='IDR_len') ) %>%
   filter(feature_len>35) %>%
@@ -248,7 +295,7 @@ summary(hs_diso)
 write_tsv(hs_diso,file=here::here('prepare','HUMAN_MOBIDB_FEATURES.tsv'))
 
 #### ...................................................................... ####
-
+# Same analysis as above but for a subset of proteins selected by Atar
 # B.) ATAR'S PROTEIN  ----------------------------------------------------------
 ###
 # 5. Get disorder for list of uniprot ==========================================
@@ -400,7 +447,7 @@ TOP4 = AA.FR %>% mutate(across(AA3,~ .*100)) %>%
 
 AA.CHARGE = AA.COUNT %>% group_by(IDR_id,IDR_len) %>%
   summarize(PLUS=sum(LYS+ARG+HIS),MINUS=sum(ASP+GLU),
-            NETCHARGE=(PLUS-MINUS), PLUS=PLUS/IDR_len, MINUS=MINUS/IDR_len)
+            NETCHARGE=(PLUS-MINUS)/IDR_len, PLUS=PLUS/IDR_len, MINUS=MINUS/IDR_len)
 
 AA.PEP = MOBIDB_LONGDISO %>% ungroup() %>%
          dplyr::select(IDR_id, feature_seq) %>%
@@ -408,7 +455,7 @@ AA.PEP = MOBIDB_LONGDISO %>% ungroup() %>%
          mutate(PEP_len = Peptides::lengthpep(feature_seq),
                 PEP_mw  = Peptides::mw(feature_seq),
                 PEP_avg_mw = PEP_mw / PEP_len,
-                PEP_netcharge = Peptides::charge(feature_seq),
+                PEP_netcharge = Peptides::charge(feature_seq)/PEP_len,
                 PEP_PI = Peptides::pI(feature_seq)) %>%
         dplyr::select(-feature_seq)
 
@@ -445,9 +492,12 @@ write_tsv(mobidb_scores, file = here::here('prepare','ATAR-IDR-FEATURES.tsv'))
 #save.image(file = here::here('prepare', 'IDR-features-data.rdata'))
 # 9. CLUSTERING OF DISORDERED REGIONS ==========================================
 ### UMAP + Clustering
+
 #load(here::here('prepare', 'IDR-features-data.rdata'))
 #hs_diso = hs_mobidb_scores %>% filter(feature_len>35)
 #hs_diso$atar_selection = hs_diso$IDR_id %in% mobidb_scores$IDR_id
+
+
 col_to_log10 =  c('PROT_len','PEP_len','PEP_mw','IDR_len','IDR_count')
 df_atar = mobidb_scores %>% dplyr::select(-starts_with('PS'),-region) %>%
           mutate( across(.cols =col_to_log10,.fns = log10,.names = "{.col}_log10")) %>%
@@ -464,26 +514,42 @@ hs_mobi_data = HS_DISO %>% ungroup() %>%
                dplyr::select(-col_to_log10) %>%
                distinct() %>% relocate(IDR_id)
 
+### Select features for umap
+# all numeric
 hs_mobi_num = hs_mobi_data %>% dplyr::select(where(~ is.numeric(.x))) %>%
               dplyr::select(-c(S,E,PS_S,PS_E,PS_len,PS_n))
-atar_num     = df_atar %>% dplyr::select(colnames(hs_mobi_num))
+# Check correlogram of numeric features to remove redundancy
+# (high absoluter correlation == redundant features)
+ggcorrplot::ggcorrplot(cor(hs_mobi_num))
 
-hs_mobi_info = hs_mobi_data %>% dplyr::select( -colnames(hs_mobi_num) )
+# non-redundant features
+hs_mobi_selected = hs_mobi_data %>%
+                   dplyr::select(all_of(AA3),aa.class,
+                                 stickiness, roseman, aggrescan,
+                                 PEP_avg_mw, netcharge_res, PEP_PI, IDR_frac)
+
+# select the same features for atar's IDR
+atar_num     = df_atar %>% dplyr::select(colnames(hs_mobi_selected))
+
+# Get non-features columns (protein id, IDR boundaries...)
+hs_mobi_info = hs_mobi_data %>% dplyr::select( -colnames(hs_mobi_selected) )
 atar_info = df_atar %>% dplyr::select(-colnames(atar_num))
 
-df_num = bind_rows(hs_mobi_num,atar_num)
+# features for umap distance
+df_num = bind_rows(hs_mobi_selected,atar_num)
 colnames(df_num)
+# non-features for umap identification
 df_info = bind_rows(hs_mobi_info,atar_info)
+
 
 library(umap)
 set.seed(142)
 umap.config = umap.defaults
 umap.config$n_neighbors = 15
-#library(M3C)
-#K <- M3C::M3C(mobi_data_t, method=2,maxK = 30, seed = 142)
-#hs_diso %>% filter( IDR_id %in% get.dup(IDR_id) )
+# Compute umap based on scaled features
 mobi_map <- df_num %>% t() %>% scale() %>% t() %>% umap::umap(seed = 142, config=umap.config)
 
+# mark outliers on umap coordinates (in 1/99% percentiles or outside the interval defined below for X1/X2)
 mobi_umap = mobi_map$layout %>% set_colnames(c('X1','X2')) %>%
             bind_cols(mobi_map$data %>% as_tibble() %>% dplyr::rename_with(.fn=xxS, s=".", sx='scaled')) %>%
             bind_cols(df_num) %>%
@@ -501,15 +567,21 @@ library(ggforce)
 umap_data = mobi_umap %>% filter(!outliers)
 summary(umap_data[,c('X1','X2')])
 
+# Plot the umap
 UMAP = ggplot(data=umap_data ,aes(x = X1,y = X2)) +
-
+  # all idrs
   geom_point(size=1.5,shape=16,color='white',alpha=0.3) +
+  # circle PS idr
   geom_point(data=subset(umap_data,PS_overlap ), size=3, shape=21, color='white',stroke=0.5) +
-  # highlight atar selection
+
+  # highlight atar idr
   geom_point(data=subset(umap_data,atar_proteins & atar_overlap), aes(color=PROTEIN), shape=16, size=4,alpha=0.9) +
   geom_text_repel(data=subset(umap_data,atar_proteins & atar_overlap),aes(label=paste0(PROTEIN,"\n",S,"-",E),color=PROTEIN),max.overlaps = 50,size=4,fontface='bold') +
+
+  # highlight idr in atar's protein (not overlapping)
   geom_point(data=subset(umap_data,atar_proteins & !atar_overlap), aes(color=PROTEIN), fill='white',shape=21, stroke=1, size=4, alpha=0.7) +
   geom_text_repel(data=subset(umap_data,atar_proteins & !atar_overlap),aes(label=paste0(PROTEIN,"\n",S,"-",E),color=PROTEIN),max.overlaps = 50,size=3,fontface='italic') +
+
   # graphical parameters
   labs(x = "X1", y = "X2", subtitle="")+
   scale_color_metro(palette = 'rainbow', discrete = T) +
@@ -521,6 +593,7 @@ UMAP = ggplot(data=umap_data ,aes(x = X1,y = X2)) +
 plot(UMAP)
 #ggiraph::girafe( code = print(UMAP) )
 
+# save umap in PNG/PDF
 ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human.png'), height=12,width=12, bg = 'black')
 ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human.pdf'), height=12,width=12, bg = 'black')
 
