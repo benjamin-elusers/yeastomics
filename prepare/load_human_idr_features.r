@@ -95,21 +95,28 @@ names(hs_diso_seq) = unique(df_hs_mobidb$IDR_id)
 
 # 3. Molecular features for human disorder =====================================
 # counts of amino acid in IDR
+has_idr_seq = hs_diso_seq_list %>% is.na %>% not
+
 HS_AA_COUNT = letterFrequency(hs_diso_seq,as.prob = F,letters = AA1) %>%
-  bind_cols( IDR_id=names(hs_diso_seq), IDR_len = widths(hs_diso_seq)) %>%
+  bind_cols( IDR_id=names(hs_diso_seq), IDR_len = widths(hs_diso_seq),
+             PROT_len = df_hs_diso$length[has_idr_seq]) %>%
   dplyr::rename(setNames(AA1,AA3))
+
 # frequency of amino acid in IDR
 HS_AA_FR = HS_AA_COUNT %>% mutate( across(AA3, ~ . / IDR_len) )
+#HS_AA_FR = HS_AA_COUNT %>% mutate( across(AA3, ~ . / PROT_len) )
+
 hs_mobidb_aa = left_join(df_hs_diso , HS_AA_COUNT, by='IDR_id')
 
 # human proteome total length
-tot_aa_hs=sum(widths(hs_aa[unique(df_hs_diso$acc)]))
+tot_aa_hs=sum(widths(hs_aa[unique(df_hs_diso$acc)])) # full sequence
+tot_aa_hs_diso=sum(HS_AA_COUNT$IDR_len) # total disordered residues
 
 # total count of amino acids across all human IDRs
 HS_DISO_AACOUNT = hs_mobidb_aa  %>% group_by(source) %>%
   summarize( across(.cols=AA3, .fns = sum_ ),
              total_count = sum_(c_across(AA3)),
-             total_freq =total_count/ tot_aa_hs)
+             total_freq = total_count/ tot_aa_hs)
 # amino acid enrichment (%AA IDR / %AA human IDR)
 HS_DISO_AAFREQ = (HS_DISO_AACOUNT[,AA3] / HS_DISO_AACOUNT$total_count) %>% as.double()
 
@@ -134,10 +141,10 @@ HS_TOP4 = HS_AA_FR %>% mutate( across(AA3, ~ . *100)) %>%
               values_from = c('name.val'))
 
 # Top 4 most enriched amino acids in IDR (with their foldchange compared to all human IDRS)
-HS_AA_FC = sweep( HS_AA_FR[,AA3],2,HS_DISO_AAFREQ,"/")
+HS_AA_FC = sweep( HS_AA_FR[,AA3],2,HS_DISO_AAFREQ,"/") %>%
+  bind_cols(IDR_id= HS_AA_FR$IDR_id, IDR_len =HS_AA_FR$IDR_len)
 HS_TOP4_FC = HS_AA_FC %>%
-  bind_cols(IDR_id= HS_AA_FR$IDR_id, IDR_len =HS_AA_FR$IDR_len) %>%
-  pivot_longer(cols = 1:20) %>%
+  pivot_longer(1:20) %>%
   group_by(IDR_id) %>%
   slice_max(order_by = value,n = 4,with_ties = F) %>%
   mutate(rk = rank(-value,ties.method = 'first'),
@@ -168,6 +175,7 @@ HS_PEP = df_hs_diso %>% ungroup %>%
 
 # All combined molecular features of IDRs
 HS_AA_feat = left_join(HS_AA_FR,HS_AACLASS_FR) %>%
+  left_join(HS_AA_FC,by=c('IDR_id','IDR_len'),suffix=c('','_fc')) %>%
   left_join(HS_AA_CHARGE,by=c('IDR_id','IDR_len')) %>%
   left_join(HS_PEP,by=c('IDR_id','IDR_len')) %>%
   left_join(HS_TOP4,by=c('IDR_id','IDR_len')) %>%
