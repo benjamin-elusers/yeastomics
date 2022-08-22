@@ -528,10 +528,13 @@ hs_mobi_num = hs_mobi_data %>% dplyr::select(where(~ is.numeric(.x))) %>%
 # (high absoluter correlation == redundant features)
 ggcorrplot::ggcorrplot(cor(hs_mobi_num))
 
+col_AA_fc = paste0(AA3,"_fc")
 # non-redundant features
 hs_mobi_selected = hs_mobi_data %>%
-                   dplyr::select(starts_with(AA3),aa.class,
-                                 stickiness, roseman, aggrescan,
+                   dplyr::select(
+                     #all_of(AA3),
+                     aa.class, all_of(col_AA_fc),
+                     stickiness, roseman, aggrescan,
                                  PEP_avg_mw, PEP_netcharge, PEP_PI, IDR_frac)
 
 # select the same features for atar's IDR
