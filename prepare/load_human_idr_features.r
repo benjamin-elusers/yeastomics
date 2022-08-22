@@ -288,8 +288,8 @@ df_hs_diso = df_hs_mobidb %>% ungroup() %>%
 hs_diso = inner_join(hs_uni,df_hs_diso,by=c('AC'='acc')) %>%
   left_join( HS_AA_feat, by=c('IDR_id','feature_len'='IDR_len') ) %>%
   filter(feature_len>35) %>%
-  dplyr::select(-DB,-id_cdna,-OX) %>%
-  dplyr::rename(PROT_len=length,IDR_len=feature_len,IDR_seq=feature_seq,
+  dplyr::select(-DB,-id_cdna,-OX,-length) %>%
+  dplyr::rename(IDR_len=feature_len,IDR_seq=feature_seq,
                 IDR_frac=content_fraction,IDR_count=content_count) %>%
   relocate(OS,OS,AC,ID,GN,ensp,NAME,PE,SV,
            PROT_len,IDR_frac,IDR_count,
@@ -420,12 +420,10 @@ AA.COUNT = letterFrequency(diso_seq,as.prob = F,letters = get.AA1()) %>%
 
 AA.FR = AA.COUNT %>% mutate(across(get.AA3() %>% as.vector, ~ ./IDR_len ))
 
-hs_aa_fr_diso = matrix(HS_DISO_AAFREQ , byrow=T,ncol=20,nrow=nrow(AA.FR))
+AA.FC = sweep(AA.FR[,AA3],2,HS_DISO_AAFREQ,"/") %>%
+        add_column(IDR_id= AA.FR$IDR_id)
 
-IDR_AAFR =  AA.FR[,get.AA3()]
-AA.FC = sweep(IDR_AAFR,2,HS_DISO_AAFREQ,"/")
-
-TOP4_FC = AA.FC %>% add_column(IDR_id= AA.FR$IDR_id) %>%
+TOP4_FC = AA.FC %>%
   pivot_longer(cols = 1:20) %>%
   group_by(IDR_id) %>%
   slice_max(order_by = value,n = 4,with_ties = F) %>%
@@ -468,11 +466,11 @@ AA.PEP = MOBIDB_LONGDISO %>% ungroup() %>%
         dplyr::select(-feature_seq)
 
 AA_feat = left_join(AA.FR,AACLASS_FR,by=c('IDR_id','IDR_len')) %>%
+  left_join(AA.FC,by=c('IDR_id'),suffix=c('','_fc')) %>%
   left_join(AA.CHARGE,by=c('IDR_id','IDR_len')) %>%
   left_join(AA.PEP,by=c('IDR_id')) %>%
   left_join(TOP4,by=c('IDR_id')) %>%
   left_join(TOP4_FC,by=c('IDR_id'))
-
 
 mobidb_scores = MOBIDB_LONGDISO %>% dplyr::select(-is_longest_feature) %>%
                   bind_cols( bind_rows(diso_score) ) %>%
@@ -532,9 +530,9 @@ ggcorrplot::ggcorrplot(cor(hs_mobi_num))
 
 # non-redundant features
 hs_mobi_selected = hs_mobi_data %>%
-                   dplyr::select(all_of(AA3),aa.class,
+                   dplyr::select(starts_with(AA3),aa.class,
                                  stickiness, roseman, aggrescan,
-                                 PEP_avg_mw, netcharge_res, PEP_PI, IDR_frac)
+                                 PEP_avg_mw, PEP_netcharge, PEP_PI, IDR_frac)
 
 # select the same features for atar's IDR
 atar_num     = df_atar %>% dplyr::select(colnames(hs_mobi_selected))
