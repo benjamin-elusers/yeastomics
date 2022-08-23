@@ -330,11 +330,11 @@ decompose_int = function(x,desc=F){
 to_iupac_multiplier = function(x){
   if(!is.numeric(x)){ stop("must give a positive integer!") }
   if(is.na(x)){ return(NA) }
-  if( x==0 || x > max(iupac_multi) ){
+
+  if( x==0 || x > 9999 ){
     poly = set_names(x,sprintf('(%s)–',x))
     return(poly)
   }
-
   X = decompose_int(x)
   N = length(X)
   #Multiplier # Number
