@@ -43,3 +43,10 @@ mytheme = theme(plot.background = element_blank(),
 # Options
 options(dplyr.summarise.inform = FALSE, dplyr.width=Inf)
 
+# Logger
+library(log)
+.info  = infoLog()
+.error =  errorLog()
+.warn  = warningLog()
+.succ  = successLog()
+
