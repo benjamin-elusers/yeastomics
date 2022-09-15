@@ -1,24 +1,59 @@
 #load(here::here('output','sc_datasets.rdata'))
 #load(here::here('output','sc_integrated_datasets.rdata'))
 #load(here::here('output','sc_predictors_proteome.rdata'))
-
 source(here::here("src","__setup_yeastomics__.r"))
 source(here::here("analysis","function_evorate_fitting.R"))
 
-# Reference Identifiers --------------------------------------------------------
-sc_uniprot = get_uniprot_reference(4932)
-sc_map_uni = get.uniprot.mapping(4932)
-sc_uniref = sc_uniprot$AC
-sc_enspref = str_subset(sc_uniprot$ensp, ENSEMBL.nomenclature())
-sc_sgd #load.hgnc(with_protein = F, all_fields = F) %>% filter(uni %in% hs_uniref)
-sc_orfref = drop_na(sc_sgd,ORF) %>% pull(ORF)
+uniprot_cerevisiae = find.uniprot_refprot(c('cerevisiae','s288c','eukaryota'))
+TAXID = 559292 # uniprot_cerevisiae$tax_id
 
 # Sequences --------------------------------------------------------------------
-sc_prot = get.uniprot.proteome(4932,DNA = F)
-sc_cdna = get.uniprot.proteome(4932,DNA = T)
+# from sgd
+s288c_prot = load.sgd.proteome(withORF=T)
+s288c_cdna = load.sgd.CDS(withORF = T)
+# from uniprot
+sc_prot = get.uniprot.proteome(TAXID,DNA = F)
+sc_cdna = get.uniprot.proteome(TAXID,DNA = T)
 
-sc_len = get.width(sc_prot) %>% rename(orf,prot_len=len) %>%
-  left_join(get.width(sc_cdna), by=c('orf')) %>% rename(cdna_len=len)
+# sgd-uniprot
+orf2uni = tibble(orf=names(s288c_prot), uni_matched = names(sc_prot)[match(s288c_prot,sc_prot)])
+orf_na = orf2uni$orf[is.na(orf2uni$uni_matched)]
+s288c_prot[orf_na]
+
+uni_with_orf = orf2uni %>% drop_na %>% pull(uni_matched)
+
+sc_uniref = names(sc_prot)
+
+# Reference Identifiers --------------------------------------------------------
+sc_map_uni = get.uniprot.mapping(TAXID)
+sc_uniprot = get_uniprot_reference(TAXID) %>% arrange(AC)
+#SC_UNI = get_uniprot_ids(sc_uniref) # Not necessary if all IDs are within the reference proteome
+
+sc_uni2ensembl = sc_map_uni %>%
+              filter(uni %in% sc_uniref & extdb == "EnsemblGenome_PRO") %>%
+              dplyr::select(AC=uni,ensp=extid)
+
+sc_uni2sgd = sc_map_uni %>%
+  filter(uni %in% sc_uniref & extdb == 'SGD') %>%
+  dplyr::select(AC=uni,sgd=extid)
+
+
+sc_reference = coalesce_join(sc_uniprot,sc_uni2ensembl, by='AC') %>%
+               left_join(sc_uni2sgd)
+
+sc_sgd = load.sgd.features(by.chr=T)
+sc_orfref = drop_na(sc_sgd,name) %>% filter(type == "ORF") %>% pull(name)
+
+## REFERENCE PROTEOME SEQUENCES ------------------------------------------------
+
+UNIPROT = sc_reference %>%
+  group_by(AC) %>%
+  mutate( is_uniref = AC %in% sc_uniref, one2one = (n()==1) ) %>%
+  left_join(sc_sgd %>% dplyr::select(sgdid,name,qual,gname,chr), by = c("sgd" = 'sgdid')) %>%
+  dplyr::rename(ORF = name, GNAME=gname, CHR=chr)
+
+sc_len = get.width(sc_prot) %>% rename(prot_len=len) %>%
+  left_join(get.width(sc_cdna), by=c('orf')) %>% rename(uniprot=orf,cdna_len=len)
 
 sc_aa_freq = (letterFrequency(sc_prot,as.prob = T,letters = get.AA1()) * 100) %>% bind_cols( id=names(sc_prot))
 sc_aa_count = letterFrequency(sc_prot,as.prob = F,letters = get.AA1()) %>% bind_cols( id=names(sc_prot))
@@ -26,27 +61,31 @@ sc_cdna_gc = (100*rowSums(letterFrequency(sc_cdna, letters="CG",as.prob = T))) %
 sc_codon_freq = Biostrings::trinucleotideFrequency(sc_cdna,step = 3,as.prob = T) *100
 
 # Proteome of reference  (Ensembl and Uniprot) ---------------------------------
-sc_ref = left_join(sc_uniprot,sc_sgd, by=c('AC'='uni')) %>%
-         arrange(AC,ensg,ensp,GN) %>%
+sc_ref = UNIPROT %>%
+         arrange(AC,ensp,GN) %>%
          mutate(
            uniprot=AC,
            is_uniref = AC %in% sc_uniref,
-           has_orf = ensp %in% sc_orfref,
-           has_ensp = ensg %in% sc_enspref,
+           has_orf = ORF %in% sc_orfref,
+           has_ensp = ensp %in% sc_uni2ensembl$ensp,
            has_cdna = !is.na(id_cdna),
            ) %>%
         left_join(sc_len, by='uniprot') %>%
-        left_join(tibble(uniprot=names(sc_cdna),UP.GC_cdna  =sc_cdna_gc ),by='uniprot')
+        left_join(tibble(uniprot=names(sc_cdna),UP.GC_cdna = sc_cdna_gc ),by='uniprot')
 
 
 # Genomics (%GC, and chromosome number) ----------------------------------------
 # sc_gc =  get_ensembl_gc(hs_ref$ensg) %>%
          # rename(ENS.GC_gene=percentage_gene_gc_content)
 
-# sc_chr = get_ensembl_chr(remove_patches = F,ENSG=sc_ref$ensg)
+chromosomes = paste0("chr_",c(LETTERS[1:2],"2mu",LETTERS[3:16],"mito"))
+sc_chr = sc_sgd %>%
+  filter(!is.na(start) & !is.na(end) ) %>%
+  mutate(chromosome_name = factor(chr, levels=unique(chr), labels = chromosomes)) %>%
+  dplyr::select(sgdid,name,type,qual,gname,chromosome_name)
 
 # Transcriptomics --------------------------------------------------------------
-hs_transcript = get_ensembl_tx(ENSG=hs_ref$ensg,ENSP=hs_ref$ensp)
+#sc_transcript = get_ensembl_tx(ENSG=hs_ref$ensg,ENSP=hs_ref$ensp)
 
 id_cols = c("OS","uniprot","AC","ID","GN","NAME","SV","ensg","enst","ensp","ensp_canonical")
 uni_col  = c("DB","OX","PE","has_cdna","id_cdna","is_uniref","has_ensp","has_ensg","cdna_len","prot_len")
