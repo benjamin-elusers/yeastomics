@@ -1957,7 +1957,7 @@ get_ensembl_version = function(latest=T,withURL=T,URL_FTP_ENSEMBL="http://ftp.en
   return(ensembl_releases)
 }
 
-get.ensembl.species= function(){
+get_ensembl_species= function(){
   URL_ENSEMBL = "https://www.ensembl.org/info/data/ftp/index.html"
   library(rvest)
   ens_ftp <- URL_ENSEMBL %>% read_html()
@@ -2113,26 +2113,69 @@ get_ensembl_fungi=function(){
   return(fungi)
 }
 ###### biomart ensembl #####
-get_ens_dataset = function(host='https://www.ensembl.org/',mart='ensembl'){
+get_ensembl_biomart = function(mart=NULL){
   library(biomaRt)
-  ens <- useEnsembl(biomart = mart, host = host, mirror=ENS_MIRROR)
-  ens_dataset = listDatasets(ens) %>% dplyr::as_tibble() %>%
-                dplyr::mutate(
-                  sp=str_split_fixed(dataset,'_',n=3)[,1],
-                  org = str_split_fixed(description,' genes ',n=2)[,1] %>% str_trim
-                )
+  library(dplyr)
+  genomes = listEnsemblGenomes(includeHosts = T) %>% add_column(type='EnsemblGenomes')
+  ensembl = listMarts(includeHosts = T,verbose = T) %>% as_tibble %>% add_column(type='Ensembl')
+  ensmarts = bind_rows(genomes,ensembl) %>%
+                mutate(vnum=str_extract(database,'[0-9]+'),
+                       host = paste0('https://',host),port = 443) # enforce  https
+  if(is.null(mart)){
+    m=menu(ensmarts$version,title = 'pick an ensembl biomart...')
+    mart = ensmarts$biomart[m]
+  }
+  MART = ensmarts %>% filter( biomart == mart )
+
+  BIOMART = useMart(biomart = MART$biomart, host = MART$host, path = MART$path, port = MART$port)
+  return(BIOMART)
+}
+
+find_ensembl_datasets = function(BIOMART){
+  library(biomaRt)
+  if(missing(BIOMART)){ BIOMART = get_ensembl_biomart() }
+
+  # host='https://www.ensembl.org/',mart='ensembl'
+  # ens <- useEnsembl(biomart = mart, host = host, mirror=ENS_MIRROR)
+  ens_dataset = listDatasets(BIOMART,verbose=T) %>% dplyr::as_tibble() %>%
+    dplyr::mutate(
+      sp=str_split_fixed(dataset,'_',n=3)[,1],
+      org = str_split_fixed(description,' genes ',n=2)[,1] %>% str_trim
+    )
   return(ens_dataset)
 }
 
+get_ensembl_dataset = function(mart,organism){
+  if(missing(mart)){ mart = get_ensembl_biomart() }
+  mart = get_ensembl_biomart(mart)
+  BM_org = find_ensembl_datasets(mart)
 
-get_ensembl_hsprot = function(verbose=T){
+  if(missing(organism) ){
+    organism = select.list(choices= BM_org$description,
+                  title = 'pick an ensembl dataset from selected biomart...')
+  }
+
+  has_organism = str_which(BM_org$description,pattern=fixed(organism,ignore_case = T))
+  if(length(has_organism) == 0L){
+    .error$log(paste0(organism," dataset: not found in the selected mart!"))
+    return(NA)
+  }
+
+  dataset_name = BM_org$dataset[ has_organism ]
+  .succ$log(paste0(organism," dataset: ",dataset_name))
+  DATASET = useDataset(dataset_name, mart)
+  #message(DATASET)
+  return(DATASET)
+}
+
+get_ensembl_prot = function(BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human'),
+                            verbose=T){
   library(biomaRt)
   att_prot = c('ensembl_peptide_id','uniprotswissprot')
   att_struct = c('gene_biotype')
 
-  hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
   # Get representative human proteome with UniProt/SwissProt identifiers
-  hs_ensp = getBM(mart = hs_ens,
+  hs_ensp = getBM(mart = BIOMART,
                   attributes = c(att_prot,att_struct),
                   filters=c('biotype','transcript_biotype','with_uniprotswissprot'),
                   values=list('protein_coding','protein_coding',T),
@@ -2146,12 +2189,10 @@ get_ensembl_hsprot = function(verbose=T){
 }
 
 get_ensembl_tx = function(verbose=T,
-                          host='https://www.ensembl.org/',
-                          mart='ensembl',
-                          dataset='hsapiens_gene_ensembl',
+                          BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human'),
                           ENSG,ENSP){
   library(biomaRt)
-  ens <- biomaRt::useEnsembl(biomart = mart, host = host, dataset = dataset, mirror=ENS_MIRROR)
+  #ens <- biomaRt::useEnsembl(biomart = mart, host = host, dataset = dataset, mirror=ENS_MIRROR)
   #ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
   att_struct = c('start_position','end_position','cds_length',
@@ -2159,8 +2200,8 @@ get_ensembl_tx = function(verbose=T,
                  'ensembl_exon_id','rank','exon_chrom_start','exon_chrom_end','is_constitutive')
   filters = c('ensembl_gene_id'=list(ENSG) )
 
-  listAttributes(ens)
-  ens_canonical =  getBM(mart = ens,
+  #listAttributes(BIOMART)
+  ens_canonical =  getBM(mart = BIOMART,
                      attributes = c(att_gene,'transcript_is_canonical'),
                      filters=c('ensembl_gene_id'),values=list(ENSG),
                      uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
@@ -2176,14 +2217,14 @@ get_ensembl_tx = function(verbose=T,
                      filter(is_enspref | canonical>=2 & has_enspref==0 )
 
   # Get representative of human transcriptome
-  ensg_trans = getBM(mart = ens,
+  ensg_trans = getBM(mart = BIOMART,
                   attributes = c(att_gene,att_struct),
                   filters='ensembl_gene_id',values=list(ENSG),
                   uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
                 dplyr::rename(ensg=ensembl_gene_id, enst=ensembl_transcript_id, ensp=ensembl_peptide_id) %>%
                 ungroup()
 
-  ensp_trans = getBM(mart = ens,
+  ensp_trans = getBM(mart = BIOMART,
                      attributes = c(att_gene,att_struct),
                      filters='ensembl_peptide_id',values=list(ENSP),
                      uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
@@ -2217,27 +2258,28 @@ get_ensembl_tx = function(verbose=T,
 }
 
 
-get_ensembl_gc = function(ENSG,host='https://www.ensembl.org/'){
+get_ensembl_gc = function(ENSG,BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human')){
   library(biomaRt)
-  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+  #ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
 
   filters = c('ensembl_gene_id'=list(ENSG))
-  hs_gc_gene=getBM(attributes=c("ensembl_gene_id",'percentage_gene_gc_content'), mart=ens,
+  hs_gc_gene=getBM(attributes=c("ensembl_gene_id",'percentage_gene_gc_content'), mart=BIOMART,
                  filters=names(filters), values=as.list(filters),
                  uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
              dplyr::rename(ensg=ensembl_gene_id) %>% distinct()
   return(hs_gc_gene)
 }
 
-get_ensembl_chr = function(as.df=T,remove_patches=T,ENSG){
+get_ensembl_chr = function(as.df=T,remove_patches=T,ENSG,
+                           BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human')){
   library(biomaRt)
 
   chromosomes = c(1:22,'MT','X','Y')
-  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+  #ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
   att_gene = c('ensembl_gene_id','chromosome_name')
   filters = c('ensembl_gene_id'=list(ENSG))
 
-  hs_chr=getBM(attributes=att_gene, mart=ens,
+  hs_chr=getBM(attributes=att_gene, mart=BIOMART,
                filters=names(filters), values=as.list(filters),
                uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
     mutate(is_patched = !(chromosome_name %in% chromosomes)) %>%
@@ -2262,16 +2304,17 @@ get_ensembl_chr = function(as.df=T,remove_patches=T,ENSG){
 }
 
 
-get_hs_GC = function(with_uniprot=T){
+get_hs_GC = function(with_uniprot=T,
+                     BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human')){
   library(biomaRt)
   att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','percentage_gene_gc_content')
-  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
-  filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
+  #ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+  filters = list('biotype'='protein_coding','transcript_biotype'='protein_coding')
   if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
 
-    hs_gc_gene=getBM(attributes=att_gene, mart=ens,
-                     filters=names(filters), values=as.list(filters),
-                     uniqueRows = T, bmHeader = F) %>% as_tibble()
+  hs_gc_gene=getBM(attributes=att_gene, mart=BIOMART,
+                   filters=names(filters), values=as.list(filters),
+                   uniqueRows = T, bmHeader = F) %>% as_tibble()
   return(hs_gc_gene)
 }
 
@@ -2362,23 +2405,28 @@ get_ens_filter_ortho = function(host='https://www.ensembl.org/',
   filter_ortho = searchFilters(hs_ens,'homolog') %>%
                  as_tibble %>%
                  mutate(sp=str_split_fixed(name,'_',n=3)[,2]) %>%
-                 mutate(org = str_replace(description,pattern = "Orthologous (.+) Genes", replacement = "\\1")) %>%
-                 dplyr::select(-description)
+                 mutate(Org = str_replace(description,pattern = "Orthologous (.+) Genes", replacement = "\\1")) %>%
+                 dplyr::select(-description) %>%
+                 mutate(org = tolower(Org))
   return(filter_ortho)
 }
 
-query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
+query_ens_ortho <- function(species='hsapiens',sp_ortho,COUNTER=1,
+                            host='https://www.ensembl.org/',
+                            mart='ensembl',
+                            dataset_suffix="gene_ensembl") {
   tictoc::tic('query Ensembl orthologs')
-  dataset  = sprintf('%s_gene_ensembl',species)
-  ortholog = sprintf('with_%s_homolog',ortho)
-  ens = useEnsembl('ensembl',dataset,mirror=ENS_MIRROR)
+  dataset  = sprintf('%s_%s',species,dataset_suffix)
+  ortholog = sprintf('with_%s_homolog',sp_ortho)
+  ens=useEnsembl(biomart = mart, dataset = dataset, host = host, mirror=ENS_MIRROR)
+
   t0 = proc.time()
   out <- tryCatch({
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
     att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide','canonical_transcript_protein','subtype',
                     'perc_id','perc_id_r1','goc_score','wga_coverage','orthology_confidence')
-    att_ortho = intersect(sprintf("%s_homolog_%s",ortho,att_species), listAttributes(ens,page='homologs')[,1])
-    cat(sprintf("Trying to fetch orthologs '%s' VS. '%s'...",species,ortho))
+    att_ortho = intersect(sprintf("%s_homolog_%s",sp_ortho,att_species), listAttributes(ens,page='homologs')[,1])
+    cat(sprintf("Trying to fetch orthologs '%s' VS. '%s'...",species,sp_ortho))
 
     Q=getBM(mart=ens,
             attributes=c(att_gene,att_ortho),
@@ -2404,15 +2452,18 @@ query_ens_ortho <- function(species='hsapiens',ortho,COUNTER=1) {
   return(out)
 }
 
-query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T) {
+query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T,
+                            host='https://www.ensembl.org/',
+                            mart='ensembl',
+                            dataset_suffix="gene_ensembl") {
   if(verbose){ tictoc::tic('query Ensembl transcript length') }
   t0 = proc.time()
   out <- tryCatch({
-    dataset_name = sprintf('%s_gene_ensembl',Sp)
+    dataset_name = sprintf('%s_%s',Sp,dataset_suffix)
     if(verbose){
       cat(sprintf("Trying to fetch structure of genes from '%s' [%s]...",dataset_name,ORG))
     }
-    Ma=useEnsembl("ensembl",dataset_name,mirror=ENS_MIRROR)
+    Ma=useEnsembl(biomart = mart, dataset = dataset_name, host = host, mirror=ENS_MIRROR)
 
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
     att_struct = c('cds_length','transcript_length')
