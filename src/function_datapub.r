@@ -2318,15 +2318,16 @@ get_hs_GC = function(with_uniprot=T,
   return(hs_gc_gene)
 }
 
-get_hs_chr = function(as.df=T,remove_patches=T,with_uniprot=T){
+get_hs_chr = function(BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human'),
+                      as.df=T,remove_patches=T,with_uniprot=T){
   library(biomaRt)
   chromosomes = c(1:22,'MT','X','Y')
   att_gene = c('ensembl_gene_id','ensembl_peptide_id','uniprotswissprot','chromosome_name')
-  ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
+  #ens=biomaRt::useMart(biomart = "ensembl", dataset = 'hsapiens_gene_ensembl')
   filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
   if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
 
-  hs_chr=getBM(attributes=att_gene, mart=ens,
+  hs_chr=getBM(attributes=att_gene, mart=BIOMART,
                filters=names(filters), values=as.list(filters),
                uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
          mutate(is_patched = !(chromosome_name %in% chromosomes))
@@ -2349,7 +2350,8 @@ get_hs_chr = function(as.df=T,remove_patches=T,with_uniprot=T){
   return(hs_chr)
 }
 
-get_hs_transcript = function(verbose=T,longest_transcript=F,with_uniprot=T){
+get_hs_transcript = function(BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human'),
+                             verbose=T,longest_transcript=F,with_uniprot=T){
   library(biomaRt)
   att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
   att_pos = c('chromosome_name','start_position','end_position')
@@ -2361,9 +2363,9 @@ get_hs_transcript = function(verbose=T,longest_transcript=F,with_uniprot=T){
 
   if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
 
-  hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
+  #hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
   # Get representative human proteome with UniProt/SwissProt identifiers
-  hs_ensg = getBM(mart = hs_ens,
+  hs_ensg = getBM(mart = BIOMART,
                   attributes = c(att_gene,att_pos,att_struct,att_uni,att_type),
                   filters=names(filters), values=as.list(filters),
                   uniqueRows = T, bmHeader = F) %>% as_tibble() %>%
@@ -2398,11 +2400,10 @@ get_hs_transcript = function(verbose=T,longest_transcript=F,with_uniprot=T){
   return(hs_ensg)
 }
 
-get_ens_filter_ortho = function(host='https://www.ensembl.org/',
-                                mart='ensembl',dat='hsapiens_gene_ensembl'){
+get_ens_filter_ortho = function(BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human')){
   library(biomaRt)
-  hs_ens = useEnsembl(host = host, biomart = mart, dataset = dat, mirror=ENS_MIRROR)
-  filter_ortho = searchFilters(hs_ens,'homolog') %>%
+ # hs_ens = useEnsembl(host = host, biomart = mart, dataset = dat, mirror=ENS_MIRROR)
+  filter_ortho = searchFilters(BIOMART,'homolog') %>%
                  as_tibble %>%
                  mutate(sp=str_split_fixed(name,'_',n=3)[,2]) %>%
                  mutate(Org = str_replace(description,pattern = "Orthologous (.+) Genes", replacement = "\\1")) %>%
@@ -2412,23 +2413,21 @@ get_ens_filter_ortho = function(host='https://www.ensembl.org/',
 }
 
 query_ens_ortho <- function(species='hsapiens',sp_ortho,COUNTER=1,
-                            host='https://www.ensembl.org/',
-                            mart='ensembl',
+                            BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human'),
                             dataset_suffix="gene_ensembl") {
   tictoc::tic('query Ensembl orthologs')
-  dataset  = sprintf('%s_%s',species,dataset_suffix)
   ortholog = sprintf('with_%s_homolog',sp_ortho)
-  ens=useEnsembl(biomart = mart, dataset = dataset, host = host, mirror=ENS_MIRROR)
+  #ens=useEnsembl(biomart = mart, dataset = dataset, host = host, mirror=ENS_MIRROR)
 
   t0 = proc.time()
   out <- tryCatch({
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
     att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide','canonical_transcript_protein','subtype',
                     'perc_id','perc_id_r1','goc_score','wga_coverage','orthology_confidence')
-    att_ortho = intersect(sprintf("%s_homolog_%s",sp_ortho,att_species), listAttributes(ens,page='homologs')[,1])
+    att_ortho = intersect(sprintf("%s_homolog_%s",sp_ortho,att_species), listAttributes(BIOMART,page='homologs')[,1])
     cat(sprintf("Trying to fetch orthologs '%s' VS. '%s'...",species,sp_ortho))
 
-    Q=getBM(mart=ens,
+    Q=getBM(mart=BIOMART,
             attributes=c(att_gene,att_ortho),
             filters="", values="",
             uniqueRows = T, bmHeader = F)
@@ -2452,28 +2451,26 @@ query_ens_ortho <- function(species='hsapiens',sp_ortho,COUNTER=1,
   return(out)
 }
 
-query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T,
-                            host='https://www.ensembl.org/',
-                            mart='ensembl',
-                            dataset_suffix="gene_ensembl") {
+query_ens_txlen <- function(Fi,Va,ORG,COUNTER=1,verbose=T,
+                            BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human')) {
   if(verbose){ tictoc::tic('query Ensembl transcript length') }
   t0 = proc.time()
   out <- tryCatch({
-    dataset_name = sprintf('%s_%s',Sp,dataset_suffix)
     if(verbose){
-      cat(sprintf("Trying to fetch structure of genes from '%s' [%s]...",dataset_name,ORG))
+      cat(sprintf("Trying to fetch structure of genes from '%s' [%s]...",BIOMART@dataset,ORG))
     }
-    Ma=useEnsembl(biomart = mart, dataset = dataset_name, host = host, mirror=ENS_MIRROR)
+
+    BM_att = listAttributes(BIOMART)[,1]
 
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
     att_struct = c('cds_length','transcript_length')
-    att_valid = intersect(c(att_gene,att_struct),listAttributes(Ma)[,1])
+    att_valid = intersect(c(att_gene,att_struct),BM_att)
     no_len = any(!att_struct %in% att_valid)
     if(no_len){
       pos_name = c("%s_position","transcript_%s","exon_chrom_%s")
       att_pos = c('ensembl_exon_id', 'is_constitutive',sprintf(pos_name,'start'), sprintf(pos_name,'end')) %>% sort
       warning('gene/transcript length unavailable!')
-      att_valid = intersect(c(att_gene,att_pos),listAttributes(Ma)[,1])
+      att_valid = intersect(c(att_gene,att_pos),BM_att)
       if(any(!att_pos %in% att_valid)){
         warning('No information about gene length available')
         return(NULL)
@@ -2481,11 +2478,11 @@ query_ens_txlen <- function(At,Fi,Va,Sp,ORG,COUNTER=1,verbose=T,
     }
 
     if(!missing(Fi) && !missing(Va)){
-      Q=getBM(attributes=att_valid, mart=Ma, filters = Fi,  values = Va, uniqueRows = T, bmHeader = F) %>%
+      Q=getBM(attributes=att_valid, mart=BIOMART, filters = Fi,  values = Va, uniqueRows = T, bmHeader = F) %>%
         group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
       return(Q)
     }else{
-      Q=getBM(attributes=att_valid, mart=Ma, uniqueRows = T, filters="", values="", bmHeader = F) %>%
+      Q=getBM(attributes=att_valid, mart=BIOMART, uniqueRows = T, filters="", values="", bmHeader = F) %>%
         group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
 
       if(no_len){
