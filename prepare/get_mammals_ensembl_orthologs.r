@@ -4,11 +4,6 @@ library(tidyverse)
 library(here)
 ENS_MIRROR='uswest'
 path_ortho = here::here('output','ens_hs_ortho')
-library(log)
-.info  = infoLog()
-.error =  errorLog()
-.warn  = warningLog()
-.succ  = successLog()
 
 #### FUNCTION ####
 count_ens_id = function(x,toprint=T){
@@ -785,8 +780,7 @@ carnivora.path = file.path(path_ortho,'hs_carnivora')
 euarcho.path  = file.path(path_ortho,'hs_euarchontoglires')
 laura.path = file.path(path_ortho,'hs_laurasiatheria')
 
-
-all_paths = c(mammals0.path,mammals.path,glires.path,laura1.path,primates.path,carnivora.path,euarcho.path,laura.path)
+all_paths = c(eutheria.path,boreo.path,rodentia.path,artio.path,primates.path,carnivora.path,euarcho.path,laura.path)
 all_folders = c(file.path(all_paths,'fasta'),file.path(all_paths,'ali'),file.path(all_paths,'tree'))
 sapply(all_folders, dir.create, showWarnings = F,recursive = T)
 
