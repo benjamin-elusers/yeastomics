@@ -1,9 +1,4 @@
 source(here::here("src","__setup_yeastomics__.r"))
-library(log)
-.info  = infoLog()
-.error =  errorLog()
-.warn  = warningLog()
-.succ  = successLog()
 
 #library(extrafont)
 #library(extrafontdb)
@@ -284,8 +279,8 @@ get_binary_col = function(df,only.names=F){
 remove_rare_vars = function(df,min_obs=2){
 
   # Find binary variables with rare observations (preferably 0's and singletons)
-  binary_vars = get_binary_col(df)
-  rare_vars = binary_vars[ colSums(binary_vars,na.rm = T) < min_obs ]
+  binary_vars = get_binary_col(df) %>% mutate(across(everything(),as.numeric))
+  rare_vars = binary_vars[ colSums( binary_vars ,na.rm = T) < min_obs ]
   n_rare = length(rare_vars)
   .succ$log(sprintf("Excluding %s/%s predictors with less than %s observations\n",n_rare,ncol(df),min_obs))
 
@@ -382,8 +377,12 @@ fix_missing_peptide_stats = function(df,id='ORF', taxon=4932,
                   )
   if(taxon == 9606){
     df_na_pep = df_na_pep %>% dplyr::rename(uniprot=id)
+    df_fixed = coalesce_join(x = df, y=df_na_pep, by = 'uniprot')
+  }else if(taxon == 4932){
+    df_na_pep = df_na_pep %>% dplyr::rename(ORF=id)
+    df_fixed = coalesce_join(x = df, y=df_na_pep, by = 'ORF')
   }
-  df_fixed = coalesce_join(x = df, y=df_na_pep, by = c('uniprot'))
+
   return(df_fixed)
 }
 
@@ -394,14 +393,14 @@ get_centrality_col = function(df,col_prefix="cat_interactions.string."){
   return(res)
 }
 
-retrieve_missing_centrality = function(orf_missing,type='string',taxon=4932){
-  centrality_low.rds = here::here('data',paste0(taxon,'-',type,'-low_stringency_centrality.rds'))
+retrieve_missing_centrality = function(orf_missing,int_type='string',taxon=4932){
+  centrality_low.rds = here::here('data',paste0(taxon,'-',int_type,'-low_stringency_centrality.rds'))
   centrality_low = preload(saved.file = centrality_low.rds,
                             loading.call = {
-                              load.network(type,taxon) %>%
+                              load.network(int_type,taxon) %>%
                               #filter(ORF1 %in% orf_missing | ORF2 %in% orf_missing) %>%
                               dplyr::select(protein1,protein2) %>%
-                              network.centrality(fromTo = ., namenet = toupper(type)) %>%
+                              network.centrality(fromTo = ., namenet = toupper(int_type)) %>%
                               filter(ids %in% orf_missing)
                             },
                             doing = 'retrieving centrality with min score 700')
@@ -443,8 +442,11 @@ fix_missing_centrality = function(df,id='ORF',col_prefix='cat_interactions.strin
     if( taxon==9606){
       df = df %>% mutate(across(where(is.character) & starts_with('string.cent_'), as.numeric))
       df_na_centrality = df_na_centrality %>% rename(ensp=ids)
+      df_fixed = coalesce_join(x = df, y=df_na_centrality, by = 'ensp')
+    }else if(taxon==4932){
+      df_na_centrality = df_na_centrality %>% rename(ORF=ids)
+      df_fixed = coalesce_join(x = df, y=df_na_centrality, by = 'ORF')
     }
-    df_fixed = coalesce_join(x = df, y=df_na_centrality, by = c('ensp'))
   }
 
   return(df_fixed)

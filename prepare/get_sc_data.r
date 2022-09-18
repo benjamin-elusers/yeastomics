@@ -18,105 +18,114 @@ sc_cdna = get.uniprot.proteome(TAXID,DNA = T)
 # sgd-uniprot
 orf2uni = tibble(orf=names(s288c_prot), uni_matched = names(sc_prot)[match(s288c_prot,sc_prot)])
 orf_na = orf2uni$orf[is.na(orf2uni$uni_matched)]
-s288c_prot[orf_na]
+#s288c_prot[orf_na] # 680 ORFs with no known uniprot
 
 uni_with_orf = orf2uni %>% drop_na %>% pull(uni_matched)
-
 sc_uniref = names(sc_prot)
 
 # Reference Identifiers --------------------------------------------------------
-sc_map_uni = get.uniprot.mapping(TAXID)
 sc_uniprot = get_uniprot_reference(TAXID) %>% arrange(AC)
+sc_sgd = load.sgd.features(by.chr=T)
+
+sc_map_uniref = get.uniprot.mapping(TAXID) # for reference proteome
+sc_map_uni = read_delim("https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/YEAST_559292_idmapping.dat.gz",
+                        col_names = c('uni','extdb','extid'))
 #SC_UNI = get_uniprot_ids(sc_uniref) # Not necessary if all IDs are within the reference proteome
 
-sc_uni2ensembl = sc_map_uni %>%
-              filter(uni %in% sc_uniref & extdb == "EnsemblGenome_PRO") %>%
+sc_uni2ens = sc_map_uni %>%
+              filter(extdb == "EnsemblGenome_PRO" ) %>%
               dplyr::select(AC=uni,ensp=extid)
 
 sc_uni2sgd = sc_map_uni %>%
-  filter(uni %in% sc_uniref & extdb == 'SGD') %>%
+  filter(extdb == 'SGD') %>%
   dplyr::select(AC=uni,sgd=extid)
 
+sc_uni_mapped = left_join(sc_uni2ens,sc_uni2sgd,by='AC')
 
-sc_reference = coalesce_join(sc_uniprot,sc_uni2ensembl, by='AC') %>%
-               left_join(sc_uni2sgd)
-
-sc_sgd = load.sgd.features(by.chr=T)
-sc_orfref = drop_na(sc_sgd,name) %>% filter(type == "ORF") %>% pull(name)
+sc_reference = inner_join(sc_sgd %>% dplyr::select(sgdid,type,qual,name,gname,chr),coalesce_join(sc_uni_mapped,sc_uniprot, by='AC'),by=c('sgdid'='sgd'))
+#sc_orfref = drop_na(sc_sgd,name) %>% filter(name %in% names(s288c_prot)) %>% dplyr::select(sgdid,orf=name)
 
 ## REFERENCE PROTEOME SEQUENCES ------------------------------------------------
-
 UNIPROT = sc_reference %>%
   group_by(AC) %>%
   mutate( is_uniref = AC %in% sc_uniref, one2one = (n()==1) ) %>%
-  left_join(sc_sgd %>% dplyr::select(sgdid,name,qual,gname,chr), by = c("sgd" = 'sgdid')) %>%
   dplyr::rename(ORF = name, GNAME=gname, CHR=chr)
 
 sc_len = get.width(sc_prot) %>% rename(prot_len=len) %>%
   left_join(get.width(sc_cdna), by=c('orf')) %>% rename(uniprot=orf,cdna_len=len)
 
-sc_aa_freq = (letterFrequency(sc_prot,as.prob = T,letters = get.AA1()) * 100) %>% bind_cols( id=names(sc_prot))
-sc_aa_count = letterFrequency(sc_prot,as.prob = F,letters = get.AA1()) %>% bind_cols( id=names(sc_prot))
-sc_cdna_gc = (100*rowSums(letterFrequency(sc_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
-sc_codon_freq = Biostrings::trinucleotideFrequency(sc_cdna,step = 3,as.prob = T) *100
+sc_aa_freq = (letterFrequency(s288c_prot,as.prob = T,letters = get.AA1()) * 100) %>% bind_cols( id=names(s288c_prot))
+sc_aa_count = letterFrequency(s288c_prot,as.prob = F,letters = get.AA1()) %>% bind_cols( id=names(s288c_prot))
+sc_cdna_gc = (100*rowSums(letterFrequency(s288c_cdna, letters="CG",as.prob = T))) %>% round(digits = 2)
+sc_codon_freq = Biostrings::trinucleotideFrequency(s288c_cdna,step = 3,as.prob = T) *100
 
 # Proteome of reference  (Ensembl and Uniprot) ---------------------------------
 sc_ref = UNIPROT %>%
          arrange(AC,ensp,GN) %>%
          mutate(
+           ensg = ORF,
            uniprot=AC,
            is_uniref = AC %in% sc_uniref,
            has_orf = ORF %in% sc_orfref,
+           has_ensg = ensg %in% sc_sgd$name,
            has_ensp = ensp %in% sc_uni2ensembl$ensp,
            has_cdna = !is.na(id_cdna),
            ) %>%
         left_join(sc_len, by='uniprot') %>%
         left_join(tibble(uniprot=names(sc_cdna),UP.GC_cdna = sc_cdna_gc ),by='uniprot')
 
-
+sc_biomart = get_ensembl_dataset('fungi_mart','cerevisiae')
 # Genomics (%GC, and chromosome number) ----------------------------------------
-# sc_gc =  get_ensembl_gc(hs_ref$ensg) %>%
-         # rename(ENS.GC_gene=percentage_gene_gc_content)
+sc_gc =  get_ensembl_gc(ENSG = sc_ref$ensg, BIOMART = sc_biomart) %>%
+         rename(ENS.GC_gene=percentage_gene_gc_content)
 
-chromosomes = paste0("chr_",c(LETTERS[1:2],"2mu",LETTERS[3:16],"mito"))
-sc_chr = sc_sgd %>%
+chromosomes = c(LETTERS[1:2],"2mu",LETTERS[3:16],"mito")
+sc_chrom = sc_sgd %>%
   filter(!is.na(start) & !is.na(end) ) %>%
   mutate(chromosome_name = factor(chr, levels=unique(chr), labels = chromosomes)) %>%
-  dplyr::select(sgdid,name,type,qual,gname,chromosome_name)
+  dplyr::select(sgdid,name,type,qual,chromosome_name) %>%
+  mutate( chr_val=T ) %>%
+  pivot_wider(id_cols=c('sgdid','name','type','qual'),
+              names_from=chromosome_name, names_prefix='chr_',
+              values_from = chr_val, values_fill = F )  %>%
+  distinct()
+
+sc_chr = sc_chrom %>% filter(type == 'ORF') %>% rename(ensg=name)
 
 # Transcriptomics --------------------------------------------------------------
-#sc_transcript = get_ensembl_tx(ENSG=hs_ref$ensg,ENSP=hs_ref$ensp)
-
-id_cols = c("OS","uniprot","AC","ID","GN","NAME","SV","ensg","enst","ensp","ensp_canonical")
-uni_col  = c("DB","OX","PE","has_cdna","id_cdna","is_uniref","has_ensp","has_ensg","cdna_len","prot_len")
+sc_transcript = get_ensembl_tx(ENSG=sc_ref$ensg, ENSP=sc_ref$ensp, BIOMART=sc_biomart)
+id_cols = c("OS","sgdid","ORF","uniprot","AC","ID","GN","GNAME","NAME","SV","ensg","enst","ensp","ensp_canonical")
+uni_col  = c("DB","OX","PE","one2one","CHR","has_cdna","id_cdna","is_uniref","has_ensp","has_ensg","cdna_len","prot_len")
 # hgnc_col = c("symbol","name","location","gene_group","locus_group","locus_type")
+sgd_col = c("qual","type",paste0('chr_',chromosomes),'has_orf')
 ens_col  = c("canonical","is_canonical","is_enspref","has_ensp_canonical",
              "has_introns",'n_proteins','n_transcripts','n_exons','n_exons_mini',
-             paste0('chr_',letters[c(1:16)],'MT','other'),
              "cds_len","transcript_len","gene_len")
 
-SC_CODING = left_join(sc_ref,sc_transcript, by='ensg', suffix=c('','_canonical')) %>%
+SC_CODING = left_join(sc_ref,sc_transcript, by=c('ensg'), suffix=c('','_canonical')) %>%
             left_join(sc_gc) %>%
             left_join(sc_chr) %>%
             relocate(all_of(id_cols),all_of(uni_col),all_of(sgd_col),all_of(ens_col)) %>%
             dplyr::rename_with(all_of(uni_col),.fn = Pxx, 'UP') %>%
             dplyr::rename_with(all_of(sgd_col),.fn = Pxx, 'SGD') %>%
-            dplyr::rename_with(all_of(ens_col),.fn = Pxx, 'ENS')
+            dplyr::rename_with(all_of(ens_col),.fn = Pxx, 'ENS') %>%
+            arrange(desc(UP.is_uniref))
+
 
 # Codons -----------------------------------------------------------------------
 library(coRdon)
 codon_table = get_codon_table()
-sc_codon = bind_cols(uniprot=names(sc_cdna),sc_codon_freq) %>%
+sc_codon = bind_cols(orf=names(s288c_cdna),sc_codon_freq) %>%
   rename(all_of(set_names(codon_table$CODON,codon_table$codon_aa))) %>%
-  rename_with(-uniprot, .fn=Pxx, 'UP_cdna')
+  rename_with(-orf, .fn=Pxx, 'SGD_cdna')
 
 # Add amino acid with its associated codons
 yeast_codon_usage.rds = here::here('output','sc-codon-usage.rds')
-sc_CU = preload(yeast_codon_usage.rds, load.codon.usage(cds=sc_cdna,with.counts=F,sp = 'sce') ) %>%
+sc_CU = preload(yeast_codon_usage.rds, load.codon.usage(cds=s288c_cdna,with.counts=F,sp = 'sce') ) %>%
         dplyr::rename_with(starts_with('CU_'),.fn=Pxx,'elek2022')
 
 # Single amino-acid frequencies ------------------------------------------------
-sc_aa = sc_aa_freq %>% rename_with(.fn = Pxx, px="UP_prot.f",s='_',.cols=-id)
+sc_aa = sc_aa_freq %>% rename_with(.fn = Pxx, px="SGD_prot.f",s='_',.cols=-id)
 # Grouped amino-acid frequencies -----------------------------------------------
 aa.prop = seqinr::SEQINR.UTIL$AA.PROPERTY %>%
   append( list('Alcohol'=c('S','T'),
@@ -128,25 +137,28 @@ sum.aa.fr = function(BS,alphabet){
 }
 aa.set = map_chr(aa.prop,str_c,collapse='')
 aa.class = paste0(tolower(sub(x=names(aa.set),"\\.","")),"_",aa.set)
-AACLASS.FR = map(aa.prop, sum.aa.fr, BS=hs_prot )
+AACLASS.FR = map(aa.prop, sum.aa.fr, BS=s288c_prot )
 sc_aa_class = AACLASS.FR %>% purrr::reduce(full_join,by='id') %>%
               rename_with(~aa.class, starts_with('fr')) %>%
-              rename_with(.fn = Pxx, px="UP_prot.f",s='_',.cols=-id)
+              rename_with(.fn = Pxx, px="SGD_prot.f",s='_',.cols=-id)
 
-SC_COUNT = left_join(sc_aa,sc_aa_class) %>% left_join(sc_codon,by=c('id'='uniprot')) %>%
-            dplyr::rename(uniprot=id) %>% relocate(uniprot)
+SC_COUNT = left_join(sc_aa,sc_aa_class) %>% left_join(sc_codon,by=c('id'='orf')) %>%
+            dplyr::rename(ORF=id) %>% relocate(ORF)
 
 # Conservation -----------------------------------------------------------------
-#hs_r4s = load.evorate(resdir = "/data/benjamin/Evolution/HUMAN",ref = NULL,ext.r4s = '.r4s')
-sc_r4s = read_rds(here("data","RESIDUE-EVORATE-YEAST.rds")) %>% group_by(id) %>%
-             summarize(lmsa=max(msa_pos), lref=max(ref_pos),
-                       pid=mean(matched==total-1), pdiv=mean(mismatched>0),pgap=mean(indel>0),
-                       nsp = mean(total),
-                       rate = mean_(r4s_rate),
-                       rate_norm = abs(2*min_(r4s_rate)) + mean_(r4s_rate)) %>%
+# sc_evo = load.evorate(alndir = "/media/WEXAC_data/FUNGI/fasta/",
+#              resdir="/media/WEXAC_data/FUNGI/",
+#              ref='Saccharomyces_cerevisiae',ext.r4s = 'raw.r4s')
+sc_r4s = read_rds(here::here('data','evorate-fungi-orthologs.rds')) %>%
+         group_by(id) %>% #= #read_rds(here("data","RESIDUE-EVORATE.rds")) %>% group_by(id) %>%
+         summarize(lmsa=max(msa_pos), lref=max(ref_pos),
+                   pid=mean(matched==total-1), qid=mean(mismatched>0), pgap=mean(indel>0),
+                   nsp = mean(total),
+                   rate = mean_(r4s_rate)) %>%
+                   #rate_norm = abs(2*min_(r4s_rate)) + mean_(r4s_rate)) %>%
              dplyr::filter(!is.na(rate)) %>%
-             dplyr::rename_with(-id, .fn = Pxx, 'r4s_mammals')
-#plot(density(x = hs_r4s_prot$r4s_mammals))
+             dplyr::rename_with(-id, .fn = Pxx, 'r4s_fungi')
+#plot(density(x = sc_r4s$r4s_fungi.rate))
 
 # Disorder ---------------------------------------------------------------------
 sc_d2p2 =  read_rds(here("data","d2p2-yeast-uniprotKB.rds")) %>%
@@ -190,11 +202,11 @@ sc_dubreuil = load.dubreuil2019.data(4) %>%
          dplyr::rename(set_names(names(IUP_cols),IUP_cols),
                         set_names(names(subset_cols),subset_cols)) %>%
          dplyr::rename_with(.cols= ends_with(c('.dom','.iup40')), .fn = str_replace_all, "\\.", "_" ) %>%
-         right_join(hs_fullscore,by=c('UNIPROT'='uniprot')) %>%
+         right_join(sc_fullscore,by=c('UNIPROT'='uniprot')) %>%
          dplyr::rename_with(.cols=-UNIPROT, .fn = Pxx, 'dubreuil2019', s='.')
 
 # Domains ----------------------------------------------------------------------
-sc_pfam=load.pfam(tax = 4932) %>%
+sc_pfam=load.pfam(tax = TAXID) %>%
              filter(seq_id %in% sc_uniref) %>%
              group_by(clan) %>% mutate(pfam.clansize = n_distinct(seq_id)) %>%
               group_by(seq_id) %>% mutate(pfam.ndom=n_distinct(hmm_acc)) %>%
@@ -209,7 +221,7 @@ sc_pfam=load.pfam(tax = 4932) %>%
 #summary(pf_ol)
 #pf_ol %>% filter( seq_id %in% pf_ol$seq_id[pf_ol$overlap & pf_ol$no_overlap])
 
-sc_pfam_count = left_join(sc_ref,hs_pfam, by=c('AC'='seq_id')) %>%
+sc_pfam_count = left_join(sc_ref,sc_pfam, by=c('AC'='seq_id')) %>%
              group_by(AC) %>%
              summarize( pfam.HMM_none= is.na(pfam.ndom) | pfam.ndom==0,
                         pfam.HMM_single= !is.na(pfam.ndom) & pfam.ndom==1,
@@ -240,7 +252,7 @@ sc_supfam=load.superfamily(tax = 'sc') %>%
           group_by(seqid) %>% mutate(superfamily.ndom=n_distinct(superfamily_id)) %>%
           add_count(superfamily_id,name="pfam.repeat")
 
-sc_supfam_count = left_join(sc_ref,hs_supfam, by=c('ensp'='seqid')) %>% group_by(ensp) %>%
+sc_supfam_count = left_join(sc_ref,sc_supfam, by=c('ensp'='seqid')) %>% group_by(ensp) %>%
                  summarize(superfamily.supfam_none= is.na(superfamily.ndom) | superfamily.ndom==0 ,
                  superfamily.supfam_single= !is.na(superfamily.ndom) & superfamily.ndom==1,
                  superfamily.supfam_pair= !is.na(superfamily.ndom) & superfamily.ndom==2,
@@ -263,7 +275,7 @@ SC_SUPFAM = left_join(sc_supfam_count,sc_superfamilies,by=c('ensp'='seqid')) %>%
             distinct()
 
 # Folding energy and stability -------------------------------------------------
-sc_stab = load.leuenberger2017.data("Saccharomyces cerevisiae",rawdata = F) %>%
+sc_stab = load.leuenberger2017.data("S. cerevisiae",rawdata = F) %>%
           add_count(protein_id,name='npep') %>%
           distinct() %>%
           mutate( nres = round(0.01*protein_coverage*length),
@@ -321,17 +333,16 @@ sc_complexes = pivot_wider(sc_complex, id_cols = members,
                            values_from = oligomers_val, values_fn=sum, values_fill = F) %>%
                 mutate(across(where(is.integer), as.logical)) %>%
                 dplyr::select(uniprot=members,where(~ is.logical(.x) && sum(.x) > 4 ))
-SC_COMPLEX = left_join(sc_oligomers,hs_assembly) %>% left_join(sc_complexes)
+SC_COMPLEX = left_join(sc_oligomers,sc_assembly) %>% left_join(sc_complexes)
 
 # Functional interactions ------------------------------------------------------
 sc_string = load.string(tax="4932",phy=F, ful=T, min.score = 900) %>%
-  mutate(ens1 = str_extract(protein1,ENSEMBL.nomenclature()),
-         ens2 = str_extract(protein2,ENSEMBL.nomenclature())
+  mutate(ens1 = str_extract(protein1,SGD.nomenclature()),
+         ens2 = str_extract(protein2,SGD.nomenclature())
   ) %>% relocate(ens1,ens2) %>% dplyr::select(-c(protein1,protein2))
 
 yeast_centrality.rds = here::here('output','sc-string-centralities.rds')
 sc_string_centralities = preload(yeast_centrality.rds, network.centrality(sc_string %>% dplyr::select(ens1,ens2)))
-
 
 sc_string_centralities$megahub_func = sc_string_centralities$cent_deg >= 300
 sc_string_centralities$superhub_func = between(sc_string_centralities$cent_deg,100,300)
@@ -342,7 +353,7 @@ sc_string_centralities = sc_string_centralities %>% type_convert() %>%
 # Biological functions (GO) ----------------------------------------------------
 unigo.rds = here::here('output','sc-uniprot-go.rds')
 
-unigo = preload(unigo.rds, get.uniprot.go(hs_uniref,taxon = 4932) )
+unigo = preload(unigo.rds, get.uniprot.go(sc_uniref,taxon = 4932) )
 sc_unigo = unigo %>%  # Uniprot-based GO annotation
            mutate( go = paste0(ONTOLOGY,"_", str_replace_all(goterm,pattern="[^A-Za-z0-9\\.]+","_"))) %>%
            filter(!obsolete & shared > 10 & ONTOLOGY != "CC") %>%
@@ -363,11 +374,10 @@ SC_UNILOC = sc_uniloc %>%
             mutate( across(.cols=everything(),.fns= as.logical))
 
 # Biological pathways (KEGG) ---------------------------------------------------
-yeast_pathways.rds = here('output','hs-kegg-pathways.rds')
+yeast_pathways.rds = here('output','sc-kegg-pathways.rds')
 sc_pathways=preload(yeast_pathways.rds,
                     get.KEGG(sp='sce',type='pathway',as.df=T,to_uniprot = T)) %>%
             mutate(desc=str_replace_all(tolower(desc),' ','_'))
-
 
 kegg_pathways = sc_pathways %>% mutate(pathway_val=T) %>%
                 pivot_wider(id_cols=id,names_from = 'desc',names_prefix = 'KEGG.path_',
@@ -396,33 +406,33 @@ sc_orthologs = unique(sc_r4s$id)
 dim(SC_CODING)
 colnames(SC_CODING)
 dim(SC_COUNT)
-dim(sc_dubreuil)
+dim(sc_CU)
+dim(sc_d2p2)
 dim(SC_PFAM)
 dim(SC_SUPFAM)
-dim(sc_CU)
 dim(sc_pepstats)
-dim(sc_d2p2)
+dim(sc_dubreuil)
 dim(SC_UNIGO)
-dim(SC_UNILOC)
 dim(sc_string_centralities)
-dim(SC_KEGG)
+dim(SC_UNILOC)
 dim(SC_FOLD)
+dim(SC_KEGG)
 dim(SC_COMPLEX)
 
-SC_DATA = left_join(SC_CODING,SC_COUNT,by=c('uniprot')) %>%
-  left_join(sc_dubreuil,by=c('uniprot'='UNIPROT')) %>%
+SC_DATA = left_join(SC_CODING,SC_COUNT,by=c('ORF')) %>%
+  left_join(sc_CU,by=c('ORF'='ID')) %>%
+  left_join(sc_d2p2,by=c('uniprot')) %>%
   left_join(SC_PFAM,by=c('uniprot'='AC')) %>%
   left_join(SC_SUPFAM,by=c('ensp'='ensp')) %>%
-  left_join(sc_CU,by=c('uniprot'='ID')) %>%
   left_join(sc_pepstats,by=c('uniprot'='UNIPROT','UP.prot_len')) %>%
-  left_join(sc_d2p2,by=c('uniprot')) %>%
+  left_join(sc_dubreuil,by=c('uniprot'='UNIPROT')) %>%
   left_join(SC_UNIGO,by=c('uniprot'='UNIPROT')) %>%
+  left_join(sc_string_centralities,by=c('ORF'='ids')) %>%
   left_join(SC_UNILOC,by=c('uniprot'='id')) %>%
-  left_join(sc_string_centralities,by=c('ensp'='ids')) %>%
-  left_join(SC_KEGG,by=c('uniprot'='id')) %>%
   left_join(SC_FOLD,by=c('uniprot'='UNIPROT')) %>%
+  left_join(SC_KEGG,by=c('uniprot'='id')) %>%
   left_join(SC_COMPLEX,by=c('uniprot')) %>%
-  left_join(sc_r4s,by=c('uniprot'='id')) %>%
+  left_join(sc_r4s,by=c('ORF'='id')) %>%
   ungroup %>%
   distinct() #%>%
   #relocate(uniprot,UP.is_uniref,ensg,ensp,gname, GENENAME, gene_biotype)
@@ -460,7 +470,7 @@ miss2 = check_missing_var(SC_FEATURES.2)
 
 #### 3. Fix network centrality (lower confidence + random forest) ####
 # Take a long time (@! ~50mn for human !@)
-SC_FEATURES.3 = fix_missing_centrality(df=SC_FEATURES.2, id='ensp', col_prefix="STRING.", taxon=4932)
+SC_FEATURES.3 = fix_missing_centrality(df=SC_FEATURES.2, id='ORF', col_prefix="STRING.", taxon=4932)
 SC_FEATURES.3 = SC_FEATURES.3 %>% mutate(across(starts_with("STRING.cent_"), .fns = min_))
 
 miss3 = check_missing_var(SC_FEATURES.3)
@@ -473,7 +483,7 @@ SC_FEATURES.4 = SC_FEATURES.3 %>%
 miss4 = check_missing_var(SC_FEATURES.4)
 
 #### 5. Fix PEPSTATS missing values (i.e not included in Dubreuil et al. 2019) ####
-SC_FEATURES.5 = fix_missing_peptide_stats(df=SC_FEATURES.4, id='uniprot', taxon=4932,
+SC_FEATURES.5 = fix_missing_peptide_stats(df=SC_FEATURES.4, id='ORF', taxon=4932,
                                          col_len='UP.prot_len',
                                          col_mw='PEPSTATS.mw',
                                          col_mw_avg='PEPSTATS.mean_MW',
@@ -528,12 +538,15 @@ miss6 = check_missing_var(SC_FEATURES.6)
 #save.image(here('output','checkpoint-6-hs-data.rdata'))
 #load(here::here('output','checkpoint-6-hs-data.rdata'))
 #### 7. Fix missing amino acid propensities ####
-uni_na_aascore = SC_FEATURES.6 %>%
+
+### 18.09.2022 ==> CURRENT CHECKPOINT (I STOPPED HERE WHEN TESTING THE SCRIPT)
+
+id_na_aascore = SC_FEATURES.6 %>%
                     dplyr::select(AC,starts_with('dubreuil2019')) %>%
                     dplyr::filter(row_number() %in% find_na_rows(.,as.indices = T)) %>%
                     pull(AC) %>% unique
-seq_aa_score = sc_prot[uni_na_aascore]
-na_aascore = retrieve_missing_aascore(uni_na_aascore,seq_aa_score)
+seq_aa_score = s288c_prot[id_na_aascore]
+na_aascore = retrieve_missing_aascore(id_na_aascore,seq_aa_score)
 df_na_aascore = na_aascore %>%
                 dplyr::rename_with(.cols=-acc, .fn=str_replace_all, 'pawar_', 'pawar_ph7_' ) %>%
                 dplyr::select(-contains(c('voronoi'))) %>%
