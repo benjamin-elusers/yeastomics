@@ -1,3 +1,4 @@
+4932-string-low_stringency_centrality.rds
 uniprot-*.rds
 fungi-evodata.rds
 yeast_strains-evodata.rds
@@ -16,4 +17,4 @@ ncbi/*
 intact/*
 dnaprodb/*
 bindingdb/*
-4932-string-low_stringency_centrality.rds
+cavityspace/*
