@@ -1005,3 +1005,36 @@ So far:
 **`r TOTAL_PROPERTIES`** proteome properties were retrieved. Here are the breakdown of properties by categories:
 
 `r knitr::kable(PROPERTIES_BY_CATEGORIES)`
+
+# Session Info {.tabset}
+
+## Appendix: All code for this report
+
+```{r get-labels, echo = FALSE}
+labs = setdiff( knitr::all_labels(), c("biblio","get-labels","platform","loaded-packages","all-packages"))
+```
+
+```{r all-code, ref.label=labs, eval=FALSE,class.source = 'fold-hide'}
+```
+
+## Platform info 
+```{r platform, out.width='100%',}
+df_platform = devtools::session_info()$platform %>% 
+  unlist(.) %>% 
+  as.data.frame(.) %>% 
+  rownames_to_column(.)
+
+kable(
+  df_platform,
+  booktabs = T, 
+  align = "l",
+  caption = "(Reproducibility - platform info)", # complete caption for main document
+  caption.short = " " # 
+)
+
+```
+
+## Session info 
+```{r session-info}
+sessioninfo::session_info()
+```
