@@ -5,3 +5,5 @@ checkpoint_test-leisr-r4s.rdata
 test-leisr-r4s.r
 proteome_aligned_s288c_vs_1011strains.rds
 IDR-features-data.rdata
+ATAR-IDR-FEATURES.tsv
+HUMAN_MOBIDB_FEATURES.tsv
