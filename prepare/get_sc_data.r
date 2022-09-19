@@ -66,13 +66,13 @@ sc_ref = UNIPROT %>%
            ensg = ORF,
            uniprot=AC,
            is_uniref = AC %in% sc_uniref,
-           has_orf = ORF %in% sc_orfref,
-           has_ensg = ensg %in% sc_sgd$name,
-           has_ensp = ensp %in% sc_uni2ensembl$ensp,
+           has_orf = ORF %in% names(s288c_prot),
+           has_ensg = !is.na(ensg) | ensg == "",
+           has_ensp = ensp %in% sc_uni_mapped$ensp,
            has_cdna = !is.na(id_cdna),
            ) %>%
         left_join(sc_len, by='uniprot') %>%
-        left_join(tibble(uniprot=names(sc_cdna),UP.GC_cdna = sc_cdna_gc ),by='uniprot')
+        left_join(tibble(ORF=names(s288c_cdna),UP.GC_cdna = sc_cdna_gc ),by='ORF')
 
 sc_biomart = get_ensembl_dataset('fungi_mart','cerevisiae')
 # Genomics (%GC, and chromosome number) ----------------------------------------
@@ -146,16 +146,16 @@ SC_COUNT = left_join(sc_aa,sc_aa_class) %>% left_join(sc_codon,by=c('id'='orf'))
             dplyr::rename(ORF=id) %>% relocate(ORF)
 
 # Conservation -----------------------------------------------------------------
-# sc_evo = load.evorate(alndir = "/media/WEXAC_data/FUNGI/fasta/",
-#              resdir="/media/WEXAC_data/FUNGI/",
-#              ref='Saccharomyces_cerevisiae',ext.r4s = 'raw.r4s')
+ # sc_evo = load.evorate(alndir = "/media/WEXAC_data/FUNGI/fasta/",
+ #              resdir="/media/WEXAC_data/FUNGI/",
+ #              ref='Saccharomyces_cerevisiae',ext.r4s = 'raw.r4s')
 sc_r4s = read_rds(here::here('data','evorate-fungi-orthologs.rds')) %>%
          group_by(id) %>% #= #read_rds(here("data","RESIDUE-EVORATE.rds")) %>% group_by(id) %>%
          summarize(lmsa=max(msa_pos), lref=max(ref_pos),
                    pid=mean(matched==total-1), qid=mean(mismatched>0), pgap=mean(indel>0),
                    nsp = mean(total),
                    rate = mean_(r4s_rate)) %>%
-                   #rate_norm = abs(2*min_(r4s_rate)) + mean_(r4s_rate)) %>%
+                   #rate_norm = abs(2*min_(r4s_rate)) + mean_(r4s_rate)) %>% # Only to use if the rates have negative values
              dplyr::filter(!is.na(rate)) %>%
              dplyr::rename_with(-id, .fn = Pxx, 'r4s_fungi')
 #plot(density(x = sc_r4s$r4s_fungi.rate))
@@ -185,25 +185,24 @@ full_score <- pbmcapply::pbmclapply(
   X=iseq,  FUN = function(x){ get_aa_score(string = as.character(sc_prot[[x]]) ) },
   mc.cores = 14,mc.cleanup = T)
 
-sc_fullscore = tibble(uniprot=sc_uniref, length=widths(sc_prot)) %>%
+sc_fullscore = tibble(id=names(sc_prot), length=widths(sc_prot)) %>%
                 bind_cols(bind_rows(full_score)) %>%
-                group_by(uniprot,length) %>%
+                left_join(sc_uni2ens,by=c('id'='AC')) %>% # adding all known matched ORF/uniprot (even outside of reference proteome)
+                group_by(id,ensp,length) %>%
                 summarize( across(aggrescan:wimleywhite, ~ sum(.x)/length ) ) %>%
                 distinct() %>%
-                dplyr::rename_with(.cols = -c(uniprot,length), .fn = xxS, 'full',s='_' )
+                dplyr::rename_with(.cols = -c(id,ensp,length), .fn = xxS, 'full',s='_' )
 
-
-sc_dubreuil = load.dubreuil2019.data(4) %>%
-         dplyr::select('UNIPROT',
-                      contains('IUP'),
-                      ends_with(c('dom','iup40')),
-                      c('standard','medium','high','small','average','large','isMB'),
-                      ) %>%
-         dplyr::rename(set_names(names(IUP_cols),IUP_cols),
+sc_diso = load.dubreuil2019.data(4) %>%
+          dplyr::select('UNIPROT','STRING', contains('IUP'), ends_with(c('dom','iup20','iup40')),
+                        c('standard','medium','high','small','average','large','isMB'),
+          ) %>%
+          dplyr::rename(set_names(names(IUP_cols),IUP_cols),
                         set_names(names(subset_cols),subset_cols)) %>%
-         dplyr::rename_with(.cols= ends_with(c('.dom','.iup40')), .fn = str_replace_all, "\\.", "_" ) %>%
-         right_join(sc_fullscore,by=c('UNIPROT'='uniprot')) %>%
-         dplyr::rename_with(.cols=-UNIPROT, .fn = Pxx, 'dubreuil2019', s='.')
+          dplyr::rename_with(.cols= ends_with(c('.dom','.iup20','.iup40')), .fn = str_replace_all, "\\.", "_" )
+
+sc_dubreuil = left_join(sc_diso,sc_fullscore, by=c('UNIPROT'='id','STRING'='ensp')) %>%
+              dplyr::rename_with(.cols=-c('UNIPROT','STRING'), .fn = Pxx, 'dubreuil2019', s='.')
 
 # Domains ----------------------------------------------------------------------
 sc_pfam=load.pfam(tax = TAXID) %>%
@@ -408,10 +407,10 @@ colnames(SC_CODING)
 dim(SC_COUNT)
 dim(sc_CU)
 dim(sc_d2p2)
+dim(sc_dubreuil)
 dim(SC_PFAM)
 dim(SC_SUPFAM)
 dim(sc_pepstats)
-dim(sc_dubreuil)
 dim(SC_UNIGO)
 dim(sc_string_centralities)
 dim(SC_UNILOC)
@@ -422,10 +421,10 @@ dim(SC_COMPLEX)
 SC_DATA = left_join(SC_CODING,SC_COUNT,by=c('ORF')) %>%
   left_join(sc_CU,by=c('ORF'='ID')) %>%
   left_join(sc_d2p2,by=c('uniprot')) %>%
+  left_join(sc_dubreuil,by=c('uniprot'='UNIPROT')) %>%
   left_join(SC_PFAM,by=c('uniprot'='AC')) %>%
   left_join(SC_SUPFAM,by=c('ensp'='ensp')) %>%
   left_join(sc_pepstats,by=c('uniprot'='UNIPROT','UP.prot_len')) %>%
-  left_join(sc_dubreuil,by=c('uniprot'='UNIPROT')) %>%
   left_join(SC_UNIGO,by=c('uniprot'='UNIPROT')) %>%
   left_join(sc_string_centralities,by=c('ORF'='ids')) %>%
   left_join(SC_UNILOC,by=c('uniprot'='id')) %>%
@@ -439,6 +438,7 @@ SC_DATA = left_join(SC_CODING,SC_COUNT,by=c('ORF')) %>%
 
 # Replace missing values  ------------------------------------------------------
 miss0 = check_missing_var(SC_DATA)
+
 
 #### 1. Fix logical variables (NA replaced by FALSE) ####
 SC_FEATURES.1 = SC_DATA %>%
@@ -460,6 +460,7 @@ SC_FEATURES.1 = SC_DATA %>%
   mutate( across( where(is.logical) & starts_with('string.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('UP.'), ~replace_na(., F)) ) %>%
   mutate( across( where(is.logical) & starts_with('HGNC.'), ~replace_na(., F)) ) %>%
+  mutate( across( where(is.logical) & starts_with('SGD.chr'), ~replace_na(., F)) ) %>%
   distinct()
 
 miss1 = check_missing_var(SC_FEATURES.1)
@@ -538,14 +539,11 @@ miss6 = check_missing_var(SC_FEATURES.6)
 #save.image(here('output','checkpoint-6-hs-data.rdata'))
 #load(here::here('output','checkpoint-6-hs-data.rdata'))
 #### 7. Fix missing amino acid propensities ####
-
-### 18.09.2022 ==> CURRENT CHECKPOINT (I STOPPED HERE WHEN TESTING THE SCRIPT)
-
 id_na_aascore = SC_FEATURES.6 %>%
                     dplyr::select(AC,starts_with('dubreuil2019')) %>%
                     dplyr::filter(row_number() %in% find_na_rows(.,as.indices = T)) %>%
-                    pull(AC) %>% unique
-seq_aa_score = s288c_prot[id_na_aascore]
+                    pull(AC) %>% unique  %>% intersect(names(sc_prot))
+seq_aa_score = sc_prot[id_na_aascore]
 na_aascore = retrieve_missing_aascore(id_na_aascore,seq_aa_score)
 df_na_aascore = na_aascore %>%
                 dplyr::rename_with(.cols=-acc, .fn=str_replace_all, 'pawar_', 'pawar_ph7_' ) %>%
@@ -592,6 +590,7 @@ miss7 = check_missing_var(SC_FEATURES.7)
 #cdna_na = HS_FEATURES.7 %>% dplyr::select( all_of(miss7$variable) )
 #missing_cdna = HS_FEATURES.7 %>% filter( is.na(UP_cdna.AAA_Lys_K) ) %>% pull(uniprot)
 #get.uniprot.proteome(9606,DNA=T)
+### 18.09.2022 ==> CURRENT CHECKPOINT (I STOPPED HERE WHEN TESTING THE SCRIPT)
 
 SC_FEATURES.8 = SC_FEATURES.7 %>%
                 mutate( ENS.cds_len = coalesce( ENS.cds_len, UP.cdna_len),
@@ -602,7 +601,7 @@ miss8 = check_missing_var(SC_FEATURES.8 %>% ungroup)
 
 SC_PROTEOME_DATA = SC_FEATURES.8 %>%
                      # Get out the rows with NA
-                     drop_na(starts_with(c('UP_cdna.','elek2022.','D2P2.','ENS.','dubreuil2019.'))) %>%
+                     drop_na(starts_with(c('UP_cdna.','elek2022.','ENS.','dubreuil2019.'))) %>%
                      dplyr::select(-GENENAME) %>%
                      # RENAME VARIABLES NON-ALPHANUMERIC CHARACTERS (NOT VALID FOR FORMULA)
                      dplyr::rename_with(.cols = everything(), .fn = str_replace_all, pattern="[^A-Za-z0-9\\.]+", replacement="_")
@@ -612,8 +611,8 @@ dim(SC_PROTEOME_DATA)
 
 saveRDS(SC_PROTEOME_DATA,here::here('released-dataset','yeastOmics-v1.rds'))
 
-# Retrieve human abundance -----------------------------------------------------
-# hs_ppm_uni = readRDS(here::here("data","paxdb_integrated_human.rds"))
+# Retrieve yeast abundance -----------------------------------------------------
+
 sc_uni = sc_map_uni %>% filter(extdb=='UniProtKB-ID') %>% dplyr::select(uni,extid)
 sc_paxdb_datasets = find_paxdb_datasets(4932)
 
@@ -623,7 +622,7 @@ sc_ppm = load.paxdb(4932,rm.zero=T) %>%
                        values_from=ppm, values_fn = mean_) %>%
             left_join(sc_uni, by=c('id_uniprot'='extid')) %>%
             left_join(sc_r4s,by=c('uni'='id')) %>%
-            mutate(log10.rate = log10(r4s_mammals.rate_norm))
+            mutate(log10.rate = log10(r4s_fungi.rate))
 
 # integrated paxdb datasets
 sc_paxdb = get.paxdb(tax=4932,abundance = 'integrated',rm.zero=T)
@@ -644,20 +643,24 @@ save(list = ls(pattern = '^sc_'), file = here('output','sc_datasets.rdata'))
 save(list = ls(pattern = '^SC_'), file = here('output','sc_integrated_datasets.rdata'))
 
 # Orthologs dataset (with/out abundance) ---------------------------------------
-# Full proteome N=20722 - after removing NA = 19417
+# Full proteome N=6549 - after removing NA = 5729
+n_distinct(SC_DATA$ORF)
+n_distinct(SC_PROTEOME_DATA$ORF)
+
 SC_ORTHOLOGS = SC_PROTEOME_DATA %>%
-                filter(!is.na(r4s_mammals.rate) & uniprot %in% sc_r4s$id) %>%
+                filter(!is.na(r4s_fungi.rate) & ORF %in% sc_r4s$id) %>%
                 filter(!is.na(uniprot) & !is.dup(uniprot)) %>%
+                filter(!is.na(ORF) & !is.dup(ORF)) %>%
                 # Remove rare variables among orthlogs (min 3 orthologs must share the feature)
                 remove_rare_vars(df=.,min_obs=3) %>%
                 distinct()
 
 dim(SC_ORTHOLOGS)
-# All orthologs N = 12977
+# All orthologs N = 3726
 
 # Define two predictions datasets with/out abundance (training/validation)
-sc_validation = SC_ORTHOLOGS %>% filter( !(uniprot %in% SC_PPM$uni) )
-sc_orthologs =  SC_ORTHOLOGS %>% filter(uniprot %in% SC_PPM$uni)
+sc_validation = SC_ORTHOLOGS %>% filter( !(ORF %in% SC_PPM$protid) )
+sc_orthologs =  SC_ORTHOLOGS %>% filter(ORF %in% SC_PPM$protid)
 dim(sc_validation) # n=263
 dim(sc_orthologs) # n=12714
 
