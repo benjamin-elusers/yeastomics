@@ -1643,6 +1643,47 @@ find.common.ancestor= function(lineage){
   return(MRCA)
 }
 
+##### ELM #####
+get_elm = function(){
+  library(readr)
+  URL_ELM = "http://elm.eu.org/"
+
+  url_instances = sprintf("%s/instances.tsv?q=*&taxon=&instance_logic=",URL_ELM) # MOTIF OCCURRENCES
+  url_classes = sprintf("%s/elms/elms_index.tsv",URL_ELM) # MOTIF REGEX
+  url_interactions = sprintf("%s/interactions/as_tsv",URL_ELM) # MOTIF INTERACTIONS
+
+  instances = read_delim(url_instances,delim = "\t",comment = "#")
+  classes = read_delim(url_classes,delim = "\t",comment = "#")
+  interactions = read_delim(url_interactions,delim = "\t",comment = "#") %>%
+                   dplyr::select(-last_col()) # For some reason the last column is empty
+
+  ELM = left_join(instances,classes, by=c('ELMIdentifier'),suffix=c('_instances','_classes')) %>%
+        left_join(interactions, by=c("ELMIdentifier" = "Elm","Primary_Acc"="interactorElm")) %>%
+        rename(n_instances = "#Instances",n_pdb_instances="#Instances_in_PDB",
+               org=Organism, elm_classes = Accession_classes, elm_instances = Accession_instances,
+               elm_desc = Description, elm_type=ELMType, elm_id=ELMIdentifier,
+               func_name =FunctionalSiteName, elm_pname = ProteinName, elm_proteins=Accessions,
+               elm_regex = Regex, elm_prob = Probability, elm_start = StartElm, elm_stop = StopElm,
+               elm_Kd_max =AffinityMax, elm_Kd_min =AffinityMin, domain = Domain,
+               domain_start = StartDomain, domain_stop = StopDomain, domain_int=interactorDomain
+               ) %>%
+        mutate(PMID = as.character(PMID)) %>%
+        separate(col=taxonomyDomain, into=c("domain_taxid",'domain_species'), sep="\\(") %>%
+        separate(col=taxonomyElm, into=c("elm_taxid",'elm_species'), sep="\\(") %>%
+        relocate(org, elm_classes,
+                 func_name, elm_type, elm_id, elm_desc,
+                 elm_regex, elm_prob, n_instances, Primary_Acc, elm_pname, elm_proteins,
+                 Start, End, elm_instances,  elm_start, elm_stop, elm_Kd_max, elm_Kd_min, elm_taxid, elm_species,
+                 domain, domain_int, domain_start, domain_stop, domain_taxid, domain_species
+                 ) %>%
+        dplyr::select(-Methods,-PDB,-PMID,n_pdb_instances,References) %>%
+        mutate( elm_species = str_remove(elm_species,"\\)$"),
+                domain_species = str_remove(domain_species,"\\)$"))
+
+
+  return(ELM)
+}
+
 # Reference sequences ----------------------------------------------------------
 ##### SGD #####
 load.sgd.CDS = function(withORF=T,orf.dna="sequence/S288C_reference/orf_dna") {
@@ -2009,9 +2050,9 @@ find_ensembl_sptree = function(treename="", URL_SPTREE="http://ftp.ensembl.org/p
   httr::set_config(httr::config(ssl_cipher_list = "DEFAULT@SECLEVEL=1"))
 
   sptrees = rvest::read_html(URL_SPTREE) %>%
-    rvest::html_nodes("a") %>%
+    rvest::html_elements("a") %>%
     rvest::html_text(trim = T) %>%
-    str_subset(pattern = "/$",negate = T)
+    str_subset(pattern = "\\.nh$")
 
   file_sptrees = basename(sptrees)
   if( is.null(treename) ){ treename = "" }
@@ -2412,8 +2453,9 @@ get_ens_filter_ortho = function(BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMB
   return(filter_ortho)
 }
 
-query_ens_ortho <- function(species='hsapiens',sp_ortho,COUNTER=1,
+query_ens_ortho <- function(sp_ortho,COUNTER=1,
                             BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human'),
+                            species='hsapiens',
                             dataset_suffix="gene_ensembl") {
   tictoc::tic('query Ensembl orthologs')
   ortholog = sprintf('with_%s_homolog',sp_ortho)
