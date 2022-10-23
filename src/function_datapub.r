@@ -1643,46 +1643,62 @@ find.common.ancestor= function(lineage){
   return(MRCA)
 }
 
-##### ELM #####
-get_elm = function(){
+##### ELM (Eukaryotic Linear Motifs) #####
+
+get_elm_motifs = function(){
   library(readr)
   URL_ELM = "http://elm.eu.org/"
+  url_motifs = sprintf("%s/elms/elms_index.tsv",URL_ELM) # MOTIF REGEX
+  elm_motifs = read_delim(url_motifs,delim = "\t",comment = "#")
+  elm_cols = c('elm_acc','elm_id','elm_name','elm_desc','elm_regex','elm_prob','n_instances','n_pdb_instances')
 
+  motifs = elm_motifs %>% dplyr::rename( set_names( names(elm_motifs), elm_cols ) )
+  return(motifs)
+}
+
+get_elm_instances = function(){
+  library(readr)
+  URL_ELM = "http://elm.eu.org/"
   url_instances = sprintf("%s/instances.tsv?q=*&taxon=&instance_logic=",URL_ELM) # MOTIF OCCURRENCES
-  url_classes = sprintf("%s/elms/elms_index.tsv",URL_ELM) # MOTIF REGEX
+  elm_instances = read_delim(url_instances,delim = "\t",comment = "#")
+  elm_cols = c('elmi_acc','elm_func','elm_id','uni_name','uni','uni_acc','elm_start','elm_end','references','method','elm_conf','pdb','org')
+
+  instances = elm_instances %>%
+              dplyr::rename( set_names( names(elm_instances), elm_cols ) ) %>%
+              mutate(org=str_wrap(org,20)) %>%
+              relocate('org','uni','uni_name','uni_acc',
+                       'elmi_acc','elm_id','elm_func','elm_start','elm_end')
+  return(instances)
+}
+
+get_elm_interactions = function(){
+  library(readr)
+  URL_ELM = "http://elm.eu.org/"
   url_interactions = sprintf("%s/interactions/as_tsv",URL_ELM) # MOTIF INTERACTIONS
+  elm_interactions = read_delim(url_interactions, col_types='cccciiiinnccc_', delim = "\t") # fix column format and skip the last column (14th column)
+  elm_cols = c("elm_id","domain_id","elm_interactor","domain_interactor",'elm_start','elm_end',
+               'domain_start','domain_end',"Kd_min","Kd_max","PMID","elm_tax",'domain_tax')
 
-  instances = read_delim(url_instances,delim = "\t",comment = "#")
-  classes = read_delim(url_classes,delim = "\t",comment = "#")
-  interactions = read_delim(url_interactions,delim = "\t",comment = "#") %>%
-                   dplyr::select(-last_col()) # For some reason the last column is empty
+  interactions = elm_interactions %>%
+                 dplyr::rename( set_names( names(elm_interactions), elm_cols ) ) %>%
+                 relocate(Kd_min,Kd_max,
+                          elm_tax,elm_id,elm_interactor,elm_start,elm_end,
+                          domain_tax,domain_id,domain_interactor,domain_start,domain_end) %>%
+                 separate(col=domain_tax, into=c("domain_taxid",'domain_species',NA), sep="[\\(\\)]") %>%
+                 separate(col=elm_tax, into=c("elm_taxid",'elm_species',NA), sep="[\\(\\)]")
 
-  ELM = left_join(instances,classes, by=c('ELMIdentifier'),suffix=c('_instances','_classes')) %>%
-        left_join(interactions, by=c("ELMIdentifier" = "Elm","Primary_Acc"="interactorElm")) %>%
-        rename(n_instances = "#Instances",n_pdb_instances="#Instances_in_PDB",
-               org=Organism, elm_classes = Accession_classes, elm_instances = Accession_instances,
-               elm_desc = Description, elm_type=ELMType, elm_id=ELMIdentifier,
-               func_name =FunctionalSiteName, elm_pname = ProteinName, elm_proteins=Accessions,
-               elm_regex = Regex, elm_prob = Probability, elm_start = StartElm, elm_stop = StopElm,
-               elm_Kd_max =AffinityMax, elm_Kd_min =AffinityMin, domain = Domain,
-               domain_start = StartDomain, domain_stop = StopDomain, domain_int=interactorDomain
-               ) %>%
-        mutate(PMID = as.character(PMID)) %>%
-        separate(col=taxonomyDomain, into=c("domain_taxid",'domain_species'), sep="\\(") %>%
-        separate(col=taxonomyElm, into=c("elm_taxid",'elm_species'), sep="\\(") %>%
-        relocate(org, elm_classes,
-                 func_name, elm_type, elm_id, elm_desc,
-                 elm_regex, elm_prob, n_instances, Primary_Acc, elm_pname, elm_proteins,
-                 Start, End, elm_instances,  elm_start, elm_stop, elm_Kd_max, elm_Kd_min, elm_taxid, elm_species,
-                 domain, domain_int, domain_start, domain_stop, domain_taxid, domain_species
-                 ) %>%
-        dplyr::select(-Methods,-PDB,-PMID,n_pdb_instances,References) %>%
-        mutate( elm_species = str_remove(elm_species,"\\)$"),
-                domain_species = str_remove(domain_species,"\\)$"))
+  return(interactions)
+}
 
+get_elm = function(){
+
+  ELM = left_join(get_elm_instances(),get_elm_motifs(),by=c('elm_id')) %>%
+        left_join(interactions, by=c("elm_id","uni"="elm_interactor",'elm_start','elm_end')) %>%
+        dplyr::select(-method,-pdb,-PMID,-n_pdb_instances,-references)
 
   return(ELM)
 }
+
 
 # Reference sequences ----------------------------------------------------------
 ##### SGD #####
