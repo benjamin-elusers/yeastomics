@@ -243,6 +243,18 @@ file_ext <- function (fn) {
 
 catn = function(x, ...){ cat(x,"\n",...) }
 
+# Convert to opposite case (uppercase to lowercase and vice versa)
+toggle_case = function(s){
+  library(magrittr)
+  AZ=concat(LETTERS)
+  az=concat(letters)
+  svec = str2chr(s)
+  S = sapply(svec,function(chr){
+        ifelse( grepl("[[:upper:]]",chr), chartr(AZ,az,chr), chartr(az,AZ,chr) )
+      })
+  return(concat(S))
+}
+
 # Format values ----------------------------------------------------------------
 
 RoundUpToNearest <- function(nb, roundto=1){ # Round up numbers to unit or decimal specified
