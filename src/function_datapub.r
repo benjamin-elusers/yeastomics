@@ -1149,6 +1149,22 @@ load.mobidb = function(taxon){
   return(mobidb)
 }
 
+merge_mobidb = function(mobidb, gap_min=1L){
+  library(GenomicRanges)
+  if(missing(mobidb)){ stop("requires mobidb data...") }
+
+  merged = mobidb %>%
+    dplyr::select(seqnames=acc,start=S,end=E) %>%
+    as("GRanges") %>%
+    reduce(min.gapwidth=gap_min,) %>% # maximum gap for merging two intervals
+    as_tibble() %>%
+    dplyr::rename(acc=seqnames,S=start,E=end,feature_len=width) %>%
+    mutate(acc=as.character(acc)) %>%
+    dplyr::select(-strand) %>%
+    arrange(acc)
+  return(merged)
+}
+
 ##### paxDB #####
 find_paxdb_downloads = function(){
   URL_PAXDB = "https://pax-db.org/downloads/latest/"
@@ -1652,7 +1668,8 @@ get_elm_motifs = function(){
   elm_motifs = read_delim(url_motifs,delim = "\t",comment = "#")
   elm_cols = c('elm_acc','elm_id','elm_name','elm_desc','elm_regex','elm_prob','n_instances','n_pdb_instances')
 
-  motifs = elm_motifs %>% dplyr::rename( set_names( names(elm_motifs), elm_cols ) )
+  motifs = elm_motifs %>% dplyr::rename( set_names( names(elm_motifs), elm_cols ) ) %>%
+           mutate(elm_func=str_split_fixed(elm_id,pattern = '_',n = 2)[,1])
   return(motifs)
 }
 
