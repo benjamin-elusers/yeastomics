@@ -41,6 +41,20 @@ load.genome = function(url) {
   return(g)
 }
 
+maskseq_ =function(BS=AAString("abcdefghijkl"), S=3, E=6){
+  # Switch case at specific position of the Biostrings sequence
+  tomask = subseq(x=BS, start=S,end=E) %>% toggle_case() %>% Biostrings::AAString()
+  subseq(x=BS, start=S,end=E) <- tomask
+  return(BS)
+}
+
+maskseq =function(BS=AAString("abcdefghijkl"), S=c(3,8), E=c(6,12)){
+  # Recursive version of maskseq
+  if(length(S)==0 && length(E)==0){ return(BS) }
+  BS = maskseq_(BS,S[1],E[1])
+  return( maskseq(BS,tail(S,-1),tail(E,-1)) )
+}
+
 stripR = function(BS,n=1){
   has_stop = Biostrings::subseq(BS,start=-1) != '*'
   if(all(has_stop)){

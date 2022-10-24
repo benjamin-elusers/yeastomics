@@ -245,13 +245,19 @@ catn = function(x, ...){ cat(x,"\n",...) }
 
 # Convert to opposite case (uppercase to lowercase and vice versa)
 toggle_case = function(s){
-  library(magrittr)
   AZ=concat(LETTERS)
   az=concat(letters)
-  svec = str2chr(s)
-  S = sapply(svec,function(chr){
+  svec = str2chr(as.character(s))
+  if( all(grepl("[[:upper:]]",svec)) ){
+    S = tolower(s) # Faster if all characters are uppercase
+  }else if( all(grepl("[[:lower:]]",svec)) ){
+    S = toupper(s)  # Faster if all characters are lowercase
+  }else{
+    # If characters used mixed casefold
+    S = sapply(svec,function(chr){
         ifelse( grepl("[[:upper:]]",chr), chartr(AZ,az,chr), chartr(az,AZ,chr) )
-      })
+    })
+  }
   return(concat(S))
 }
 
