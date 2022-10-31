@@ -1144,7 +1144,7 @@ load.mobidb = function(taxon){
     separate(col=feature, sep='-',into=c('evidence','feature','source')) %>%
     separate_rows('start..end',sep=',') %>%
     separate('start..end',into = c('S','E'),convert = T) %>%
-    mutate( feature_len = E-S+1 )
+    mutate( feature_len = E-S+1, ncbi_taxid = taxon )
   toc()
   return(mobidb)
 }
