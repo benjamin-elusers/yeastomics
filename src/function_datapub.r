@@ -1157,7 +1157,7 @@ merge_mobidb = function(mobidb, gap_min=1L){
   merged = mobidb %>%
     dplyr::select(seqnames=acc,start=S,end=E) %>%
     as("GRanges") %>%
-    reduce(min.gapwidth=gap_min,) %>% # maximum gap for merging two intervals
+    reduce(min.gapwidth=gap_min) %>% # maximum gap for merging two intervals
     as_tibble() %>%
     dplyr::rename(acc=seqnames,S=start,E=end,feature_len=width) %>%
     mutate(acc=as.character(acc)) %>%
