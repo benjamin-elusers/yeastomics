@@ -2102,7 +2102,7 @@ find_ensembl_sptree = function(treename="", URL_SPTREE="http://ftp.ensembl.org/p
 
 get_ensembl_sptree = function(treename=NULL,URL_SPTREE="http://ftp.ensembl.org/pub/current_compara/species_trees/"){
 
-  url_tree = find_ensembl_sptree(treename,URL_SPTREE)
+  url_tree = find_ensembl_sptree(treename,URL_SPTREE) %>% utils::URLencode()
   treefile = basename(url_tree) %>% fs::path_ext_set('.nh')
   yeastomics_tree = here::here('data','ensembl',treefile)
 
