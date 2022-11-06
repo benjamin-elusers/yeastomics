@@ -2253,7 +2253,7 @@ get_ensembl_dataset = function(mart,organism){
   if(length(has_organism) == 0L){
     .error$log(paste0(organism," dataset: not found in the selected mart!"))
     return(NA)
-  }else if(length(has_organism) >= 1L){
+  }else if(length(has_organism) > 1L){
     .warn$log(paste0("More than one organism matched :",BM_org$description[has_organism]))
     has_organism=has_organism[1]
     .warn$log(paste0("using the first one :",BM_org$description[has_organism]))
