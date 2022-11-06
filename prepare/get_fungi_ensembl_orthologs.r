@@ -3,7 +3,6 @@ source(here::here("src","__setup_yeastomics__.r"))
 library(tidyverse)
 library(here)
 ENS_MIRROR='uswest'
-path_ortho = here::here('output','ens_sc_ortho')
 
 #### FUNCTION ####
 count_ens_id = function(x,toprint=T){
@@ -20,13 +19,16 @@ count_ens_id = function(x,toprint=T){
   message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | orthologs = %6s',nr,ng,nt,np,no))
 }
 
-get_sp = function(full_name){
-  spname = str_split_fixed(full_name,"_",n=3)
-  first = str_sub(spname[,1],start = 1,end=1) %>% str_to_lower()
-  second = spname[,2] %>% str_to_lower()
-  return(paste0(first,second))
-}
+get_sp = function(full_name, sep='_'){
 
+  nsep = str_count(full_name,pattern = sep)
+  spname = str_split(full_name, sep)
+
+  long  = map_chr(spname, ~last(.x) %>% str_to_lower())
+  short = map_chr(spname, ~head(.x,-1) %>% str_sub(start = 1,end=1) %>% str_to_lower() %>% concat())
+
+  return(paste0(short,long))
+}
 match_species_names = function(sp1, sp2, cutoff=0.1){
 
   library(stringdist)
@@ -181,7 +183,7 @@ get_orthologs_clade =function(ens_ortho=df_query, clade_species, clade_name,
   return(hs_closest)
 }
 
-get_mammals_sequence = function(x,ortho=ortho_prefix){
+get_fungi_sequence = function(x,ortho=ortho_prefix){
 
   sp = ortho$ens_dataset[x]
   message(sprintf('%2s %s',x,sp))
@@ -312,48 +314,45 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
   }
 }
 
-ens_sc_orthologs = preload(saved.file = file.path(path_ortho,'ensembl_scerevisiae_filter.rds'),
-                           { get_ens_filter_ortho(host = 'https://fungi.ensembl.org/',
-                                                  mart = 'fungi_mart',
-                                                  dat='scerevisiae_eg_gene') }, # species with yeast orthologs data
-                           'get ensembl homolog filter...')
 
 
 #### WORKFLOW ####
+path_ortho = here::here('output','ens_sc_ortho')
+sc_biomart = get_ensembl_dataset('fungi_mart','cerevisiae')
+#sp_biomart = get_ensembl_dataset('fungi_mart','pombe')
+
+ens_sc_orthologs = preload(saved.file = file.path(path_ortho,'ensembl_scerevisiae_filter.rds'),
+                           { get_ens_filter_ortho(BIOMART = sc_biomart) }, # species with yeast orthologs data
+                           'get ensembl homolog filter...')
+
 # 0. retrieve reference genome/transcriptome/proteome from ensembl -------------
 # Get reference identifiers (Uniprot/ENSP = proteome, ENSG = Genome, ENST=Transcriptome)
 #find.uniprot_refprot(c('cerevisiae','yeast','s288c'))
+orfref = load.sgd.proteome() %>% names
 sc_uniref = get.uniprot.proteome(taxid = '559292',DNA = T,fulldesc = F) %>% names
 ensp_uniref = get.uniprot.mapping(taxid = 559292, targetdb='EnsemblGenome_PRO') %>% pull(extid)
 ensg_uniref = get.uniprot.mapping(taxid = 559292, targetdb='EnsemblGenome') %>% pull(extid)
 
-
 sgd_gene = load.sgd.features() %>%
-           filter(type == 'ORF') %>%
            mutate( gname=ifelse(gname=="",NA,gname),
                    gene = coalesce(gname,name)) %>%
            dplyr::pull(gene)
 
 sc_tx =preload( file.path(path_ortho,'ensembl_scerevisiae_tx.rds'),
-                { get_ensembl_tx(ENSG = ensg_uniref, ENSP = ensp_uniref,
-                                 host = 'https://fungi.ensembl.org/',
-                                 mart = "fungi_mart",
-                                 dataset = 'scerevisiae_eg_gene') %>%
-                    dplyr::rename_with(.cols = ends_with('_len'), .fn = Pxx, 'hs', s='_') },
+                { get_ensembl_tx(ENSG=orfref, ENSP=orfref, BIOMART=sc_biomart) %>%
+                    dplyr::rename_with(.cols = ends_with('_len'), .fn = Pxx, 'sc', s='_') },
                 'get ensembl yeast transcripts...')
 
-sc_ens=biomaRt::useMart(host = 'https://fungi.ensembl.org/',
-                        biomart = "fungi_mart", dataset = 'scerevisiae_eg_gene')
-#get_ens_dataset(host = 'https://fungi.ensembl.org/',mart = "fungi_mart")
 
 # 1. get Ensembl Fungi ---------------------------------------------------
 library(treeio)
 # Ensembl Fungi
-fungi_tree = get_ensembl_sptree(URL_SPTREE = 'http://ftp.ebi.ac.uk/ensemblgenomes/pub/fungi/current/compara/species_trees/')
+fungi_tree = get_ensembl_sptree(treename = '',URL_SPTREE = 'http://ftp.ebi.ac.uk/ensemblgenomes/pub/fungi/current/compara/species_trees/')
+ensembl_fungi = get_ensembl_fungi() %>% mutate( sp = get_sp(species) ) %>% filter(peptide_compara == 'Y')
 
-ensembl_fungi = get_ensembl_fungi()
+SC_ORTHO = inner_join(ens_sc_orthologs,ensembl_fungi,by=c('sp'))
 
-ENS_SPECIES = match_species_names(fungi_tree$tip.label,ens_sc_orthologs$org,0.01) %>%
+ENS_SPECIES = match_species_names(SC_ORTHO$org,fungi_tree$tip.label,0.01) %>%
   left_join(ens_sc_orthologs,by=c('s2'='org')) %>%
   arrange(desc(similarity)) %>%
   filter(similarity > 0.8) %>%
