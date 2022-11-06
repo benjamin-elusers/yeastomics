@@ -2529,7 +2529,7 @@ query_ens_ortho <- function(sp_ortho,COUNTER=1,
     ortho_ensp = att_ortho[3]
     Q$no_ortholog = is.na(Q[[ortho_ensp]]) | (Q[[ortho_ensp]] == "")
 
-    return(Q)
+    return(Q %>% as_tibble())
   },
   error=function(cond) {
     cat(sprintf('Failed to retrieve orthologs for current species: %s!\n',species))
@@ -2574,7 +2574,7 @@ query_ens_txlen <- function(Fi,Va,ORG,COUNTER=1,verbose=T,
     if(!missing(Fi) && !missing(Va)){
       Q=getBM(attributes=att_valid, mart=BIOMART, filters = Fi,  values = Va, uniqueRows = T, bmHeader = F) %>%
         group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
-      return(Q)
+      return(Q %>% as_tibble())
     }else{
       Q=getBM(attributes=att_valid, mart=BIOMART, uniqueRows = T, filters="", values="", bmHeader = F) %>%
         group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
@@ -2590,9 +2590,9 @@ query_ens_txlen <- function(Fi,Va,ORG,COUNTER=1,verbose=T,
           mutate(cds_length = sum_(exon_length)) %>%
           dplyr::select(-contains('exon')) %>% ungroup() %>% distinct() %>%
           dplyr::select(-is_constitutive,-gene_length)
-        return(Qtx)
+        return(Qtx %>% as_tibble())
       }
-      return(Q)
+      return(Q %>% as_tibble())
     }
   },
   error=function(cond) {
