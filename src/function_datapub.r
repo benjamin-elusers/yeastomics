@@ -2143,6 +2143,18 @@ get_ensembl_19mammals = function(){
   return(mammals)
 }
 
+get_ensembl_sp = function(full_name, sep='_'){
+  library(stringr)
+  library(purrr)
+  nsep = str_count(full_name,pattern = sep)
+  spname = str_split(full_name, sep)
+
+  long  = map_chr(spname, ~last(.x) %>% str_to_lower())
+  short = map_chr(spname, ~head(.x,-1) %>% str_sub(start = 1,end=1) %>% str_to_lower() %>% concat())
+
+  return(paste0(short,long))
+}
+
 get_ensembl_vertebrates=function(){
   library(readr)
   library(tidyverse)
@@ -2161,6 +2173,8 @@ get_ensembl_vertebrates=function(){
                             'assembly_version','assembly_accession','genebuild',
                             'variation','microarray','pan_compara','peptide_compara','genome_alignments',
                             'other_alignments', 'cored_db','species_id','n_protein_coding','n_swissprot','n_trembl','coverage')
+
+  vertebrates$sp = get_ensembl_sp(vertebrates$species)
 
   return(vertebrates)
 }
@@ -2184,6 +2198,8 @@ get_ensembl_fungi=function(){
                       'assembly_version','assembly_accession','genebuild',
                       'variation','microarray','pan_compara','peptide_compara','genome_alignments',
                       'other_alignments', 'cored_db','species_id','n_protein_coding','n_swissprot','n_trembl','coverage')
+
+  fungi$sp = get_ensembl_sp(fungi$species)
 
   return(fungi)
 }
