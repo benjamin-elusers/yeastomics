@@ -244,7 +244,7 @@ file_ext <- function (fn) {
 catn = function(x, ...){ cat(x,"\n",...) }
 
 
-match_strings = function(SP1, SP2,cutoff=0.2){
+match_strings = function(SP1, SP2, max_strings=20){
   # Matching strings based on similarity
   library(tidystringdist)
   library(stringdist)
@@ -259,11 +259,16 @@ match_strings = function(SP1, SP2,cutoff=0.2){
   matched_name = paired_name %>%
                  # Keep matched names that are nested (i.e. one string is a substring of the other)
                  rowwise %>% mutate(is_substring = str_contains(s2,s1) - str_contains(s1,s2)) %>%
-                 group_by(s1) %>% filter( if_any(is_substring, ~ . != 0) | all(is_substring==0))
+                 group_by(s1) %>% filter( if_any(is_substring, ~ . != 0) | all(is_substring==0)) %>%
+                 add_count(name='n1') %>% mutate( is_matched = (n1 == 1) )
 
   similarities = tidy_stringdist(df=matched_name,v1=s1,v2=s2) %>%
                  group_by(s1) %>%
-                 filter(soundex == min(soundex) & jw < cutoff)
+                 filter(is_matched | soundex == min(soundex) ) %>%
+                 slice_min(order_by = lcs, n = max_strings) %>%
+                 add_count(name='n1') %>% mutate( is_matched = (n1 == 1) )
+
+    #add_count(name='n1') %>% mutate( is_matched = (n1 == 1) )
 
   return(similarities)
 }
