@@ -2206,11 +2206,11 @@ get_ensembl_fungi=function(){
 
 
 ###### biomart ensembl #####
-get_ensembl_biomart = function(mart=NULL){
+get_ensembl_biomart = function(mart=NULL,quiet=T){
   library(biomaRt)
   library(dplyr)
   genomes = listEnsemblGenomes(includeHosts = T) %>% add_column(type='EnsemblGenomes')
-  ensembl = listMarts(includeHosts = T,verbose = T) %>% as_tibble %>% add_column(type='Ensembl')
+  ensembl = listMarts(includeHosts = T,verbose = !quiet) %>% as_tibble %>% add_column(type='Ensembl')
   ensmarts = bind_rows(genomes,ensembl) %>%
                 mutate(vnum=str_extract(database,'[0-9]+'),
                        host = paste0('https://',host),port = 443) # enforce  https
@@ -2224,13 +2224,13 @@ get_ensembl_biomart = function(mart=NULL){
   return(BIOMART)
 }
 
-find_ensembl_datasets = function(BIOMART){
+find_ensembl_datasets = function(BIOMART,quiet=T){
   library(biomaRt)
   if(missing(BIOMART)){ BIOMART = get_ensembl_biomart() }
 
   # host='https://www.ensembl.org/',mart='ensembl'
   # ens <- useEnsembl(biomart = mart, host = host, mirror=ENS_MIRROR)
-  ens_dataset = listDatasets(BIOMART,verbose=T) %>% dplyr::as_tibble() %>%
+  ens_dataset = listDatasets(BIOMART,verbose=!quiet) %>% dplyr::as_tibble() %>%
     dplyr::mutate(
       sp=str_split_fixed(dataset,'_',n=3)[,1],
       org = str_split_fixed(description,' genes ',n=2)[,1] %>% str_trim
