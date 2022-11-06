@@ -2248,18 +2248,22 @@ get_ensembl_dataset = function(mart,organism){
                   title = 'pick an ensembl dataset from selected biomart...')
   }
 
-  has_organism = str_which(BM_org$description,pattern=fixed(organism,ignore_case = T))
-
-  if(length(has_organism) == 0L){
-    .error$log(paste0(organism," dataset: not found in the selected mart!"))
-    return(NA)
-  }else if(length(has_organism) > 1L){
-    .warn$log(paste0("More than one organism matched :",BM_org$description[has_organism]))
-    has_organism=has_organism[1]
-    .warn$log(paste0("using the first one :",BM_org$description[has_organism]))
+  has_dataset = str_which(BM_org$dataset,pattern=fixed(organism,ignore_case = T))
+  dataset_name = BM_org$dataset[ has_dataset ]
+  no_dataset = length(has_dataset) == 0L
+  if(no_dataset){
+    has_organism = str_which(BM_org$description,pattern=fixed(organism,ignore_case = T))
+    norg = length(has_organism)
+    if(norg == 0L){
+      .error$log(paste0(organism," dataset: not found in the selected mart!"))
+      return(NA)
+    }else if(norg > 1L){
+      .warn$log(paste0("More than one organism matched :",BM_org$description[has_organism]))
+      has_organism=has_organism[1]
+      .warn$log(paste0("using the first one :",BM_org$description[has_organism]))
+    }
+    dataset_name = BM_org$dataset[ has_organism ]
   }
-
-  dataset_name = BM_org$dataset[ has_organism ]
   .succ$log(paste0(organism," dataset: ",dataset_name))
   DATASET = useDataset(dataset_name, mart)
   #message(DATASET)
