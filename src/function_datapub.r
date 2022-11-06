@@ -2155,7 +2155,7 @@ get_ensembl_vertebrates=function(){
   vertebrates = inner_join(ens_vertebrates,uni_vertebrates,
                            by = c("#name", "species", "division", "taxonomy_id", "genebuild",
                                   'assembly'='assembly_name','assembly_accession'='assembly_id') ) %>%
-                           readr::type_convert()
+                readr::type_convert()
 
   colnames(vertebrates) = c('organism','species','division','tax_id',
                             'assembly_version','assembly_accession','genebuild',
@@ -2176,17 +2176,19 @@ get_ensembl_fungi=function(){
   uni_fungi=read_delim(url_uni_fungi) %>% mutate(uniprotCoverage=str_replace_all(uniprotCoverage,'\t',''))
 
   fungi = inner_join(ens_fungi,uni_fungi,
-                           by = c("#name", "species", "division", "taxonomy_id", "genebuild",
-                                  'assembly'='assembly_name','assembly_accession'='assembly_id') ) %>%
-    readr::type_convert()
+                     by = c("#name", "species", "division", "taxonomy_id", "genebuild",
+                            'assembly'='assembly_name','assembly_accession'='assembly_id') ) %>%
+          readr::type_convert()
 
   colnames(fungi) = c('organism','species','division','tax_id',
-                            'assembly_version','assembly_accession','genebuild',
-                            'variation','microarray','pan_compara','peptide_compara','genome_alignments',
-                            'other_alignments', 'cored_db','species_id','n_protein_coding','n_swissprot','n_trembl','coverage')
+                      'assembly_version','assembly_accession','genebuild',
+                      'variation','microarray','pan_compara','peptide_compara','genome_alignments',
+                      'other_alignments', 'cored_db','species_id','n_protein_coding','n_swissprot','n_trembl','coverage')
 
   return(fungi)
 }
+
+
 ###### biomart ensembl #####
 get_ensembl_biomart = function(mart=NULL){
   library(biomaRt)
