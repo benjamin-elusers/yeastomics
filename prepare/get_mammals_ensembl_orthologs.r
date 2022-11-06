@@ -3,7 +3,6 @@ source(here::here("src","__setup_yeastomics__.r"))
 library(tidyverse)
 library(here)
 ENS_MIRROR='uswest'
-path_ortho = here::here('output','ens_hs_ortho')
 
 #### FUNCTION ####
 count_ens_id = function(x,toprint=T){
@@ -20,31 +19,17 @@ count_ens_id = function(x,toprint=T){
   message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | orthologs = %6s',nr,ng,nt,np,no))
 }
 
-get_sp = function(full_name){
-  spname = str_split_fixed(full_name,"_",n=3)
-  first = str_sub(spname[,1],start = 1,end=1) %>% str_to_lower()
-  second = spname[,2] %>% str_to_lower()
-  return(paste0(first,second))
+get_sp = function(full_name, sep='_'){
+
+  nsep = str_count(full_name,pattern = sep)
+  spname = str_split(full_name, sep)
+
+  long  = map_chr(spname, ~last(.x) %>% str_to_lower())
+  short = map_chr(spname, ~head(.x,-1) %>% str_sub(start = 1,end=1) %>% str_to_lower() %>% concat())
+
+  return(paste0(short,long))
 }
 
-match_species_names = function(ens_tree, ens_sp){
-
-  library(stringdist)
-  if(class(ens_tree) == 'phylo'){
-    sp_tree =  ens_tree$tip.label %>% tolower
-  }else{
-    sp_tree = ens_tree
-  }
-  sp_ensembl = ens_sp %>% tolower
-
-  sim_names = stringsimmatrix(sp_tree, sp_ensembl, method='jw',p=0.1,useNames='strings')
-  maxS= apply(sim_names,1,max_)
-  i_maxS= apply(sim_names,1,which.max)
-
-  matched = tibble(sp_tree=sp_tree, sp_ens = sp_ensembl[i_maxS], similarity=maxS)
-
-  return(matched)
-}
 
 find_orthologs = function(x,ortho=ens_mammals_df){
   taxid = ortho$tax_id[x]
@@ -230,7 +215,6 @@ prepare_phylodata = function(id_hs, path_group, group_data, sp_seq=all_seq, add_
 
 make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
 #  irow=15
-
   library(muscle)
   library(ape)
   og = ortho[irow,]
@@ -309,27 +293,46 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
   }
 }
 
-ens_hs_orthologs = preload(saved.file = file.path(path_ortho,'ensembl_hsapiens_filter.rds'),
-                           { get_ens_filter_ortho() }, # species with human orthologs data
-                           'get ensembl homolog filter...')
 
 #### WORKFLOW ####
+path_ortho = here::here('output','ens_hs_ortho','release-108')
+hs_biomart = get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human')
+ens_hs_orthologs = preload(saved.file = file.path(path_ortho,'ensembl_hsapiens_filter.rds'),
+                          { get_ens_filter_ortho(BIOMART = hs_biomart) }, # species with human orthologs data
+                           'get ensembl homolog filter...')
+
 # 0. retrieve reference genome/transcriptome/proteome from ensembl -------------
 # Get reference identifiers (Uniprot/ENSP = proteome, ENSG = Genome, ENST=Transcriptome)
 hs_uniref = get.uniprot.proteome(taxid = '9606',DNA = T,fulldesc = T) %>% names
 ensp_uniref = hs_uniref %>% str_extract(ENSEMBL.nomenclature()) %>% na.omit() %>% as.vector
 n_distinct(ensp_uniref)
+
 ensg_hgnc = load.hgnc(with_protein = T,all_fields = T) %>% drop_na(ensg) %>% pull(ensg)
 hs_tx =preload( file.path(path_ortho,'ensembl_hsapiens_tx.rds'),
-                { get_ensembl_tx(ENSG = ensg_hgnc, ENSP = ensp_uniref) %>%
+                { get_ensembl_tx(ENSG = ensg_hgnc, ENSP = ensp_uniref, BIOMART=hs_biomart) %>%
                     dplyr::rename_with(.cols = ends_with('_len'), .fn = Pxx, 'hs', s='_') },
                 'get ensembl human transcripts...')
-
 
 # 1. get Ensembl vertebrates ---------------------------------------------------
 library(treeio)
 # Ensembl Vertebrates
-ens_vertebrates_tree = get_ensembl_sptree('vertebrates_species-tree_Ensembl')
+vertebrates_tree = get_ensembl_sptree('vertebrates_species-')
+ensembl_vertebrates = get_ensembl_vertebrates() %>% mutate( sp = get_sp(species) ) %>% filter(peptide_compara == 'Y')
+
+HS_ORTHO = inner_join(ens_hs_orthologs,ensembl_vertebrates,by=c('Org'='organism','sp'))
+
+ENS_SPECIES = match_strings(HS_ORTHO$species,vertebrates_tree$tip.label) %>%
+  left_join(ens_hs_orthologs,by=c('s2'='org')) %>%
+  arrange(desc(similarity)) %>%
+  filter(similarity > 0.8) %>%
+  dplyr::rename(vertebrates_tree=s1,ens_org=s2,ens_sim=similarity,ortho_filter=name,ens_sp=sp)
+
+ENS_TREE = match_strings(fungi_tree$tip.label,ensembl_fungi$species,0.01) %>%
+  dplyr::rename(fungi_tree=s1, ens_sp=s2, fungi_similarity=similarity )
+
+
+match_species_names("mus_spretus","Mus_spretus_strain_SPRET/EiJ")
+
 ens_vertebrates_tree$node.label = make.unique(ens_vertebrates_tree$node.label)
 # Save all unique node labels and replace duplicated node labels by NA in tree
 ens_vertebrates_nodes = ens_vertebrates_tree$node.label
@@ -340,13 +343,12 @@ dup_nodes = set_names(dup_nodenums,dup_nodelabels)
 #ens_vertebrates_tree$node.label[is_dup_nodes] = NA
 
 
-ens_vertebrates_info = get_ensembl_vertebrates() %>%
-  # compute similarity between species tree names and ensembl species
-  left_join(match_species_names(ens_vertebrates_tree,.$species),by=c('species'='sp_ens')) %>%
-  dplyr::rename(vertebrates_tree=sp_tree, vertebrates_similarity=similarity ) %>%
-  left_join(ens_hs_orthologs, by=c('organism'='org')) %>%
-  dplyr::rename(ens_filter = name, ens_dataset = sp) %>%
-  relocate(organism,species,ens_dataset,ens_filter,vertebrates_tree,vertebrates_similarity)
+  # # compute similarity between species tree names and ensembl species
+  # left_join(match_species_names(ens_vertebrates_tree,.$species),by=c('species'='sp_ens')) %>%
+  # dplyr::rename(vertebrates_tree=sp_tree, vertebrates_similarity=similarity ) %>%
+  # left_join(ens_hs_orthologs, by=c('organism'='org')) %>%
+  # dplyr::rename(ens_filter = name, ens_dataset = sp) %>%
+  # relocate(organism,species,ens_dataset,ens_filter,vertebrates_tree,vertebrates_similarity)
 
 # Get lineage from root node (common ancestor to vertebrate)
 ens_vertebrates_clades = ape::subtrees(ens_vertebrates_tree, wait=FALSE) %>%
