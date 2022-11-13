@@ -566,6 +566,7 @@ miss = check_missing_var(HS_PROTEOME_DATA)
 dim(HS_PROTEOME_DATA)
 
 saveRDS(HS_PROTEOME_DATA,here::here('released-dataset','humanOmics-v0.rds'))
+#HS_PROTEOME_DATA = readRDS(here::here('released-dataset','humanOmics-v0.rds'))
 
 # Retrieve human abundance -----------------------------------------------------
 # hs_ppm_uni = readRDS(here::here("data","paxdb_integrated_human.rds"))
@@ -724,6 +725,16 @@ print(labels(hs_validation_lm))
 print(coefficients(hs_validation_lm)[is.na(coefficients(hs_validation_lm))])
 decompose_variance(hs_validation_lm,to.df = T)
 
+
+library(broom)
+
+# STEPWISE
+p=aov_plot(aov_model(hs_best_lm,min_pv = 1e-3), name='best')
+ggsave(p, path = here::here('plots'),
+       scale=1.1, width = 12,height=12, bg = 'white',
+       filename = 'human-stepwise-best-model-ess_26pc_72var.pdf')
+
+
 ###
 ###
 ###
@@ -744,7 +755,6 @@ sc2hs = readr::read_delim('/home/benjamin/Downloads/sc-hs-features - Sheet1.tsv'
 sc2hs$hs_var[sc2hs$sc_var=='sgd.pGC'] = 'UP.GC_cdna'
 sc2hs$hs_var[str_detect(sc2hs$sc_var,'pu2008')] = NA
 nomatch = sc2hs %>% filter( similarity < 1 & !is.na(hs_var) & hs_var == "" )
-
 
 sc_matched = sc2hs %>% filter(similarity == 1 | !is.na(hs_var) & hs_var != "" & hs_var %in% hs_evo_all$variable)
 nvar = n_distinct(sc_matched$hs_var)
