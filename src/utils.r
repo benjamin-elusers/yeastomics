@@ -584,7 +584,7 @@ get_os <- function(){
 
 get_rows_by_keyword = function(word,df){
   library(tidyverse)
-  rows = df %>% dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, paste0("(?i)",as.character(word))))
+  rows = df |> dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, paste0("(?i)",as.character(word))))
   return(rows)
 }
 
@@ -599,15 +599,15 @@ find_keywords = function(df,keywords,strict=T){
     count_keywords[[kw]]=count_kw
   }
 
-  df_count_keywords = df %>% bind_cols(count_keywords) %>%
-    rowwise() %>%
-    mutate(keyword_matched=sum(c_across(all_of(keywords)))) %>%
-    filter(keyword_matched>0) %>%
-    arrange(desc(keyword_matched)) %>% ungroup()
+  df_count_keywords = df |> bind_cols(count_keywords) |>
+    rowwise() |>
+    mutate(keyword_matched=sum(c_across(all_of(keywords)))) |>
+    filter(keyword_matched>0) |>
+    arrange(desc(keyword_matched)) |> ungroup()
 
   if(strict){
    MAX_K = max(df_count_keywords$keyword_matched)
-   return( df_count_keywords %>% dplyr::filter( keyword_matched == MAX_K) )
+   return( df_count_keywords |> dplyr::filter( keyword_matched == MAX_K) )
  }
   return( df_count_keywords )
 }
