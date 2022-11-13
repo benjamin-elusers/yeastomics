@@ -612,17 +612,28 @@ dim(SC_PROTEOME_DATA)
 saveRDS(SC_PROTEOME_DATA,here::here('released-dataset','yeastOmics-v1.rds'))
 
 # Retrieve yeast abundance -----------------------------------------------------
-
 sc_uni = sc_map_uni %>% filter(extdb=='UniProtKB-ID') %>% dplyr::select(uni,extid)
-sc_paxdb_datasets = find_paxdb_datasets(4932)
+# raw paxdb datasets + ho et al. 2018
+ho_et_al_2018 = load.abundance() %>%
+                set_names(c("orf","ho2018_MPC","ho2018_MDPC","ho2018_gfp","ho2018_ms")) %>%
+                ungroup()
 
-# raw paxdb datasets
+sc_ho_dataset = skimr::skim(ho_et_al_2018[,-1]) %>% dplyr::select(skim_variable,complete_rate) %>%
+                as_tibble() %>% dplyr::rename(id=skim_variable,cov=complete_rate) %>%
+                mutate(organ='WHOLE_ORGANISM',taxon="4932", filename=paste0(taxon,"-",id),
+                       is_integrated=T, score=NA, w=NA, yr="2018",ndata=19, cov=as.character(100*round(cov,1)))
+
+sc_paxdb_datasets = find_paxdb_datasets(4932) %>% bind_rows(sc_ho_dataset)
+
+
 sc_ppm = load.paxdb(4932,rm.zero=T) %>%
             pivot_wider(id_cols = c(protid,id_uniprot), names_from = c('id'),
                        values_from=ppm, values_fn = mean_) %>%
             left_join(sc_uni, by=c('id_uniprot'='extid')) %>%
-            left_join(sc_r4s,by=c('uni'='id')) %>%
-            mutate(log10.rate = log10(r4s_fungi.rate))
+            left_join(sc_r4s,by=c('protid'='id')) %>%
+            mutate(log10.rate = log10(r4s_fungi.rate)) %>%
+            left_join(ho_et_al_2018,by = c('protid'='orf'))
+
 
 # integrated paxdb datasets
 sc_paxdb = get.paxdb(tax=4932,abundance = 'integrated',rm.zero=T)
@@ -639,6 +650,7 @@ SC_PPM = sc_paxdb %>%
                            names_from = 'organ', names_prefix = 'PPM_',
                            values_from = 'ppm_int', values_fn = log10) )
 
+
 save(list = ls(pattern = '^sc_'), file = here('output','sc_datasets.rdata'))
 save(list = ls(pattern = '^SC_'), file = here('output','sc_integrated_datasets.rdata'))
 
@@ -650,74 +662,74 @@ n_distinct(SC_PROTEOME_DATA$ORF)
 SC_ORTHOLOGS = SC_PROTEOME_DATA %>%
                 filter(!is.na(r4s_fungi.rate) & ORF %in% sc_r4s$id) %>%
                 filter(!is.na(uniprot) & !is.dup(uniprot)) %>%
+                filter(!is.na(ensp) & !is.dup(ensp)) %>%
                 filter(!is.na(ORF) & !is.dup(ORF)) %>%
                 # Remove rare variables among orthlogs (min 3 orthologs must share the feature)
                 remove_rare_vars(df=.,min_obs=3) %>%
                 distinct()
 
 dim(SC_ORTHOLOGS)
+n_distinct(SC_ORTHOLOGS$ORF)
 # All orthologs N = 3726
 
+n_distinct(SC_PPM$protid)
+
 # Define two predictions datasets with/out abundance (training/validation)
-sc_validation = SC_ORTHOLOGS %>% filter( !(ORF %in% SC_PPM$protid) )
-sc_orthologs =  SC_ORTHOLOGS %>% filter(ORF %in% SC_PPM$protid)
-dim(sc_validation) # n=263
-dim(sc_orthologs) # n=12714
+MPC_nona = ho_et_al_2018 %>% drop_na(ho2018_MPC)
+sc_validation = SC_ORTHOLOGS %>% filter( !(ORF %in% MPC_nona$orf) )
+sc_orthologs =  SC_ORTHOLOGS %>% filter(ORF %in% MPC_nona$orf)
+dim(sc_validation) # n=86
+dim(sc_orthologs) # n=3639
 
 # Evo Rate vs. Expression -------------------------------------------------
 all_ppm_er_cor = map_dfr(sc_paxdb_datasets$id ,
-                         function(x){ spearman.toplot(X=sc_ppm$log10.rate, Y=sc_ppm[[x]]) }
-)  %>% add_column(paxdb = sc_paxdb_datasets$id) %>%
+                         function(x){ spearman.toplot(X=sc_ppm$log10.rate, Y=sc_ppm[[x]]) } ) %>%
+  add_column(paxdb = sc_paxdb_datasets$id) %>%
   arrange(desc(abs(estimate))) %>%
   left_join(sc_paxdb_datasets, by=c('paxdb'='id')) %>%
   dplyr::select(organ,is_integrated,estimate,N,p.value,filename,cov,yr) %>%
   mutate(filename = ifelse(is_integrated,
                            str_remove_all(filename,"(9606\\-|\\-integrated\\.txt)"),
                            str_remove_all(filename,"(9606\\-|\\.txt|_Maxquant|_gene|SEQUEST)")),
-         cor_range = cut(estimate,breaks=c(-0.5,-0.2,-0.1,0.1,0.2,0.5)),
+         cor_range = cut(estimate,breaks=c(-0.7,-0.5,-0.3,-0.2,-0.1,0.1)),
          filename_n = paste0(filename," (N ",N,")")) %>%
   print(n=200)
 
-p_ER_int = ggplot(all_ppm_er_cor %>% filter(is_integrated),
+p_ER_int = ggplot(all_ppm_er_cor,
                   aes(y=reorder(filename_n,abs(estimate)),fill=organ,x=estimate)) +
   geom_col() +
   #geom_text(aes(label=N,x=1.2*max(estimate))) +
   geom_text(aes(label=round(estimate,3),x=estimate),size=3,hjust='inward') +
   theme(legend.position='none')
 
-ggsave(p_ER_int, filename=here::here('plots','sc-abundance-evolution-tissues-integrated.pdf'))
-
-p_ER = ggplot(all_ppm_er_cor %>% filter(!is_integrated),
-              aes(y=reorder(filename_n,abs(estimate)),x=organ, fill=estimate)) +
-  geom_raster() + scale_fill_viridis_c() + theme(axis.text.x = element_text(angle=90,hjust=1))
-  #geom_text(aes(label=N,x=1.2*max(estimate)),size=3) +
-  #geom_text(aes(label=round(estimate,3),x=estimate),size=2,hjust='inward') +
-  #facet_grid(organ~cor_range,scales = 'free_y',drop = T) +
-  #theme(legend.position='none',axis.text = element_text(size=6), strip.text = element_text(size=5))
-ggsave(p_ER,scale=3,filename=here::here('plots','sc-abundance-evolution-tissues-experimental.pdf'))
-
+ggsave(p_ER_int, filename=here::here('plots','sc-abundance-evolution.pdf'))
 
 # Explaining variance in evolutionary rate -------------------------------------
 #IDCOLS = c("uniprot","ensp","ensg","GENENAME","gene_biotype")
-ID_COLS = c('uniprot','GN','ensp')
-XCOL="PPM"
+ID_COLS = c('ORF','GN')
+XCOL="ho2018_MPC"
 YCOL="ER"
 ZCOL=NULL
 
-sc_ortho_predictors = sc_orthologs %>% group_by(uniprot,GN,ensp) %>%
+sc_ortho_predictors = sc_orthologs %>% group_by(ORF,GN,uniprot) %>%
   dplyr::select(where(is.numeric) | where(is.logical)) %>%
-  dplyr::select(-c('SV', starts_with("r4s_mammals"),"has_unique_id") )
+  dplyr::select(-c('SV', starts_with("r4s_fungi"),"has_unique_id") )
 
-SC_PREDICTORS = hs_ortho_predictors %>% ungroup
+SC_PREDICTORS = sc_ortho_predictors %>% ungroup
 
 SC_PPM$PPM = SC_PPM$PPM_WHOLE_ORGANISM
-SC_ER = left_join(sc_r4s,SC_PPM, by=c('id'='uni'))
-SC_ER$ER = log10(SC_ER$r4s_mammals.rate_norm)
+SC_ER = left_join(sc_r4s,SC_PPM, by=c('id'='protid')) %>%
+        left_join(ho_et_al_2018,by=c('id'='orf')) %>%
+        mutate(ER = log10(r4s_fungi.rate))
+        #drop_na(ho2018_MPC,ER)
 
-#HS_PPM$PPM = HS_PPM$PPM_BRAIN
 
-SC_LMDATA = left_join(SC_PREDICTORS,SC_ER,by=c('uniprot'='id')) %>% drop_na(PPM) %>%
-            filter(!is.na(uniprot) & !is.dup(uniprot)) %>%
+ggplot(SC_ER, aes(x=ho2018_MPC,y=ER)) + geom_point() + geom_smooth()
+spearman.toplot(SC_ER$ho2018_MPC,SC_ER$ER)
+
+SC_LMDATA = left_join(SC_PREDICTORS,SC_ER,by=c('ORF'='id')) %>%
+            drop_na(ho2018_MPC) %>%
+            filter(!is.na(ORF) & !is.dup(ORF)) %>%
             distinct()
 
 fit0 = fit_m0(INPUT_LM = SC_LMDATA,PREDICTORS = SC_PREDICTORS,
@@ -725,21 +737,20 @@ fit0 = fit_m0(INPUT_LM = SC_LMDATA,PREDICTORS = SC_PREDICTORS,
               MAX_XCOR = 0.5, MAX_YCOR=0.5, MIN_N = 2)
 
 df0=decompose_variance(fit0$LM0,T)
-spearman.toplot(fit0$P$ER,fit0$P$PPM)
+spearman.toplot(fit0$P$ER,fit0$P$ho2018_MPC)
 
 #save.image(here('output','checkpoint-sc-orthologs-data.rdata'))
 load(here::here('output','checkpoint-sc-orthologs-data.rdata'))
 
 # Filter Dataset for prediction --------------------------------------------------
 sc_evo_all= preload(here("output","lm-evo-sc.rds"), select_variable(fit0,response='.resid', raw=T))
-sc_best= sc_evo_all %>% filter(pc_ess > 0.1 & variable != YCOL)
 sc_best= sc_evo_all %>% filter(pc_ess > 0.5 & variable != YCOL)
 sc_best= sc_evo_all %>% filter(pc_ess > 1 & variable != YCOL)
+sc_best= sc_evo_all %>% filter(pc_ess > 2 & variable != YCOL)
+sc_best= sc_evo_all %>% filter(pc_ess > 5 & variable != YCOL)
 
-#uni_brain = HS_PPM$uni[!is.na(HS_PPM$PPM_BRAIN)]
 sc_best_pred = fit0$P[,c(XCOL, YCOL, '.resid', ZCOL, intersect(sc_best$variable, colnames(fit0$P)))]
-#fit0$P$uniprot %in% uni_brain
-sc_nbest = n_distinct(hs_best$variable)
+sc_nbest = n_distinct(sc_best$variable)
 
 formula_null = reformulate(response=YCOL,termlabels = "1",intercept = T)
 LM_ER = lm(data=sc_best_pred, formula_null)
@@ -748,21 +759,21 @@ decompose_variance(LM_ER)
 #formula_sc_best_ER=paste0(YCOL," ~ ",paste0( P_evo$variable,collapse=" + "))
 formula_sc_best = reformulate(sc_best$variable, response =  '.resid')
 
-m_best_ER = step(object=LM_ER, scope = as.formula(formula_hs_best), direction = 'forward',k=log(hs_nbest)*2,trace=0)
+m_best_ER = step(object=LM_ER, scope = as.formula(formula_sc_best), direction = 'forward',k=log(sc_nbest)*2,trace=0)
 decompose_variance(m_best_ER,to.df = T)
 
-sc_best_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),data=sc_best_pred)
+sc_best_lm = lm(reformulate(response = YCOL, termlabels = c(XCOL,labels(m_best_ER)),data=sc_best_pred)
 print(labels(sc_best_lm))
 print(sc_nbest)
 decompose_variance(sc_best_lm,to.df = T)
 
-formula_m0 = reformulate(response=YCOL,termlabels = "PPM",intercept = T)
+formula_m0 = reformulate(response=YCOL,termlabels = XCOL,intercept = T)
 LM0 = lm(data=sc_best_pred, formula_m0)
 decompose_variance(LM0,T)
 
 ## Validate
-sc_valid = left_join(sc_orthologs,SC_ER,by=c('uniprot'='id')) %>%
-  filter(!is.na(uniprot) & !is.dup(uniprot) & !(uniprot %in% uni_brain)) %>%
+sc_valid = left_join(sc_validation,SC_ER,by=c('ORF'='id')) %>%
+  filter(!is.na(ORF) & !is.dup(ORF) ) %>%
   distinct()
 
 LM_validation_ER = lm(data=sc_valid, formula_null)
@@ -807,5 +818,25 @@ decompose_variance(sc_validation_lm,to.df = T)
 # print(intersect(labels(hs_best_lm),sc_best))
 # print(hs_nbest)
 # decompose_variance(hs_best_lm,to.df = T)
+library(broom)
+
+# STEPWISE
+sc_perf = aov_model(sc_best_lm,min_pv = 1e-3)
+nvar = nrow(sc_perf)
+ess_pc = sum(sc_perf$ess)
+p=aov_plot(aov_model(sc_best_lm,min_pv = 1e-3), name='best')
 
 
+## ADD SIGN
+## V1 = LM(ER ~ PPM + BEST_VAR)
+## V2 = LM(ER ~ BEST_VAR)
+
+## PRED EVO RATE WITH BEST VAR
+cor(sc_best_pred$ER, predict(sc_best_lm))
+
+ggsave(p, path = here::here('plots'),
+       scale=1.1, width = 12,height=12, bg = 'white',
+       filename = 'yeast-stepwise-best-model-ess_65pc_27var.pdf')
+
+
+### HUMAN
