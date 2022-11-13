@@ -4,7 +4,7 @@
 #source('src/function_phylogenetic.r',local = T)
 yeastomics_url = "https://raw.githubusercontent.com/benjamin-elusers/yeastomics"
 source(file.path(yeastomics_url,"main/src/utils.r"))
-.dbg = Logger$new("DEBUG")$
+.dbg = log::Logger$new("DEBUG")$
   date()$
   time()$
   hook(crayon::bgWhite)
