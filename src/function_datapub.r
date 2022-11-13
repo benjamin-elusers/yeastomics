@@ -2553,7 +2553,7 @@ query_ens_ortho <- function(sp_ortho,COUNTER=1,
   return(out)
 }
 
-query_ens_txlen <- function(Fi,Va,ORG,COUNTER=1,verbose=T,
+query_ens_txlen <- function(Fi,Va,ORG,COUNTER=1,verbose=T, debug=F,
                             BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL','human')) {
   if(verbose){ tictoc::tic('query Ensembl transcript length') }
   t0 = proc.time()
@@ -2568,6 +2568,8 @@ query_ens_txlen <- function(Fi,Va,ORG,COUNTER=1,verbose=T,
     att_struct = c('cds_length','transcript_length')
     att_valid = intersect(c(att_gene,att_struct),BM_att)
     no_len = any(!att_struct %in% att_valid)
+    if(debug){ print(att_valid)}
+
     if(no_len){
       pos_name = c("%s_position","transcript_%s","exon_chrom_%s")
       att_pos = c('ensembl_exon_id', 'is_constitutive',sprintf(pos_name,'start'), sprintf(pos_name,'end')) %>% sort

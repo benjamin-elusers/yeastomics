@@ -49,4 +49,7 @@ library(log)
 .error =  errorLog()
 .warn  = warningLog()
 .succ  = successLog()
-
+.dbg = Logger$new("DEBUG")$
+  date()$
+  time()$
+  hook(crayon::bgWhite)
