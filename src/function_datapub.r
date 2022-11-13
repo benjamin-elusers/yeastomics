@@ -4,6 +4,10 @@
 #source('src/function_phylogenetic.r',local = T)
 yeastomics_url = "https://raw.githubusercontent.com/benjamin-elusers/yeastomics"
 source(file.path(yeastomics_url,"main/src/utils.r"))
+.dbg = Logger$new("DEBUG")$
+  date()$
+  time()$
+  hook(crayon::bgWhite)
 
 # TO REMOVE DEPENDENCIES, THOSE FUNCTIONS WERE COPIED FROM OTHER SCRIPTS
 # Utils --------------------------------------------------------------------
@@ -2562,18 +2566,21 @@ query_ens_txlen <- function(Fi,Va,ORG,COUNTER=1,verbose=T, debug=F,
       cat(sprintf("Trying to fetch structure of genes from '%s' [%s]...",BIOMART@dataset,ORG))
     }
 
+    if(debug){ .dbg$log(c("Dataset to be used for query:",BIOMART@dataset)) }
+
     BM_att = listAttributes(BIOMART)[,1]
 
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
     att_struct = c('cds_length','transcript_length')
     att_valid = intersect(c(att_gene,att_struct),BM_att)
     no_len = any(!att_struct %in% att_valid)
-    if(debug){ print(att_valid)}
+
+    if(debug){ .dbg$log(c("Valid attributes for query:",att_valid)) }
 
     if(no_len){
+      warning('gene/transcript length unavailable!')
       pos_name = c("%s_position","transcript_%s","exon_chrom_%s")
       att_pos = c('ensembl_exon_id', 'is_constitutive',sprintf(pos_name,'start'), sprintf(pos_name,'end')) %>% sort
-      warning('gene/transcript length unavailable!')
       att_valid = intersect(c(att_gene,att_pos),BM_att)
       if(any(!att_pos %in% att_valid)){
         warning('No information about gene length available')
@@ -2590,6 +2597,7 @@ query_ens_txlen <- function(Fi,Va,ORG,COUNTER=1,verbose=T, debug=F,
         group_by(ensembl_gene_id) #%>% dplyr::filter(transcript_length == max(transcript_length))
 
       if(no_len){
+        if(debug){ .dbg$log("Computing gene/cds/transcript length...") }
         Qtx = Q %>%
           filter(ensembl_peptide_id != "" & !is.na(ensembl_peptide_id) & is_constitutive==1) %>%
           mutate(gene_length = end_position-start_position+1,
