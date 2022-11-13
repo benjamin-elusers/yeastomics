@@ -21,14 +21,25 @@ count_ens_id = function(x,toprint=T){
   message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | orthologs = %6s',nr,ng,nt,np,no))
 }
 
-find_orthologs = function(ortho,BM=hs_biomart){
+find_orthologs = function(ortho,BM=hs_biomart,use_cache=T){
+
+  current_org = ortho$ens_org
+  current_sp = ortho$ens_sp
+  current_dataset = paste0(current_sp,"_gene_ensembl")
+  orgname = tolower(str_replace_all(current_org,'[ -]+','_'))
+  cache_file = file.path(path_ortho,paste0(ortho$tax_id,'-',current_sp,'-',orgname,'.rds'))
+
+  if(use_cache & file.exists(cache_file)){
+    cache_date = file.info(cache_file)[,'ctime'] %>% format(format="%d-%m-%Y %H:%M:%S")
+    .info$log(sprintf("Using cached data for '%s' created on %s",current_org,cache_date))
+     return(readRDS(cache_file))
+  }
+
 
   hs_cols = c('ensg','enst','ensp',"is_enspref","has_ensp","is_canonical","canonical",
               "hs_gene_len","hs_transcript_len", 'hs_cds_len',
               "has_introns","n_transcripts","n_proteins","n_exons","n_exons_mini")
 
-  current_org = ortho$ens_org
-  current_sp = ortho$ens_sp
 
   att_species = c('ensembl_gene','ensembl_peptide',
                   'canonical_transcript_protein','associated_gene_name','subtype',
@@ -42,7 +53,15 @@ find_orthologs = function(ortho,BM=hs_biomart){
                   hs = sprintf("ensembl_%s_id",seqtype),
                   ortho = c(sp_att[1:2], paste0(current_sp,'_homolog_ensembl_transcript')))
 
-  if( is.na(current_sp) ){
+  bm_ortho = tryCatch({
+    get_ensembl_dataset("ENSEMBL_MART_ENSEMBL", current_dataset)
+  },error=function(cond) {
+    .error$log(sprintf('skipping species: %s!\n',current_org))
+    message(cond)
+    return(NULL)
+  })
+
+  if( is.na(current_sp) | is.null(bm_ortho) ){
     .warn$log(sprintf('Skip %s (%s) for orthologs...',current_org,current_sp))
     return(NULL)
   }
@@ -56,20 +75,21 @@ find_orthologs = function(ortho,BM=hs_biomart){
     .info$log("--> remove low confidence orthologs")
 
     col_ortho_prot = grep('homolog_ensembl_peptide',colnames(Q1.1),v=T)
-    bm_ortho = get_ensembl_dataset("ENSEMBL_MART_ENSEMBL", current_org)
+
     id_ortho = ens_id %>% pull(all,ortho)
-    sp_txlen = query_ens_txlen(ORG=current_org, BIOMART=bm_ortho, COUNTER = 1, verbose=F) %>%
+    sp_txlen = query_ens_txlen(ORG=current_org, BIOMART=bm_ortho, COUNTER = 1, verbose=F, debug=T) %>%
                dplyr::rename(ens_id %>% pull(hs,all)) %>%
                filter(ensp != "" & !is.na(ensp)) %>%
                dplyr::rename(cds_len_ortho=cds_length, tx_len_ortho = transcript_length) %>%
                dplyr::rename( id_ortho )
+
     if( is.null(sp_txlen) ){ return(NULL) }
 
     #id_ortho = set_names(paste0(current_sp,"_",id_hs[c(1,3)]),sp_att[c(1,3)])
 
     Q1.2 = inner_join(Q1.1,hs_tx, by=ens_id$all ) %>%
            inner_join(sp_txlen,by=names(id_ortho)[1:2]) %>%
-           as_tibble() %>% distinct()
+           as_tibble() %>% distinct() %>% type_convert()
     .info$log("--> keep orthologs with cds closest in length")
 
     col_gname = str_subset(colnames(Q1.2),'homolog_associated_gene_name$')
@@ -102,15 +122,14 @@ find_orthologs = function(ortho,BM=hs_biomart){
   error=function(cond) {
     .error$log(sprintf('skipping species: %s!\n',current_org))
     message(cond)
+    return(NA)
   }
   )
 
-  QORTHO = bind_cols(ortho,QORTHO) %>% mutate(ens_dataset=current_sp)
-  #QORTHO$two = phylum.2
-  #QORTHO$four = phylum.4
-
-  orgname = tolower(str_replace_all(current_org,'[ -]+','_'))
-  saveRDS(QORTHO,file.path(path_ortho,paste0(ortho$tax_id,'-',current_sp,'-',orgname,'.rds')))
+  if(!is.na(QORTHO)){
+    QRES = bind_cols(ortho,QORTHO) %>% mutate(ens_dataset=current_sp)
+    saveRDS(QRES,cache_file)
+  }
   return(QORTHO)
 }
 
@@ -357,9 +376,12 @@ library(biomaRt)
 
 ##ens_ortho = ens_mammals_df %>% filter(is_leaf)
 ens_ortho = vt_df %>% filter(is_leaf & !is.na(ens_filter))
-
 NSP=n_distinct(ens_ortho$species)
+
+save.image(file.path(path_ortho,"checkpoint-vertebrates-ensembl108.rdata"))
+
 # Save all ensembl queries to get human-mammals orthologs
+# Currently fails a lot due to timeout queries (probably server error or too many long queries)
 HS_QUERY = preload(file.path(path_ortho,'ensembl_hs_vertebrates_orthologs.rds'),
                    {  lapply(1:NSP, function(i){ find_orthologs(ortho=ens_ortho[i,]) }) %>% compact },
                    'retrieve human to vertebrates orthologs...')
