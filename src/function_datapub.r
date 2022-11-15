@@ -2534,8 +2534,13 @@ query_ens_ortho <- function(sp_ortho,COUNTER=1,
     #                 'perc_id','perc_id_r1','goc_score','wga_coverage','orthology_confidence')
     #att_ortho = intersect(sprintf("%s_homolog_%s",sp_ortho,att_species), )
 
-    att_ortho = grep(x=listAttributes(BIOMART,page='homologs',what='name'), sp_ortho ,value=T)
-    cat(sprintf("Trying to fetch orthologs '%s' VS. '%s'...",species,sp_ortho))
+    att_ortho = grep(x=listAttributes(BIOMART,page='homologs',what='name'), paste0(sp_ortho,"_") ,value=T)
+    .info$log(sprintf("Trying to fetch orthologs '%s' VS. '%s'...\n",species,sp_ortho))
+
+    if(length(att_ortho)==0){
+      .error$log(sprintf('No attributes for current species: %s!\n',sp_ortho))
+      return(NULL)
+    }
 
     Q=getBM(mart=BIOMART,
             attributes=c(att_gene,att_ortho),
@@ -2548,12 +2553,11 @@ query_ens_ortho <- function(sp_ortho,COUNTER=1,
     return(Q %>% as_tibble())
   },
   error=function(cond) {
-    cat(sprintf('Failed to retrieve orthologs for current species: %s!\n',species))
-    message(cond)
+    .error$log(sprintf('Failed to retrieve orthologs for current species: %s!\n',species))
     return(NULL)
   },
   finally={
-    cat(sprintf('done [%s]\n',COUNTER))
+    #.error$log(sprintf('done [%s]\n',COUNTER))
     elapsed=(proc.time()-t0)['elapsed']
     if(elapsed>5){ tictoc::toc() }
   }
