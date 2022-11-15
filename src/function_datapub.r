@@ -1614,6 +1614,54 @@ get_eggnog_species = function(node){
   return(sp_info)
 }
 
+get_eggnog_alignment = function(node, use_trimmed=T, max_timeout=500){
+
+  default_timeout = getOption("timeout")
+  options(timeout = max(max_timeout, default_timeout))
+  path_eggnog = here::here('data','eggnog')
+  dir.create(path_eggnog,showWarnings = F,recursive = T)
+  ncpus = parallel::detectCores()-2
+
+  library(archive)
+  URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
+  eggnog_node = find_eggnog_node(node)
+  find_eggnog_version()
+  url_node_info= paste0(URL_EGGNOG,"per_tax_level/",eggnog_node$id,"/")
+
+  .info$log(sprintf('get alignment for taxonomic node %s (%s)\n',eggnog_node$id,eggnog_node$name))
+
+  eggnog_node_files = rvest::read_html(url_node_info) %>%
+    rvest::html_nodes("a") %>% # Retrieve hyperlink corresponding to taxonomic level
+    rvest::html_text(trim = T) # Taxonomic level id is each hyperlink text
+
+  ali_tar = grep("_raw_algs.tar",eggnog_node_files,v=T)
+  if(use_trimmed){
+    .info$log('[using trimmed alignments]')
+    ali_tar = grep("_trimmed_algs.tar",eggnog_node_files,v=T)
+  }
+  url_ali_node = paste0(url_node_info,ali_tar)
+
+  eggnog_node_ali = file.path(path_eggnog,ali_tar)
+  if( !file.exists(eggnog_node_ali) ){ # download cause it is large archive
+    .info$log('download alignment archive for taxonomic node...')
+    download.file(url = url_ali_node, eggnog_node_ali, cacheOK = T )
+  }
+  .info$log('extract alignments for taxonomic node...')
+  ali_files = archive::archive(eggnog_node_ali) |>
+              mutate( og = str_replace(string = basename(path), '\\..+gz$',''))
+  archive::archive_extract(eggnog_node_ali, dir=path_eggnog)
+
+  .info$log(sprintf('reading alignments in parallel (%s cores)...\n',ncpus))
+  node_ali = pbmcapply::pbmclapply(X = file.path(path_eggnog,ali_files$path),
+                                   FUN=Biostrings::readAAMultipleAlignment,
+                                    mc.cores = ncpus)
+
+  names(node_ali) = ali_files$og
+
+  options(timeout = default_timeout)
+  return(node_ali)
+}
+
 get_eggnog_node = function(node){
 
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
