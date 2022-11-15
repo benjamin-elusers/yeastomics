@@ -2525,12 +2525,16 @@ query_ens_ortho <- function(sp_ortho,COUNTER=1,
   ortholog = sprintf('with_%s_homolog',sp_ortho)
   #ens=useEnsembl(biomart = mart, dataset = dataset, host = host, mirror=ENS_MIRROR)
 
+  BM_att = listAttributes(BIOMART,what='name')
+
   t0 = proc.time()
   out <- tryCatch({
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
-    att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide','canonical_transcript_protein','subtype',
-                    'perc_id','perc_id_r1','goc_score','wga_coverage','orthology_confidence')
-    att_ortho = intersect(sprintf("%s_homolog_%s",sp_ortho,att_species), listAttributes(BIOMART,page='homologs')[,1])
+    # att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide','canonical_transcript_protein','subtype',
+    #                 'perc_id','perc_id_r1','goc_score','wga_coverage','orthology_confidence')
+    #att_ortho = intersect(sprintf("%s_homolog_%s",sp_ortho,att_species), )
+
+    att_ortho = grep(x=listAttributes(BIOMART,page='homologs',what='name'), sp_ortho ,value=T)
     cat(sprintf("Trying to fetch orthologs '%s' VS. '%s'...",species,sp_ortho))
 
     Q=getBM(mart=BIOMART,
@@ -2538,7 +2542,7 @@ query_ens_ortho <- function(sp_ortho,COUNTER=1,
             filters="", values="",
             uniqueRows = T, bmHeader = F)
 
-    ortho_ensp = att_ortho[3]
+    ortho_ensp = grep("ensembl_peptide",att_ortho,value=T)
     Q$no_ortholog = is.na(Q[[ortho_ensp]]) | (Q[[ortho_ensp]] == "")
 
     return(Q %>% as_tibble())
@@ -2568,7 +2572,7 @@ query_ens_txlen <- function(Fi,Va,ORG,COUNTER=1,verbose=T, debug=F,
 
     if(debug){ .dbg$log(c("Dataset to be used for query:",BIOMART@dataset)) }
 
-    BM_att = listAttributes(BIOMART)[,1]
+    BM_att = listAttributes(BIOMART,what='name')
 
     att_gene = c('ensembl_gene_id','ensembl_transcript_id','ensembl_peptide_id')
     att_struct = c('cds_length','transcript_length')
