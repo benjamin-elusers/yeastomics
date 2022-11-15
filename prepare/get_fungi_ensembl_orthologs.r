@@ -7,138 +7,228 @@ ENS_MIRROR='uswest'
 #### FUNCTION ####
 count_ens_id = function(x,toprint=T){
   nr = nrow(x)
-  sp_ensp = str_subset(colnames(x),"homolog_ensembl_peptide")
+
+  id_sp = str_subset(colnames(x),"homolog_ensembl_peptide")
+  if( length(id_sp) == 0L ){ id_sp="id_ortho" }
 
   ng = n_distinct(x$ensg)
   nt = n_distinct(x$enst)
   np = n_distinct(x$ensp)
-  no = n_distinct(x[[sp_ensp]])
+  no = n_distinct(x[[id_sp]])
   if(!toprint)
     return(c('genes'=ng,'transcript'=nt,'protein'=np,'ortholog'=no))
 
   message(sprintf('rows = %7s | genes = %6s | transcripts = %6s | proteins = %6s | orthologs = %6s',nr,ng,nt,np,no))
 }
 
-get_sp = function(full_name, sep='_'){
 
-  nsep = str_count(full_name,pattern = sep)
-  spname = str_split(full_name, sep)
+#find_orthologs = function(x,ortho=ens_mammals_df){
+#   taxid = ortho$tax_id[x]
+#   org = ortho$organism[x]
+#   sp = ortho$ens_sp[x]
+#   ens_sp = paste0(ortho$ens_sp[x],"_eg")
+#   spname =  ortho$species[x]
+#   treename = ortho$label[x]
+#   # phylum.2 = ortho$two[x]
+#   # phylum.4 = ortho$four[x]
+#   numlab = ortho$num_label[x]
+#   col_filter=ortho$ortho_filter[x]
+#   att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide',
+#                   'canonical_transcript_protein','subtype',
+#                   'perc_id','perc_id_r1','goc_score',
+#                   'wga_coverage','orthology_confidence')
+#   sp_att = sprintf("%s_homolog_%s",ens_sp,att_species)
+#
+#   if( is.na(sp) ){
+#     .warn$log(sprintf('Skip %s (%s) for orthologs...',org,spname))
+#     return(NULL)
+#   }
+#
+#   QORTHO = tryCatch({
+#     id_hs = c('ensg','enst','ensp')
+#     Q1.0 = query_ens_ortho( host = 'https://fungi.ensembl.org/',
+#                             mart = "fungi_mart",dataset_suffix='eg_gene',
+#                             species = 'scerevisiae',sp_ortho=ens_sp,COUNTER=x) %>% as_tibble() %>%
+#       dplyr::rename(ensg=ensembl_gene_id,ensp=ensembl_peptide_id,enst=ensembl_transcript_id) %>%
+#       filter(!no_ortholog)
+#
+#     col_ortho_conf = grep('orthology_confidence',sp_att,v=T)
+#     Q1.1 = Q1.0[ Q1.0[[col_ortho_conf]] == 1,]
+#     .info$log("--> remove low confidence orthologs")
+#
+#     col_ortho_prot = grep('homolog_ensembl_peptide',colnames(Q1.1),v=T)
+#     sp_txlen = query_ens_txlen(Sp = sp,ORG=org,COUNTER = x,verbose=F,
+#                                host = 'https://fungi.ensembl.org/',
+#                                mart = "fungi_mart",dataset_suffix='eg_gene') %>%
+#       filter(ensembl_peptide_id != "" & !is.na(ensembl_peptide_id)) %>%
+#       dplyr::rename(ensg=ensembl_gene_id, enst=ensembl_transcript_id, ensp=ensembl_peptide_id) %>%
+#       dplyr::rename_with(.cols=!ends_with('length'), .fn = Pxx, sp, s='_') %>%
+#       dplyr::rename(cds_len_ortho=cds_length, tx_len_ortho = transcript_length)
+#     if( is.null(sp_txlen) ){ return(NULL) }
+#
+#     id_ortho = set_names(paste0(sp,"_",id_hs[c(1,3)]),sp_att[c(1,3)])
+#     Q1.2 = inner_join(Q1.1,sc_tx, by=id_hs) %>%
+#       inner_join(sp_txlen,by=id_ortho) %>%
+#       as_tibble() %>% distinct()
+#     .info$log("--> keep orthologs with cds closest in length")
+#
+#     col_gname = str_subset(colnames(Q1.2),'homolog_associated_gene_name$')
+#     col_pid = str_subset(colnames(Q1.2),'perc_id$')
+#     col_canonical = str_subset(colnames(Q1.2),'canonical_transcript_protein')
+#
+#     Q1.3 = Q1.2 %>%
+#       dplyr::filter(!is.na(hs_cds_len-cds_len_ortho)) %>%
+#       group_by(ensg,enst,ensp) %>%
+#       mutate(cds_diff = abs(hs_cds_len - cds_len_ortho)) %>%
+#       mutate(tx_diff = abs(hs_transcript_len - tx_len_ortho)) %>%
+#       dplyr::filter( cds_diff == min(cds_diff)) %>%
+#       # in case there are >2 orthologs for a human protein, pick the one with the highest pid
+#       group_by(ensp) %>% dplyr::filter( .data[[col_pid]] == max_(.data[[col_pid]]) ) %>%
+#       # in case there are >2 orthologs for a human protein, pick the one with the gene name
+#       #dplyr::filter( .data[[col_gname]] != "" ) %>%
+#       # in case there are >2 orthologs for a human protein, pick the one with closest transcript length
+#       dplyr::filter( tx_diff == min(tx_diff) ) %>%
+#       relocate(all_of(sc_cols)) %>%
+#       dplyr::rename(cds_len=cds_len_ortho,tx_len=tx_len_ortho) %>%
+#       dplyr::rename_with(.cols = !starts_with(sp) & -any_of(sc_cols), .fn = Pxx, sp, s='_' ) %>%
+#       ungroup() %>% distinct()
+#
+#     count_ens_id(Q1.3)
+#     Q1.3
+#   },
+#   error=function(cond) {
+#     .error$log(sprintf('skipping species: %s!\n',org))
+#     message(cond)
+#   }
+#   )
+#   orgname = tolower(str_replace_all(org,'[ -]+','_'))
+#   QORTHO$ens_dataset = sp
+#   QORTHO$organism = org
+#   QORTHO$species = spname
+#   QORTHO$fungi_tree = treename
+#   QORTHO$treename = treename
+#   QORTHO$id_ortho = QORTHO[[paste0(sp,"_homolog_ensembl_peptide")]]
+#   QORTHO$pid_ortho = QORTHO[[paste0(sp,"_homolog_perc_id")]]
+#   QORTHO$cds_delta = QORTHO[[paste0(sp,'_cds_diff')]]
+#   QORTHO$tx_delta = QORTHO[[paste0(sp,'_tx_diff')]]
+#   QORTHO$gname_ortho = QORTHO[[paste0(sp,'_homolog_associated_gene_name')]]
+#   #QORTHO$two = phylum.2
+#   #QORTHO$four = phylum.4
+#   QORTHO$num_label =numlab
+#   QORTHO$filter = col_filter
+#   saveRDS(QORTHO,file.path(path_ortho,paste0(taxid,'-',sp,'-',orgname,'.rds')))
+#   return(QORTHO)
+# }
 
-  long  = map_chr(spname, ~last(.x) %>% str_to_lower())
-  short = map_chr(spname, ~head(.x,-1) %>% str_sub(start = 1,end=1) %>% str_to_lower() %>% concat())
+find_orthologs = function(ortho,BM=hs_biomart,use_cache=T){
 
-  return(paste0(short,long))
-}
-match_species_names = function(sp1, sp2, cutoff=0.1){
+  current_org = ortho$ens_org
+  current_sp = ortho$ens_sp
+  current_dataset = paste0(current_sp,"_gene_ensembl")
+  orgname = tolower(str_replace_all(current_org,'[ -]+','_'))
+  cache_file = file.path(path_ortho,paste0(ortho$tax_id,'-',current_sp,'-',orgname,'.rds'))
 
-  library(stringdist)
-  SP1 =  sp1 %>% tolower
-  SP2 =  sp2 %>% tolower
+  if(use_cache & file.exists(cache_file)){
+    cache_date = file.info(cache_file)[,'ctime'] %>% format(format="%d-%m-%Y %H:%M:%S")
+    .info$log(sprintf("Using cached data for '%s' created on %s",current_org,cache_date))
+    return(readRDS(cache_file))
+  }
 
-  sim_names = stringsimmatrix(SP1, SP2, method='jw',p=cutoff,useNames='strings')
-  maxS= apply(sim_names,1,max_)
-  i_maxS= apply(sim_names,1,function(x){ which(x == max(x, na.rm = F))[1] })
 
-  matched = tibble(s1=sp1, s2 = sp2[i_maxS], similarity=maxS)
+  hs_cols = c('ensg','enst','ensp',"is_enspref","has_ensp","is_canonical","canonical",
+              "hs_gene_len","hs_transcript_len", 'hs_cds_len',
+              "has_introns","n_transcripts","n_proteins","n_exons","n_exons_mini")
 
-  return(matched)
-}
 
-find_orthologs = function(x,ortho=ens_mammals_df){
-  taxid = ortho$tax_id[x]
-  org = ortho$organism[x]
-  sp = ortho$ens_sp[x]
-  ens_sp = paste0(ortho$ens_sp[x],"_eg")
-  spname =  ortho$species[x]
-  treename = ortho$label[x]
-  # phylum.2 = ortho$two[x]
-  # phylum.4 = ortho$four[x]
-  numlab = ortho$num_label[x]
-  col_filter=ortho$ortho_filter[x]
-  att_species = c('ensembl_gene','associated_gene_name','ensembl_peptide',
-                  'canonical_transcript_protein','subtype',
+  att_species = c('ensembl_gene','ensembl_peptide',
+                  'canonical_transcript_protein','associated_gene_name','subtype',
                   'perc_id','perc_id_r1','goc_score',
                   'wga_coverage','orthology_confidence')
-  sp_att = sprintf("%s_homolog_%s",ens_sp,att_species)
+  sp_att = sprintf("%s_homolog_%s",current_sp,att_species)
 
-  if( is.na(sp) ){
-    .warn$log(sprintf('Skip %s (%s) for orthologs...',org,spname))
+
+  ens_id = tibble(seqtype = c('gene','peptide','transcript'),
+                  all = c('ensg','ensp','enst'),
+                  hs = sprintf("ensembl_%s_id",seqtype),
+                  ortho = c(sp_att[1:2], paste0(current_sp,'_homolog_ensembl_transcript')))
+
+  bm_ortho = tryCatch({
+    get_ensembl_dataset("ENSEMBL_MART_ENSEMBL", current_dataset)
+  },error=function(cond) {
+    .error$log(sprintf('skipping species: %s!\n',current_org))
+    message(cond)
+    return(NULL)
+  })
+
+  if( is.na(current_sp) | is.null(bm_ortho) ){
+    .warn$log(sprintf('Skip %s (%s) for orthologs...',current_org,current_sp))
     return(NULL)
   }
 
   QORTHO = tryCatch({
-    id_hs = c('ensg','enst','ensp')
-    Q1.0 = query_ens_ortho( host = 'https://fungi.ensembl.org/',
-                            mart = "fungi_mart",dataset_suffix='eg_gene',
-                            species = 'scerevisiae',sp_ortho=ens_sp,COUNTER=x) %>% as_tibble() %>%
-      dplyr::rename(ensg=ensembl_gene_id,ensp=ensembl_peptide_id,enst=ensembl_transcript_id) %>%
-      filter(!no_ortholog)
+    Q1.0 = query_ens_ortho(sp_ortho=current_sp, species='hsapiens', BIOMART = BM,COUNTER=1) %>%
+      dplyr::rename(ens_id %>% pull(hs,all)) %>% filter(!no_ortholog)
 
     col_ortho_conf = grep('orthology_confidence',sp_att,v=T)
     Q1.1 = Q1.0[ Q1.0[[col_ortho_conf]] == 1,]
     .info$log("--> remove low confidence orthologs")
 
     col_ortho_prot = grep('homolog_ensembl_peptide',colnames(Q1.1),v=T)
-    sp_txlen = query_ens_txlen(Sp = sp,ORG=org,COUNTER = x,verbose=F,
-                               host = 'https://fungi.ensembl.org/',
-                               mart = "fungi_mart",dataset_suffix='eg_gene') %>%
-      filter(ensembl_peptide_id != "" & !is.na(ensembl_peptide_id)) %>%
-      dplyr::rename(ensg=ensembl_gene_id, enst=ensembl_transcript_id, ensp=ensembl_peptide_id) %>%
-      dplyr::rename_with(.cols=!ends_with('length'), .fn = Pxx, sp, s='_') %>%
-      dplyr::rename(cds_len_ortho=cds_length, tx_len_ortho = transcript_length)
+
+    id_ortho = ens_id %>% pull(all,ortho)
+    sp_txlen = query_ens_txlen(ORG=current_org, BIOMART=bm_ortho, COUNTER = 1, verbose=F, debug=T) %>%
+      dplyr::rename(ens_id %>% pull(hs,all)) %>%
+      filter(ensp != "" & !is.na(ensp)) %>%
+      dplyr::rename(cds_len_ortho=cds_length, tx_len_ortho = transcript_length) %>%
+      dplyr::rename( id_ortho )
+
     if( is.null(sp_txlen) ){ return(NULL) }
 
-    id_ortho = set_names(paste0(sp,"_",id_hs[c(1,3)]),sp_att[c(1,3)])
-    Q1.2 = inner_join(Q1.1,sc_tx, by=id_hs) %>%
-      inner_join(sp_txlen,by=id_ortho) %>%
-      as_tibble() %>% distinct()
+    #id_ortho = set_names(paste0(current_sp,"_",id_hs[c(1,3)]),sp_att[c(1,3)])
+
+    Q1.2 = inner_join(Q1.1,hs_tx, by=ens_id$all ) %>%
+      inner_join(sp_txlen,by=names(id_ortho)[1:2]) %>%
+      as_tibble() %>% distinct() %>% type_convert()
     .info$log("--> keep orthologs with cds closest in length")
 
     col_gname = str_subset(colnames(Q1.2),'homolog_associated_gene_name$')
+    col_id = str_subset(colnames(Q1.2),'ensembl_peptide$')
     col_pid = str_subset(colnames(Q1.2),'perc_id$')
     col_canonical = str_subset(colnames(Q1.2),'canonical_transcript_protein')
 
+    ortho_cols= c('id_ortho','pid_ortho','cds_delta','tx_delta','gname_ortho')
     Q1.3 = Q1.2 %>%
       dplyr::filter(!is.na(hs_cds_len-cds_len_ortho)) %>%
       group_by(ensg,enst,ensp) %>%
-      mutate(cds_diff = abs(hs_cds_len - cds_len_ortho)) %>%
-      mutate(tx_diff = abs(hs_transcript_len - tx_len_ortho)) %>%
-      dplyr::filter( cds_diff == min(cds_diff)) %>%
+      mutate(cds_delta = abs(hs_cds_len - cds_len_ortho)) %>%
+      mutate(tx_delta = abs(hs_transcript_len - tx_len_ortho)) %>%
+      dplyr::filter( cds_delta == min(cds_delta)) %>%
       # in case there are >2 orthologs for a human protein, pick the one with the highest pid
       group_by(ensp) %>% dplyr::filter( .data[[col_pid]] == max_(.data[[col_pid]]) ) %>%
       # in case there are >2 orthologs for a human protein, pick the one with the gene name
-      #dplyr::filter( .data[[col_gname]] != "" ) %>%
+      dplyr::filter( .data[[col_gname]] != "" ) %>%
       # in case there are >2 orthologs for a human protein, pick the one with closest transcript length
-      dplyr::filter( tx_diff == min(tx_diff) ) %>%
-      relocate(all_of(sc_cols)) %>%
-      dplyr::rename(cds_len=cds_len_ortho,tx_len=tx_len_ortho) %>%
-      dplyr::rename_with(.cols = !starts_with(sp) & -any_of(sc_cols), .fn = Pxx, sp, s='_' ) %>%
+      dplyr::filter( tx_delta == min(tx_delta) ) %>%
+      relocate(all_of(hs_cols)) %>%
+      dplyr::rename(cds_len=cds_len_ortho,tx_len=tx_len_ortho,
+                    id_ortho=!!col_id, pid_ortho=!!col_pid, gname_ortho = !!col_gname) %>%
+      dplyr::rename_with(.cols = !starts_with(current_sp) & -any_of(c(hs_cols,ortho_cols)), .fn = Pxx, current_sp, s='_' ) %>%
       ungroup() %>% distinct()
 
     count_ens_id(Q1.3)
     Q1.3
   },
   error=function(cond) {
-    .error$log(sprintf('skipping species: %s!\n',org))
+    .error$log(sprintf('skipping species: %s!\n',current_org))
     message(cond)
+    return(NULL)
   }
   )
-  orgname = tolower(str_replace_all(org,'[ -]+','_'))
-  QORTHO$ens_dataset = sp
-  QORTHO$organism = org
-  QORTHO$species = spname
-  QORTHO$fungi_tree = treename
-  QORTHO$treename = treename
-  QORTHO$id_ortho = QORTHO[[paste0(sp,"_homolog_ensembl_peptide")]]
-  QORTHO$pid_ortho = QORTHO[[paste0(sp,"_homolog_perc_id")]]
-  QORTHO$cds_delta = QORTHO[[paste0(sp,'_cds_diff')]]
-  QORTHO$tx_delta = QORTHO[[paste0(sp,'_tx_diff')]]
-  QORTHO$gname_ortho = QORTHO[[paste0(sp,'_homolog_associated_gene_name')]]
-  #QORTHO$two = phylum.2
-  #QORTHO$four = phylum.4
-  QORTHO$num_label =numlab
-  QORTHO$filter = col_filter
-  saveRDS(QORTHO,file.path(path_ortho,paste0(taxid,'-',sp,'-',orgname,'.rds')))
+
+  if(!is.null(QORTHO)){
+    QRES = bind_cols(ortho,QORTHO) %>% mutate(ens_dataset=current_sp)
+    saveRDS(QRES,cache_file)
+  }
   return(QORTHO)
 }
 
@@ -315,9 +405,8 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
 }
 
 
-
 #### WORKFLOW ####
-path_ortho = here::here('output','ens_sc_ortho')
+path_ortho = here::here('output','ens_sc_ortho','release-55')
 sc_biomart = get_ensembl_dataset('fungi_mart','cerevisiae')
 #sp_biomart = get_ensembl_dataset('fungi_mart','pombe')
 
@@ -347,63 +436,113 @@ sc_tx =preload( file.path(path_ortho,'ensembl_scerevisiae_tx.rds'),
 # 1. get Ensembl Fungi ---------------------------------------------------
 library(treeio)
 # Ensembl Fungi
-fungi_tree = get_ensembl_sptree(treename = '',URL_SPTREE = 'http://ftp.ebi.ac.uk/ensemblgenomes/pub/fungi/current/compara/species_trees/')
-ensembl_fungi = get_ensembl_fungi() %>% mutate( sp = get_sp(species) ) %>% filter(peptide_compara == 'Y')
+fu_tree = get_ensembl_sptree(treename = 'fungi_protein-trees_default.nh',URL_SPTREE = 'http://ftp.ebi.ac.uk/ensemblgenomes/pub/fungi/current/compara/species_trees/')
 
-SC_ORTHO = inner_join(ens_sc_orthologs,ensembl_fungi,by=c('sp'))
+fu_node = tibble( node = fu_tree$node.label,
+                  node_ = make.unique(node), is_duplicated = duplicated(node))
 
-ENS_SPECIES = match_species_names(SC_ORTHO$org,fungi_tree$tip.label,0.01) %>%
-  left_join(ens_sc_orthologs,by=c('s2'='org')) %>%
-  arrange(desc(similarity)) %>%
-  filter(similarity > 0.8) %>%
-  dplyr::rename(fungi_tree=s1,ens_org=s2,ens_sim=similarity,ortho_filter=name,ens_sp=sp)
+ens_fu = get_ensembl_fungi() %>% mutate( sp = get_ensembl_sp(species) ) %>%
+         filter(peptide_compara == 'Y' & sp %in% ens_sc_orthologs$sp)
 
-ENS_TREE = match_species_names(fungi_tree$tip.label,ensembl_fungi$species) %>%
-            dplyr::rename(fungi_tree=s1, ens_sp=s2, fungi_similarity=similarity )
 
-ens_fungi_info = ensembl_fungi %>%
-                 left_join(ENS_TREE, by=c('species'='ens_sp')) %>%
-                 inner_join(ENS_SPECIES, by=c('fungi_tree')) %>%
-                 relocate(organism,species,ens_sp,ortho_filter,fungi_tree,fungi_similarity)
-ens_fungi_tree = ape::keep.tip(fungi_tree,ens_fungi_info$fungi_tree)
-ens_fungi_tree$node.label = make.unique(ens_fungi_tree$node.label)
-# Save all unique node labels and replace duplicated node labels by NA in tree
-ens_fungi_nodes = ens_fungi_tree$node.label
-is_dup_nodes = str_detect(ens_fungi_nodes,".+\\.[0-9]+$")
-dup_nodelabels = ens_fungi_nodes[is_dup_nodes]
-dup_nodenums  = tidytree::nodeid(ens_fungi_tree,dup_nodelabels)
+# based on ncbi taxid and synonyms
+fu_names = tribble(~common_name,       ~sci_name,
+                   "ashbya_gossypii",                "eremothecium_gossypii_atcc_10895",
+                   "aspergillus_fumigatus",          "aspergillus_fumigatus_af293",
+                   "aspergillus_fumigatusa1163",     "aspergillus fumigatus a1163",
+                   "candida_auris",                  "_auris_strain_strain_b8441",
+                   "candida_duobushaemulonis",       "_duobushaemulonis_strain_strain_b09383",
+                   "candida_glabrata",               "_glabrata_cbs_138",
+                   "candida_haemuloni",              "_haemuloni_strain_b11899",
+                   "candida_pseudohaemulonis",       "_pseudohaemulonii_strain_b12108",
+                   "colletotrichum_gloeosporioides", "colletotrichum_fructicola_nara_gc5",
+                   "fusarium_solani",                "fusarium_vanettenii_77-13-4_strain_mpvi_77-13-4",
+                   "gaeumannomyces_graminis",        "gaeumannomyces_tritici_r3-111a-1",
+                   "komagataella_pastoris",          "komagataella_phaffii_gs115",
+                   "magnaporthe_oryzae",             "pyricularia_oryzae_70-15",
+                   "magnaporthe_poae",               "magnaporthiopsis_poae_atcc_64411",
+                   "melampsora_laricipopulina",      "melampsora_larici-populina_98ag31",
+                   "neosartorya_fischeri",           "aspergillus_fischeri_nrrl_181",
+                   "phaeosphaeria_nodorum",          "parastagonospora_nodorum_sn15",
+                   "puccinia_graminis",              "puccinia_graminis_f._sp._tritici_crl_75-36-700-3",
+                   "puccinia_graminisug99",          "puccinia_graminis_f._sp._tritici_04ken156/4",
+                   "pyrenophora_triticirepentis",    "pyrenophora_tritici-repentis_pt-1c-bfp",
+                   "pyricularia_oryzae",             "pyricularia_oryzae_strain_br32",
+                   "verticillium_dahliae",           "verticillium_dahliae_vdls.17",
+                   "verticillium_dahliaejr2",        "verticillium_dahliae_jr2",
+)
+
+
+fu_species = match_strings(ens_fu$species,fu_tree$tip.label,use_soundex = F) %>%
+             bind_rows(fu_names %>% dplyr::rename(s1='common_name')) %>%
+             dplyr::filter( is_matched | !is.na(sci_name)) %>%
+             group_by(s1) %>% add_count(name='n1') %>%
+             mutate( s2 = ifelse(is.na(s2), sci_name, s2),
+                     is_matched = n1 == 1,
+                     verified = ifelse( is.na(sci_name), 'by_similarity', 'taxid_synonym') ) %>%
+             dplyr::select(-sci_name)
+
+
+
+fu_info = inner_join(ens_sc_orthologs,ens_fu, by=c('Org'='organism','sp')) %>%
+          left_join(fu_species , by = c('species'='s1')) %>%
+          dplyr::rename(fu_tree=s2,ens_org=org,ens_filter=name,ens_sp=sp) %>%
+          filter(!is.na(fu_tree)) %>%
+          relocate(tax_id, Org, ens_org, ens_sp,species,fu_tree,ens_filter,
+                   osa:soundex, is_identical:is_matched, n1, verified,
+                   species_id:coverage,division,cored_db,
+                   assembly_version:genebuild,variation:other_alignments
+          )
+
 
 # Get lineage from root node (common ancestor to vertebrate)
-ens_fungi_clades = ape::subtrees(ens_fungi_tree, wait=FALSE) %>%
-  set_names( ens_fungi_tree$node.label ) %>%
-  purrr::keep(!is_dup_nodes)
+fu_clades = ape::subtrees(fu_tree, wait=FALSE) %>%
+            set_names( fu_tree$node.label ) %>%
+            purrr::discard(fu_node$is_duplicated)
 
-ens_fungi = ens_fungi_tree %>% as_tibble() %>%
-  mutate(depth = ape::node.depth(ens_fungi_tree),
+fu_data = fu_tree %>% as_tibble() %>%
+  mutate(depth = ape::node.depth(fu_tree),
          is_leaf = depth == 1, nodes = label %>% make.unique,
-         fungi_tree=label, label=tolower(label), Label = str_to_title(label) )
-ens_fungi_df = left_join(ens_fungi,ens_fungi_info,by=c('fungi_tree')) %>%
-  mutate(num_label = ifelse(is_leaf,paste0(node,".",organism),''))
+         label=tolower(label), Label = str_to_title(label) )
+
+fu_df = left_join(fu_data,fu_info,by=c('label'='fu_tree')) %>%
+  mutate(num_label = ifelse(is_leaf,paste0(node,".",ens_org),''))
+
+
+# Get lineage from root node (common ancestor to fungi)
+#fu_lineages = ape::nodepath(fu_tree, from = treeio::rootnode(fu_tree)) %>%
+#              set_names(fu_tree$tip.label)
+
+find.lineage(fu_tree)
+
+map_dfr(.x = names(fu_lineages), .f = ~ tibble(taxon=.x, ancestors=fu_lineages[.x], node_label=fu_data$label[fu_data$node %in% fu_lineages[.x]))
+
+NUM_NODES = fu_df$node[!fu_df$is_leaf]
+NUM_TIPS  = fu_df$node[fu_df$is_leaf]
 
 library(ggtree)
-FUNGI = ggtree(ens_fungi_tree,ladderize = T,right = T,branch.length = 'none')  +
-  ggtree::geom_nodelab(aes(subset=!(node %in% dup_nodenums)),size=3,geom='label',node = 'internal') +
-  ggtree::geom_tiplab(size=3,offset=0.5,align=T) + xlim(0,20) + ylim(0,50)
+dup_nodes = fu_node$node[fu_node$is_duplicated]
+sc_ortho_node = fu_data$node[ fu_data$is_leaf & fu_data$label %in% fu_species$s2]
+
+
+FUNGI = ggtree(fu_tree,ladderize = T,right = T,branch.length = 'none')  +
+  ggtree::geom_tippoint(aes(subset=(node %in% sc_ortho_node)),size=1, color='red') +
+  ggtree::geom_nodelab(aes(subset=!(node %in% dup_nodes)),size=3,geom='label',node = 'internal') +
+  ggtree::geom_tiplab(size=3,offset=0.5,align=T) + xlim(0,30) + ylim(0,400)
 ggsave(plot=FUNGI, filename=file.path(path_ortho,'FUNGI_TREE.pdf'), height=25, width=25)
 
-# 1.1 query Ensembl biomart for human orthologuous proteins in vertebrates -----
-library(biomaRt)
-ens=useEnsembl(host = 'https://fungi.ensembl.org/', biomart = 'fungi_mart')
-sc_ens=useDataset(dataset = 'scerevisiae_eg_gene', mart = ens)
+# 1.1 query Ensembl biomart for yeast orthologuous proteins in fungi -----
 
-#listAttributes(sc_ens) %>% View
+#listAttributes(sc_biomart) %>% View
 
 sc_cols = c('ensg','enst','ensp',"is_enspref","has_ensp","is_canonical","canonical",
             "hs_gene_len","hs_transcript_len", 'hs_cds_len',
             "has_introns","n_transcripts","n_proteins","n_exons","n_exons_mini")
 
-ens_ortho = ens_fungi_df %>% filter(is_leaf & !is.na(ortho_filter)) %>%
+ens_ortho = fu_df %>% filter(is_leaf & !is.na(ens_filter)) %>%
             mutate(ens_dataset = paste0(ens_sp,'_eg_gene'))
+
+
 # Save all ensembl queries to get human-mammals orthologs
 SC_QUERY = preload(file.path(path_ortho,'ensembl_sc_fungi_orthologs.rds'),
                    { lapply(X=1:nrow(ens_ortho), FUN=function(x){ find_orthologs(x,ens_ortho) }) %>% compact },
