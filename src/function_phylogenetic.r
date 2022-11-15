@@ -305,6 +305,26 @@ get.enog.4891 = function(){
   return(node.info)
 }
 
+find.lineage= function(tree,full=F){
+
+  taxons = tree$tip.label
+  phyla  = tree$node.label
+  nodes  = seq(taxons)
+  N  = length(taxons)
+  lineage = lapply(nodes, function(n){ list(tax_node=n,anc_node=treeio::ancestor(tree,n)) })
+  df_lineage = dplyr::bind_rows(lineage)
+  df_lineage$taxon = taxons[df_lineage$tax_node]
+  df_lineage$ancestor = phyla[df_lineage$anc_node-N]
+
+  if(full){ return(df_lineage) }
+
+  lin = df_lineage |> group_by(taxon) |>
+    mutate(lineage_name=paste0(rev(ancestor),collapse=','),
+           lineage_node=paste0(rev(anc_node),collapse=',')) |>
+    dplyr::select(taxon,lineage_name,lineage_node) |> unique()
+  return(lin)
+}
+
 find.common.ancestor= function(lineage){
   L = strsplit(lineage,',')
   LCA = Reduce(intersect, L)
