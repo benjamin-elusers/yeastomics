@@ -28,7 +28,7 @@ safe_download = function(url, path, debug=F){
   file = path
   if( dir.exists(path) ){
     filename = basename(url)
-    file = file.path(path,filename,'.txt')
+    file = file.path(path,paste0(filename,'.txt'))
   }
 
   if( file.exists(file) && debug ){
