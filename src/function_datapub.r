@@ -1618,8 +1618,8 @@ fetch_eggnog_fasta = function(og){
   url_fasta_og = sprintf("%s/%s",URL_FASTA_EGGNOG,og)
 
   if(url.exists(url_fasta_og)){
-    fasta_og = Biostrings::readAAStringSet()
-    return(og_fasta)
+    fasta_og = Biostrings::readAAStringSet(url_fasta_og)
+    return(fasta_og)
   }else{
     .error$log(sprintf("Orthogroup not found (%s)",og))
     return(NULL)
@@ -1629,8 +1629,8 @@ fetch_eggnog_fasta = function(og){
 load_eggnog_fasta = function(ogs){
 
   .info$log(sprintf("Retrieve %s fasta sequences of eggnog orthogroups...",dplyr::n_distinct(ogs)))
-  ogs = pbmcapply::pbmclapply(ogs, fetch_eggnog_fasta, mc.cores = parallel::detectCores()-2)
-
+  eggnog_fasta = pbmcapply::pbmclapply(ogs, fetch_eggnog_fasta, mc.cores = parallel::detectCores()-2)
+  return(eggnog_fasta)
 }
 
 get_eggnog_alignment = function(node, use_trimmed=T, max_timeout=500){
