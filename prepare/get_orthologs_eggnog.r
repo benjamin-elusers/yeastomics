@@ -12,14 +12,9 @@ fu_yeast = eggnog_annotations_species(node = 4751, species = c(4932,4896))
 fu_taxons = count_taxons_eggnog_node(4751)
 
 fu_fastafiles = sprintf('%s/%s.fasta',fu_dir,fuNOG$OG)
-download.file(fuNOG$url_fasta, fu_fastafiles, quiet=T,mode = 'wb')
-
-
-
-walk2(fuNOG$url_fasta, fu_fastafiles, safe_download)
-
 pbmcapply::pbmclapply(fuNOG$url_fasta, safe_download, mc.cores=14, path=fu_dir)
 
+safe_download(fuNOG$url_fasta[1], path=fu_dir)
 #fu_fasta=load_eggnog_fasta()
 #fu_ali = get_eggnog_alignment(node=4751, use_trimmed = F)
 
