@@ -23,12 +23,12 @@ url.exists <- function(url) {
   return(FALSE)
 }
 
-safe_download = function(url, path, debug=F){
+safe_download = function(url, path, ext='.txt', debug=F){
 
   file = path
   if( dir.exists(path) ){
     filename = basename(url)
-    file = file.path(path,paste0(filename,'.txt'))
+    file = file.path(path,paste0(filename,ext))
   }
 
   if( file.exists(file) && debug ){
