@@ -1613,7 +1613,7 @@ get_eggnog_species = function(node){
   return(sp_info)
 }
 
-fetch_eggnog_fasta = function(og){
+fetch_eggnog_fasta = function(og,download=F){
   URL_FASTA_EGGNOG = "http://eggnogapi5.embl.de/nog_data/text/fasta"
   url_fasta_og = sprintf("%s/%s",URL_FASTA_EGGNOG,og)
 
@@ -1632,6 +1632,7 @@ load_eggnog_fasta = function(ogs){
   eggnog_fasta = pbmcapply::pbmclapply(ogs, fetch_eggnog_fasta, mc.cores = parallel::detectCores()-2)
   return(eggnog_fasta)
 }
+
 
 get_eggnog_alignment = function(node, use_trimmed=T, max_timeout=500){
 
@@ -1684,6 +1685,8 @@ get_eggnog_alignment = function(node, use_trimmed=T, max_timeout=500){
 get_eggnog_node = function(node){
 
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
+  URL_FASTA_EGGNOG = "http://eggnogapi5.embl.de/nog_data/text/fasta"
+
   eggnog_node = find_eggnog_node(node)
   find_eggnog_version()
   #library(rotl)
@@ -1703,7 +1706,9 @@ get_eggnog_node = function(node){
                     col_names = c('node','OG','nprot','nsp','string_ids','taxon_ids'),
                     col_types = 'cciicc') %>%
                  mutate(one2one = (nprot == nsp) ) %>%
-                 left_join(node_trees, by=c('node','OG'))
+                 left_join(node_trees, by=c('node','OG')) %>%
+                 mutate(url_fasta = sprintf("%s/%s",URL_FASTA_EGGNOG,OG),
+                        fasta_OK = url.exists(url_fasta))
 
   return(node_members)
 }
