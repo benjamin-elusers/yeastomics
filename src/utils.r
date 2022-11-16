@@ -23,6 +23,27 @@ url.exists <- function(url) {
   return(FALSE)
 }
 
+safe_download = function(url, path, debug=F){
+
+  file = path
+  if( dir.exists(path) ){
+    filename = basename(url)
+    file = file.path(path,filename,'.txt')
+  }
+
+  if( file.exists(file) && debug ){
+    message(sprintf("already downloaded (%s)",file))
+  }
+
+  if(url.exists(url) && !file_exists(file)){
+    tryCatch(
+      download.file(url , file, mode = "w", quiet=T),
+      error = function(e){
+        message(sprintf("URL does not exist (%s)",url))
+      })
+  }
+}
+
 check.url <- function(url) {
   # Test if url exists and accessible
 
