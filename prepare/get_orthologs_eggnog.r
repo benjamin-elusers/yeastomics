@@ -3,6 +3,7 @@ library(tidyverse)
 library(here)
 
 # Fungi = 4751
+fu_dir = here::here('data','eggnog','4751-fuNOG')
 
 fuNOG = get_eggnog_node(node = 4751)
 fu_species = get_eggnog_species(node = 4751)
@@ -10,11 +11,16 @@ fu_species = get_eggnog_species(node = 4751)
 fu_yeast = eggnog_annotations_species(node = 4751, species = c(4932,4896))
 fu_taxons = count_taxons_eggnog_node(4751)
 
-fu_dir = here::here('data','eggnog','4751-fuNOG')
 fu_fastafiles = sprintf('%s/%s.fasta',fu_dir,fuNOG$OG)
-safely(download_file(fu_urls, fu_fastafiles)
-fu_fasta=load_eggnog_fasta()
+download.file(fuNOG$url_fasta, fu_fastafiles, quiet=T,mode = 'wb')
 
+
+
+walk2(fuNOG$url_fasta, fu_fastafiles, safe_download)
+
+pbmcapply::pbmclapply(fuNOG$url_fasta, safe_download, mc.cores=14, path=fu_dir)
+
+#fu_fasta=load_eggnog_fasta()
 #fu_ali = get_eggnog_alignment(node=4751, use_trimmed = F)
 
 
