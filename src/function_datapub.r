@@ -1578,7 +1578,7 @@ find_eggnog_node=function(node,GUI=F){
     str_sub(end=-2L) # Remove the "/" of the directories
 
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG, find_eggnog_version(.print=F))
-  egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccfcc',progress = F) %>%
+  egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccccc',progress = F) %>%
             janitor::clean_names()
 
   XX = egg_tax$taxid_lineage %>% str_split(pattern=',')
@@ -1589,7 +1589,6 @@ find_eggnog_node=function(node,GUI=F){
             distinct %>% arrange(id) %>% dplyr::filter(id %in% taxlevels)
 
   tax_nodes = sprintf("%-s (%-s) ",taxlevel$id, taxlevel$name)
-
 
   if(missing(node)){
     chosen_node =  menu(tax_nodes, graphics = GUI, title = 'choose a taxonomic node...')
@@ -1608,10 +1607,30 @@ get_eggnog_species = function(node){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   eggnog_node = find_eggnog_node(node)
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG,find_eggnog_version(.print=F))
-  sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccfcc',progress = F) %>%
+  sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccccc',progress = F) %>%
             janitor::clean_names() %>%
             dplyr::filter(grepl(eggnog_node$name,named_lineage)) # find species with node in their lineage
   return(sp_info)
+}
+
+fetch_eggnog_fasta = function(og){
+  URL_FASTA_EGGNOG = "http://eggnogapi5.embl.de/nog_data/text/fasta"
+  url_fasta_og = sprintf("%s/%s",URL_FASTA_EGGNOG,og)
+
+  if(url.exists(url_fasta_og)){
+    fasta_og = Biostrings::readAAStringSet()
+    return(og_fasta)
+  }else{
+    .error$log(sprintf("Orthogroup not found (%s)",og))
+    return(NULL)
+  }
+}
+
+load_eggnog_fasta = function(ogs){
+
+  .info$log(sprintf("Retrieve %s fasta sequences of eggnog orthogroups...",dplyr::n_distinct(ogs)))
+  ogs = pbmcapply::pbmclapply(ogs, fetch_eggnog_fasta, mc.cores = parallel::detectCores()-2)
+
 }
 
 get_eggnog_alignment = function(node, use_trimmed=T, max_timeout=500){
@@ -1678,11 +1697,11 @@ get_eggnog_node = function(node){
   library(ape)
   node_trees = readr::read_delim(trees_file,delim='\t',
                                  col_names=c('node','OG','algo','tree'),
-                                 col_types='fffc')
+                                 col_types='ccfc')
 
   node_members = readr::read_delim(members_file,delim = '\t',
                     col_names = c('node','OG','nprot','nsp','string_ids','taxon_ids'),
-                    col_types = 'ffiicc') %>%
+                    col_types = 'cciicc') %>%
                  mutate(one2one = (nprot == nsp) ) %>%
                  left_join(node_trees, by=c('node','OG'))
 
