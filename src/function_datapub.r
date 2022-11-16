@@ -1707,8 +1707,7 @@ get_eggnog_node = function(node){
                     col_types = 'cciicc') %>%
                  mutate(one2one = (nprot == nsp) ) %>%
                  left_join(node_trees, by=c('node','OG')) %>%
-                 mutate(url_fasta = sprintf("%s/%s",URL_FASTA_EGGNOG,OG),
-                        fasta_OK = url.exists(url_fasta))
+                 mutate(url_fasta = sprintf("%s/%s",URL_FASTA_EGGNOG,OG))
 
   return(node_members)
 }
