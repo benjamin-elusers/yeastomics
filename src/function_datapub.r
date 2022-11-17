@@ -1789,8 +1789,8 @@ count_eggnog_node = function( node = 33208, subnode = 40674){
 
             "n1to1_clade" =  sum_(c_across(all_of(subnode_species))==1),
             "f1to1_clade" =  n1to1_clade / n1_species,
-            "one2one_clade" =  np_clade == nsp_clade,
-            'string_ids_clade' = strfind(paste0("^",subnode_species), string_ids))
+            "one2one_clade" =  np_clade == nsp_clade)
+            #'string_ids_clade' = strfind(paste0("^",subnode_species), string_ids))
 
   return(clade_stats)
 }
