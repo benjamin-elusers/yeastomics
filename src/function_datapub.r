@@ -1781,13 +1781,13 @@ count_eggnog_node = function( node = 33208, subnode = 40674){
   clade_stats = node_stats %>%
     rowwise() %>%
     mutate( "f_og" = nsp / n0_species,
-            "np_clade" =  sum_(c_across(subnode_species)),
+            "np_clade" =  sum_(c_across(all_of(subnode_species))),
             "fp_clade" =  np_clade / n1_species,
 
-            "nsp_clade" =  sum_(c_across(subnode_species)!=0),
+            "nsp_clade" =  sum_(c_across(all_of(subnode_species))!=0),
             "fsp_clade" =  nsp_clade / n1_species,
 
-            "n1to1_clade" =  sum_(c_across(subnode_species)==1),
+            "n1to1_clade" =  sum_(c_across(all_of(subnode_species))==1),
             "f1to1_clade" =  n1to1_clade / n1_species,
             "one2one_clade" =  np_clade == nsp_clade,
             'string_ids_clade' = strfind(paste0("^",subnode_species), string_ids))

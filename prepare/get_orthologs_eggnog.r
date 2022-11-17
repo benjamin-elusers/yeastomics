@@ -23,10 +23,12 @@ fu_yeast = eggnog_annotations_species(node = 4751, species = c(4932,4896))
 fu_taxons = count_taxons_eggnog_node(4751)
 
 fu_fastafiles = sprintf('%s/%s.fasta',fu_dir,fuNOG$OG)
-pbmcapply::pbmclapply(fuNOG$url_fasta, safe_download, mc.cores=14, path=fu_dir, ext='.fasta')
+#pbmcapply::pbmclapply(fuNOG$url_fasta, safe_download, mc.cores=14, path=fu_dir, ext='.fasta')
 #fu_ali = get_eggnog_alignment(node=4751, use_trimmed = F)
 
 fu_clades = map_dfr(names(fungi_clades), ~get_eggnog_taxonomy(.x))
+fu_4890 = count_eggnog_node(4751, 4890)
+fu_5204 = count_eggnog_node(4751, 5204)
 
 
 # Ascomycetes = 4890
@@ -39,11 +41,17 @@ am_yeast = eggnog_annotations_species(node = 4890, species = c(4932,4896))
 am_taxons = count_taxons_eggnog_node(4890)
 
 am_fastafiles = sprintf('%s/%s.fasta',am_dir,amNOG$OG)
-pbmcapply::pbmclapply(amNOG$url_fasta, safe_download, mc.cores=14, path=am_dir, ext='.fasta')
-am_ali = get_eggnog_alignment(node=4890, use_trimmed = F)
+#pbmcapply::pbmclapply(amNOG$url_fasta, safe_download, mc.cores=14, path=am_dir, ext='.fasta')
+#am_ali = get_eggnog_alignment(node=4890, use_trimmed = F)
 
 am_clades = map_dfr(names(ascomycota_clades), ~get_eggnog_taxonomy(.x))
 
+am_451866 = count_eggnog_node(4890,451866)
+am_4891 = count_eggnog_node(4890,4891)
+am_147541 = count_eggnog_node(4890,147541)
+am_147545 = count_eggnog_node(4890,147545)
+am_147550 = count_eggnog_node(4890,147550)
+am_147548 = count_eggnog_node(4890,147548)
 
 # Mammalia = 40674
 ma_dir = here::here('data','eggnog','40674-mammalia')
@@ -73,4 +81,7 @@ pbmcapply::pbmclapply(mzNOG$url_fasta, safe_download, mc.cores=14, path=mz_dir, 
 #mz_ali = get_eggnog_alignment(node=33208, use_trimmed = F)
 mz_clades = map(metazoa_clades, ~get_eggnog_taxonomy(.x))
 
-mz_clade = count_eggnog_node(33208, 40674)
+mz_7742 = count_eggnog_node(33208, 7742)
+mz_40674 = count_eggnog_node(33208, 40674)
+mz_50557 = count_eggnog_node(33208, 50557)
+mz_6231 = count_eggnog_node(33208, 6231)
