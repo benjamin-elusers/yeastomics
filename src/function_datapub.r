@@ -1745,6 +1745,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
                   mutate(clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size))
 
   taxlevel$size = unique(node_species$node_nsp)
+  cat('\n')
   .info$log(sprintf('taxonomic level is : %s_%s (n=%s)',taxlevel$id, taxlevel$name, taxlevel$size))
 
   if(missing(subnode)){ subnode = node }
