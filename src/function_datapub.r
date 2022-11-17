@@ -1764,16 +1764,19 @@ count_taxons_eggnog_node = function(node, subnode=1){
     }
   }
 
+  .info$log('count number of species in orthogroups...')
   s_count = sapply(node_species$taxid, function(sp){ str_count(node_members$taxon_ids,pattern=sp) })
   rownames(s_count) = node_members$OG
   colnames(s_count) = paste0('ns_',colnames(s_count))
   df_ns = s_count %>% as.data.frame() %>% rownames_to_column('OG')
 
+  .info$log('count number of proteins in orthogroups...')
   p_count = sapply(node_species$taxid, function(sp){ str_count(node_members$string_ids,pattern = paste0(sp,"\\.")) })
   rownames(p_count) = node_members$OG
   colnames(p_count) = paste0('np_',colnames(p_count))
   df_np = p_count %>% as.data.frame() %>% rownames_to_column('OG')
 
+  .info$log('compute orthogroups statistic for the taxonomic level...')
   og_ids = node_members %>% dplyr::select(OG,string_ids) %>%
     separate_rows( string_ids, sep=",") %>%
     separate(col=string_ids, into = c('taxid','string'), sep='\\.', extra = 'merge') %>%
@@ -1789,7 +1792,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
   for(i in 1:subnode_found){
 
     df_clade = df_subnode[i,]
-    .info$log(sprintf('inspecting clade : %s_%s (n=%s)',df_clade$clade_id, df_clade$clade_name, df_clade$clade_size))
+    .info$log(sprintf('inspecting clade  %s_%s (n=%s)...',df_clade$clade_id, df_clade$clade_name, df_clade$clade_size))
     subnode_species = get_eggnog_species(df_clade$clade_id) %>% pull(taxid,taxon)
 
 
