@@ -1579,7 +1579,7 @@ find_eggnog_node=function(node,GUI=F){
 
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG, find_eggnog_version(.print=F))
   egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccccc',progress = F,
-                              col_names =  c('taxid','taxon','rank','lineage_name','lineage_id'))
+                              skip = 1,col_names =  c('taxid','taxon','rank','lineage_name','lineage_id'))
 
   XX = egg_tax$lineage_id %>% str_split(pattern=',')
   YY = egg_tax$lineage_name %>% str_split(pattern=',')
@@ -1626,11 +1626,11 @@ get_eggnog_taxonomy = function(node){
            separate_rows(c('lineage_id','lineage_name'), sep=',') %>%
            mutate(seen=1) %>%
            group_by(clade_id=lineage_id,clade_name=lineage_name) %>%
-           summarize(clade_n=sum(seen)) %>%
-           arrange(desc(clade_n),clade_id,clade_name) %>%
+           summarize(clade_size=sum(seen)) %>%
+           arrange(desc(clade_size),clade_id,clade_name) %>%
            ungroup() %>%
            mutate(is_clade = !(clade_id %in% SP),
-                  is_subnode = clade_n <= NSP)
+                  is_subnode = clade_size < NSP)
 
   return(clades)
 }
@@ -1713,7 +1713,7 @@ get_eggnog_node = function(node){
   members_file = paste0(url_node_info,grep("_members.tsv.gz",eggnog_node_files,v=T))
   trees_file = paste0(url_node_info,grep("_trees.tsv.gz",eggnog_node_files,v=T))
   library(ape)
-  node_trees = readr::read_delim(trees_file,delim='\t',
+  node_trees = readr::read_delim(file = trees_file , delim='\t',
                                  col_names=c('node','OG','algo','tree'),
                                  col_types='ccfc')
 
@@ -1727,88 +1727,82 @@ get_eggnog_node = function(node){
   return(node_members)
 }
 
-count_taxons_eggnog_node = function(node, subnode){
-
-  if(missing(node)){ subnode = node }
+count_taxons_eggnog_node = function(node, subnode=1){
 
   taxlevel = find_eggnog_node(node)
   node_species = get_eggnog_species(taxlevel$id)
   node_members = get_eggnog_node(taxlevel$id)
   node_clades = get_eggnog_taxonomy(taxlevel$id)
 
-  node_subnodes = node_clades %>% filter(is_clade & is_subnode & nsp > 1) %>%
-                  mutate(clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,nsp))
+  node_subnodes = node_clades %>% filter(clade_id == node | (is_clade & is_subnode & clade_size > 1)) %>%
+                  mutate(clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size))
 
-  df_subnode = node_subnodes %>% filter(clade_id == subnode )
-  if( nrow(df_subnode) == 0 ){
-    .warn$log(sprintf('subnode %s not found in node %s (%s)',subnode,taxlevel$id, taxlevel$name))
-    choice = menu(choices =node_subnodes$clade_desc,graphics = F, title='pick a valid clade...')
-    df_subnode = node_subnodes[choice,]
+  if(missing(subnode)){ subnode = node }
+
+  df_subnode = node_subnodes %>% filter(clade_id %in% subnode )
+  subnode_found = n_distinct(df_subnode$clade_id)
+
+  if( subnode_found < length(subnode) ){
+    na_subnode = setdiff(subnode,node_subnodes$clade_id)
+    .warn$log(sprintf('node %s (%s) does not contain any of those subnodes: %s ',taxlevel$id, taxlevel$name,paste0(na_subnode,collapse=" ")))
+
+    if( subnode_found == 0){
+      clade_choices = node_subnodes %>% mutate( rownum = row_number() ) %>% pull(clade_desc,rownum)
+      choice = select.list(choices=clade_choices, multiple=T, graphics = F, title='pick a valid clade...')
+      subnode_found = n_distinct(choice)
+      df_subnode = node_subnodes[names(choice),]
+    }
   }
-  subnode_species = get_eggnog_species(df_subnode$clade_id)
 
   s_count = sapply(node_species$taxid, function(sp){ str_count(node_members$taxon_ids,pattern=sp) })
-  p_count = sapply(node_species$taxid, function(sp){ str_count(node_members$string_ids,pattern = paste0(sp,"\\.")) })
-
-  s_clade = s_count[, subnode_species$taxid ]
-  p_clade = p_count[, subnode_species$taxid ]
-
-  s_clade_0 = s_clade == 0
-  p_clade_1to1 = p_clade==1
-  s1to1_clade = rowSums(s_clade!=0 & s_clade==p_clade_1to1)
-  fs_clade = rowSums(s_clade) / df_subnode$clade_n
-  f1to1_clade = s1to1_clade / rowSums(s_clade)
-  clade_count = bind_cols(subnode,node_members)
-
+  rownames(s_count) = node_members$OG
   colnames(s_count) = paste0('ns_',colnames(s_count))
+  df_ns = s_count %>% as.data.frame() %>% rownames_to_column('OG')
+
+  p_count = sapply(node_species$taxid, function(sp){ str_count(node_members$string_ids,pattern = paste0(sp,"\\.")) })
+  rownames(p_count) = node_members$OG
   colnames(p_count) = paste0('np_',colnames(p_count))
+  df_np = p_count %>% as.data.frame() %>% rownames_to_column('OG')
 
-  # add column counting the number of times a protein from a taxon is seen
-  node = bind_cols(node_members,p_count %>% as_tibble,)
+  og_ids = node_members %>% dplyr::select(OG,string_ids) %>%
+    separate_rows( string_ids, sep=",") %>%
+    separate(col=string_ids, into = c('taxid','string'), sep='\\.', extra = 'merge') %>%
+    group_by(OG,taxid) %>%
+    add_count(name='northo') %>%
+    group_by(OG) %>%
+    mutate( id_ns = n_distinct(taxid),
+            id_np = n_distinct(string),
+            id_one2one = id_ns==id_np,
+            id_n1to1 = sum(northo == 1) )
+
+  clade_list = list()
+  for(i in 1:subnode_found){
+
+    df_clade = df_subnode[i,]
+    subnode_species = get_eggnog_species(df_clade$clade_id) %>% pull(taxid,taxon)
 
 
-  return(node)
+    clade_stats = bind_cols(df_clade,og_ids) %>%
+                  group_by(OG) %>%
+                    filter(taxid %in% subnode_species) %>%
+                  group_by(OG,taxid) %>%
+                    add_count(name='clade_northo') %>%
+                  group_by(OG) %>%
+                    mutate( clade_ns = n_distinct(taxid),
+                            clade_np = n_distinct(string),
+                            clade_f  = clade_ns / clade_size,
+                            clade_one2one = clade_ns==clade_np,
+                            clade_n1to1  = sum(clade_northo == 1),
+                            clade_f1to1 = clade_n1to1 / clade_ns ) %>%
+                  ungroup() %>%
+                  dplyr::select(-c(taxid,string,northo,clade_northo)) %>%
+                  distinct()
+
+    clade_list[[df_clade$clade_desc]] = left_join(clade_stats,df_ns,by='OG') %>% left_join(df_np,by='OG')
+  }
+  if( subnode_found == 1 ){ return( unlist(clade_list) )}
+  return(clade_list)
 }
-
-#' count_eggnog_node = function( node = 33208, subnode = 40674){
-#'
-#'   node_info=get_eggnog_taxonomy(node)
-#'   node_name = unique(node_info$node_name)
-#'
-#'   subnode_info=get_eggnog_taxonomy(subnode)
-#'   subnode_name = unique(subnode_info$node_name)
-#'
-#'   # check if subnode is part of the node
-#'   if(missing(subnode) || !(subnode %in% node_subnodes) ){
-#'     .error$log(sprintf('subnode %s (%s) not found in node %s (%s)',
-#'                        node, node_name, subnode,subnode_name))
-#'     return(NULL)
-#'   }
-#'
-#'   node_stats = count_taxons_eggnog_node(node)
-#'   node_species = grep('np_', colnames(node_stats),v=T)
-#'   n0_species = n_distinct(node_species)
-#'   subnode_species = paste0('np_',subnode_info$taxid)
-#'   n1_species = n_distinct(subnode_species)
-#'
-#'   .info$log(sprintf('count species in subnode %s (%s)...',subnode,subnode_name))
-#'
-#'   clade_stats = node_stats %>%
-#'     rowwise() %>%
-#'     mutate( "f_og" = nsp / n0_species,
-#'             "np_clade" =  sum_(c_across(all_of(subnode_species))),
-#'             "fp_clade" =  np_clade / n1_species,
-#'
-#'             "nsp_clade" =  sum_(c_across(all_of(subnode_species))!=0),
-#'             "fsp_clade" =  nsp_clade / n1_species,
-#'
-#'             "n1to1_clade" =  sum_(c_across(all_of(subnode_species))==1),
-#'             "f1to1_clade" =  n1to1_clade / n1_species,
-#'             "one2one_clade" =  np_clade == nsp_clade)
-#'             #'string_ids_clade' = strfind(paste0("^",subnode_species), string_ids))
-#'
-#'   return(clade_stats)
-#' }
 
 find.common.ancestor= function(lineage){
   L = strsplit(lineage,',')
