@@ -1543,29 +1543,6 @@ find_eggnog_downloads = function(){
   return(eggnog_files)
 }
 
-get_eggnog_taxonomy = function(node){
-  URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
-  eggnog_node = find_eggnog_node(node)
-  .ver=find_eggnog_version(.print = F)
-  eggnog_levelinfo_archive = sprintf("%s/%s.level_info.tar.gz",URL_EGGNOG,.ver)
-
-  if( !url.exists(eggnog_levelinfo_archive) ){
-    .error$log(sprintf('Taxonomic level information not found (%s)!',eggnog_levelinfo_archive))
-    return(NULL)
-  }
-  .info$log(sprintf("retrieving taxonomic level info for %s (%s)...",eggnog_node$id,eggnog_node$name))
-  taxlevel_files = archive::archive(eggnog_levelinfo_archive)
-  node_file = grep(x=taxlevel_files$path, pattern = eggnog_node$id,v=T)
-
-  node_levelinfo =  archive::archive_read(eggnog_levelinfo_archive, file = node_file)
-
-  .info$log(sprintf("reading taxonomic level info (%s)...",node_file))
-  taxlevel = readr::read_delim(node_levelinfo, delim = '\t', col_types = 'ccccc',
-                               col_names = c('taxid','taxon','rank','lineage','lineage_node')) %>%
-             mutate(node=eggnog_node$id, node_name = eggnog_node$name)
-  return(taxlevel)
-}
-
 
 eggnog_annotations_species=function(node,species){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
@@ -1575,7 +1552,7 @@ eggnog_annotations_species=function(node,species){
   eggnog_annotation_file = sprintf("%s/%s.og_annotations.tsv",URL_EGGNOG,.ver)
   eggnog_annotations_node = readr::read_delim(eggnog_annotation_file,"\t",
                                               col_types = 'ccfc',
-                                              col_names = c('nodes','og','letter','enog_annot')) %>%
+                                              col_names = c('nodes','og','letter','annotation')) %>%
                             dplyr::filter(nodes == node)
 
 
@@ -1601,11 +1578,11 @@ find_eggnog_node=function(node,GUI=F){
     str_sub(end=-2L) # Remove the "/" of the directories
 
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG, find_eggnog_version(.print=F))
-  egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccccc',progress = F) %>%
-            janitor::clean_names()
+  egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccccc',progress = F,
+                              col_names =  c('taxid','taxon','rank','lineage_name','lineage_id'))
 
-  XX = egg_tax$taxid_lineage %>% str_split(pattern=',')
-  YY = egg_tax$named_lineage %>% str_split(pattern=',')
+  XX = egg_tax$lineage_id %>% str_split(pattern=',')
+  YY = egg_tax$lineage_name %>% str_split(pattern=',')
   ok = sapply(XX,length) == sapply(YY,length)
 
   taxlevel= tibble(id = as.integer(unlist(XX[ok])), name = unlist(YY[ok])) %>%
@@ -1630,11 +1607,38 @@ get_eggnog_species = function(node){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   eggnog_node = find_eggnog_node(node)
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG,find_eggnog_version(.print=F))
-  sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccccc',progress = F) %>%
-            janitor::clean_names() %>%
-            dplyr::filter(grepl(eggnog_node$name,named_lineage)) # find species with node in their lineage
+  sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccccc',progress = F,
+                              col_names =  c('taxid','taxon','rank','lineage_name','lineage_id')) %>%
+            # find species with node in their lineage
+            dplyr::filter(grepl(eggnog_node$name,lineage_name)) %>%
+            mutate(node_id=eggnog_node$id, node_name = eggnog_node$name) %>%
+            relocate(node_id,node_name)
+
   return(sp_info)
 }
+#
+# get_eggnog_taxonomy = function(node){
+#   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
+#   eggnog_node = find_eggnog_node(node)
+#   .ver=find_eggnog_version(.print = F)
+#   eggnog_levelinfo_archive = sprintf("%s/%s.level_info.tar.gz",URL_EGGNOG,.ver)
+#
+#   if( !url.exists(eggnog_levelinfo_archive) ){
+#     .error$log(sprintf('Taxonomic level information not found (%s)!',eggnog_levelinfo_archive))
+#     return(NULL)
+#   }
+#   .info$log(sprintf("retrieving taxonomic level info for %s (%s)...",eggnog_node$id,eggnog_node$name))
+#   taxlevel_files = archive::archive(eggnog_levelinfo_archive)
+#   node_file = grep(x=taxlevel_files$path, pattern = eggnog_node$id,v=T)
+#
+#   node_levelinfo =  archive::archive_read(eggnog_levelinfo_archive, file = node_file)
+#
+#   .info$log(sprintf("reading taxonomic level info (%s)...",node_file))
+#   taxlevel = readr::read_delim(node_levelinfo, delim = '\t', col_types = 'ccccc',
+#                                col_names = c('taxid','taxon','rank','lineage','lineage_node')) %>%
+#     mutate(node=eggnog_node$id, node_name = eggnog_node$name)
+#   return(taxlevel)
+# }
 
 fetch_eggnog_fasta = function(og,download=F){
   URL_FASTA_EGGNOG = "http://eggnogapi5.embl.de/nog_data/text/fasta"
@@ -1647,13 +1651,6 @@ fetch_eggnog_fasta = function(og,download=F){
     .error$log(sprintf("Orthogroup not found (%s)",og))
     return(NULL)
   }
-}
-
-load_eggnog_fasta = function(ogs){
-
-  .info$log(sprintf("Retrieve %s fasta sequences of eggnog orthogroups...",dplyr::n_distinct(ogs)))
-  eggnog_fasta = pbmcapply::pbmclapply(ogs, fetch_eggnog_fasta, mc.cores = parallel::detectCores()-2)
-  return(eggnog_fasta)
 }
 
 
@@ -1748,6 +1745,9 @@ count_taxons_eggnog_node = function(node){
 
   # add column counting the number of times a protein from a taxon is seen
   node = bind_cols(node_members,p_count %>% as_tibble)
+
+
+
   return(node)
 }
 
