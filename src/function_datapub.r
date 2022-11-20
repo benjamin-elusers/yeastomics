@@ -1581,8 +1581,7 @@ find_eggnog_node=function(node,GUI=F,.print=T){
             mutate(lineage_name = str_replace_all(lineage_name,", ", replacement = "_"))
 
   taxlevel = egg_tax %>% dplyr::select(-taxid,-taxon,-rank) %>% distinct() %>%
-             separate_rows("lineage_id","lineage_name",sep=',') %>%
-             hablar::convert(int(lineage_id)) %>%
+             separate_rows("lineage_id","lineage_name",sep=',',convert = T) %>%
              dplyr::rename(id=lineage_id, name=lineage_name) %>%
              filter(id %in% taxlevels) %>%
              group_by(id) %>% add_count(name='size') %>%
@@ -1705,13 +1704,13 @@ get_eggnog_alignment = function(node, use_trimmed=T, max_timeout=500){
   return(node_ali)
 }
 
-get_eggnog_node = function(node,silent=F){
+get_eggnog_node = function(node,to_long=F,silent=F){
 
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   URL_FASTA_EGGNOG = "http://eggnogapi5.embl.de/nog_data/text/fasta"
 
   eggnog_node = find_eggnog_node(node,.print=!silent)
-  find_eggnog_version()
+  find_eggnog_version(.print = !silent)
   #library(rotl)
   url_node_info = paste0(URL_EGGNOG,"per_tax_level/",eggnog_node$id,"/")
   eggnog_node_files = rvest::read_html(url_node_info) %>%
@@ -1731,6 +1730,12 @@ get_eggnog_node = function(node,silent=F){
                  mutate(one2one = (nprot == nsp) ) %>%
                  left_join(node_trees, by=c('node','OG')) %>%
                  mutate(url_fasta = sprintf("%s/%s",URL_FASTA_EGGNOG,OG))
+
+  if(to_long){
+    node_members = node_members %>%
+                   separate_rows(string_ids,sep=',',convert = T) %>%
+                   separate('string_ids', c('taxon','string'), sep = '\\.', extra='merge',fill = 'right')
+  }
 
   return(node_members)
 }
@@ -1755,8 +1760,9 @@ find_eggnog_subnode=function(node_clade,subnode){
     na_subnode = setdiff(subnode,node_subnodes$clade_id)
     .warn$log(sprintf('node %s (%s) does not contain any of those %s subnodes: %s ',taxlevel$id, taxlevel$name,n_distinct(na_subnode),paste0(na_subnode,collapse=" ")))
 
-    if( subnode_found == 0){
+    if(subnode_found == 0){
       clade_choices = node_subnodes %>% mutate( rownum = row_number() ) %>% pull(clade_desc,rownum)
+      .error$log(sprintf("None of the input clades were found within the taxonomic level %s_%s !",taxlevel$id, taxlevel$name))
       choice = select.list(choices=clade_choices, multiple=T, graphics = F, title='pick a valid clade...')
       subnode_found = n_distinct(choice)
       df_subnode = node_subnodes[names(choice),]
@@ -1778,7 +1784,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
 
   taxlevel = find_eggnog_node(node)
   node_species = get_eggnog_species(taxlevel$id)
-  node_members = get_eggnog_node(taxlevel$id) %>% dplyr::select(OG,taxon_ids,string_ids)
+  node_members = get_eggnog_node(taxlevel$id,silent = T) %>% dplyr::select(OG,taxon_ids,string_ids)
   node_clade = get_eggnog_taxonomy(taxlevel$id)
   df_subnode = find_eggnog_subnode(node_clade,subnode)
 
@@ -1818,7 +1824,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
     df_clade = df_subnode[i,]
     .info$log(sprintf('inspecting clade  %s_%s (n=%s)...',df_clade$clade_id, df_clade$clade_name, df_clade$clade_size))
     subnode_species = get_eggnog_species(df_clade$clade_id) %>% pull(taxid,taxon)
-
+    subnode_ids = get_eggnog_node(df_clade$clade_id,silent=T,to_long=T)
 
     clade_stats = bind_cols(df_clade,og_ids) %>%
                   group_by(OG) %>%
