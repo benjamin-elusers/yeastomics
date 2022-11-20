@@ -1525,15 +1525,6 @@ get.ppm.ortho = function(node="4751.fungi", raw=F, which.abundance="integrated")
 # }
 
 ##### eggNOG #####
-find_eggnog_version = function(.print=T){
-  eggnog_files=find_eggnog_downloads()
-  .version = str_extract(pattern="^(e[0-9](\\.[0-9])?)\\.",string = eggnog_files) %>%
-             gtools::mixedsort(na.last = F) %>%
-             last %>% str_sub(end=-2L) #remove the '.' after the version number
-  if(.print){ cat(sprintf("EggNOG VERSION: %s\n",.version)) }
-  return(.version)
-}
-
 find_eggnog_downloads = function(){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   eggnog_files = rvest::read_html(URL_EGGNOG) %>%
@@ -1543,6 +1534,14 @@ find_eggnog_downloads = function(){
   return(eggnog_files)
 }
 
+find_eggnog_version = function(.print=T){
+  eggnog_files=find_eggnog_downloads()
+  .version = str_extract(pattern="^(e[0-9](\\.[0-9])?)\\.",string = eggnog_files) %>%
+             gtools::mixedsort(na.last = F) %>%
+             last %>% str_sub(end=-2L) #remove the '.' after the version number
+  if(.print){ cat(sprintf("EggNOG VERSION: %s\n",.version)) }
+  return(.version)
+}
 
 eggnog_annotations_species=function(node,species){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
@@ -1555,13 +1554,12 @@ eggnog_annotations_species=function(node,species){
                                               col_names = c('nodes','og','letter','annotation')) %>%
                             dplyr::filter(nodes == node)
 
-
   members_node = get_eggnog_node(node) %>%
+        dplyr::select( -c(algo,tree,taxon_ids) ) %>%
+        distinct() %>%
         separate_rows(string_ids,sep = ',') %>%
-        mutate(taxon = str_extract(string = string_ids, '^[0-9]+\\.') %>% str_sub(end=-2)) %>%
-        mutate(string=str_replace_all(string = string_ids, '^[0-9]+\\.', "")) %>%
-        dplyr::select( -c(algo,tree,taxon_ids,string_ids) ) %>%
-        distinct()
+        separate(string_ids, c('taxon','string'), extra = 'merge')
+
 
   annotation_sp = left_join(members_node,eggnog_annotations_node, by=c('node'='nodes','OG'='og')) %>%
                     dplyr::filter(taxon %in% species) %>%
@@ -1579,19 +1577,18 @@ find_eggnog_node=function(node,GUI=F){
 
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG, find_eggnog_version(.print=F))
   egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccccc',progress = F,
-                              skip = 1,col_names =  c('taxid','taxon','rank','lineage_name','lineage_id'))
+                              skip = 1,col_names =  c('taxid','taxon','rank','lineage_name','lineage_id')) %>%
+            mutate(lineage_name = str_replace_all(lineage_name,", ", replacement = "_"))
 
-  # egg_tax %>% separate(col = lineage_id, into='clade_id', sep = ',') %>%
-  #   separate(col = lineage_name, into='clade_name', sep = ',')
+  taxlevel = egg_tax %>% dplyr::select(-taxid,-taxon,-rank) %>% distinct() %>%
+             separate_rows("lineage_id","lineage_name",sep=',') %>%
+             hablar::convert(int(lineage_id)) %>%
+             dplyr::rename(id=lineage_id, name=lineage_name) %>%
+             filter(id %in% taxlevels) %>%
+             group_by(id) %>% add_count(name='size') %>%
+             distinct() %>% arrange(id)
 
-  XX = egg_tax$lineage_id %>% str_split(pattern=',')
-  YY = egg_tax$lineage_name %>% str_split(pattern=',')
-  ok = sapply(XX,length) == sapply(YY,length)
-
-  taxlevel= tibble(id = as.integer(unlist(XX[ok])), name = unlist(YY[ok])) %>%
-            distinct %>% arrange(id) %>% dplyr::filter(id %in% taxlevels)
-
-  tax_nodes = sprintf("%-s (%-s) ",taxlevel$id, taxlevel$name)
+  tax_nodes = sprintf("%-s_%-s (%-s)",taxlevel$id, taxlevel$name, taxlevel$size)
 
   if(missing(node)){
     chosen_node =  menu(tax_nodes, graphics = GUI, title = 'choose a taxonomic node...')
@@ -1614,8 +1611,8 @@ get_eggnog_species = function(node){
                               col_names =  c('taxid','taxon','rank','lineage_name','lineage_id')) %>%
             # find species with node in their lineage
             dplyr::filter(grepl(eggnog_node$name,lineage_name)) %>%
-            mutate(node_id=eggnog_node$id, node_name = eggnog_node$name, node_nsp = n_distinct(taxid)) %>%
-            relocate(node_id,node_name,node_nsp)
+            mutate(node_id=eggnog_node$id, node_name = eggnog_node$name, node_size = eggnog_node$size) %>%
+            relocate(node_id,node_name,node_size)
   return(sp_info)
 }
 
@@ -1624,7 +1621,7 @@ get_eggnog_taxonomy = function(node){
   eggnog_node = find_eggnog_node(node)
   node_sp = get_eggnog_species(eggnog_node$id)
   SP = node_sp$taxid
-  NSP = n_distinct(SP)
+  NSP = eggnog_node$size
 
   clades = node_sp %>%
            separate_rows(c('lineage_id','lineage_name'), sep=',') %>%
@@ -1723,11 +1720,11 @@ get_eggnog_node = function(node){
   library(ape)
   node_trees = readr::read_delim(file = trees_file , delim='\t',
                                  col_names=c('node','OG','algo','tree'),
-                                 col_types='ccfc')
+                                 col_types='ccfc',progress = F)
 
   node_members = readr::read_delim(members_file,delim = '\t',
                     col_names = c('node','OG','nprot','nsp','string_ids','taxon_ids'),
-                    col_types = 'cciicc') %>%
+                    col_types = 'cciicc',progress = F) %>%
                  mutate(one2one = (nprot == nsp) ) %>%
                  left_join(node_trees, by=c('node','OG')) %>%
                  mutate(url_fasta = sprintf("%s/%s",URL_FASTA_EGGNOG,OG))
@@ -1736,6 +1733,9 @@ get_eggnog_node = function(node){
 }
 
 count_taxons_eggnog_node = function(node, subnode=1){
+  # e.g.
+  # node=4751
+  # subnode=c(4890,5204,451866,4891,147541,147545,147550,147548)
 
   taxlevel = find_eggnog_node(node)
   node_species = get_eggnog_species(taxlevel$id)
