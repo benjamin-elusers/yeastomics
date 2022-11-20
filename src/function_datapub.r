@@ -1545,22 +1545,21 @@ find_eggnog_version = function(.print=T){
 
 eggnog_annotations_species=function(node,species){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
-  eggnog_node = find_eggnog_node(node,.print=F)
   .ver=find_eggnog_version(.print = F)
+  eggnog_node = find_eggnog_node(node,.print=F)
   #library(rotl)
   eggnog_annotation_file = sprintf("%s/%s.og_annotations.tsv",URL_EGGNOG,.ver)
   eggnog_annotations_node = readr::read_delim(eggnog_annotation_file,"\t",
                                               col_types = 'icfc',
                                               col_names = c('nodes','og','letter','annotation')) %>%
-                            dplyr::filter(nodes == eggnog_node$node_id)
+                            dplyr::filter(nodes == eggnog_node$id)
 
-  members_node = get_eggnog_node(eggnog_node$node_id,to_long = T) %>%
+  members_node = get_eggnog_node(eggnog_node$id,to_long = T,silent = T) %>%
         dplyr::select( -c(algo,tree,taxon_ids) ) %>%
         distinct()
 
   annotation_sp = left_join(members_node,eggnog_annotations_node, by=c('node'='nodes','OG'='og')) %>%
-                    dplyr::filter(taxon %in% species)# %>%
-                    #mutate( OG = fct_drop(OG))
+                    dplyr::filter(taxon %in% species)
   return(annotation_sp)
 }
 
@@ -1731,7 +1730,9 @@ get_eggnog_node = function(node,to_long=F,silent=F){
                  mutate(url_fasta = sprintf("%s/%s",URL_FASTA_EGGNOG,OG))
 
   if(to_long){
-    .info$log("returning long format *rows= unique(taxon + string_id) per orthogroup*")
+    if(!silent){
+      .info$log("returning long format *rows= unique(taxon + string_id) per orthogroup*")
+    }
     node_members = node_members %>%
                    separate_rows(string_ids,sep=',',convert = T) %>%
                    separate('string_ids', c('taxon','string'), sep = '\\.', extra='merge',fill = 'right')
