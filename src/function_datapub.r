@@ -1609,6 +1609,7 @@ get_eggnog_species = function(node){
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG,find_eggnog_version(.print=F))
   sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccccc',progress = F,
                               col_names =  c('taxid','taxon','rank','lineage_name','lineage_id')) %>%
+            mutate(lineage_name = str_replace_all(lineage_name,", ", replacement = "_")) %>%
             # find species with node in their lineage
             dplyr::filter(grepl(eggnog_node$name,lineage_name)) %>%
             mutate(node_id=eggnog_node$id, node_name = eggnog_node$name, node_size = eggnog_node$size) %>%
@@ -1618,20 +1619,20 @@ get_eggnog_species = function(node){
 
 get_eggnog_taxonomy = function(node){
 
-  eggnog_node = find_eggnog_node(node) %>% dplyr::rename_with(~paste0('node_',.))
+  #eggnog_node = find_eggnog_node(node) %>% dplyr::rename_with(~paste0('node_',.))
   node_sp = get_eggnog_species(eggnog_node$node_id)
   SP = node_sp$taxid
 
-  clades = bind_cols(eggnog_node,node_sp) %>%
+  clades = node_sp %>%
            separate_rows(c('lineage_id','lineage_name'), sep=',') %>%
            mutate(seen=1) %>%
-           group_by(clade_id=lineage_id,clade_name=lineage_name) %>%
+           group_by(node_id,node_name,node_size, clade_id=lineage_id, clade_name=lineage_name) %>%
            summarize(clade_size=sum(seen)) %>%
            arrange(desc(clade_size),clade_id,clade_name) %>%
            ungroup() %>%
            mutate(is_clade = !(clade_id %in% SP),
                   is_subnode = clade_size < node_size) %>%
-          relocate(node_id,node_name,node_size)
+           relocate(node_id,node_name,node_size)
 
   return(clades)
 }
