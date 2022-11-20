@@ -1618,23 +1618,19 @@ get_eggnog_species = function(node){
 
 get_eggnog_taxonomy = function(node){
 
-  eggnog_node = find_eggnog_node(node)
-  node_sp = get_eggnog_species(eggnog_node$id)
+  eggnog_node = find_eggnog_node(node) %>% dplyr::rename_with(~paste0('node_',.))
+  node_sp = get_eggnog_species(eggnog_node$node_id)
   SP = node_sp$taxid
-  NSP = eggnog_node$size
 
-  clades = node_sp %>%
+  clades = bind_cols(eggnog_node,node_sp) %>%
            separate_rows(c('lineage_id','lineage_name'), sep=',') %>%
            mutate(seen=1) %>%
            group_by(clade_id=lineage_id,clade_name=lineage_name) %>%
            summarize(clade_size=sum(seen)) %>%
            arrange(desc(clade_size),clade_id,clade_name) %>%
            ungroup() %>%
-           mutate(node_id = eggnog_node$id,
-                  node_name=eggnog_node$name,
-                  node_size=NSP,
-                  is_clade = !(clade_id %in% SP),
-                  is_subnode = clade_size < NSP) %>%
+           mutate(is_clade = !(clade_id %in% SP),
+                  is_subnode = clade_size < node_size) %>%
           relocate(node_id,node_name,node_size)
 
   return(clades)
