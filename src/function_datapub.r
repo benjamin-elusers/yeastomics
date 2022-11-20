@@ -1705,12 +1705,12 @@ get_eggnog_alignment = function(node, use_trimmed=T, max_timeout=500){
   return(node_ali)
 }
 
-get_eggnog_node = function(node){
+get_eggnog_node = function(node,silent=F){
 
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   URL_FASTA_EGGNOG = "http://eggnogapi5.embl.de/nog_data/text/fasta"
 
-  eggnog_node = find_eggnog_node(node)
+  eggnog_node = find_eggnog_node(node,.print=!silent)
   find_eggnog_version()
   #library(rotl)
   url_node_info = paste0(URL_EGGNOG,"per_tax_level/",eggnog_node$id,"/")
