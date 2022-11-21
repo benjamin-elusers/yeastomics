@@ -1803,15 +1803,16 @@ count_taxons_eggnog_node = function(node, subnode=1){
   node_species = get_eggnog_species(taxlevel$id) %>% pull(taxid,taxon)
   .info$log('count number of orthologs/species in orthogroups...')
   #tictoc::tic('count number of orthologs/species in orthogroups...')
-  node_members = get_eggnog_node(taxlevel$id,.print = F,to_long = T)
+  node_members = get_eggnog_node(taxlevel$id,.print = F,to_long = T) %>%
+                 dplyr::rename(node_id=node)
 
   node_orthologs = node_members %>%
     dplyr::select(starts_with('node'),OG,taxid,string) %>%
     group_by(OG) %>%
     mutate( taxid = factor(taxid,node_species),
             id = paste0(taxid,".",string),
-            og_ids = list(id)) %>%
-    nest( og_orthologs = c(taxid,string,id) )
+            node_orthogroup = list(id)) %>%
+    nest( node_orthologs = c(taxid,string,id) )
   #tictoc::toc()
 
   .info$log('compute orthogroups statistic for the taxonomic level...')
@@ -1839,41 +1840,31 @@ count_taxons_eggnog_node = function(node, subnode=1){
     subnode_species = get_eggnog_species(df_clade$clade_id) %>% pull(taxid,taxon)
 
     tic('clade ortholog')
-    clade_orthologs = node_members %>%
-                      dplyr::select(starts_with('node'),OG,taxid,string) %>%
+    clade_orthologs = left_join(df_clade,node_members) %>%
+                      dplyr::select(starts_with(c('node','clade'),ignore.case = T),OG,taxid,string) %>%
                       filter( taxid %in% subnode_species ) %>%
+                      group_by(OG,taxid) %>%
+                      add_count(name='clade_northo') %>%
                       group_by(OG) %>%
                       mutate( taxid = factor(taxid,node_species),
                               id = paste0(taxid,".",string),
-                              clade_ids = list(id)) %>%
-                      dplyr::select(-taxid,-string) %>%
-                      distinct()
+                              clade_ns = n_distinct(taxid),
+                              clade_np = n_distinct(string),
+                              clade_one2one = clade_ns==clade_np,
+                              clade_f  = clade_ns / clade_size,
+                              clade_n1to1  = sum(clade_northo == 1),
+                              clade_f1to1 = clade_n1to1 / clade_ns
+                      ) %>%
+                      dplyr::select(-clade_northo) %>%
+                      distinct() %>%
+                      mutate( clade_orthogroup = list(id) ) %>%
+                      nest( clade_orthologs = c(taxid,string,id) )
     toc()
-    clade_stats = left_join(df_clade,df_og,c('node_id'='node','node_name','node_size')) %>%
-                  group_by(OG) %>%
-                    filter(taxid %in% subnode_species) %>%
-                    distinct() %>%
-                  group_by(OG,taxid) %>%
-                    add_count(name='clade_northo') %>%
-                  group_by(OG) %>%
-                    mutate( clade_ns = n_distinct(taxid),
-                            clade_np = n_distinct(string),
-                            clade_f  = clade_ns / clade_size,
-                            clade_one2one = clade_ns==clade_np,
-                            clade_n1to1  = sum(clade_northo == 1),
-                            clade_f1to1 = clade_n1to1 / clade_ns ) %>%
-                  ungroup() %>%
-                  mutate(string_id = paste0(taxid,".",string) ) %>%
-                  dplyr::select(starts_with(c('node_','og','clade'),ignore.case = T),
-                                string_id, algo,tree,url_fasta,-og_northo,-clade_northo) %>%
-                  nest(clade_ids=string_id) %>%
-                  distinct() %>%
-                  relocate(algo,tree,url_fasta,.after = last_col())
 
 
-    clade_list[[df_clade$clade_desc]] = left_join(clade_stats,df_ns,by='OG') %>%
-      left_join(df_np,by='OG') %>%
-      nest(ns = starts_with('ns_'), np = starts_with('np_'))
+
+
+    clade_list[[df_clade$clade_desc]] = left_join(df_og,clade_orthologs)
   }
   if( nrow(df_subnode) == 1 ){ return( unlist(clade_list) )}
   return(clade_list)
