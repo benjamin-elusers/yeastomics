@@ -1557,12 +1557,12 @@ eggnog_annotations_species=function(node,species){
 
   .info$log('reading eggnog orthogroups...')
   members_node = get_eggnog_node(eggnog_node$id,to_long = T,.print = F) %>%
-        dplyr::select( -c(algo,tree,taxon_ids, url_fasta) ) %>%
+        dplyr::select( -c(algo,tree,taxon_ids,url_fasta) ) %>%
         distinct()
 
   .info$log('merging annotations on orthogroups...')
   annotation_sp = left_join(members_node,eggnog_annotations_node, by=c('node'='nodes','OG'='og')) %>%
-                    dplyr::filter(taxon %in% species)
+                    dplyr::filter(taxid %in% species)
   return(annotation_sp)
 }
 
