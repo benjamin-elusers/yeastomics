@@ -1623,9 +1623,10 @@ get_eggnog_species = function(node){
 
 get_eggnog_taxonomy = function(node){
 
-  #eggnog_node = find_eggnog_node(node) %>% dplyr::rename_with(~paste0('node_',.))
-  node_sp = get_eggnog_species(node)
+  taxlevel = find_eggnog_node(node,.print = F)
+  node_sp = get_eggnog_species(eggnog_node$node_id)
   SP = node_sp$taxid
+  .info$log(sprintf("retrieving taxonomy for %s_%s...",taxlevel$id,taxlevel$name))
 
   clades = node_sp %>%
            separate_rows(c('lineage_id','lineage_name'), sep=',') %>%
@@ -1729,8 +1730,6 @@ get_eggnog_node = function(node,to_long=F,silent=F){
                  relocate(starts_with('node')) %>%
                  mutate(og_one2one = (og_np == og_ns) ) %>%
                  mutate(url_fasta = sprintf("%s/%s",URL_FASTA_EGGNOG,OG)) %>%
-                 mutate( og_orthologs = str_split(string_ids,','),
-                         og_species = str_split(taxon_ids,',')) %>%
                  left_join(node_trees, by=c('node','OG'))
 
   if(to_long){
@@ -1790,48 +1789,41 @@ count_taxons_eggnog_node = function(node, subnode=1){
   # subnode=c(4890,5204,451866,4891,147541,147545,147550,147548)
 
   taxlevel = find_eggnog_node(node)
-  df_subnode = find_eggnog_subnode(node_clade,subnode)
+  df_subnode = find_eggnog_subnode(taxlevel$id,subnode)
 
-  node_clade = get_eggnog_taxonomy(taxlevel$id)
+  #node_clade = get_eggnog_taxonomy(taxlevel$id)
+  node_species = get_eggnog_species(taxlevel$id) %>% pull(taxid,taxon)
+  .info$log('count number of orthologs/species in orthogroups...')
+  tictoc::tic('count number of orthologs/species in orthogroups...')
   node_members = get_eggnog_node(taxlevel$id,silent = T,to_long = T)
-  node_species = get_eggnog_species(taxlevel$id)
+  node_species = get_eggnog_species(taxlevel$id) %>% pull(taxid,taxon)
 
-  .info$log('count number of species in orthogroups...')
-  #tictoc::tic('count number of species in orthogroups...')
-  s_count = sapply(node_species$taxid, function(sp){ str_count(node_members$taxon_ids,pattern=sp) })
-  rownames(s_count) = node_members$OG
-  colnames(s_count) = paste0('ns_',colnames(s_count))
-  df_ns = s_count %>% as.data.frame() %>% rownames_to_column('OG')
-  #tictoc::toc()
-
-  .info$log('count number of proteins in orthogroups...')
-  #tictoc::tic('count number of proteins in orthogroups...')
-  p_count = sapply(node_species$taxid, function(sp){ str_count(node_members$string_ids,pattern = paste0(sp,"\\.")) })
-  rownames(p_count) = node_members$OG
-  colnames(p_count) = paste0('np_',colnames(p_count))
-  df_np = p_count %>% as.data.frame() %>% rownames_to_column('OG')
-  #tictoc::toc()
+  node_orthologs = node_members %>%
+    dplyr::select(OG,taxid,string) %>%
+    mutate( taxid = factor(taxid,node_species) ) %>%
+    group_by(OG) %>%
+    nest( orthologs = c(taxid,string) ) %>%
+  tictoc::toc()
 
   .info$log('compute orthogroups statistic for the taxonomic level...')
   tictoc::tic('compute orthogroups statistic for the taxonomic level...')
-  og_info = node_members %>%
-            separate_rows( string_ids, sep=",") %>%
-            separate(col=string_ids, into = c('taxid','string'), sep='\\.', extra = 'merge')
 
-  og_stats = og_info %>%
+  og_stats = node_members %>%
              dplyr::rename(og_ns = nsp, og_np = nprot, og_one2one = one2one) %>%
              dplyr::select( starts_with('og',ignore.case = ), algo, tree, url_fasta,
                             taxid,string,
-                             ) %>%
+                             )  %>% distinct() %>%
              group_by(OG,taxid) %>%
                add_count(name='og_northo') %>%
              group_by(OG) %>%
                mutate(og_n1to1 = sum(og_northo == 1)) %>%
-            dplyr::select(-taxid,-string,-og_northo) %>%
-            distinct()
+             dplyr::select(-taxid,-string,-og_northo) %>%
+             distinct()
 
-  og_ids = og_info %>% group_by(OG) %>%
-           dplyr::select(taxid,string) %>%
+  og_ids = node_members %>%
+            dplyr::select(OG,taxid,string) %>%
+            group_by(OG) %>%
+
            mutate(string_id = paste0(taxid,".",string) ) %>%
            dplyr::select(-taxid,-string) %>%
            distinct() %>%
