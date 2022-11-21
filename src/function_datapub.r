@@ -1746,7 +1746,7 @@ get_eggnog_node = function(node,to_long=F,.print=T){
     }
     node_members = node_members %>%
                    separate_rows(string_ids,sep=',',convert = T) %>%
-                   separate('string_ids', c('taxon','string'), sep = '\\.', extra='merge',fill = 'right',remove = F)
+                   separate('string_ids', c('taxid','string'), sep = '\\.', extra='merge',fill = 'right',remove = F)
   }
 
   return(node_members)
@@ -1807,10 +1807,10 @@ count_taxons_eggnog_node = function(node, subnode=1){
   node_species = get_eggnog_species(taxlevel$id) %>% pull(taxid,taxon)
 
   node_orthologs = node_members %>%
-    dplyr::select(OG,taxid,string) %>%
-    mutate( taxid = factor(taxid,node_species) ) %>%
+    dplyr::select(OG,taxon,string) %>%
+    mutate( taxid = factor(taxon,node_species) ) %>%
     group_by(OG) %>%
-    nest( orthologs = c(taxid,string) ) %>%
+    nest( orthologs = c(taxid,string) )
   tictoc::toc()
 
   .info$log('compute orthogroups statistic for the taxonomic level...')
