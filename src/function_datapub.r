@@ -1839,7 +1839,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
     .info$log(sprintf('count species/orthologs for clade  %s_%s (n=%s)...',df_clade$clade_id, df_clade$clade_name, df_clade$clade_size))
     subnode_species = get_eggnog_species(df_clade$clade_id) %>% pull(taxid,taxon)
 
-    tic('clade ortholog')
+    #tic('clade ortholog')
     clade_orthologs = left_join(df_clade,node_members) %>%
                       dplyr::select(starts_with(c('node','clade'),ignore.case = T),OG,taxid,string) %>%
                       filter( taxid %in% subnode_species ) %>%
@@ -1859,10 +1859,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
                       distinct() %>%
                       mutate( clade_orthogroup = list(id) ) %>%
                       nest( clade_orthologs = c(taxid,string,id) )
-    toc()
-
-
-
+    #toc()
 
     clade_list[[df_clade$clade_desc]] = left_join(df_og,clade_orthologs)
   }
