@@ -1802,25 +1802,26 @@ count_taxons_eggnog_node = function(node, subnode=1){
   #node_clade = get_eggnog_taxonomy(taxlevel$id)
   node_species = get_eggnog_species(taxlevel$id) %>% pull(taxid,taxon)
   .info$log('count number of orthologs/species in orthogroups...')
-  tictoc::tic('count number of orthologs/species in orthogroups...')
+  #tictoc::tic('count number of orthologs/species in orthogroups...')
   node_members = get_eggnog_node(taxlevel$id,.print = F,to_long = T)
-  node_species = get_eggnog_species(taxlevel$id) %>% pull(taxid,taxon)
 
   node_orthologs = node_members %>%
-    dplyr::select(OG,taxon,string) %>%
-    mutate( taxid = factor(taxon,node_species) ) %>%
+    dplyr::select(starts_with('node'),OG,taxid,string) %>%
     group_by(OG) %>%
-    nest( orthologs = c(taxid,string) )
-  tictoc::toc()
+    mutate( taxid = factor(taxid,node_species),
+            id = paste0(taxid,".",string),
+            og_ids = list(id)) %>%
+    nest( og_orthologs = c(taxid,string,id) )
+  #tictoc::toc()
 
   .info$log('compute orthogroups statistic for the taxonomic level...')
-  tictoc::tic('compute orthogroups statistic for the taxonomic level...')
+  og_info =  node_members %>%
+             dplyr::select( starts_with('node'), OG, algo, url_fasta, tree) %>%
+             distinct()
 
   og_stats = node_members %>%
-             dplyr::rename(og_ns = nsp, og_np = nprot, og_one2one = one2one) %>%
-             dplyr::select( starts_with('og',ignore.case = ), algo, tree, url_fasta,
-                            taxid,string,
-                             )  %>% distinct() %>%
+             dplyr::select( starts_with(c('node','og'),ignore.case=T), taxid,string ) %>%
+             distinct() %>%
              group_by(OG,taxid) %>%
                add_count(name='og_northo') %>%
              group_by(OG) %>%
@@ -1828,18 +1829,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
              dplyr::select(-taxid,-string,-og_northo) %>%
              distinct()
 
-  og_ids = node_members %>%
-            dplyr::select(OG,taxid,string) %>%
-            group_by(OG) %>%
-
-           mutate(string_id = paste0(taxid,".",string) ) %>%
-           dplyr::select(-taxid,-string) %>%
-           distinct() %>%
-           nest(og_ids = string_id)
-  tictoc::toc()
-
-  df_og = left_join(og_info,og_stats) %>% left_join(og_ids) #%>% left_join(node_species,by=c('node'='node_id','node_name','node_size','taxid'))
-
+  df_og = left_join(og_info,og_stats) %>% left_join(node_orthologs)
 
   clade_list = list()
   for(i in 1:nrow(df_subnode)){
@@ -1848,6 +1838,17 @@ count_taxons_eggnog_node = function(node, subnode=1){
     .info$log(sprintf('count species/orthologs for clade  %s_%s (n=%s)...',df_clade$clade_id, df_clade$clade_name, df_clade$clade_size))
     subnode_species = get_eggnog_species(df_clade$clade_id) %>% pull(taxid,taxon)
 
+    tic('clade ortholog')
+    clade_orthologs = node_members %>%
+                      dplyr::select(starts_with('node'),OG,taxid,string) %>%
+                      filter( taxid %in% subnode_species ) %>%
+                      group_by(OG) %>%
+                      mutate( taxid = factor(taxid,node_species),
+                              id = paste0(taxid,".",string),
+                              clade_ids = list(id)) %>%
+                      dplyr::select(-taxid,-string) %>%
+                      distinct()
+    toc()
     clade_stats = left_join(df_clade,df_og,c('node_id'='node','node_name','node_size')) %>%
                   group_by(OG) %>%
                     filter(taxid %in% subnode_species) %>%
