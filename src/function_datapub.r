@@ -1607,11 +1607,14 @@ find_eggnog_node=function(node,GUI=F,.print=T){
   return(df_node)
 }
 
-get_eggnog_species = function(node){
+get_eggnog_species = function(node,.print = T){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   eggnog_node = find_eggnog_node(node,.print=F)
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG,find_eggnog_version(.print=F))
-  .info$log(sprintf('retrieving species for taxonomic level %s_%s...',eggnog_node$id, eggnog_node$name))
+
+  if(.print){
+    .info$log(sprintf('retrieving species for taxonomic level %s_%s...',eggnog_node$id, eggnog_node$name))
+  }
 
   sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccccc',progress = F,
                               col_names =  c('taxid','taxon','rank','lineage_name','lineage_id')) %>%
@@ -1623,12 +1626,15 @@ get_eggnog_species = function(node){
   return(sp_info)
 }
 
-get_eggnog_taxonomy = function(node){
+get_eggnog_taxonomy = function(node,.print=T){
 
   taxlevel = find_eggnog_node(node,.print = F)
-  node_sp = get_eggnog_species(node)
+  node_sp = get_eggnog_species(node,.print = F)
   SP = node_sp$taxid
-  .info$log(sprintf("retrieving taxonomy for %s_%s...",taxlevel$id,taxlevel$name))
+
+  if(.print){
+    .info$log(sprintf("retrieving taxonomy for %s_%s...",taxlevel$id,taxlevel$name))
+  }
 
   clades = node_sp %>%
            separate_rows(c('lineage_id','lineage_name'), sep=',') %>%
@@ -1705,13 +1711,13 @@ get_eggnog_alignment = function(node, use_trimmed=T, max_timeout=500){
   return(node_ali)
 }
 
-get_eggnog_node = function(node,to_long=F,silent=F){
+get_eggnog_node = function(node,to_long=F,.print=T){
 
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   URL_FASTA_EGGNOG = "http://eggnogapi5.embl.de/nog_data/text/fasta"
 
-  find_eggnog_version(.print = !silent)
-  eggnog_node = find_eggnog_node(node,.print=!silent) %>% rename_with(~paste0("node_",.))
+  find_eggnog_version(.print = .print)
+  eggnog_node = find_eggnog_node(node,.print=.print) %>% rename_with(~paste0("node_",.))
   #library(rotl)
   url_node_info = paste0(URL_EGGNOG,"per_tax_level/",eggnog_node$node_id,"/")
   eggnog_node_files = rvest::read_html(url_node_info) %>%
@@ -1735,7 +1741,7 @@ get_eggnog_node = function(node,to_long=F,silent=F){
                  left_join(node_trees, by=c('node','OG'))
 
   if(to_long){
-    if(!silent){
+    if(.print){
       .info$log("returning long format *rows= unique(taxon + string_id) per orthogroup*")
     }
     node_members = node_members %>%
