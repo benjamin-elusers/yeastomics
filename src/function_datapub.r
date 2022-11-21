@@ -1557,7 +1557,7 @@ eggnog_annotations_species=function(node,species){
 
   .info$log('reading eggnog orthogroups...')
   members_node = get_eggnog_node(eggnog_node$id,to_long = T,silent = T) %>%
-        dplyr::select( -c(algo,tree,taxon_ids, og_orthologs, og_species, url_fasta) ) %>%
+        dplyr::select( -c(algo,tree,taxon_ids, url_fasta) ) %>%
         distinct()
 
   .info$log('merging annotations on orthogroups...')
@@ -1611,6 +1611,8 @@ get_eggnog_species = function(node){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   eggnog_node = find_eggnog_node(node,.print=F)
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG,find_eggnog_version(.print=F))
+  .info$log(sprintf('retrieving species from taxonomic level %s_%s',eggnog_node$id, eggnog_node$name,eggnog_node$size))
+
   sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccccc',progress = F,
                               col_names =  c('taxid','taxon','rank','lineage_name','lineage_id')) %>%
             mutate(lineage_name = str_replace_all(lineage_name,", ", replacement = "_")) %>%
