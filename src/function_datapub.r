@@ -1624,7 +1624,7 @@ get_eggnog_species = function(node){
 get_eggnog_taxonomy = function(node){
 
   taxlevel = find_eggnog_node(node,.print = F)
-  node_sp = get_eggnog_species(eggnog_node$node_id)
+  node_sp = get_eggnog_species(node)
   SP = node_sp$taxid
   .info$log(sprintf("retrieving taxonomy for %s_%s...",taxlevel$id,taxlevel$name))
 

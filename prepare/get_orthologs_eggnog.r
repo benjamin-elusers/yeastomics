@@ -1,6 +1,7 @@
 source(here::here("src","__setup_yeastomics__.r"))
 library(tidyverse)
 library(here)
+
 #eggnog_fasta = Biostrings::readAAStringSet("http://eggnog5.embl.de/download/latest/e5.proteomes.faa")
 fungi_clades = c('4890'='ascomycota', '5204'='basidiomycota')
 ascomycota_clades = c('451866'='taphrimycotina','4891'='saccharomycetes','147541'='dothideomycetes',
@@ -11,16 +12,22 @@ clades = lst('33154'=
           lst('33208'=metazoa_clades)
          )
 
-
 # Fungi = 4751
 fu_dir = here::here('data','eggnog','4751-fungi')
-
-fuNOG = get_eggnog_node(node = 4751)
-fu_tax=get_eggnog_taxonomy(4751)
+fuNOG      = get_eggnog_node(node = 4751)
+fu_tax     = get_eggnog_taxonomy(4751)
 fu_species = get_eggnog_species(node = 4751)
+fu_yeast   = eggnog_annotations_species(node = 4751, species = c(4932,4896))
+fu_taxons  = count_taxons_eggnog_node(4751, subnode=c(4890,5204,451866,4891,147541,147545,147550,147548)  )
 
-fu_yeast = eggnog_annotations_species(node = 4751, species = c(4932,4896))
-fu_taxons = count_taxons_eggnog_node(4751)
+
+## Make the fungi species tree
+### Select orthogroups with 179 species and at most 200 proteins ###
+
+
+# Filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast)
+
+
 
 fu_fastafiles = sprintf('%s/%s.fasta',fu_dir,fuNOG$OG)
 #pbmcapply::pbmclapply(fuNOG$url_fasta, safe_download, mc.cores=14, path=fu_dir, ext='.fasta')
@@ -81,6 +88,7 @@ pbmcapply::pbmclapply(mzNOG$url_fasta, safe_download, mc.cores=14, path=mz_dir, 
 #mz_ali = get_eggnog_alignment(node=33208, use_trimmed = F)
 mz_clades = map(metazoa_clades, ~get_eggnog_taxonomy(.x))
 
+get_eggnog_species(7742)
 mz_7742 = count_eggnog_node(33208, 7742)
 mz_40674 = count_eggnog_node(33208, 40674)
 mz_50557 = count_eggnog_node(33208, 50557)
