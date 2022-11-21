@@ -1556,7 +1556,7 @@ eggnog_annotations_species=function(node,species){
                             dplyr::filter(nodes == eggnog_node$id)
 
   .info$log('reading eggnog orthogroups...')
-  members_node = get_eggnog_node(eggnog_node$id,to_long = T,silent = T) %>%
+  members_node = get_eggnog_node(eggnog_node$id,to_long = T,.print = F) %>%
         dplyr::select( -c(algo,tree,taxon_ids, url_fasta) ) %>%
         distinct()
 
@@ -1803,7 +1803,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
   node_species = get_eggnog_species(taxlevel$id) %>% pull(taxid,taxon)
   .info$log('count number of orthologs/species in orthogroups...')
   tictoc::tic('count number of orthologs/species in orthogroups...')
-  node_members = get_eggnog_node(taxlevel$id,silent = T,to_long = T)
+  node_members = get_eggnog_node(taxlevel$id,.print = F,to_long = T)
   node_species = get_eggnog_species(taxlevel$id) %>% pull(taxid,taxon)
 
   node_orthologs = node_members %>%
