@@ -138,22 +138,26 @@ get.sc.ohno = function(myseq) {
 }
 
 # get sequence identifier from STRING ID (without the prefix taxon)
-get.id.STRING = function(id,what=c('id','tax'),noprint=FALSE){
+get.id.STRING = function(id,what=c('both','id','tax'),noprint=T){
 
   if(!is.character(id)){
     warning("input is not a character")
     return(NA)
   }
-  to_return = match.arg(what,c('id','tax'),several.ok = F)
+  to_return = match.arg(what,c('both','id','tax'),several.ok = F)
 
-  if( str_detect(id,pattern='^([0-9]+)\\.(\\w+)') ){
-    taxon = str_extract(id,pattern='^([0-9]+)')
-    string = str_split_fixed(id,pattern = '^([0-9]+)\\.',2)[,2]
-    if(!noprint){ cat(sprintf("taxon %s id %s\n",taxon,string)) }
-    if(to_return=='id'){
-      return(string)
+  if( all(str_detect(id,pattern='^([0-9]+)\\.(\\w+)')) ){
+    df_id = str_split_fixed(id,pattern = '\\.',2) %>%
+            as_tibble() %>%
+            dplyr::rename(taxid=V1,string=V2)
+
+    if(!noprint){ print(df_id %>% t()) }
+    if(to_return=='both'){
+      return(df_id)
+    }else if(to_return=='id'){
+      return(df_id$string)
     }else if(to_return == 'tax'){
-      return(taxon)
+      return(df_id$taxid)
     }
   }else{
     warning("Unrecognized input format (should be taxon.id)")
