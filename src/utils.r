@@ -296,14 +296,14 @@ match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, manual = F, ve
                  slice_min(order_by = lcs, n = max_strings)
 
   if(verbose){
-    cat(sprintf('%s identical/substring matches\n',n_distinct(twins$s1)))
-    cat(sprintf('%s unmatched names\n',n_distinct(unmatched$s1)))
+    cat(sprintf('%s identical/substring matches...\n',n_distinct(twins$s1)))
+    cat(sprintf('%s unmatched names...\n',n_distinct(unmatched$s1)))
   }
 
   if(!manual){
     results = bind_rows(twins,similarities)
   }else{
-    cat('matching remaining names manually...\n')
+    cat('matching remaining names manually...\n\n')
     DUP = similarities %>% filter(n1 != 1)
     dup_name = DUP$s1 %>% unique
     name_chosen=c()
@@ -312,8 +312,9 @@ match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, manual = F, ve
       x = menu(name_options,graphics = F, title = paste0("'",name,"' corresponds to:"))
       name_chosen = append(name_chosen, name_options[x])
     }
-    MANUAL = tibble(s1=dup_name,s2=name_chosen, verified = 'manually/taxid/synonym') %>%
-                left_join(DUP, by=c('s1','s2'))
+    MANUAL = tibble(s1=dup_name,s2=name_chosen) %>%
+                left_join(DUP, by=c('s1','s2')) %>%
+                mutate(verified = 'manually/taxid/synonym')
     results = bind_rows(twins,MANUAL) %>% add_count(name='n1') %>% mutate( is_matched = (n1 == 1) )
   }
 
