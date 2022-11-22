@@ -1543,6 +1543,18 @@ find_eggnog_version = function(.print=T){
   return(.version)
 }
 
+find_eggnog_taxlevels = function(.print=T){
+  URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
+  taxlevels = rvest::read_html(paste0(URL_EGGNOG,"per_tax_level/")) %>%
+    rvest::html_nodes("a") %>% # Retrieve hyperlink corresponding to taxonomic level
+    rvest::html_text(trim = T) %>% # Taxonomic level id is each hyperlink text
+    str_subset(pattern = "^[0-9]+/$") %>% # Retrieve the taxonomic level (directories)
+    str_sub(end=-2L) # Remove the "/" of the directories
+  nnodes = n_distinct(taxlevels)
+  if(.print){ .info$log(sprintf("found %s eggnog taxonomic levels...",nnodes)) }
+  return(taxlevels)
+}
+
 eggnog_annotations_species=function(node,species){
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   .ver=find_eggnog_version(.print = F)
@@ -1567,12 +1579,9 @@ eggnog_annotations_species=function(node,species){
 }
 
 find_eggnog_node=function(node,GUI=F,.print=T){
+
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
-  taxlevels = rvest::read_html(paste0(URL_EGGNOG,"per_tax_level/")) %>%
-    rvest::html_nodes("a") %>% # Retrieve hyperlink corresponding to taxonomic level
-    rvest::html_text(trim = T) %>% # Taxonomic level id is each hyperlink text
-    str_subset(pattern = "/$") %>% # Retrieve the taxonomic level (directories)
-    str_sub(end=-2L) # Remove the "/" of the directories
+  taxlevels = find_eggnog_taxlevels()
 
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG, find_eggnog_version(.print=F))
   egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccccc',progress = F,
@@ -1646,6 +1655,11 @@ get_eggnog_taxonomy = function(node,.print=T){
            mutate(is_clade = !(clade_id %in% SP),
                   is_subnode = clade_size <= node_size) %>%
            relocate(node_id,node_name,node_size)
+
+  clades_only = clades %>% filter(is_clade) %>% rowwise() %>%
+                mutate( clade_sp = list(get_eggnog_species(clade_id) %>% pull(taxid,taxon)))
+
+clades$species =
 
   return(clades)
 }
@@ -1799,12 +1813,16 @@ count_taxons_eggnog_node = function(node, subnode=1){
   taxlevel = find_eggnog_node(node)
   df_subnode = find_eggnog_subnode(taxlevel$id,subnode)
 
-  #node_clade = get_eggnog_taxonomy(taxlevel$id)
-  node_species = get_eggnog_species(taxlevel$id) %>% pull(taxid,taxon)
+  node_clades = get_eggnog_taxonomy(taxlevel$id)
+  node_taxons  = get_eggnog_species(taxlevel$id)
+  node_species = node_taxons %>% pull(taxid,taxon)
+
   .info$log('count number of orthologs/species in orthogroups...')
   #tictoc::tic('count number of orthologs/species in orthogroups...')
   node_members = get_eggnog_node(taxlevel$id,.print = F,to_long = T) %>%
-                 dplyr::rename(node_id=node)
+                 dplyr::rename(node_id=node) %>%
+                 left_join(node_taxons, by='taxid')
+
 
   node_orthologs = node_members %>%
     dplyr::select(starts_with('node'),OG,taxid,string) %>%
