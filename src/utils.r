@@ -265,7 +265,7 @@ file_ext <- function (fn) {
 catn = function(x, ...){ cat(x,"\n",...) }
 
 
-match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, remove_duplicate_manually = F){
+match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, manual = F, verbose=T){
   # Matching strings based on similarity
   library(tidystringdist)
   library(stringdist)
@@ -281,35 +281,43 @@ match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, remove_duplica
                  # Keep matched names that are nested (i.e. one string is a substring of the other)
                  rowwise %>% mutate(is_substring = str_contains(s2,s1) - str_contains(s1,s2)) %>%
                  group_by(s1) %>% filter( if_any(is_substring, ~ . != 0) | all(is_substring==0)) %>%
-                 mutate( is_matched = (n() == 1) )
+                 mutate( is_matched = (n() == 1))
 
-  twins = matched_name %>% filter(is_matched)
+  twins = matched_name %>% filter(is_matched) %>% mutate(verified = 'by_substring')
+  unmatched  = matched_name %>% filter(!is_matched)
 
-  similarities = tidy_stringdist(df=matched_name,v1=s1,v2=s2) %>%
+  similarities = tidy_stringdist(df=unmatched,v1=s1,v2=s2) %>%
                  group_by(s1) %>%
                  # remove names that have been previously matched (identical or substring)
-                 mutate( already_matched = s2 %in% twins$s2) %>%
-                 filter( is_matched | !is_matched & !already_matched ) %>%
+                 mutate( already_matched = s2 %in% twins$s2, verified='by_similarity') %>%
+                 filter( !already_matched ) %>%
                  filter( ifelse(use_soundex, soundex == min(soundex), T) ) %>%
                  add_count(name='n1') %>% mutate( is_matched = (n1 == 1) )  %>%
                  slice_min(order_by = lcs, n = max_strings)
 
-  if(remove_duplicate_manually){
-    ND = similarities %>% filter( n1 == 1) %>% mutate( verified = 'by_similarity')
-    D = similarities %>% filter(n1 != 1)
-    dup_name = D$s1 %>% unique
+  if(verbose){
+    cat(sprintf('%s identical/substring matches\n',n_distinct(twins$s1)))
+    cat(sprintf('%s unmatched names\n',n_distinct(unmatched$s1)))
+  }
+
+  if(!manual){
+    results = bind_rows(twins,similarities)
+  }else{
+    cat('matching remaining names manually...\n')
+    DUP = similarities %>% filter(n1 != 1)
+    dup_name = DUP$s1 %>% unique
     name_chosen=c()
     for(name in dup_name){
-      name_options = D %>% filter(s1 == name) %>% pull(s2) %>% setdiff(name_chosen)
-      x = menu(name_options,graphics = F, title = paste0(name,': pick the corresponding matching name'))
+      name_options = DUP %>% filter(s1 == name) %>% pull(s2) %>% setdiff(name_chosen)
+      x = menu(name_options,graphics = F, title = paste0("'",name,"' corresponds to:"))
       name_chosen = append(name_chosen, name_options[x])
     }
-    D_chosen = tibble(s1=dup_name,s2=name_chosen, verified = 'manually/taxid/synonym') %>% left_join(D, by=c('s1','s2'))
-    D_final = bind_rows(ND,D_chosen) %>% add_count(name='n1') %>% mutate( is_matched = (n1 == 1) )
-    nfound = sum(D_final$is_matched)
-    return(D_final)
+    MANUAL = tibble(s1=dup_name,s2=name_chosen, verified = 'manually/taxid/synonym') %>%
+                left_join(DUP, by=c('s1','s2'))
+    results = bind_rows(twins,MANUAL) %>% add_count(name='n1') %>% mutate( is_matched = (n1 == 1) )
   }
-  return(similarities)
+
+  return(results)
 }
 
 # Convert to opposite case (uppercase to lowercase and vice versa)
