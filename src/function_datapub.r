@@ -1654,7 +1654,8 @@ get_eggnog_taxonomy = function(node,.print=T,only_clade=T){
            ungroup() %>%
            mutate(is_eggnog = (clade_id %in% TAXLEVELS),
                   is_clade = is_eggnog & !(clade_id %in% SP),
-                  is_subnode = clade_size <= node_size) %>%
+                  is_subnode = clade_size <= node_size,
+                  clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size)) %>%
            relocate(node_id,node_name,node_size)
 
   if(only_clade){ return(clades %>% filter(is_clade)) }
@@ -1777,8 +1778,7 @@ find_eggnog_subnode=function(node_clade,subnode){
   }
 
   node_subnodes = node_clade %>%
-                  filter(is_clade &  is_subnode & clade_size > 1) %>%
-                  mutate(clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size))
+                  filter(is_clade &  is_subnode & clade_size > 1)
 
   nsub=length(subnode)
   df_subnode = node_subnodes %>% filter(clade_id %in% subnode )
