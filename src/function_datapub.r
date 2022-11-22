@@ -1581,7 +1581,7 @@ eggnog_annotations_species=function(node,species){
 find_eggnog_node=function(node,GUI=F,.print=T){
 
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
-  taxlevels = find_eggnog_taxlevels()
+  taxlevels = find_eggnog_taxlevels(.print=F)
 
   eggnog_tax_info = sprintf("%s/%s.taxid_info.tsv",URL_EGGNOG, find_eggnog_version(.print=F))
   egg_tax = readr::read_delim(eggnog_tax_info,delim="\t",col_types = 'ccccc',progress = F,
@@ -1635,12 +1635,12 @@ get_eggnog_species = function(node,.print = T){
   return(sp_info)
 }
 
-get_eggnog_taxonomy = function(node,.print=T){
+get_eggnog_taxonomy = function(node,.print=T,only_clade=T){
 
   taxlevel = find_eggnog_node(node,.print = F)
   node_sp = get_eggnog_species(node,.print = F)
   SP = node_sp$taxid
-
+  TAXLEVELS = find_eggnog_taxlevels()
   if(.print){
     .info$log(sprintf("retrieving taxonomy for %s_%s...",taxlevel$id,taxlevel$name))
   }
@@ -1652,14 +1652,18 @@ get_eggnog_taxonomy = function(node,.print=T){
            summarize(clade_size=sum(seen)) %>%
            arrange(desc(clade_size),clade_id,clade_name) %>%
            ungroup() %>%
-           mutate(is_clade = !(clade_id %in% SP),
+           mutate(is_eggnog = (clade_id %in% TAXLEVELS),
+                  is_clade = is_eggnog & !(clade_id %in% SP),
                   is_subnode = clade_size <= node_size) %>%
-           relocate(node_id,node_name,node_size)
+           relocate(node_id,node_name,node_size) %>%
 
-  clades_only = clades %>% filter(is_clade) %>% rowwise() %>%
-                mutate( clade_sp = list(get_eggnog_species(clade_id) %>% pull(taxid,taxon)))
-
-clades$species =
+  if(only_clade){
+      clades_ = clades %>%
+        filter(is_clade) %>%
+        rowwise() %>%
+        mutate( clade_sp = list(get_eggnog_species(clade_id,.print = F) %>% pull(taxid,taxon)))
+    return(clades_)
+  }
 
   return(clades)
 }
