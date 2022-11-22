@@ -1644,7 +1644,7 @@ get_eggnog_taxonomy = function(node,.print=T){
            arrange(desc(clade_size),clade_id,clade_name) %>%
            ungroup() %>%
            mutate(is_clade = !(clade_id %in% SP),
-                  is_subnode = clade_size < node_size) %>%
+                  is_subnode = clade_size <= node_size) %>%
            relocate(node_id,node_name,node_size)
 
   return(clades)
@@ -1761,7 +1761,7 @@ find_eggnog_subnode=function(node_clade,subnode){
   }
 
   node_subnodes = node_clade %>%
-                  filter(is_clade & (node_id == clade_id | is_subnode) & clade_size > 1) %>%
+                  filter(is_clade &  is_subnode & clade_size > 1) %>%
                   mutate(clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size))
 
   nsub=length(subnode)
