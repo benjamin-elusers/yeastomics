@@ -1640,7 +1640,7 @@ get_eggnog_taxonomy = function(node,.print=T,only_clade=T){
   taxlevel = find_eggnog_node(node,.print = F)
   node_sp = get_eggnog_species(node,.print = F)
   SP = node_sp$taxid
-  TAXLEVELS = find_eggnog_taxlevels()
+  TAXLEVELS = find_eggnog_taxlevels(.print = F)
   if(.print){
     .info$log(sprintf("retrieving taxonomy for %s_%s...",taxlevel$id,taxlevel$name))
   }
@@ -1657,13 +1657,7 @@ get_eggnog_taxonomy = function(node,.print=T,only_clade=T){
                   is_subnode = clade_size <= node_size) %>%
            relocate(node_id,node_name,node_size)
 
-  if(only_clade){
-      clades_ = clades %>%
-        filter(is_clade) %>%
-        rowwise() %>%
-        mutate( clade_sp = list(get_eggnog_species(clade_id,.print = F) %>% pull(taxid,taxon)))
-    return(clades_)
-  }
+  if(only_clade){ return(clades %>% filter(is_clade)) }
 
   return(clades)
 }
@@ -1817,7 +1811,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
   taxlevel = find_eggnog_node(node)
   df_subnode = find_eggnog_subnode(taxlevel$id,subnode)
 
-  node_clades = get_eggnog_taxonomy(taxlevel$id)
+  node_clades = get_eggnog_taxonomy(taxlevel$id,only_clade = F)
   node_taxons  = get_eggnog_species(taxlevel$id)
   node_species = node_taxons %>% pull(taxid,taxon)
 
