@@ -1658,7 +1658,11 @@ get_eggnog_taxonomy = function(node,.print=T,only_clade=T){
            relocate(node_id,node_name,node_size)
 
   if(only_clade){ return(clades %>% filter(is_clade)) }
-
+  #sp %>%
+  #  separate_rows(c(lineage_id,lineage_name),sep=',') %>%
+  #  filter(lineage_id %in% TAXLEVELS) %>%
+  #  mutate(seen=T) %>%
+  #  pivot_wider(names_from=c(lineage_id,lineage_name),values_from = seen, values_fill=F)
   return(clades)
 }
 
@@ -1811,16 +1815,15 @@ count_taxons_eggnog_node = function(node, subnode=1){
   taxlevel = find_eggnog_node(node)
   df_subnode = find_eggnog_subnode(taxlevel$id,subnode)
 
-  node_clades = get_eggnog_taxonomy(taxlevel$id,only_clade = F)
+  node_clades = get_eggnog_taxonomy(taxlevel$id)
   node_taxons  = get_eggnog_species(taxlevel$id)
   node_species = node_taxons %>% pull(taxid,taxon)
 
   .info$log('count number of orthologs/species in orthogroups...')
   #tictoc::tic('count number of orthologs/species in orthogroups...')
   node_members = get_eggnog_node(taxlevel$id,.print = F,to_long = T) %>%
-                 dplyr::rename(node_id=node) %>%
-                 left_join(node_taxons, by='taxid')
-
+                 dplyr::rename(node_id=node) #%>%
+  #               left_join(node_taxons, by = c("node_id", "node_name", "node_size", "taxid"))
 
   node_orthologs = node_members %>%
     dplyr::select(starts_with('node'),OG,taxid,string) %>%
@@ -1875,10 +1878,11 @@ count_taxons_eggnog_node = function(node, subnode=1){
                       dplyr::select(-clade_northo) %>%
                       distinct() %>%
                       mutate( clade_orthogroup = list(id) ) %>%
-                      nest( clade_orthologs = c(taxid,string,id) )
+                      nest( clade_orthologs = c(taxid,string,id) ) %>%
+                      left_join(df_og, by = c("node_id", "node_name", "node_size", "OG"))
     #toc()
 
-    clade_list[[df_clade$clade_desc]] = left_join(df_og,clade_orthologs, by = c("node_id", "node_name", "node_size", "OG"))
+    clade_list[[df_clade$clade_desc]] = clade_orthologs
   }
   if( nrow(df_subnode) == 1 ){ return( unlist(clade_list) )}
   return(clade_list)
