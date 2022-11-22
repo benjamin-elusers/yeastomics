@@ -108,15 +108,16 @@ count_pair_ali = function(ali){
   S1 = seq2char(alignedPattern(ali))
   S2 = seq2char(alignedSubject(ali))
   L=nchar(ali)
+  L1= pattern(ali) |> unaligned() |> width()
+  L2= subject(ali) |> unaligned() |> width()
   N=nmatch(ali)
   NS=nmismatch(ali)
   GAP = sum((S1=="-" & S2=="-"))
   INDEL = sum(xor(S1!='-',S2!='-'))
   IN = sum(S1!="-" & S2=="-")
   DEL = sum(S1=="-" & S2!="-")
-  return(c('S'=N,'NS'=NS,'G'=INDEL,"I"=IN,"D"=DEL,'L'=L,"gapped"=GAP))
+  return(c('S'=N,'NS'=NS,'G'=INDEL,"I"=IN,"D"=DEL,'L'=L,'L1'=L1,'L2'=L2,"gapped"=GAP))
 }
-
 
 msa2df = function(MSA_SEQ,REF_NAME,ID,verbose=F){
 
@@ -184,5 +185,4 @@ score_ali = function(p1,p2,s1,s2, mat="BLOSUM62", opening=10, extend=4){
     tibble::as_tibble()
   return(row_data)
 }
-
 
