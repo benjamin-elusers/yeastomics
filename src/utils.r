@@ -300,9 +300,9 @@ match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, manual = F, ve
     cat(sprintf('%s unmatched names...\n',n_distinct(unmatched$s1)))
   }
 
-  if(!manual){
-    results = bind_rows(twins,similarities)
-  }else{
+  ndup = sum(similarities$n1 != 1)
+  results = bind_rows(twins,similarities)
+  if(manual && ndup>1){
     cat('matching remaining names manually...\n\n')
     DUP = similarities %>% filter(n1 != 1)
     dup_name = DUP$s1 %>% unique
