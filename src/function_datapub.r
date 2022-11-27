@@ -1654,7 +1654,7 @@ get_eggnog_taxonomy = function(node,.print=T,only_clade=T){
            ungroup() %>%
            mutate(is_eggnog = (clade_id %in% TAXLEVELS),
                   is_clade = is_eggnog & !(clade_id %in% SP),
-                  is_subnode = clade_size <= node_size,
+                  is_subnode = clade_size < node_size | clade_id == node_id,
                   clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size)) %>%
            relocate(node_id,node_name,node_size)
 
@@ -1807,23 +1807,18 @@ find_eggnog_subnode=function(node_clade,subnode){
   return(df_subnode)
 }
 
-count_taxons_eggnog_node = function(node, subnode=1){
+count_eggnog_orthologs = function(node){
   # e.g.
   # node=4751
-  # subnode=c(4890,5204,451866,4891,147541,147545,147550,147548)
 
   taxlevel = find_eggnog_node(node)
-  df_subnode = find_eggnog_subnode(taxlevel$id,subnode)
-
-  node_clades = get_eggnog_taxonomy(taxlevel$id)
   node_taxons  = get_eggnog_species(taxlevel$id)
   node_species = node_taxons %>% pull(taxid,taxon)
 
   .info$log('count number of orthologs/species in orthogroups...')
   #tictoc::tic('count number of orthologs/species in orthogroups...')
   node_members = get_eggnog_node(taxlevel$id,.print = F,to_long = T) %>%
-                 dplyr::rename(node_id=node) #%>%
-  #               left_join(node_taxons, by = c("node_id", "node_name", "node_size", "taxid"))
+    dplyr::rename(node_id=node) #%>%
 
   node_orthologs = node_members %>%
     dplyr::select(starts_with('node'),OG,taxid,string) %>%
@@ -1836,22 +1831,35 @@ count_taxons_eggnog_node = function(node, subnode=1){
 
   .info$log('compute orthogroups statistic for the taxonomic level...')
   og_info =  node_members %>%
-             dplyr::select( starts_with('node'), OG, algo, url_fasta, tree) %>%
-             distinct()
+    dplyr::select( starts_with('node'), OG, algo, url_fasta, tree) %>%
+    distinct()
 
   og_stats = node_members %>%
-             dplyr::select( starts_with(c('node','og'),ignore.case=T), taxid,string ) %>%
-             distinct() %>%
-             group_by(OG,taxid) %>%
-               add_count(name='og_northo') %>%
-             group_by(OG) %>%
-               mutate(og_n1to1 = sum(og_northo == 1)) %>%
-             dplyr::select(-taxid,-string,-og_northo) %>%
-             distinct()
+    dplyr::select( starts_with(c('node','og'),ignore.case=T), taxid,string ) %>%
+    distinct() %>%
+    group_by(OG,taxid) %>%
+    add_count(name='og_northo') %>%
+    group_by(OG) %>%
+    mutate(og_n1to1 = sum(og_northo == 1)) %>%
+    dplyr::select(-taxid,-string,-og_northo) %>%
+    distinct()
 
   df_og = left_join(og_info,og_stats,by = c("node_id", "node_name", "node_size", "OG")) %>%
-          left_join(node_orthologs,by = c("node_id", "node_name", "node_size", "OG"))
+    left_join(node_orthologs,by = c("node_id", "node_name", "node_size", "OG"))
 
+  return(df_og)
+}
+
+count_taxons_eggnog_node = function(node, subnode=1){
+  # e.g.
+  # node=4751
+  # subnode=c(4890,5204,451866,4891,147541,147545,147550,147548)
+
+  taxlevel = find_eggnog_node(node)
+  df_og = count_eggnog_orthologs(node)
+  df_subnode = find_eggnog_subnode(taxlevel$id,subnode)
+
+  node_clades = get_eggnog_taxonomy(taxlevel$id)
   clade_list = list()
   for(i in 1:nrow(df_subnode)){
 
@@ -1860,7 +1868,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
     subnode_species = get_eggnog_species(df_clade$clade_id) %>% pull(taxid,taxon)
 
     #tic('clade ortholog')
-    clade_orthologs = left_join(df_clade,node_members,by = c("node_id", "node_name", "node_size")) %>%
+    clade_orthologs = left_join(df_clade,df_og,by = c("node_id", "node_name", "node_size")) %>%
                       dplyr::select(starts_with(c('node','clade'),ignore.case = T),OG,taxid,string) %>%
                       filter( taxid %in% subnode_species ) %>%
                       group_by(OG,taxid) %>%
@@ -1878,8 +1886,7 @@ count_taxons_eggnog_node = function(node, subnode=1){
                       dplyr::select(-clade_northo) %>%
                       distinct() %>%
                       mutate( clade_orthogroup = list(id) ) %>%
-                      nest( clade_orthologs = c(taxid,string,id) ) %>%
-                      left_join(df_og, by = c("node_id", "node_name", "node_size", "OG"))
+                      nest( clade_orthologs = c(taxid,string,id) )
     #toc()
 
     clade_list[[df_clade$clade_desc]] = clade_orthologs
