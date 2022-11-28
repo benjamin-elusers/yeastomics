@@ -1625,7 +1625,7 @@ get_eggnog_species = function(node,.print = T){
     .info$log(sprintf('retrieving species for taxonomic level %s_%s...',eggnog_node$id, eggnog_node$name))
   }
 
-  sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccccc',progress = F,
+  sp_info = readr::read_delim(eggnog_tax_info,delim="\t",col_types='ccccc',progress = F, skip = 1,
                               col_names =  c('taxid','taxon','rank','lineage_name','lineage_id')) %>%
             mutate(lineage_name = str_replace_all(lineage_name,", ", replacement = "_")) %>%
             # find species with node in their lineage
@@ -1635,7 +1635,7 @@ get_eggnog_species = function(node,.print = T){
   return(sp_info)
 }
 
-get_eggnog_taxonomy = function(node,.print=T,only_clade=T){
+get_eggnog_taxonomy = function(node,.print=T,only_clade=T,add_species=T){
 
   taxlevel = find_eggnog_node(node,.print = F)
   node_sp = get_eggnog_species(node,.print = F)
@@ -1658,12 +1658,12 @@ get_eggnog_taxonomy = function(node,.print=T,only_clade=T){
                   clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size)) %>%
            relocate(node_id,node_name,node_size)
 
+  if(add_species){
+    clades = clades %>% rowwise %>%
+      mutate(clade_sp = list( node_sp %>% filter(str_detect(lineage_id,clade_id)) %>% pull(taxid) ))
+  }
   if(only_clade){ return(clades %>% filter(is_clade)) }
-  #sp %>%
-  #  separate_rows(c(lineage_id,lineage_name),sep=',') %>%
-  #  filter(lineage_id %in% TAXLEVELS) %>%
-  #  mutate(seen=T) %>%
-  #  pivot_wider(names_from=c(lineage_id,lineage_name),values_from = seen, values_fill=F)
+
   return(clades)
 }
 
@@ -1850,16 +1850,30 @@ count_eggnog_orthologs = function(node){
   return(df_og)
 }
 
-count_taxons_eggnog_node = function(node, subnode=1){
+count_clade_orthologs = function(df_node, subnode=1){
   # e.g.
-  # node=4751
+  # df_node=4751
   # subnode=c(4890,5204,451866,4891,147541,147545,147550,147548)
 
-  taxlevel = find_eggnog_node(node)
-  df_og = count_eggnog_orthologs(node)
-  df_subnode = find_eggnog_subnode(taxlevel$id,subnode)
+  if(missing(df_node)){
+    .error$log("requires orthologs count at a taxonomic level... (use count_eggnog_ortholoogs(taxid))")
+  }else if( length(df_node)==1 && is_number(df_node) ){
+    node = df_node
+    df_node = count_eggnog_orthologs(node)
+  }
 
-  node_clades = get_eggnog_taxonomy(taxlevel$id)
+  nodeid = unique(df_node$node_id)
+  nodename = unique(df_node$node_name)
+  if( length(nodeid) > 1 ){
+    .warn$log(sprintf("multiple taxonomic levels found : %s",paste0(nodeid,collapse=" ")))
+    .warn$log(sprintf("using the first taxonomic level: %s_%s",nodeid[1],nodename[1]))
+    nodeid = unique(df_node$node_id)[1]
+    nodename = unique(df_node$node_name)[1]
+  }
+
+  node_clades = get_eggnog_taxonomy(nodeid,only_clade = T, add_species=T)
+  df_subnode = find_eggnog_subnode(nodeid,subnode)
+
   clade_list = list()
   for(i in 1:nrow(df_subnode)){
 
