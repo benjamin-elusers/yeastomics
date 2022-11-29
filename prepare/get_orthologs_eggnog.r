@@ -214,14 +214,16 @@ library(taxize)
 fungi$tip.label = fu_ncbi_eggnog$taxid
 fu_clades = subtrees(fungi) %>%
             set_names(fungi$node.label %>% str_remove_all("['\\[\\]]"))  %>%
-            map_dfr( ~ tibble(clade_sp = list(.x$tip.label), clade_size= n_distinct(clade_sp)), .id = "clade_name")  %>%
+            map_dfr( ~ tibble(clade_sp = list(.x$tip.label), clade_size= n_distinct(unlist(clade_sp))), .id = "clade_name")  %>%
             filter(clade_size > 4 & clade_name != "") %>%
             mutate( clade_id = taxize::get_ids(clade_name, db='ncbi',verbose = F)$ncbi,
                     is_clade = T, is_subnode = T,
-                    clade_desc =sprintf('%s_%s_%ssp',clade_id,clade_name,clade_size)) %>%
-            relocate(clade_id,clade_name,clade_size)
+                    clade_desc =sprintf('%s_%s_%ssp',clade_id,str_replace_all(clade_name," ","."),clade_size)) %>%
+            relocate(clade_id,clade_name,clade_size,clade_desc,is_clade,is_subnode,clade_sp) %>%
+            arrange(desc(clade_size))
 
 colnames(fu_tax)
+head(fu_tax)
 
 fu_yeast   = eggnog_annotations_species(node = 4751, species = c(4932,4896))
 fu_og  = count_eggnog_orthologs(4751)
