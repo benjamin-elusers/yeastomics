@@ -193,29 +193,35 @@ fuNOG      = get_eggnog_node(node = 4751)
 fu_tax     = get_eggnog_taxonomy(4751)
 fu_species = get_eggnog_species(node = 4751)
 
-####_NCBI tree from taxons/taxids (manual) ####
-# write_lines(fu_species$taxid, here::here('data','ncbi','4751-fungi-179taxids.txt'))
-# write_lines(fu_species$taxon, here::here('data','ncbi','4751-fungi-179taxons.txt'))
-# fungi=treeio::read.tree("/home/benjamin/Desktop/GitHub/yeastomics/data/ncbi/ncbi-fungi.phy")
-# fungi$tip.label = str_remove_all(fungi$tip.label,"['\\[\\]]") #%>% str_replace_all(" ","_")
-# fu_ncbi = preload( saved.file = file.path(ncbi_dir,'ncbi-to-eggnog-fungi-179species.rds'),
-#                    { match_strings(fungi$tip.label, SP2=fu_species$taxon, use_soundex = F, manual = T) },
-#                    'match ncbi species tree to eggnog fungal species...')
-# fu_ncbi_eggnog = fu_ncbi %>%
-#   left_join( fu_species %>% mutate(Taxon=taxon, taxon=tolower(taxon)), c('s2'='taxon')) %>%
-#   dplyr::rename(ncbi_name=s1,eggnog_name=s2) %>%
-#   dplyr::select(-c(is_identical:is_substring,osa:n1))
+####_download NCBI common tree from list of species (manual) ####
+# write_lines(fu_species$taxid, file.path(ncbi_dir,'4751-fungi-179taxids.txt'))
+# write_lines(fu_species$taxon, file.path(ncbi_dir,'4751-fungi-179taxons.txt'))
+fungi = treeio::read.tree(file.path(ncbi_dir,"ncbi-fungi.phy"))
+fungi$tip.label = str_remove_all(fungi$tip.label,"['\\[\\]]") #%>% str_replace_all(" ","_")
+fu_ncbi = preload( saved.file = file.path(ncbi_dir,'ncbi-to-eggnog-fungi-179species.rds'),
+                    { match_strings(fungi$tip.label, SP2=fu_species$taxon, use_soundex = F, manual = T) },
+                    'match ncbi species tree to eggnog fungal species...')
+fu_ncbi_eggnog = fu_ncbi %>%
+   left_join( fu_species %>% mutate(Taxon=taxon, taxon=tolower(taxon)), c('s2'='taxon')) %>%
+   dplyr::rename(ncbi_name=s1,eggnog_name=s2) %>%
+   dplyr::select(-c(is_identical:is_substring,osa:n1))
 
-fu_ncbi = get_ncbi_tree(fu_species$taxid)
+####_get NCBI tree from taxon identifiers (not necessarily find all ids) ####
+#fu_ncbi = get_ncbi_tree(fu_species$taxid)
 #fungi_eggnog$tip.label = fu_ncbi_eggnog$taxid
 
-
 library(taxize)
-fu_ncbi  = subtrees(fungi_eggnog) %>%
-           set_names(fungi_eggnog$node.label %>% str_remove_all("['\\[\\]]"))  %>%
-           map_df(~.x$tip.label %>% n_distinct %>% as_tibble, .id = "clades")  %>%
-           filter(value>4 & clades != "") %>%
-           mutate( ncbi_id = taxize::get_ids(clades, db='ncbi',verbose = F)$ncbi )
+fungi$tip.label = fu_ncbi_eggnog$taxid
+fu_clades = subtrees(fungi) %>%
+            set_names(fungi$node.label %>% str_remove_all("['\\[\\]]"))  %>%
+            map_dfr( ~ tibble(clade_sp = list(.x$tip.label), clade_size= n_distinct(clade_sp)), .id = "clade_name")  %>%
+            filter(clade_size > 4 & clade_name != "") %>%
+            mutate( clade_id = taxize::get_ids(clade_name, db='ncbi',verbose = F)$ncbi,
+                    is_clade = T, is_subnode = T,
+                    clade_desc =sprintf('%s_%s_%ssp',clade_id,clade_name,clade_size)) %>%
+            relocate(clade_id,clade_name,clade_size)
+
+colnames(fu_tax)
 
 fu_yeast   = eggnog_annotations_species(node = 4751, species = c(4932,4896))
 fu_og  = count_eggnog_orthologs(4751)
