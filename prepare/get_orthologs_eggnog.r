@@ -1,6 +1,9 @@
 library(tidyverse)
 library(here)
 source(here::here("src","__setup_yeastomics__.r"))
+library(treeio)
+library(tidytree)
+ncbi_dir = here::here("data","ncbi")
 #eggnog_fasta = Biostrings::readAAStringSet("http://eggnog5.embl.de/download/latest/e5.proteomes.faa")
 
 filter_orthogroups = function( orthologs_count, ref_sp = 4932,ref_tree,
@@ -170,10 +173,6 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932,ref_tree,
   return(og_ref)
 }
 
-library(treeio)
-library(tidytree)
-fungi=treeio::read.tree("/home/benjamin/Desktop/GitHub/yeastomics/data/ncbi/ncbi-fungi.phy")
-fungi$tip.label = str_remove_all(fungi$tip.label,"['\\[\\]]") #%>% str_replace_all(" ","_")
 
 fungi_clades = c('4890'='ascomycota', '5204'='basidiomycota')
 ascomycota_clades = c('451866'='taphrimycotina','4891'='saccharomycetes','147541'='dothideomycetes',
@@ -188,31 +187,45 @@ ascomycota_clades = c('451866'='taphrimycotina','4891'='saccharomycetes','147541
 # |----|---Eurotiomycetes = 147545
 # |-----|--Sordariomycetes = 147550
 # |-----|--Leotiomycetes = 147548
-ncbi_dir = here::here("data","ncbi")
 
 fu_dir = here::here("data","eggnog","Fungi_4751")
 fuNOG      = get_eggnog_node(node = 4751)
 fu_tax     = get_eggnog_taxonomy(4751)
 fu_species = get_eggnog_species(node = 4751)
-write_lines(fu_species$taxid, here::here('data','ncbi','4751-fungi-179taxids.txt'))
-write_lines(fu_species$taxon, here::here('data','ncbi','4751-fungi-179taxons.txt'))
+
+####_NCBI tree from taxons/taxids (manual) ####
+# write_lines(fu_species$taxid, here::here('data','ncbi','4751-fungi-179taxids.txt'))
+# write_lines(fu_species$taxon, here::here('data','ncbi','4751-fungi-179taxons.txt'))
+# fungi=treeio::read.tree("/home/benjamin/Desktop/GitHub/yeastomics/data/ncbi/ncbi-fungi.phy")
+# fungi$tip.label = str_remove_all(fungi$tip.label,"['\\[\\]]") #%>% str_replace_all(" ","_")
+# fu_ncbi = preload( saved.file = file.path(ncbi_dir,'ncbi-to-eggnog-fungi-179species.rds'),
+#                    { match_strings(fungi$tip.label, SP2=fu_species$taxon, use_soundex = F, manual = T) },
+#                    'match ncbi species tree to eggnog fungal species...')
+# fu_ncbi_eggnog = fu_ncbi %>%
+#   left_join( fu_species %>% mutate(Taxon=taxon, taxon=tolower(taxon)), c('s2'='taxon')) %>%
+#   dplyr::rename(ncbi_name=s1,eggnog_name=s2) %>%
+#   dplyr::select(-c(is_identical:is_substring,osa:n1))
+
+fu_ncbi = get_ncbi_tree(fu_species$taxid)
+#fungi_eggnog$tip.label = fu_ncbi_eggnog$taxid
 
 
-fu_ncbi = preload( saved.file = file.path(ncbi_dir,'ncbi-to-eggnog-fungi-179species.rds'),
-                   { match_strings(fungi$tip.label, SP2=fu_species$taxon, use_soundex = F, manual = T) },
-                   'match ncbi species tree to eggnog fungal species...')
-fu_ncbi_eggnog = fu_ncbi %>%
-  left_join( fu_species %>% mutate(Taxon=taxon, taxon=tolower(taxon)), c('s2'='taxon')) %>%
-  dplyr::rename(ncbi_name=s1,eggnog_name=s2) %>%
-  dplyr::select(-c(is_identical:is_substring,osa:n1))
-
-fungi_eggnog = read.tree(file.path(ncbi_dir,"ncbi-fungi.phy"))
-fungi_eggnog$tip.label = fu_ncbi_eggnog$taxid
-fu_clades = fungi_eggnog %>% subtrees() %>% set_names(fungi_eggnog$node.label)
-schizo = fu_clades$Schizosaccharomyces
-
+library(taxize)
+fu_ncbi  = subtrees(fungi_eggnog) %>%
+           set_names(fungi_eggnog$node.label %>% str_remove_all("['\\[\\]]"))  %>%
+           map_df(~.x$tip.label %>% n_distinct %>% as_tibble, .id = "clades")  %>%
+           filter(value>4 & clades != "") %>%
+           mutate( ncbi_id = taxize::get_ids(clades, db='ncbi',verbose = F)$ncbi )
 
 fu_yeast   = eggnog_annotations_species(node = 4751, species = c(4932,4896))
+fu_og  = count_eggnog_orthologs(4751)
+
+fu_taxons  = count_clade_orthologs(4751, subnode=c(4751,4890,5204,451866,4891,147541,147545,147550)  )
+
+#fu_og_
+#subnode=c(4751,4890,5204,451866,4891,147541,147545,147550)
+
+
 fu_taxons  = count_taxons_eggnog_node(4751, subnode=c(4751,4890,5204,451866,4891,147541,147545,147550)  )
 
 # remove orthogroup from fungi node present in other subnodes
@@ -356,5 +369,23 @@ e6.hierarchy = readr::read_delim(file.path(e6_dir,"e6.og2parents_and_children.ne
                                  col_names = c("OG","nparent","nchild","OG_parent","OG_child"))
 
 
-#ncbi_names = readr::read_delim(file.path(ncbi_dir,'names.dmp'), delim='\t|\t', col_types='ccc')
-#ncbi_node = readr::read_delim(file.path(ncbi_dir,'nodes.dmp'), delim='\t|\t', col_types='ccc')
+#### NCBI
+# ncbi_names = readr::read_delim(file.path(ncbi_dir,'names.dmp'),
+#                                col_names=c('taxid','name','uname','class'),
+#                                delim='\t|\t', col_types='cccc', col_select = 1:4) %>%
+#   mutate(class = str_replace(class,'\t\\|',""))
+#
+# ncbi_sciname = ncbi_names %>% filter(class == 'scientific name')
+# library(hutils)
+# ncbi_sciname %>% filter( name %pin% fungi_eggnog$node.label)
+#
+#
+# node_pnames = ncbi_sciname %>% filter( name %pin% fungi_eggnog$node.label) %>% pull(name)
+# tmp = match_strings(fungi_eggnog$node.label, node_pnames, manual = T)
+
+# ncbi_node = readr::read_delim(file.path(ncbi_dir,'nodes.dmp'),
+#                               col_names=c('taxid','taxid_parent','rank','embl_code'),
+#                               delim='\t|\t', col_types='cccccccccc', col_select=1:13)
+
+# ncbi_lineage = readr::read_delim(file.path(ncbi_dir,'rankedlineage.dmp'),
+#                                  col_names=c(), delim='\t|\t', col_types='cccc', col_select=1:5)
