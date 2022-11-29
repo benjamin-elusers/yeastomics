@@ -1895,7 +1895,7 @@ count_clade_orthologs = function(df_node, df_subnode){
     #tic('clade ortholog')
     CLADE_SP = df_clade$clade_sp[[1]]
     clade_orthologs = left_join(df_clade,df_node,by = c("node_id", "node_name", "node_size")) %>%
-                      mutate(node_og=node_orthologs)
+                      mutate(node_og=node_orthologs) %>%
                       unnest(cols=node_og) %>%
                       filter( taxid %in% factor(CLADE_SP,levels(taxid)) ) %>%
                       group_by(OG,taxid) %>% add_count(name = 'clade_northo') %>%

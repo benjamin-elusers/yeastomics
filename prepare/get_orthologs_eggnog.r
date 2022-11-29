@@ -7,7 +7,7 @@ ncbi_dir = here::here("data","ncbi")
 #eggnog_fasta = Biostrings::readAAStringSet("http://eggnog5.embl.de/download/latest/e5.proteomes.faa")
 
 filter_orthogroups = function( orthologs_count, ref_sp = 4932,ref_tree,
-                               debug=F, force=F, min_species=5 ){
+                               debug=F, force=F){
 
   if(missing(orthologs_count)){
     .warn$log('Must input a taxonomic level and some valid clades...')
@@ -22,7 +22,7 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932,ref_tree,
     mutate( node_has_ref = map(node_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist,
             clade_has_ref = map(clade_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist)
 
-  og_count =  df_og %>% ungroup() %>% mutate(nog = n_distinct(OG)) %>%
+  # og_count =  df_og %>% ungroup() %>% mutate(nog = n_distinct(OG)) %>%
     group_by(node_id,node_name,node_has_ref) %>% mutate( node_nog =n_distinct(OG) ) %>%
     group_by(node_id,node_name,clade_id,clade_name,clade_has_ref) %>% add_count(name='clade_nog') %>%
     dplyr::select(node_id,node_name,node_size, nog, node_has_ref, node_nog,
@@ -212,44 +212,35 @@ fu_ncbi_eggnog = fu_ncbi %>%
 #fungi_eggnog$tip.label = fu_ncbi_eggnog$taxid
 
 library(taxize)
-fungi$tip.label = fu_ncbi_eggnog$taxid
+fungi$tip.label = fu_ncbi_eggnog$taxid[match(tolower(fungi$tip.label),fu_ncbi_eggnog$ncbi_name)]
 fu_clades = subtrees(fungi) %>%
             set_names(fungi$node.label %>% str_remove_all("['\\[\\]]"))  %>%
             map_dfr( ~ tibble(clade_sp = list(.x$tip.label %>% sort), clade_size= n_distinct(unlist(clade_sp))), .id = "clade_name")  %>%
-            filter(clade_size > 4 & clade_name != "") %>%
+            filter(clade_size > 2, clade_name != "") %>%
             bind_cols( fu_node ) %>%
             mutate( clade_id = taxize::get_ids(clade_name, db='ncbi',verbose = F)$ncbi %>% as.character(),
-                    is_clade = T,
+                    is_clade = T, is_eggnog=F,
                     is_subnode = clade_size < node_size | clade_size == node_id,
                     clade_desc =sprintf('%s_%s_%ssp',clade_id,str_replace_all(clade_name," ","."),clade_size)) %>%
             relocate(node_id,node_name,node_size,clade_id,clade_name,clade_size,clade_desc,is_clade,is_subnode,clade_sp) %>%
             arrange(desc(clade_size))
 
-test = full_join(fu_tax,fu_clades)
-
-View(test)
-
 fu_yeast   = eggnog_annotations_species(node = 4751, species = c(4932,4896))
 fu_og  = count_eggnog_orthologs(4751)
 
-fu_taxons  = count_clade_orthologs(4751, subnode=c(4751,4890,5204,451866,4891,147541,147545,147550)  )
-
-#fu_og_
-#subnode=c(4751,4890,5204,451866,4891,147541,147545,147550)
-
-
-fu_taxons  = count_taxons_eggnog_node(4751, subnode=c(4751,4890,5204,451866,4891,147541,147545,147550)  )
+fu_taxons  = count_clade_orthologs(fu_og, fu_clades)
 
 # remove orthogroup from fungi node present in other subnodes
 fu_orthogroups = bind_rows(fu_taxons) %>%
   mutate( node_only = !( clade_id == 4751 & OG %in% OG[clade_id != 4751] ),
           has_4932 = map(clade_orthologs,~ sum(.x$taxid == 4932)))
+dim(fu_orthogroups)
 #og_4932 = fu_yeast %>% filter(taxid == 4932) %>% pull(OG,string)
 
 # Filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast)
 fu_og = filter_orthogroups(orthologs_count = fu_orthogroups,
-                           ref_tree = fungi_eggnog, ref_sp = 4932,
-                           debug = F, force = F, min_sp = 5)
+                           ref_tree = fungi, ref_sp = 4932,
+                           debug = F, force = F)
 
 fu_ = fu_orthogroups %>% filter(clade_id == node_id & clade_ns == node_size & has_4932==1)
 n_distinct(fu_179sp_with4932)
