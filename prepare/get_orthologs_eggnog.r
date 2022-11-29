@@ -189,6 +189,7 @@ ascomycota_clades = c('451866'='taphrimycotina','4891'='saccharomycetes','147541
 # |-----|--Leotiomycetes = 147548
 
 fu_dir = here::here("data","eggnog","Fungi_4751")
+fu_node    = find_eggnog_node(node = 4751,.print = F) %>% dplyr::rename_with(~Pxx(.,px='node',s="_"))
 fuNOG      = get_eggnog_node(node = 4751)
 fu_tax     = get_eggnog_taxonomy(4751)
 fu_species = get_eggnog_species(node = 4751)
@@ -214,16 +215,19 @@ library(taxize)
 fungi$tip.label = fu_ncbi_eggnog$taxid
 fu_clades = subtrees(fungi) %>%
             set_names(fungi$node.label %>% str_remove_all("['\\[\\]]"))  %>%
-            map_dfr( ~ tibble(clade_sp = list(.x$tip.label), clade_size= n_distinct(unlist(clade_sp))), .id = "clade_name")  %>%
+            map_dfr( ~ tibble(clade_sp = list(.x$tip.label %>% sort), clade_size= n_distinct(unlist(clade_sp))), .id = "clade_name")  %>%
             filter(clade_size > 4 & clade_name != "") %>%
-            mutate( clade_id = taxize::get_ids(clade_name, db='ncbi',verbose = F)$ncbi,
-                    is_clade = T, is_subnode = T,
+            bind_cols( fu_node ) %>%
+            mutate( clade_id = taxize::get_ids(clade_name, db='ncbi',verbose = F)$ncbi %>% as.character(),
+                    is_clade = T,
+                    is_subnode = clade_size < node_size | clade_size == node_id,
                     clade_desc =sprintf('%s_%s_%ssp',clade_id,str_replace_all(clade_name," ","."),clade_size)) %>%
-            relocate(clade_id,clade_name,clade_size,clade_desc,is_clade,is_subnode,clade_sp) %>%
+            relocate(node_id,node_name,node_size,clade_id,clade_name,clade_size,clade_desc,is_clade,is_subnode,clade_sp) %>%
             arrange(desc(clade_size))
 
-colnames(fu_tax)
-head(fu_tax)
+test = full_join(fu_tax,fu_clades)
+
+View(test)
 
 fu_yeast   = eggnog_annotations_species(node = 4751, species = c(4932,4896))
 fu_og  = count_eggnog_orthologs(4751)
