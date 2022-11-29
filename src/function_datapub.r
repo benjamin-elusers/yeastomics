@@ -1660,7 +1660,7 @@ get_eggnog_taxonomy = function(node,.print=T,only_clade=T,add_species=T){
 
   if(add_species){
     clades = clades %>% rowwise %>%
-      mutate(clade_sp = list( node_sp %>% filter(str_detect(lineage_id,clade_id)) %>% pull(taxid) ))
+      mutate(clade_sp = list( node_sp %>% filter(str_detect(lineage_id,clade_id)) %>% pull(taxid) %>% sort ))
   }
   if(only_clade){ return(clades %>% filter(is_clade)) }
 
