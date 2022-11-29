@@ -1655,7 +1655,7 @@ get_eggnog_taxonomy = function(node,.print=T,only_clade=T,add_species=T){
            mutate(is_eggnog = (clade_id %in% TAXLEVELS),
                   is_clade = is_eggnog & !(clade_id %in% SP),
                   is_subnode = clade_size < node_size | clade_id == node_id,
-                  clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size)) %>%
+                  clade_desc = sprintf("%s_%s_%sspecies",clade_id,clade_name,clade_size)) %>%
            relocate(node_id,node_name,node_size)
 
   if(add_species){
