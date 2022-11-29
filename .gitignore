@@ -40,6 +40,12 @@ packrat/src/AnnotationDbi/AnnotationDbi_1.48.0.tar.gz
 /*_files/
 misc/*
 *.dmp
+
+# saved data ncbi (sqlite)
+data/ncbi/*.sql
+data/ncbi/*.sqlite
+
+
 ### LARGE FILES >50MB
 # find . -size +50M | cat >> .gitignore
 data/ncbi/*
@@ -61,4 +67,3 @@ output/proteome-features-04_01_2022.rds
 output/PHD-THESIS-F3.1-ortholog-abundance-pombe-cerevisiae.pdf
 prepare/checkpoint_test-leisr-r4s.rdata
 plots/*
-accessionTaxa.sql
