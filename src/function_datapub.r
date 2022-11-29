@@ -1857,18 +1857,20 @@ count_clade_orthologs = function(df_node, subnode=1){
 
   if(missing(df_node)){
     .error$log("requires orthologs count at a taxonomic level... (use count_eggnog_ortholoogs(taxid))")
+    return(NULL)
   }else if( length(df_node)==1 && is_number(df_node) ){
     node = df_node
     df_node = count_eggnog_orthologs(node)
+  }else if( is.null(dim(df_node)) || length(dim(df_node)) != 2 || any(!is.element(c('node_id','node_name'),colnames(df_node))) ) {
+    .error$log("`df_node` must be a 2-dimensional object with columns 'node_id' and 'node_name'")
+    return(NULL)
   }
 
-  nodeid = unique(df_node$node_id)
-  nodename = unique(df_node$node_name)
+  nodeid = unique(df_node$node_id)[1]
+  nodename = unique(df_node$node_name)[1]
   if( length(nodeid) > 1 ){
     .warn$log(sprintf("multiple taxonomic levels found : %s",paste0(nodeid,collapse=" ")))
-    .warn$log(sprintf("using the first taxonomic level: %s_%s",nodeid[1],nodename[1]))
-    nodeid = unique(df_node$node_id)[1]
-    nodename = unique(df_node$node_name)[1]
+    .warn$log(sprintf("using the first taxonomic level: %s_%s",nodeid,nodename))
   }
 
   node_clades = get_eggnog_taxonomy(nodeid,only_clade = T, add_species=T)
@@ -2912,10 +2914,10 @@ find_ncbi_lineage = function(){
   return(ncbi_lineage_rk)
 }
 
-find_ncbi_taxid = function(spnames,dbfile='data/ncbi/accessionTaxa.sql',verbose=F){
+find_ncbi_taxid = function(spnames,dbfile='data/ncbi/ncbiTaxa.sql',verbose=F,sciname=F){
   library(taxonomizr)
   if( file.exists(dbfile) ){
-    taxaId<-getId(taxa = spnames ,sqlFile = dbfile)
+    taxaId<-getId(taxa = spnames ,sqlFile = dbfile,onlyScientific = sciname)
     if(verbose){ print(taxaId) }
     return(taxaId)
   }else{
@@ -2924,6 +2926,19 @@ find_ncbi_taxid = function(spnames,dbfile='data/ncbi/accessionTaxa.sql',verbose=
     return(NA)
   }
 }
+
+get_ncbi_tree = function(ids,dbfile='data/ncbi/ncbiTaxa.sql'){
+  if(missing(ids)){
+    .error$log('need a vector of species names/taxid...')
+  }
+  #if(!any(is_number(ids))){ ids = find_ncbi_taxid(ids) }
+  ncbi_tree = taxonomizr::getTaxonomy(ids,sqlFile=dbfile) %>%
+    taxonomizr::makeNewick(naSub = "",quote = "'") %>%
+    ape::read.tree(text=.)
+
+  return(ncbi_tree)
+}
+
 
 load.hgnc = function(with_protein=T, all_fields=F){
 
