@@ -1655,8 +1655,9 @@ get_eggnog_taxonomy = function(node,.print=T,only_clade=T,add_species=T){
            mutate(is_eggnog = (clade_id %in% TAXLEVELS),
                   is_clade = is_eggnog & !(clade_id %in% SP),
                   is_subnode = clade_size < node_size | clade_id == node_id,
-                  clade_desc = sprintf("%s_%s_%ssp",clade_id,str_replace_all(clade_name," ","."),clade_size)) %>%
-           relocate(node_id,node_name,node_size)
+                  clade_dirname = clade_name %>% str_replace_all("[^a-zA-Z0-9_\\-]+","."),
+                  clade_desc = sprintf("%s_%s_%ssp",clade_id,clade_dirname,clade_size)) %>%
+           relocate(node_id,node_name,node_size,starts_with('clade_'))
 
   if(add_species){
     clades = clades %>% rowwise %>%
