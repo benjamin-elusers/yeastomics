@@ -122,7 +122,7 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
     REF_ID = NODE$id[ NODE$taxid == ref_sp ]
     nref = length(REF_ID)
 
-    if(nref==0 ){
+    if(nref==0){
       .error$log(sprintf('(i=%s) orthogroup %s has no reference sequence (taxid=%s)',i,OG,ref_sp))
       next
     }else if( nref>2 ){
@@ -152,13 +152,13 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
     fasta_in = open_fasta(og_fastafile, og_data$url_fasta)
 
     OG_unique = rep(OG, times=nref) |> makeunique::make_unique(sep='.',wrap_in_brackets = F)
-    fasta_out = sprintf("%s-%s_sp-%s-%s-1to1_orthologs.fa",CLADE_FNAME,CLADE_NS,OG_unique,REFID)
+    fasta_out = sprintf("%s-%s_sp-%s-%s-1to1_orthologs.fa",CLADE_FNAME,CLADE_NS,OG_unique,REF_ID)
     fastapath = file.path(CLADE_DIR,fasta_out)
     has_output = file.exists(fastapath)
 
     if(nref==2){
-      ogs = paste0(OG_unique,collapse="")
-      if(debug){  .dbg$log(sprintf('(i=%s) orthogroup %s has %s reference orthologs (to be splitted into: %s)',i,OG,nref,ogs)) }
+      ogs = paste0(OG_unique,collapse=" ")
+      .info$log(sprintf('(i=%s) orthogroup %s has %s reference orthologs (to be splitted into: %s)',i,OG,nref,ogs))
     }
 
     for(R in 1:nref){
@@ -187,7 +187,7 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
       tree_1to1 = keep.tip(ref_tree,ref_tree_orthogroup$label)
       tree_1to1$tip.label = ref_tree_orthogroup$id
 
-      write_r4s_input(tree = tree_1to1,  fasta = fasta_1to1, outfasta = fastapath)
+      write_r4s_input(tree = tree_1to1,  fasta = fasta_1to1, outfasta = fastapath[R])
     }
   }
   return(og_ref)
@@ -271,7 +271,6 @@ janitor::tabyl(fu_ref,clade_name,clade_ns)
 fu_processed = filter_orthogroups(orthologs_count = fu_ref,
                            ref_tree = fungi, ref_sp = 4932,
                           debug = F, force = F)
-
 
 # Select orthogroups for building the fungi species tree
 # ---> orthogroups must be at the taxonomic level of fungi (id=4751)
