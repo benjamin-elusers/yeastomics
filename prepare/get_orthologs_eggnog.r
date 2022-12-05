@@ -94,50 +94,16 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
                                debug=F, force=F){
 
   if(missing(orthologs_count)){
-    .warn$log('Must input a taxonomic level and some valid clades...')
-    node = find_eggnog_node()
-    clades = get_eggnog_taxonomy(node$id,.print = T) %>% mutate(clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size))
-    selected = select.list(clades$clade_desc,multiple = T)
-    orthologs_count = count_taxons_eggnog_node(node$id, clades$clade_id[ clades$clade_desc %in% selected] ) %>% bind_rows()
+    .error$log('Must input a dataframe with the orthogroups from a taxonomic level across valid subclades...')
+    return(NULL)
+    #node = find_eggnog_node()
+    #clades = get_eggnog_taxonomy(node$id,.print = T) %>% mutate(clade_desc = sprintf("%s_%s (n=%s)",clade_id,clade_name,clade_size))
+    #selected = select.list(clades$clade_desc,multiple = T)
+    #orthologs_count = count_taxons_eggnog_node(node$id, clades$clade_id[ clades$clade_desc %in% selected] ) %>% bind_rows()
   }
 
   .info$log("remove orthogroups without reference species...")
-  # df_og = orthologs_count %>%
-  #   mutate( node_has_ref = map(node_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist,
-  #           clade_has_ref = map(clade_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist)
-  #
-  #  og_count =  df_og %>% ungroup() %>% mutate(nog = n_distinct(OG)) %>%
-  #   group_by(node_id,node_name,node_has_ref) %>% mutate( node_nog =n_distinct(OG) ) %>%
-  #   group_by(node_id,node_name,clade_id,clade_name,clade_has_ref) %>% add_count(name='clade_nog') %>%
-  #   dplyr::select(node_id,node_name,node_size, nog, node_has_ref, node_nog,
-  #                 clade_has_ref,clade_id,clade_name,clade_has_ref,clade_nog) %>%
-  #   distinct()
-  # og_ref = df_og %>% filter(node_has_ref > 0) %>%
-  #   group_by(node_id,clade_id) %>% add_count(name='clade_n')
   og_ref = orthologs_count
-  #df_og %>% janitor::tabyl(node_has_ref,clade_name)
-  #df_og %>% janitor::tabyl(clade_has_ref,clade_name)
-  # N0 = nrow(df_og)
-  # n0 = n_distinct(df_og$OG)
-  # has_ref= og_ref$node_has_ref>0
-  # n1 = n_distinct(og_ref$OG[has_ref])
-  # N1 = sum(has_ref)
-  # .succ$log(sprintf("number of orthogroups with reference species  = %s/%s (total=%s/%s)",n1,n0,N1,N0))
-  # has_many_ref= og_ref$node_has_ref>1
-  # n2.0 = n_distinct(og_ref$OG[has_ref & has_many_ref])
-  # N2.0 = sum(has_many_ref)
-  # .succ$log(sprintf("   ---> single reference species  = %s/%s (total=%s/%s)",n2.0,n1,N2.0,N1))
-  # has_single_ref= og_ref$node_has_ref==1
-  # n2 = n_distinct(og_ref$OG[has_single_ref])
-  # N2 = sum(has_single_ref)
-  # .succ$log(sprintf("   ---> single reference species  = %s/%s (total=%s/%s)",n2,n1,N2,N1))
-  # is_1to1 = og_ref$clade_one2one==T
-  # n3 = n_distinct(og_ref$OG[has_single_ref & is_1to1])
-  # N3 = sum(has_single_ref & is_1to1)
-  # .succ$log(sprintf("   -------> one-to-one orthologs  = %s/%s (total=%s/%s)",n3,n2,N3,N2))
-  # n3.0 = n_distinct(og_ref$OG[has_single_ref & !is_1to1])
-  # N3.0 = sum(has_single_ref & !is_1to1)
-  # .succ$log(sprintf("   -------> one-to-many orthologs = %s/%s (total=%s/%s)",n3.0,n2,N3.0,N2))
   nstep = nrow(og_ref)
   pc1 = as.integer(nstep/1000)
   for( i in 1:nrow(og_ref) ){
@@ -147,7 +113,6 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
     if(i %% pc1 == 0){ cat(sprintf("[%.1f%%] ---> %6d/%6d      \r",perc,i,nstep)) }
     OG = og_data$OG
     NPROT = og_data$clade_np
-    is_one2one = og_data$clade_one2one
 
     NODE_ID  = og_data$node_id
     NODE_NAME = og_data$node_name
@@ -157,11 +122,22 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
     REF_ID = NODE$id[ NODE$taxid == ref_sp ]
     nref = length(REF_ID)
 
+    if(nref==0 ){
+      .error$log(sprintf('(i=%s) orthogroup %s has no reference sequence (taxid=%s)',i,OG,ref_sp))
+      next
+    }else if( nref>2 ){
+      if(debug){
+        .warn$log(sprintf('(i=%s) orthogroup %s has multiple reference sequences (taxid=%s n=%s)',i,OG,ref_sp,nref))
+      }
+      next
+    }
+
     CLADE_FNAME = og_data$clade_dirname
     CLADE_ID = og_data$clade_id
     CLADE_SIZE = og_data$clade_size
     CLADE_N = og_data$clade_n
     CLADE_NS = og_data$clade_ns
+    is_one2one = og_data$clade_one2one
 
     CLADE = og_data$clade_orthologs[[1]] %>%
              mutate(ref = (taxid==ref_sp), is_dup = is.dup(taxid) ) %>%
@@ -172,69 +148,40 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
     CLADE_DIR = here::here('data','eggnog',NODE_DESC,CLADE_DESC)
     dir.create(CLADE_DIR,showWarnings = F,recursive = T)
 
-    if(nref==0){
-      .error$log(sprintf('(i=%s) orthogroup %s has no reference sequence (taxid=%s)',i,OG,ref_sp))
-      next
-    }else if(nref> 1){
-      if(nref==2){
-        if(debug){
-          .warn$log(sprintf('(i=%s) orthogroup %s has duplicated reference sequences (taxid=%s n=%s)',i,OG,ref_sp,nref))
-          .warn$log("splitting fasta between the two duplicated reference orthologs...")
-        }
-      }else{
-        if(debug){
-          .warn$log(sprintf('(i=%s) orthogroup %s has multiple reference sequences (taxid=%s n=%s)',i,OG,ref_sp,nref))
-        }
-      }
-      next
-      #print(og_data)
-      #readline('continue?')
-    }else if(nref==1){
+    og_fastafile = file.path(FASTA_DIR,paste0(OG,'.fasta'))
+    fasta_in = open_fasta(og_fastafile, og_data$url_fasta)
 
-      fasta_out = sprintf("%s-%s_sp-%s-%s-1to1_orthologs.fa",CLADE_FNAME,CLADE_NS,OG,REF_ID)
+
+    for(R in 1:nref){
+
+      refid = REF_ID[R]
+      refog = OG
+      if(nref==2){ refog = paste0(OG,".",R) }
+      fasta_out = sprintf("%s-%s_sp-%s-%s-1to1_orthologs.fa",CLADE_FNAME,CLADE_NS,refog,refid)
       fastapath = file.path(CLADE_DIR,fasta_out)
       has_output = file.exists(fastapath)
 
       if( has_output ){
-        if(debug){  .dbg$log(sprintf('(i=%s) orthogroup %s already processed',i,OG)) }
-        next
+        if(debug){  .dbg$log(sprintf('(i=%s) orthogroup %s already processed',i,refog)) }
+        break
       }
 
-      og_fastafile = file.path(FASTA_DIR,paste0(OG,'.fasta'))
-      fasta_in = open_fasta(og_fastafile, og_data$url_fasta)
-
-      # tree_out =  str_replace(fasta_out,'\\.fa$','.nwk')
-      # treepath = file.path(CLADE_DIR,tree_out)
-
-      # Get fasta sequence of the single reference sequence
-      #ref_seq = fasta_in[[REF_ID]] %>% as.character() %>% chartr("U","X",x = .) %>% setNames(REF_ID)
-
-      if( is_one2one ){
-        if(debug){ .dbg$log(sprintf('(i=%s) orthogroup %s has 1-to-1 ortholog',i,OG)) }
+      if( is_one2one && nref==1 ){ # only if there is a single reference id in clade
+        if(debug){ .dbg$log(sprintf('(i=%s) orthogroup %s has 1-to-1 ortholog',i,refog)) }
         fasta_1to1 = fasta_in[CLADE$id]
-
-        ref_tree_orthogroup = inner_join(ref_tree %>% as_tibble(), CLADE,by=c('label'='taxid'))
-        tree_1to1 = keep.tip(ref_tree,ref_tree_orthogroup$label)
-        tree_1to1$tip.label = ref_tree_orthogroup$id
-
       }else{
-
-        # Count and get fasta sequences of duplicated orthologs from the current clade
         if(debug){
           .dbg$log(sprintf('(i=%s - %s) orthogroup %s has %s taxons for %s duplicated orthologs',i,CLADE_FNAME,OG,n_distinct(CLADE$taxid),sum(CLADE$is_dup)))
         }
-
-        fasta_1to1 = reduce_orthologs(fasta_in, REF_ID, CLADE$id)
-        # # Final set of sequences with 1-to-1 orthologs for current clade
-        DF_CLADE_1TO1 = CLADE %>% filter( id %in% names(fasta_1to1) )
-        # NP_1to1 = n_distinct(DF_CLADE_1TO1$taxid)
-        # NS_1to1 = n_distinct(DF_CLADE_1TO1$id)
-        # if(debug){ .dbg$log(sprintf("ns = %s np = %s",NP_1to1,NS_1to1)) }
-
-        ref_tree_orthogroup = inner_join(ref_tree %>% as_tibble(), DF_CLADE_1TO1,by=c('label'='taxid'))
-        tree_1to1 = keep.tip(ref_tree,ref_tree_orthogroup$label)
-        tree_1to1$tip.label = ref_tree_orthogroup$id
+        fasta_1to1 = reduce_orthologs(fasta_in, refid, CLADE$id)
       }
+
+      # Final set of sequences with 1-to-1 orthologs for current clade
+      DF_CLADE_1TO1 = CLADE %>% filter( id %in% names(fasta_1to1) )
+      ref_tree_orthogroup = inner_join(ref_tree %>% as_tibble(), DF_CLADE_1TO1,by=c('label'='taxid'))
+      tree_1to1 = keep.tip(ref_tree,ref_tree_orthogroup$label)
+      tree_1to1$tip.label = ref_tree_orthogroup$id
+
       write_r4s_input(tree = tree_1to1,  fasta = fasta_1to1, outfasta = fastapath)
     }
   }
