@@ -151,17 +151,22 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
     og_fastafile = file.path(FASTA_DIR,paste0(OG,'.fasta'))
     fasta_in = open_fasta(og_fastafile, og_data$url_fasta)
 
+    OG_unique = rep(OG, times=nref) |> makeunique::make_unique(sep='.',wrap_in_brackets = F)
+    fasta_out = sprintf("%s-%s_sp-%s-%s-1to1_orthologs.fa",CLADE_FNAME,CLADE_NS,OG_unique,REFID)
+    fastapath = file.path(CLADE_DIR,fasta_out)
+    has_output = file.exists(fastapath)
+
+    if(nref==2){
+      ogs = paste0(OG_unique,collapse="")
+      if(debug){  .dbg$log(sprintf('(i=%s) orthogroup %s has %s reference orthologs (to be splitted into: %s)',i,OG,nref,ogs)) }
+    }
 
     for(R in 1:nref){
 
       refid = REF_ID[R]
-      refog = OG
-      if(nref==2){ refog = paste0(OG,".",R) }
-      fasta_out = sprintf("%s-%s_sp-%s-%s-1to1_orthologs.fa",CLADE_FNAME,CLADE_NS,refog,refid)
-      fastapath = file.path(CLADE_DIR,fasta_out)
-      has_output = file.exists(fastapath)
+      refog = OG_unique[R]
 
-      if( has_output ){
+      if( has_output[R]){
         if(debug){  .dbg$log(sprintf('(i=%s) orthogroup %s already processed',i,refog)) }
         break
       }
