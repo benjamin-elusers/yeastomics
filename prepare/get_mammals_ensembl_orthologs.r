@@ -378,7 +378,7 @@ library(biomaRt)
 ens_ortho = vt_df %>% filter(is_leaf & !is.na(ens_filter))
 NSP=n_distinct(ens_ortho$species)
 
-save.image(file.path(path_ortho,"checkpoint-vertebrates-ensembl108.rdata"))
+#save.image(file.path(path_ortho,"checkpoint-vertebrates-ensembl108.rdata"))
 
 # Save all ensembl queries to get human-mammals orthologs
 # Currently fails a lot due to timeout queries (probably server error or too many long queries)
@@ -532,6 +532,8 @@ t1.1 | p1
 # Get lineage from root node (common ancestor to eutherian mammals)
 ma_lineages = ape::nodepath(ma_tree, from = treeio::rootnode(ma_tree)) %>%
   set_names(c(ma_tree$node.label,"out"))
+
+find.lineage(ma_tree)
 
 nodenum = tidytree::nodeid(ma_tree,names(ma_clades))
 #mammals_grp = dendextend::cutree(as.dendrogram(phytools::force.ultrametric(ma_tree)),k=6)
