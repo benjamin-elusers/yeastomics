@@ -21,19 +21,17 @@ reduce_orthologs = function(fastaseq, id_ref, id_orthogroup){
   is_dup = df_seq$np>1
   id_dup = df_seq$ids[is_dup]
 
-  # Align each duplicated ortholog to the reference sequence and select best representative per taxon
-  #.dbg$log('select most representative orthologs compared to reference sequence...')
-  CLOSEST = map_dfr(seq_along(id_dup), ~score_ali(p1=orthogroup_seq[.x], s1=id_dup[.x],
-                                                  p2=reference_seq, s2=id_ref)) %>%
+  CLOSEST = map_dfr(seq_along(id_orthogroup), ~score_ali(p1=orthogroup_seq[.x], s1=id_orthogroup[.x],
+                                        p2=reference_seq, s2=id_ref)) %>%
     mutate(taxon1=str_split_fixed(ID1,'\\.',2)[,1] ) %>%
     mutate(delta_ol = abs(100-OL1), delta_pid = abs(100-PID1) ) %>%
     group_by(taxon1) %>%
     arrange( delta_ol, delta_pid ) %>%
-    #filter( nearest(100,OL1) & nearest(PID1,100)) %>%
-    dplyr::slice_head(n=1)
+    dplyr::slice_head(n=1) %>%
+    ungroup() %>%
+    arrange( delta_ol, delta_pid )
 
-  id_1to1 = c(id_one2one,CLOSEST$ID1) %>% unique()
-  return(fastaseq[id_1to1])
+    return(fastaseq[CLOSEST$ID1])
 }
 
 open_fasta = function(fastafile, fastaurl,debug=F){
@@ -53,19 +51,24 @@ open_fasta = function(fastafile, fastaurl,debug=F){
   }
 }
 
-write_r4s_input = function(tree,fasta,outfasta,debug=F){
+check_ortho = function(outfasta,outtree,debug=F){
+
+  has_fasta = file.exists( file.path(outfasta) )
+  has_tree = file.exists( file.path(outtree) )
+  SEQ=if(has_fasta) Biostrings::readAAStringSet(file.path(outfasta)) else NULL
+  TREE=if(has_tree) ape::read.tree(file.path(outtree)) else NULL
+  return( list(fasta=SEQ,tree=TREE) )
+}
+
+write_r4s_input = function(tree,fasta,outfasta,outtree,debug=F){
 
   if(debug){
     .dbg$log('...writing the tree and alignments for 1-to-1 orthologs...')
   }
 
-  outtree =  str_replace(outfasta,'\\.fa$','.nwk')
-  outdir = dirname(outfasta)
   fastaname = basename(outfasta)
   treename = basename(outtree)
 
-  has_fasta = file.exists( file.path(outfasta) )
-  has_tree = file.exists( file.path(outtree) )
   np_tree  = n_distinct(tree$tip.label)
   np_fasta = n_distinct(names(fasta))
 
@@ -75,17 +78,19 @@ write_r4s_input = function(tree,fasta,outfasta,debug=F){
     if(np_tree<3){
       .error$log(sprintf("not enough 1-to-1 orthologs found (%s)...",np_tree))
     }else{
-      if( has_fasta ){
-        .dbg$log(sprintf("fasta file %s exists and not empty. already processed?",outname))
-      }else{
+
+      if(!file.exists(outfasta)){
+        .dbg$log(sprintf("writing fasta file %s",fastaname))
         writeXStringSet(fasta,outfasta,append = F,format = 'fasta')
       }
 
-      if(has_tree){
-        .dbg$log(sprintf("tree file %s exists and not empty. already processed?",treename))
-      }else{
-        write.tree(tree,outtree)
-      }
+      #if(!file.exists(outtree)){
+      if(debug){ .dbg$log(sprintf("writing tree file %s",treename)) }
+      #tree$edge.length=NULL
+      tree$node.label=NULL
+      #tree$root.edge=NULL
+      #print(tree)
+      write.tree(tree,outtree)
     }
   }
 }
@@ -105,7 +110,7 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
   .info$log("remove orthogroups without reference species...")
   og_ref = orthologs_count
   nstep = nrow(og_ref)
-  pc1 = as.integer(nstep/1000)
+  pc1 = as.integer(nstep/ min(nstep,1000))
   for( i in 1:nrow(og_ref) ){
 
     og_data = og_ref[i,]
@@ -137,6 +142,7 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
     CLADE_SIZE = og_data$clade_size
     CLADE_N = og_data$clade_n
     CLADE_NS = og_data$clade_ns
+    CLADE_FS = og_data$clade_f
     is_one2one = og_data$clade_one2one
 
     CLADE = og_data$clade_orthologs[[1]] %>%
@@ -147,18 +153,24 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
     CLADE_DESC = og_data$clade_desc
     CLADE_DIR = here::here('data','eggnog',NODE_DESC,CLADE_DESC)
     dir.create(CLADE_DIR,showWarnings = F,recursive = T)
+    dir.create(file.path(CLADE_DIR,'fasta'),showWarnings = F,recursive = T)
+    dir.create(file.path(CLADE_DIR,'tree'),showWarnings = F,recursive = T)
 
     og_fastafile = file.path(FASTA_DIR,paste0(OG,'.fasta'))
     fasta_in = open_fasta(og_fastafile, og_data$url_fasta)
 
     OG_unique = rep(OG, times=nref) |> makeunique::make_unique(sep='.',wrap_in_brackets = F)
-    fasta_out = sprintf("%s-%s_sp-%s-%s-1to1_orthologs.fa",CLADE_FNAME,CLADE_NS,OG_unique,REF_ID)
-    fastapath = file.path(CLADE_DIR,fasta_out)
+    fasta_out = sprintf("%s_%s_%s_1to1-orthologs.fa",CLADE_FNAME,OG_unique,REF_ID)
+    tree_out =  str_replace(fasta_out,'\\.fa$','.nwk') #%>% paste0("_eggnog")
+    fastapath = file.path(CLADE_DIR,"fasta",fasta_out)
+    treepath = file.path(CLADE_DIR,"tree",tree_out)
     has_output = file.exists(fastapath)
 
     if(nref==2){
       ogs = paste0(OG_unique,collapse=" ")
-      .info$log(sprintf('(i=%s) orthogroup %s has %s reference orthologs (to be splitted into: %s)',i,OG,nref,ogs))
+      if(debug){
+        .dbg$log(sprintf('(i=%s) orthogroup %s has %s reference orthologs (to be splitted into: %s)',i,OG,nref,ogs))
+      }
     }
 
     for(R in 1:nref){
@@ -166,31 +178,37 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
       refid = REF_ID[R]
       refog = OG_unique[R]
 
-      if( has_output[R]){
+      outputs=check_ortho(fastapath[R],treepath[R])
+      fasta_1to1 = outputs$fasta
+      tree_1to1  = outputs$tree
+
+      if( !is.null(fasta_1to1) && !is.null(tree_1to1) ){
         if(debug){  .dbg$log(sprintf('(i=%s) orthogroup %s already processed',i,refog)) }
         break
-      }
-
-      if( is_one2one && nref==1 ){ # only if there is a single reference id in clade
-        if(debug){ .dbg$log(sprintf('(i=%s) orthogroup %s has 1-to-1 ortholog',i,refog)) }
-        fasta_1to1 = fasta_in[CLADE$id]
       }else{
-        if(debug){
-          .dbg$log(sprintf('(i=%s - %s) orthogroup %s has %s taxons for %s duplicated orthologs',i,CLADE_FNAME,OG,n_distinct(CLADE$taxid),sum(CLADE$is_dup)))
+        if(is.null(fasta_1to1)){
+          fasta_1to1 = reduce_orthologs(fasta_in, refid, CLADE$id)
+          if(is_one2one){ .dbg$log(sprintf('(i=%s) orthogroup %s has 1-to-1 ortholog',i,refog)) }
+          if(debug){
+              .dbg$log(sprintf('(i=%s - %s) orthogroup %s has %s taxons for %s duplicated orthologs',i,CLADE_FNAME,OG,n_distinct(CLADE$taxid),sum(CLADE$is_dup)))
+          }
         }
-        fasta_1to1 = reduce_orthologs(fasta_in, refid, CLADE$id)
+
+        if(is.null(tree_1to1)){
+          # Final set of sequences with 1-to-1 orthologs for current clade
+          DF_CLADE_1TO1 = CLADE %>% filter( id %in% names(fasta_1to1) ) %>% arrange(match(id, names(fasta_1to1)))
+
+          ref_tree_orthogroup = inner_join(ref_tree %>% as_tibble(), DF_CLADE_1TO1,by=c('label'='taxid'))
+          tree_1to1 = keep.tip(ref_tree,ref_tree_orthogroup$label)
+          tree_1to1$tip.label = ref_tree_orthogroup$id
+        }
+
+        write_r4s_input(tree = tree_1to1,  fasta = fasta_1to1,
+                        outfasta = fastapath[R], outtree=treepath[R])
       }
-
-      # Final set of sequences with 1-to-1 orthologs for current clade
-      DF_CLADE_1TO1 = CLADE %>% filter( id %in% names(fasta_1to1) )
-      ref_tree_orthogroup = inner_join(ref_tree %>% as_tibble(), DF_CLADE_1TO1,by=c('label'='taxid'))
-      tree_1to1 = keep.tip(ref_tree,ref_tree_orthogroup$label)
-      tree_1to1$tip.label = ref_tree_orthogroup$id
-
-      write_r4s_input(tree = tree_1to1,  fasta = fasta_1to1, outfasta = fastapath[R])
     }
   }
-  return(og_ref)
+  #return(og_ref)
 }
 
 
@@ -219,6 +237,10 @@ fu_species = get_eggnog_species(node = 4751)
 # write_lines(fu_species$taxon, file.path(ncbi_dir,'4751-fungi-179taxons.txt'))
 fungi = treeio::read.tree(file.path(ncbi_dir,"ncbi-fungi.phy"))
 fungi$tip.label = str_remove_all(fungi$tip.label,"['\\[\\]]") #%>% str_replace_all(" ","_")
+
+sptree=here::here(fu_dir,"basic_sptree","cog_100-alg_concat_default-raxml_default")
+fungi_19 = treeio::read.tree(file.path(sptree,"fungi179-19orthogroups-seqs-sorted.fa.gz.final_tree.nw"))
+
 fu_ncbi = preload( saved.file = file.path(ncbi_dir,'ncbi-to-eggnog-fungi-179species.rds'),
                     { match_strings(fungi$tip.label, SP2=fu_species$taxon, use_soundex = F, manual = T) },
                     'match ncbi species tree to eggnog fungal species...')
@@ -233,10 +255,12 @@ fu_ncbi_eggnog = fu_ncbi %>%
 
 library(taxize)
 fungi$tip.label = fu_ncbi_eggnog$taxid[match(tolower(fungi$tip.label),fu_ncbi_eggnog$ncbi_name)]
+#fungi_19$tip.label = fu_ncbi_eggnog$taxid[match(tolower(fungi_19$tip.label),fu_ncbi_eggnog$taxid)]
+
 fu_clades = subtrees(fungi) %>%
             set_names(fungi$node.label %>% str_remove_all("['\\[\\]]"))  %>%
-            map_dfr( ~ tibble(clade_sp = list(.x$tip.label %>% sort), clade_size= n_distinct(unlist(clade_sp))), .id = "clade_name")  %>%
-            filter(clade_size > 2, clade_name != "") %>%
+            map_dfr( ~ tibble(clade_sp = list(.x$tip.label %>% sort %>% factor(.,levels=fu_species$taxid)), clade_size= n_distinct(unlist(clade_sp))), .id = "clade_name")  %>%
+            filter(clade_size > 2 & clade_name != "") %>%
             bind_cols( fu_node ) %>%
             mutate( clade_id = taxize::get_ids(clade_name, db='ncbi',verbose = F)$ncbi %>% as.character(),
                     clade_dirname = clade_name %>% str_replace_all("[^a-zA-Z0-9_\\-]+","."),
@@ -244,33 +268,53 @@ fu_clades = subtrees(fungi) %>%
                     is_clade = T, is_eggnog=F,
                     is_subnode = clade_size < node_size | clade_size == node_id,
                     clade_desc =sprintf('%s_%s_%ssp',clade_id,clade_dirname,clade_size),
-                    node_desc =sprintf('%s_%s',node_id,node_dirname)) %>%
+                    node_desc =sprintf('%s_%s',node_id,node_dirname),
+                    clade_has_4896.4932 = map(clade_sp, ~ any(.x %in% c(4932,4896))) %>% unlist) %>%
             relocate(node_id,node_name,node_dirname,node_desc,node_size,
                      clade_id,clade_name,clade_dirname,clade_desc,clade_size,
                      is_clade,is_subnode,clade_sp) %>%
             arrange(desc(clade_size))
 
+fu_clades_toprocess = fu_clades %>% filter(clade_size > 20 | clade_has_4896.4932)
 fu_yeast   = eggnog_annotations_species(node = 4751, species = c(4932,4896))
-fu_og  = count_eggnog_orthologs(4751)
-fu_orthogroups  = count_clade_orthologs(fu_og, fu_clades) %>% bind_rows()
+fu_og  = preload(saved.file = here::here("data/eggnog/4751_Fungi-orthogroups.rds"),
+                 loading.call = { count_eggnog_orthologs(4751) },
+                 doing = "fungi othogroups...")
+
+fu_orthogroups  = preload(saved.file = here::here("data/eggnog/4751_Fungi-orthogroups-clades.rds"),
+                          loading.call = { count_clade_orthologs(fu_og, fu_clades_toprocess) %>% bind_rows() },
+                          doing = "orthogroups by fungi subclades...")
+
 fu_ref = fu_orthogroups %>%
   mutate(ref_sp = 4932,
          # remove orthogroup from fungi node present in other subnodes
          node_only = !( clade_id == 4751 & OG %in% OG[clade_id != 4751] ),
          node_has_ref = map(node_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist,
-         clade_has_ref = map(clade_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist) %>%
-  filter(node_has_ref>0 & clade_ns > 2) %>%
+         clade_has_ref = map(clade_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist,
+         node_has_4896 = map(node_orthologs, ~ sum(.x$taxid %in% 4896)) %>% unlist,
+         clade_has_4896 = map(clade_orthologs, ~ sum(.x$taxid %in% 4896)) %>% unlist)
+
+
+fu_toprocess = fu_ref %>%
+  filter(node_has_ref %in% c(1,2) & (clade_ns > 20 | clade_has_ref %in% c(0,1,2) | clade_has_4896 %in% c(1,2)) & clade_f > 0.5 ) %>%
   group_by(node_id,clade_id) %>% add_count(name='clade_n')
 
 dim(fu_orthogroups)
 dim(fu_ref)
-table(fu_ref$clade_name,fu_ref$node_has_ref)
-janitor::tabyl(fu_ref,clade_name,clade_ns)
+dim(fu_toprocess)
+table(fu_toprocess$clade_name,fu_toprocess$node_has_ref)
+janitor::tabyl(fu_toprocess,clade_name,clade_ns)
 
-# Filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast)
-fu_processed = filter_orthogroups(orthologs_count = fu_ref,
-                           ref_tree = fungi, ref_sp = 4932,
-                          debug = F, force = F)
+####_filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast) ####
+chunk_size=100
+chunks=seq(1,nrow(fu_toprocess),by=chunk_size)
+pbmcapply::pbmclapply(chunks,FUN = function(irow){
+                     filter_orthogroups(
+                          orthologs_count = fu_toprocess[irow:(irow+chunk_size),],
+                          ref_tree = fungi_19,
+                          ref_sp = 4932,
+                          debug = F,
+                          force = F) },mc.cores = 14)
 
 # Select orthogroups for building the fungi species tree
 # ---> orthogroups must be at the taxonomic level of fungi (id=4751)
@@ -280,39 +324,7 @@ fu_processed = filter_orthogroups(orthologs_count = fu_ref,
 fu_sptree = fu_ref %>%
             filter(clade_id == node_id & clade_f1to1>0.975 & clade_f == 1 & node_has_ref == 1)
 
-clade_dir =   file.path(fu_dir,"4751_Fungi_179sp")
-fungi_og = tibble(filename=list.files(clade_dir,pattern='.fa$')) %>%
-           separate(col=filename,sep='\\-',
-                    into=c('clade','nsp','og','ref','ext'),remove = F,extra = 'merge') %>%
-           filter(og %in% fu_sptree$OG)
-
-sptree_dir = file.path(fu_dir,"FUNGI-SPECIES-TREE")
-file.copy(from=file.path(clade_dir,fungi_og$filename),
-          to = file.path(sptree_dir,fungi_og$filename))
-
-# treefiles = str_replace(fungi_og$filename,"\\.fa$","\\.nwk")
-# file.copy(from=file.path(clade_dir,treefiles),
-#           to = file.path(sptree_dir,treefiles))
-
-
-FASTA1TO1 = list.files(fu_dir,  recursive = T, pattern = '.fa', full.names = T,include.dirs = F,no.. = F)
-ortho1to1 = str_split_fixed(basename(FASTA1TO1),"-",n=4) %>%
-  as_tibble() %>%
-  set_names(c('clade','nspecies','OG','refid')) %>%
-  mutate(nspecies = str_remove(nspecies,'_sp$'),
-         refid = str_remove(refid,"-1to1_orthologs.fa"),
-         fastafile=FASTA1TO1) %>%
-  separate(refid, into=c('taxid','string'), sep='\\.' ) %>%
-  type_convert()
-
-fungi_orthoseq = read.sequences(ortho1to1$fastafile,ncores = 14,type='AA')
-ortho1to1$NSP = sapply(fungi_orthoseq,length)
-sum(ortho1to1$nspecies != ortho1to1$NSP)
-#unlink(ortho1to1$fastafile[ortho1to1$nspecies != NSP])
-
-fungi_179sp = ortho1to1 %>%
-  left_join(fu_orthogroups, by=c('clade'='clade_name','OG')) %>%
-  filter(clade_id == 4751 )
+#fu_processed = fu_ref %>% filter(node_has_ref %in% c(1,2) & clade_has_ref %in% c(0,1,2))
 
 
 #### METAZOA ####
@@ -337,7 +349,9 @@ mz_ncbi = preload( saved.file = file.path(ncbi_dir,'ncbi-to-eggnog-metazoa-161sp
 mz_ncbi_eggnog = mz_ncbi %>%
   left_join( mz_species %>% mutate(Taxon=taxon, taxon=tolower(taxon)), c('s2'='taxon')) %>%
   dplyr::rename(ncbi_name=s1,eggnog_name=s2) %>%
-  dplyr::select(-c(is_identical:is_substring,osa:n1))
+  dplyr::select(-c(is_identical:is_substring,osa:n1)) %>%
+  mutate(ncbi_Name = str_to_sentence(ncbi_name))
+
 
 ####_get NCBI tree from taxon identifiers (not necessarily find all ids) ####
 #mz_ncbi = get_ncbi_tree(mz_species$taxid)
@@ -356,28 +370,73 @@ mz_clades = subtrees(metazoa) %>%
           is_clade = T, is_eggnog=F,
           is_subnode = clade_size < node_size | clade_size == node_id,
           clade_desc =sprintf('%s_%s_%ssp',clade_id,clade_dirname,clade_size),
-          node_desc =sprintf('%s_%s',node_id,node_dirname)) %>%
+          node_desc =sprintf('%s_%s',node_id,node_dirname),
+          clade_has_9606 = map(clade_sp, ~ any(.x %in% c(9606))) %>% unlist) %>%
   relocate(node_id,node_name,node_dirname,node_desc,node_size,
            clade_id,clade_name,clade_dirname,clade_desc,clade_size,
            is_clade,is_subnode,clade_sp) %>%
   arrange(desc(clade_size))
 
+mz_clades_toprocess = mz_clades %>% filter(clade_size > 5 | clade_has_9606)
+
+library(ggtree)
+metazoa = treeio::read.tree(here::here('data','ncbi','ncbi-metazoan.phy'))
+df_metazoa = metazoa %>% as_tibble() %>%
+             mutate( label = stringr::str_remove_all(label,pattern="'"),
+                     depth = ape::node.depth(metazoa),
+                     is_leaf = depth == 1) %>%
+             left_join(mz_ncbi_eggnog %>% dplyr::select(ncbi_name,ncbi_Name,eggnog_name,taxid), by=c('label'='ncbi_Name')) %>%
+             mutate( to_process = label %in% mz_clades_toprocess$clade_name) %>%
+             left_join(mz_clades, by=c('label'='clade_name'))
+
+df_clade = df_metazoa %>% filter( !is_leaf )
+
+ggtree(metazoa,layout = 'dendrogram',branch.length = 'none') %<+% df_metazoa +
+  geom_nodepoint(aes(subset=node %in% df_clade$node, col = to_process),size=2) +
+  geom_text_repel(aes(subset=node %in% df_clade$node, label=clade_desc, col = to_process),
+                  fontface='bold', size=3)
+
 mz_human   = eggnog_annotations_species(node = 33208, species = c(9606))
-mz_og  = count_eggnog_orthologs(33208)
-mz_orthogroups  = count_clade_orthologs(mz_og, mz_clades) %>% bind_rows()
+
+mz_og  = preload(saved.file = here::here("data/eggnog/33208_Metazoa-orthogroups.rds"),
+                 loading.call = { count_eggnog_orthologs(33208) },
+                 doing = "metazoa orthogroups...")
+
+mz_orthogroups  = preload(saved.file = here::here("data/eggnog/33208_Metazoa-orthogroups-clades_over_5sp.rds"),
+                          loading.call = { count_clade_orthologs(mz_og, mz_clades_toprocess) %>% bind_rows() },
+                          doing = "orthogroups by metazoa subclades...")
+
 mz_ref = mz_orthogroups %>%
   mutate(ref_sp = 9606,
          # remove orthogroup from fungi node present in other subnodes
          node_only = !( clade_id == 33208 & OG %in% OG[clade_id != 33208] ),
          node_has_ref = map(node_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist,
-         clade_has_ref = map(clade_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist) %>%
-  filter(node_has_ref>0 & clade_ns > 2) %>%
+         clade_has_ref = map(clade_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist)
+
+mz_toprocess = mz_ref %>%
+  filter(node_has_ref %in% c(1,2) & (clade_ns > 20 | clade_has_ref %in% c(1,2)) & clade_f > 0.5 ) %>%
   group_by(node_id,clade_id) %>% add_count(name='clade_n')
 
 dim(mz_orthogroups)
 dim(mz_ref)
-table(mz_ref$clade_name,mz_ref$node_has_ref)
-janitor::tabyl(mz_ref,clade_name,clade_ns)
+dim(mz_toprocess)
+table(mz_toprocess$clade_name,mz_toprocess$node_has_ref)
+janitor::tabyl(mz_toprocess,clade_name,clade_ns)
+
+####_filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast) ####
+chunk_size=100
+chunks=seq(1,nrow(mz_toprocess),by=chunk_size)
+pbmcapply::pbmclapply(chunks,FUN = function(irow){
+  filter_orthogroups(
+    orthologs_count = mz_toprocess[irow:(irow+chunk_size),],
+    ref_tree = metazoa,
+    ref_sp = 9606,
+    debug = F,
+    force = F) },mc.cores = 6)
+
+
+mz_ref %>% filter(node_has_ref == 2 & clade_has_ref == 2)
+
 
 # Filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast)
 mz_processed = filter_orthogroups(orthologs_count = mz_ref,
@@ -385,16 +444,13 @@ mz_processed = filter_orthogroups(orthologs_count = mz_ref,
                                   debug = F, force = F)
 
 
-
-
-
 #### MAMMALIA ####
-mammalia = treeio::read.tree(here::here('data','ncbi','ncbi-mammalia.phy'))
-mammalia$tip.label = str_remove_all(mammalia$tip.label,"['\\[\\]]") #%>% str_replace_all(" ","_")
-mammalia_clades = c('40674'='mammalia','314146'='euarchontoglires','9443'='primates',
-                    '9989'='rodentia','33554'='carnivora','91561'='cetartiodactyla',
-                    '9397'='chiroptera','311790'='Afrotheria')
-
+# mammalia = treeio::read.tree(here::here('data','ncbi','ncbi-mammalia.phy'))
+# mammalia$tip.label = str_remove_all(mammalia$tip.label,"['\\[\\]]") #%>% str_replace_all(" ","_")
+# mammalia_clades = c('40674'='mammalia','314146'='euarchontoglires','9443'='primates',
+#                     '9989'='rodentia','33554'='carnivora','91561'='cetartiodactyla',
+#                     '9397'='chiroptera','311790'='Afrotheria')
+#
 #
 # ma_dir = here::here('data','eggnog','40674_Mammalia')
 # maNOG = get_eggnog_node(40674)
@@ -408,44 +464,17 @@ mammalia_clades = c('40674'='mammalia','314146'='euarchontoglires','9443'='prima
 #                    { match_strings(SP1=mammalia$tip.label, SP2=ma_species$taxon, use_soundex = F, manual = T) },
 #                    'match ncbi species tree to eggnog mammalian species...')
 #
-# ma_ncbi_eggnog = ma_ncbi %>%
-#   left_join( ma_species %>% mutate(Taxon=taxon, taxon=tolower(taxon)), c('s2'='taxon')) %>%
-#   dplyr::rename(ncbi_name=s1,eggnog_name=s2) %>%
-#   dplyr::select(-c(is_identical:is_substring,osa:n1))
-#
-#
 # mammalia_eggnog = treeio::read.tree(here::here('data','ncbi','ncbi-mammalia.phy'))
 # mammalia_eggnog$tip.label = ma_ncbi_eggnog$taxid
-#
-# ma_human = eggnog_annotations_species(node = 40674, species = c(9606))
-# ma_taxons = count_taxons_eggnog_node(node=40674, subnode=c(40674,314146,9443,9989,33554,314294,9397,311790))
 #
 # laurasiatheria = extract.clade(mammalia_eggnog, 'Laurasiatheria', root.edge = 0, collapse.singles = TRUE)
 # laurasiatheria_clades=c('cetartiodactyla'=91561,'carnivora'=33554,'chiroptera'=9397)
 # id_laurasiatheria = laurasiatheria$tip.label %>% as.numeric %>% sum
 #
-# ma_orthogroups = bind_rows(ma_taxons) %>%
-#   mutate( node_only = !( clade_id == 40674 & OG %in% OG[clade_id != 40674] ),
-#           has_9606 = map(clade_orthologs,~ sum(.x$taxid == 9060)))
-#
-#
-# ma_og = filter_orthogroups(orthologs_count = ma_orthogroups,
-#                            ref_tree=mammalia_eggnog, ref_sp = 9606,
-#                            debug = T, force = T, min_sp = 1)
-#
-# FASTA1TO1 = list.files(ma_dir,  recursive = T, pattern = '.fa', full.names = T,include.dirs = F,no.. = F)
-# ortho1to1 = str_split_fixed(basename(FASTA1TO1),"-",n=4) %>%
-#   as_tibble() %>%
-#   set_names(c('clade','nspecies','OG','refid')) %>%
-#   mutate(nspecies = str_remove(nspecies,'_sp$'),
-#          refid = str_remove(refid,"-1to1_orthologs.fa"),
-#          fastafile=FASTA1TO1) %>%
-#   separate(refid, into=c('taxid','string'), sep='\\.' ) %>%
-#   type_convert()
-
 #pbmcapply::pbmclapply(mzNOG$url_fasta, safe_download, mc.cores=14, path=mz_dir, ext='.fasta')
 #mz_ali = get_eggnog_alignment(node=33208, use_trimmed = F)
 #mz_clades = map(metazoa_clades, ~get_eggnog_taxonomy(.x))
+
 
 
 #### EGGNOG V6 ####
