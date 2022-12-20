@@ -827,11 +827,14 @@ ess_pc = sum(sc_perf$ess)
 p=aov_plot(aov_model(sc_best_lm,min_pv = 1e-3), name='best')
 
 
-## ADD SIGN
+## ADD SIGN FOR EACH VAR (RED LINE SHOULD GO OPPOSITE)
 ## V1 = LM(ER ~ PPM + BEST_VAR)
-## V2 = LM(ER ~ BEST_VAR)
+## V2 = LM(ER ~ BEST_VAR)+ LM(RES_ER ~ ABUNDANCE)
+## USE SAME NUMBER OF VARIABLES
 
 ## PRED EVO RATE WITH BEST VAR
+
+
 cor(sc_best_pred$ER, predict(sc_best_lm))
 
 ggsave(p, path = here::here('plots'),
