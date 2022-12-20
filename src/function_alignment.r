@@ -76,13 +76,13 @@ get_identity = function(ali){
 }
 
 count_gaps = function(ali,bycol=T){
-  #alignment = Biostrings::readAAMultipleAlignment(fastafile,'fasta')
+
   if( !bycol ){
     pgaps = rep(0,nrow(ali))
     freqmat=alphabetFrequency(ali,as.prob = T)
     return(freqmat[, "-"])
   }else{
-    pgaps = rep(0,ncol(alignment))
+    pgaps = rep(0,ncol(ali))
     consmat = consensusMatrix(ali,as.prob = T)
     if( "-" %in% rownames(consmat) ){
       pgaps = consmat["-",]
@@ -90,6 +90,12 @@ count_gaps = function(ali,bycol=T){
     return(pgaps)
   }
 }
+
+count_gaps_fromfile = function(ali,bycol=T){
+  alignment = Biostrings::readAAMultipleAlignment(ali,'fasta')
+  return( count_gaps(alignment,bycol) )
+}
+
 
 get_overlap = function(ali){
   p=unaligned(pattern(ali))
