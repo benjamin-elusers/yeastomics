@@ -137,7 +137,7 @@ find_orthologs = function(ortho,BM=sc_biomart,use_cache=T){
 get_orthologs_clade =function(ens_ortho=df_query, clade_species, clade_name,
                               only_count=T, MIN_N=4, MIN_F=0.7){
 
-  valid_species = intersect(tolower(clade_species),unique(ens_ortho$species))
+  valid_species = intersect(tolower(clade_species),unique(ens_ortho$label))
   clade_size = n_distinct(clade_species)
   clade_nsp = n_distinct(valid_species)
   .info$log(sprintf('clade %s (n=%s/%s)...',clade_name,clade_nsp,clade_size))
@@ -166,7 +166,7 @@ get_orthologs_clade =function(ens_ortho=df_query, clade_species, clade_name,
              f_yeast = n_orthogroups / n_distinct(ens_ortho$ensp),
              clade=clade_name) %>%
       ungroup() %>%
-      dplyr::select(clade,clade_size,species,label,ens_org,nsp,n_orthogroups,f_human) %>%
+      dplyr::select(clade,clade_size,species,label,ens_org,nsp,n_orthogroups,f_yeast) %>%
       distinct()
     cat('\n')
     return(clade_ortho)
@@ -444,25 +444,25 @@ df_query =  purrr::map(SC_QUERY, magrittr::extract, col_ens) %>% bind_rows()
 
 CLADES_FUNGI = map(names(fu_clades) %>% na.omit %>% as.vector,
                    ~ get_orthologs_clade(clade_species=fu_clades[[.x]]$tip.label,
-                                         clade_name=.x,MIN_N = 1)) %>%
+                                         clade_name=.x,MIN_N = 1,MIN_F = 0.1)) %>%
   purrr::compact() %>%
   bind_rows()
 
-CLADES_COUNT = CLADES_VERTEBRATES %>%
-  left_join(ens_vertebrates,by=c('clade'='Label')) %>%
-  dplyr::select(clade,n_orthogroups,f_human,clade_size,depth) %>%
+CLADES_COUNT = CLADES_FUNGI %>%
+  left_join(fu_df,by=c('clade'='Label')) %>%
+  dplyr::select(clade,n_orthogroups,f_yeast,clade_size,depth) %>%
   distinct  %>%
-  arrange(f_human) %>%
+  arrange(f_yeast) %>%
   mutate(num_node = paste0(clade,'\n',n_orthogroups))
 
-p0=ggplot(CLADES_COUNT,aes(y=n_orthogroups, x=reorder(clade,f_human),color=f_human)) +
+p0=ggplot(CLADES_COUNT,aes(y=n_orthogroups, x=reorder(clade,f_yeast),color=f_yeast)) +
   geom_point() +
   geom_text(aes(label=clade), size=3.5, hjust=-0.1,angle=90) +
   theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
-  xlab('') + ylim(0,20000) + scale_x_discrete( expand= expansion(c(.02,.02)))
+  xlab('') + ylim(0,6000) + scale_x_discrete( expand= expansion(c(.02,.02)))
 
-t0=ggtree(ens_vertebrates_tree,ladderize = T,right = T,branch.length = 'none') %<+% CLADES_COUNT  +
-  geom_nodepoint(aes(size = f_human, color = n_orthogroups)) +
+t0=ggtree(fu_tree,ladderize = T,right = T,branch.length = 'none') %<+% CLADES_COUNT  +
+  geom_nodepoint(aes(size = f_yeast, color = n_orthogroups)) +
   xlim(-10,50)
 t0.1 = t0 +   ggtree::geom_nodelab(aes(label=num_node),size=3,geom='text',node = 'internal',hjust=1.1,angle=25)
 library(patchwork)
@@ -470,11 +470,11 @@ library(patchwork)
 #t0.1 | p0
 
 T0=t0
-for(i in dup_nodenums){
+for(i in dup_nodes){
   T0 = T0 %>% collapse(node = i,mode = "none")
 }
 T0.1 = T0 + ylim(1,55) + xlim(-20,50) +
-  geom_point2(aes(subset=(node %in% dup_nodenums)), shape=23, size=2, fill='red')  +
+  geom_point2(aes(subset=(node %in% dup_nodes)), shape=23, size=2, fill='red')  +
   ggtree::geom_nodelab(aes(label=num_node),size=3,geom='text',node = 'internal',hjust=1.1,angle=0) +
   theme(legend.position="bottom", legend.box="vertical", legend.margin=margin())
 
@@ -529,13 +529,13 @@ ggsave(MAMMALS_4, filename=file.path(path_ortho,'MAMMALS_TREE_4phylum.pdf'), sca
 
 
 
-hs_closest_two = df_query %>%
+sc_closest_two = df_query %>%
   filter(two != '0' ) %>%
   group_by(two,ensp) %>%
   arrange(cds_delta,desc(pid_ortho),tx_delta) %>%
   mutate(rk_two = row_number()) %>%
   ungroup() %>% arrange(ensp)
-hs_closest_four = df_query %>%
+sc_closest_four = df_query %>%
   filter(two != '0' ) %>%
   group_by(four,ensp) %>%
   arrange(cds_delta,desc(pid_ortho),tx_delta) %>%
@@ -552,7 +552,7 @@ ortho_prefix = df_query %>%
   group_by(ens_dataset) %>%
   mutate(n_orthologs = n_distinct(id_ortho),
          #f_orthologs = n_orthologs/n_protein_coding, n_uniprot = n_swissprot+n_trembl,
-         f_human = n_orthologs/n_human,
+         f_yeast = n_orthologs/n_yeast,
          qq_pid = toString( round(quantile(pid_ortho,c(0.01,0.05,0.25,0.75,0.95,0.99),na.rm=T)) ),
          md_cds_diff = median_(cds_delta)) %>%
   dplyr::select(-id_ortho,-pid_ortho,-cds_delta,-tx_delta,-gname_ortho,-ensp) %>%
@@ -584,7 +584,7 @@ for( s in mammals ){ #
 #dim(HS_ORTHO)
 #colnames(HS_ORTHO)
 
-# 4. get 1-to-1 orthologs human ------------------------------------------------
+# 4. get 1-to-1 orthologs yeast ------------------------------------------------
 HS_BOREOEUTHERIA = ortho_prefix %>%
   filter(f_human >0.78) %>%
   group_by(two) %>% mutate(num_two = sprintf("%s (n=%s)",two,n_distinct(ens_dataset))  ) %>%
@@ -779,3 +779,8 @@ table(best$n_laura.1)
 table(best$n_primates)
 table(best$n_laurasiatheria)
 table(best$n_euarchontoglires)
+
+
+
+
+
