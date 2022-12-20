@@ -75,6 +75,22 @@ get_identity = function(ali){
   sapply(paste0("PID",1:4),function(x){ pid(ali,x) })
 }
 
+count_gaps = function(ali,bycol=T){
+  #alignment = Biostrings::readAAMultipleAlignment(fastafile,'fasta')
+  if( !bycol ){
+    pgaps = rep(0,nrow(ali))
+    freqmat=alphabetFrequency(ali,as.prob = T)
+    return(freqmat[, "-"])
+  }else{
+    pgaps = rep(0,ncol(alignment))
+    consmat = consensusMatrix(ali,as.prob = T)
+    if( "-" %in% rownames(consmat) ){
+      pgaps = consmat["-",]
+    }
+    return(pgaps)
+  }
+}
+
 get_overlap = function(ali){
   p=unaligned(pattern(ali))
   s=unaligned(subject(ali))
