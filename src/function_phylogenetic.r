@@ -398,7 +398,7 @@ read.R4S = function(r4s, id=NULL,verbose=T){
              # dplyr::select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
   }
 
-  return(df.r4s)
+  return(df.r4s %>% readr::type_convert)
 }
 
 read.R4S.param = function(r4s, as.df=F){
