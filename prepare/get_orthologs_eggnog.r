@@ -380,10 +380,10 @@ mz_clades = subtrees(metazoa) %>%
 mz_clades_toprocess = mz_clades %>% filter(clade_size > 5 | clade_has_9606)
 
 library(ggtree)
-metazoa = treeio::read.tree(here::here('data','ncbi','ncbi-metazoan.phy'))
-df_metazoa = metazoa %>% as_tibble() %>%
+metazoa_tree = treeio::read.tree(here::here('data','ncbi','ncbi-metazoan.phy'))
+df_metazoa = metazoa_tree %>% as_tibble() %>%
              mutate( label = stringr::str_remove_all(label,pattern="'"),
-                     depth = ape::node.depth(metazoa),
+                     depth = ape::node.depth(metazoa_tree),
                      is_leaf = depth == 1) %>%
              left_join(mz_ncbi_eggnog %>% dplyr::select(ncbi_name,ncbi_Name,eggnog_name,taxid), by=c('label'='ncbi_Name')) %>%
              mutate( to_process = label %in% mz_clades_toprocess$clade_name) %>%
@@ -408,13 +408,13 @@ mz_orthogroups  = preload(saved.file = here::here("data/eggnog/33208_Metazoa-ort
 
 mz_ref = mz_orthogroups %>%
   mutate(ref_sp = 9606,
-         # remove orthogroup from fungi node present in other subnodes
+         # remove orthogroup from metazoa node present in other subnodes
          node_only = !( clade_id == 33208 & OG %in% OG[clade_id != 33208] ),
          node_has_ref = map(node_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist,
          clade_has_ref = map(clade_orthologs, ~ sum(.x$taxid %in% ref_sp)) %>% unlist)
 
 mz_toprocess = mz_ref %>%
-  filter(node_has_ref %in% c(1,2) & (clade_ns > 20 | clade_has_ref %in% c(1,2)) & clade_f > 0.5 ) %>%
+  filter(node_has_ref %in% c(1,2) & (clade_ns > 5 | clade_has_ref %in% c(1,2)) & clade_f > 0.5 ) %>%
   group_by(node_id,clade_id) %>% add_count(name='clade_n')
 
 dim(mz_orthogroups)
@@ -423,12 +423,15 @@ dim(mz_toprocess)
 table(mz_toprocess$clade_name,mz_toprocess$node_has_ref)
 janitor::tabyl(mz_toprocess,clade_name,clade_ns)
 
-####_filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast) ####
-chunk_size=100
-chunks=seq(1,nrow(mz_toprocess),by=chunk_size)
-pbmcapply::pbmclapply(chunks,FUN = function(irow){
+####_filter orthogroups fasta to keep at most 161 species (ortholog closest to human) ####
+#chunk_size=100
+#chunks=seq(1,nrow(mz_toprocess),by=chunk_size)
+mz_toprocess.2 = mz_toprocess %>% filter(clade_ns < 20 & clade_has_ref == 0)
+list_mz_toprocess = split(mz_toprocess.2, mz_toprocess.2$clade_desc)
+
+pbmcapply::pbmclapply(seq(list_mz_toprocess),FUN = function(og){
   filter_orthogroups(
-    orthologs_count = mz_toprocess[irow:(irow+chunk_size),],
+    orthologs_count = list_mz_toprocess[[og]],
     ref_tree = metazoa,
     ref_sp = 9606,
     debug = F,
