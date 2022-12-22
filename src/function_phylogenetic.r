@@ -388,18 +388,18 @@ read.R4S = function(r4s, id=NULL,verbose=T){
            dplyr::relocate(ID,POS,SEQ,SCORE) %>%
            as_tibble() %>%
           janitor::clean_names('screaming_snake') %>%
-          separate(col=MSA, into=c('nmsa','nseq'), remove=F, sep='/') %>%
+          separate(col=MSA, into=c('nmsa','nseq'), remove=F, sep='/',convert = T) %>%
           mutate(fmsa = nmsa/nseq, fgap= 1- fmsa)
   if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
     df.r4s = df.r4s %>%
              dplyr::mutate( QQ = str_remove_all(QQ_INTERVAL, pattern = "\\[|\\]") ) %>%
-             separate(col=QQ, into=c('QQ1','QQ2'), sep = ',')
+             separate(col=QQ, into=c('QQ1','QQ2'), sep = ',',convert = T)
              #         QQ1 = as.double(str_split_fixed(QQ,',',n=2)[,1]),
              #         QQ2 = as.double(str_split_fixed(QQ,',',n=2)[,2])) %>%
              # dplyr::select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
   }
 
-  return(df.r4s %>% readr::type_convert())
+  return(df.r4s)
 }
 
 read.R4S.param = function(r4s, as.df=F){
