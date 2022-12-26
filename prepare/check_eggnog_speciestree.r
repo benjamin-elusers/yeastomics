@@ -46,3 +46,45 @@ pdf(here::here("plots","4751_Fungi-species_tree-ncbi_vs_eggnog.pdf"))
 Quartet::VisualizeQuartets(tmp$trees[[1]],tmp$trees[[2]], style='pie')
 dev.off()
 #TreeDist::VisualizeMatching(NyeSimilarity, tmp$trees[[1]],tmp$trees[[2]],TreeDist::MapTrees())
+
+
+## METAZOAN ##
+source(here::here("src","__setup_yeastomics__.r"))
+
+ncbi_metazoa = ape::read.tree(file=here::here("data","ncbi","ncbi-metazoan.phy"))
+ncbi_metazoa$tip.label = stringr::str_replace_all(ncbi_metazoa$tip.label,"'","")
+ncbi_metazoa$node.label=NULL
+write.tree(phy = ncbi_metazoa,file = here::here("data","ncbi","ncbi-metazoan-taxon.nw"))
+
+
+ncbi_metazoan = treeio::read.nhx(file=here::here("data","eggnog","33208_Metazoa_speciestree","ncbi-metazoan.nw"))
+ncbi_metazoan_data = ncbi_metazoan %>% as_tibble() %>% mutate(is_leaf = treeio::isTip(.,.node=node))
+
+library(phytools)
+
+metazoa_fromto = match_strings(ncbi_metazoa$tip.label,
+                               ncbi_metazoan_data$sci_name[ncbi_metazoan_data$is_leaf],
+                               verbose = T, use_soundex = F, max_strings = 1) %>%
+                 mutate(ncbi_name=stringr::str_to_sentence(s1),
+                        ete_name=stringr::str_to_sentence(s2)) %>%
+                 dplyr::relocate(ncbi_name,ete_name) %>%
+                 left_join(ncbi_metazoan_data, by=c('ete_name'='sci_name'))
+
+
+pdf(here::here("data","eggnog","33208_Metazoa_speciestree","cophyloplot-ncbi-ete3.pdf"),width = 15,height=20)
+tmp=cophylo(tr1 = ncbi_metazoa, tr2 =ncbi_metazoan@phylo, rotate=T, assoc = as.matrix(metazoa_fromto[,c('ncbi_name','label')]) )
+plot(tmp,link.type="curved",cex=0.3,lwd=1,lty=1)
+legend('topleft',legend = "NCBI\ntaxonomy", bty = 'n',text.font = 2)
+legend('topright',legend = "ETE3", bty = 'n',text.font = 2)
+dev.off()
+
+
+
+ncbi_metazoan = treeio::read.nhx(file=here::here("data","eggnog","33208_Metazoa_speciestree","ncbi-metazoan.nw"))
+
+
+ete_metazoan = ncbi_metazoan@phylo
+ete_metazoan$tip.label= metazoa_fromto$taxid[match(ncbi_metazoan@phylo$tip.label,metazoa_fromto$label)]
+write.tree(phy = ete_metazoan,file = here::here("data","ncbi","ete-metazoan-taxid.nw"))
+ete_metazoan$tip.label= metazoa_fromto$ncbi_name[match(ncbi_metazoan@phylo$tip.label,metazoa_fromto$label)]
+write.tree(phy = ete_metazoan,file = here::here("data","ncbi","ete-metazoan-taxon.nw"))
