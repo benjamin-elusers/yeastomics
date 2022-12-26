@@ -1573,9 +1573,53 @@ eggnog_annotations_species=function(node,species){
         distinct()
 
   .info$log('merging annotations on orthogroups...')
+  func_class = eggnog_functional_categories()
   annotation_sp = left_join(members_node,eggnog_annotations_node, by=c('node'='nodes','OG'='og')) %>%
-                    dplyr::filter(taxid %in% species)
+                    dplyr::filter(taxid %in% species) %>%
+                    left_join(func_class, by=c('letter'))
   return(annotation_sp)
+}
+
+eggnog_functional_categories = function(){
+
+  function_type = c( "INFORMATION STORAGE & PROCESSING",
+                     "CELLULAR PROCESSES & SIGNALING",
+                     "METABOLISM",
+                     "POORLY CHARACTERIZED")
+  function_letters = c("ABJKL","DMNOTUVWYZ","CEFGHIPQ","RS")
+
+  df_function = tribble(~letter, ~func_type, ~eggnog_func,
+    'A', function_type[1], "RNA processing and modification",
+    'B', function_type[1], "Chromatin structure and dynamics",
+    'J', function_type[1], "Translation, ribosomal structure and biogenesis",
+    'K', function_type[1], "Transcription",
+    'L', function_type[1], "Replication, recombination and repair",
+
+    'D', function_type[2], "Cell cycle control, cell division, chromosome partitioning",
+    'M', function_type[2], "Cell wall/membrane/envelope biogenesis",
+    'N', function_type[2], "Cell motility",
+    'O', function_type[2], "Posttranslational modification, protein turnover, chaperones",
+    'T', function_type[2], "Signal transduction mechanisms",
+    'U', function_type[2], "Intracellular trafficking, secretion, and vesicular transport",
+    'V', function_type[2], "Defense mechanisms",
+    'W', function_type[2], "Extracellular structures",
+    'Y', function_type[2], "Nuclear structure",
+    'Z', function_type[2], "Cytoskeleton",
+
+    'C', function_type[3], "Energy production and conversion",
+    'E', function_type[3], "Amino acid transport and metabolism",
+    'F', function_type[3], "Nucleotide transport and metabolism",
+    'G', function_type[3], "Carbohydrate transport and metabolism",
+    'H', function_type[3], "Coenzyme transport and metabolism",
+    'I', function_type[3], "Lipid transport and metabolism",
+    'P', function_type[3], "Inorganic ion transport and metabolism",
+    'Q', function_type[3], "Secondary metabolites biosynthesis, transport and catabolism",
+
+    'R', function_type[4], "General function prediction only",
+    'S', function_type[4], "Function unknown"
+  )
+
+  return(df_function)
 }
 
 find_eggnog_node=function(node,GUI=F,.print=T){
@@ -1918,6 +1962,7 @@ count_clade_orthologs = function(df_node, df_subnode){
   if( nrow(df_subnode) == 1 ){ return( unlist(clade_list) )}
   return(clade_list)
 }
+
 
 find.common.ancestor= function(lineage){
   L = strsplit(lineage,',')
