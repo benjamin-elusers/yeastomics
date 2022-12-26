@@ -129,51 +129,33 @@ ggsave(path=here::here("plots"),
        scale=1.5)
 
 ###
-r4s_res=pbmcapply::pbmcmapply(r4s_files,FUN = read.R4S, mc.cores = 14, SIMPLIFY=F) # DO NOT SIMPLIFY TO KEEP AS A LIST
+r4s_res=pbmcapply::pbmcmapply(r4s_files,FUN = read.R4S, mc.cores = 20, SIMPLIFY=F) # DO NOT SIMPLIFY TO KEEP AS A LIST
 saveRDS(r4s_res,file.path(fudir,"rate4site-4751_fungi-clades.rds"))
-
 
 #### LOAD EVOLUTIONARY DATA ####
 load(here::here("data/eggnog","4751_Fungi-eggnog-results.rdata"))
 r4s_res = readRDS(file.path(fudir,"rate4site-4751_fungi-clades.rds"))
-R4S = map(r4s_res, ~separate(data=.x, col="MSA", remove=F, into=c('nmsa','nseq'), sep="/"))
 
-df_r4s = tibble(r4sfile  = names(r4s_res),
+#tens=seq(0,1,len=6)
+brk = c(0,0.3,0.5,0.7,1)
+deciles = brk %>% percent0 %>% paste.pair(s='-')
+
+df_r4s = tibble(r4sfile = names(r4s_res),
                 clade = str_extract(dirname(r4sfile),clade_regex),
                 OG = str_split_fixed(basename(r4sfile),'_',n=3)[,2],
                 r4s_res = r4s_res,
                 param = str_extract(basename(r4sfile),"\\.[^\\.]*trim[^\\.]*\\.") ) %>%
-         unnest(r4s_res)
+         unnest(r4s_res) %>%
+         mutate(fmsa_bin = cut(fmsa, brk, deciles) )
 
-
-tmp = df_r4s %>%
-    separate(col="MSA", remove=F, into=c('nmsa','nseq'), sep="/")
-head(tmp)
-
-         #mutate(f_MSA = nmsa/nseq)
 df_rate = df_r4s %>% group_by(clade,OG,ID,param) %>%
           mutate(ER=mean_(SCORE),
-                 f_gap = mean( !(SEQ %in% Biostrings::AA_STANDARD) )) %>%
-          dplyr::select(OG,ID,clade,param,ER,f_MSA) %>%
+                 gap_first = mean_( !(SEQ %in% Biostrings::AA_STANDARD) )) %>%
+          dplyr::select(OG,ID,clade,param,ER,gap_first) %>%
           distinct() %>%
           pivot_wider(id_cols=c(OG,ID,param), names_from=clade, values_from = ER, names_prefix = 'ER.')
 
-parse_fraction = function(x){ eval(parse(text=as.character(x))) }
-
-tmp = df_r4s %>%
-  rowwise() %>%
-  mutate( f_aligned = parse_fraction(MSA),
-          bin_aligned = cut(f_aligned, seq(0,1,len=11)))
-
-
 df_rate_param= split( df_rate, df_rate$param)
-
-dim(df_er_ppm)
-
-
-#%>%
-  group_by(clade,param) %>%
-  summarise( notAA = mean( !(SEQ %in% Biostrings::AA_STANDARD) ))
 
 ggplot(df_gap) +
   geom_col(aes(x=param,y=notAA,fill=param)) +
@@ -228,12 +210,39 @@ ggsave(path=here::here("plots"),
 
 #### CALCULATE CLADE ER vs. ABUNDANCE CORRELATION ####
 
-# integrated paxdb datasets
-ho_et_al_2018 = load.abundance() %>%
-  set_names(c("orf","ho2018_MPC","ho2018_MDPC","ho2018_gfp","ho2018_ms")) %>%
-  ungroup()
-sc_abundance = get.paxdb(tax=4932,abundance = 'integrated',rm.zero=T)  %>%
-              full_join(ho_et_al_2018,by = c('protid'='orf'))
-df_er_ppm = left_join(df_rate, sc_abundance, by=c('ID'='protid'))
+df_er_ppm = left_join(df_rate, sc_abundance, by=c('ID'='protid')) %>% ungroup
+dim(df_er_ppm)
 
+cor_ppm = map_dfr(clades,~cor.sub.by(df_er_ppm, XX=paste0("ER.",.x), YY="ppm_int", BY="param") %>% mutate(xcol=paste0("ER.",.x),ycol="ppm_int"))
+cc1=ggplot(cor_ppm, aes(x=param)) +
+    geom_col(aes(y=r,fill=param)) +
+    geom_text(aes(y=r,label=r %>% round(2)),size=3,vjust='outward') +
+    facet_wrap(~xcol) + ylab("spearman (ER-PPM)") +
+    theme_clean() +
+    theme(axis.text.x = element_text(angle=30,hjust=1)) +
+    scale_fill_metro_d()
 
+cor_mpc = map_dfr(clades,~cor.sub.by(df_er_ppm, XX=paste0("ER.",.x), YY="ho2018_MPC", BY="param") %>% mutate(xcol=paste0("ER.",.x),ycol="ppm_int"))
+cc2=ggplot(cor_mpc, aes(x=param)) +
+    geom_col(aes(y=r,fill=param)) +
+    geom_text(aes(y=r,label=r %>% round(2)),size=3,vjust='outward') +
+    facet_wrap(~xcol)  + ylab("spearman (ER-MPC)") +
+    theme_clean() +
+    theme(axis.text.x = element_text(angle=30,hjust=1))+
+    scale_fill_metro_d()
+
+cor_mdpc = map_dfr(clades,~cor.sub.by(df_er_ppm, XX=paste0("ER.",.x), YY="ho2018_MDPC", BY="param") %>% mutate(xcol=paste0("ER.",.x),ycol="ppm_int"))
+cc3=ggplot(cor_mdpc, aes(x=param)) +
+    geom_col(aes(y=r,fill=param)) +
+    geom_text(aes(y=r,label=r %>% round(2)),size=3,vjust='outward') +
+    facet_wrap(~xcol) + ylab("spearman (ER-MDPC)") +
+    theme_clean() +
+    theme(axis.text.x = element_text(angle=30,hjust=1)) +
+    scale_fill_fermenter()
+
+ggsave(
+  path=here::here("plots","paper_evo"),
+  filename = "4751_Fungi-evorate_abundance-clades.pdf",
+  plot = marrangeGrob(list(cc1,cc2,cc3), nrow=1, ncol=1),
+  width = 21, height = 29.7, units = "cm"
+)
