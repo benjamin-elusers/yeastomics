@@ -96,7 +96,7 @@ write_r4s_input = function(tree,fasta,outfasta,outtree,debug=F){
 }
 
 filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
-                               debug=F, force=F){
+                               debug=F, force=F, eggnog_tree=F){
 
   if(missing(orthologs_count)){
     .error$log('Must input a dataframe with the orthogroups from a taxonomic level across valid subclades...')
@@ -161,7 +161,10 @@ filter_orthogroups = function( orthologs_count, ref_sp = 4932, ref_tree,
 
     OG_unique = rep(OG, times=nref) |> makeunique::make_unique(sep='.',wrap_in_brackets = F)
     fasta_out = sprintf("%s_%s_%s_1to1-orthologs.fa",CLADE_FNAME,OG_unique,REF_ID)
-    tree_out =  str_replace(fasta_out,'\\.fa$','.nwk') #%>% paste0("_eggnog")
+    tree_out =  str_replace(fasta_out,'\\.fa$','.nwk')
+    if(eggnog_tree){
+      tree_out = str_replace(fasta_out,'\\.fa$','.nwk_eggnog') # FOR SPECIES TREE
+    }
     fastapath = file.path(CLADE_DIR,"fasta",fasta_out)
     treepath = file.path(CLADE_DIR,"tree",tree_out)
     has_output = file.exists(fastapath)
@@ -316,16 +319,43 @@ pbmcapply::pbmclapply(chunks,FUN = function(irow){
                           debug = F,
                           force = F) },mc.cores = 14)
 
+#### _retrieveing orthogroups to build species tree ####
 # Select orthogroups for building the fungi species tree
 # ---> orthogroups must be at the taxonomic level of fungi (id=4751)
 # ---> all species must be present (179 fungal species)
 # ---> at least 95% of orthologs should be 1-to-1
 # ---> s. cerevisiae ortholog must be single (not duplicated)
 fu_sptree = fu_ref %>%
-            filter(clade_id == node_id & clade_f1to1>0.975 & clade_f == 1 & node_has_ref == 1)
+            filter(clade_id == node_id & clade_f1to1>0.975 & clade_f == 1 & node_has_ref == 1) %>%
+            mutate( ref_id = map_chr(node_orthogroup,~str_subset(.x, "^4932\\.")) )
 
-#fu_processed = fu_ref %>% filter(node_has_ref %in% c(1,2) & clade_has_ref %in% c(0,1,2))
+fu_sptree_fasta = with(fu_sptree,
+                       file.path(fu_dir,clade_desc,"fasta",
+                                 paste0(clade_name,"_",OG,"_",ref_id,"_","1to1-orthologs.fa")))
+fu_sptree_tree = with(fu_sptree,
+                      file.path(fu_dir,clade_desc,"tree",
+                                paste0(clade_name,"_",OG,"_",ref_id,"_","1to1-orthologs.nwk")))
 
+fu_sptree_dir = here::here("data","eggnog","4751_Fungi","FUNGI-SPECIES-TREE")
+#file.exists(fu_sptree_fasta)
+#file.exists(fu_sptree_tree)
+file.copy(fu_sptree_fasta,fu_sptree_dir)
+file.copy(fu_sptree_tree,fu_sptree_dir)
+
+orthogroup_fasta = Biostrings::readAAStringSet(fu_sptree_fasta)
+names(orthogroup_fasta) = names(orthogroup_fasta)  %>% str_replace("\\.","|")
+orthogroup_fasta.sorted = orthogroup_fasta[gtools::mixedsort(names(orthogroup_fasta))]
+
+orthologs_ids =map(fu_sptree_fasta,
+                   ~Biostrings::readAAStringSet(.x) %>%
+                     names() %>%
+                     str_replace("\\.","|") %>%
+                     gtools::mixedsort() )
+Biostrings::writeXStringSet(orthogroup_fasta.sorted,
+                            filepath=file.path(mz_sptree_dir,"fungi179-19orthogroups-seqs-sorted.fa.gz"), compress = T, format = 'fasta')
+
+write_lines(unlist(lapply(orthologs_ids, paste, collapse="\t")),
+            file = file.path(mz_sptree_dir,"fungi179-19orthogroups-seqs-sorted.ids"))
 
 #### METAZOA ####
 # Metazoa = 33208
@@ -337,12 +367,13 @@ mzNOG      = get_eggnog_node(node = 33208)
 mz_tax     = get_eggnog_taxonomy(33208)
 mz_species = get_eggnog_species(node = 33208)
 
+metazoa_clades = c('7742'='vertebrata','40674'='mammalia','50557'='insecta','6231'='nematoda')
+
 ####_download NCBI common tree from list of species (manual) ####
 # write_lines(mz_species$taxid, here::here('data','ncbi','33208-metazoa-161taxids.txt'))
 # write_lines(mz_species$taxon, here::here('data','ncbi','33208-metazoa-161taxons.txt'))
 metazoa = treeio::read.tree(here::here('data','ncbi','ncbi-metazoan.phy'))
 metazoa$tip.label = str_remove_all(metazoa$tip.label,"['\\[\\]]") #%>% str_replace_all(" ","_")
-metazoa_clades = c('7742'='vertebrata','40674'='mammalia','50557'='insecta','6231'='nematoda')
 mz_ncbi = preload( saved.file = file.path(ncbi_dir,'ncbi-to-eggnog-metazoa-161species.rds'),
                    { match_strings(metazoa$tip.label, SP2=mz_species$taxon, use_soundex = F, manual = T) },
                    'match ncbi species tree to eggnog fungal species...')
@@ -379,22 +410,22 @@ mz_clades = subtrees(metazoa) %>%
 
 mz_clades_toprocess = mz_clades %>% filter(clade_size > 5 | clade_has_9606)
 
-library(ggtree)
-metazoa_tree = treeio::read.tree(here::here('data','ncbi','ncbi-metazoan.phy'))
-df_metazoa = metazoa_tree %>% as_tibble() %>%
-             mutate( label = stringr::str_remove_all(label,pattern="'"),
-                     depth = ape::node.depth(metazoa_tree),
-                     is_leaf = depth == 1) %>%
-             left_join(mz_ncbi_eggnog %>% dplyr::select(ncbi_name,ncbi_Name,eggnog_name,taxid), by=c('label'='ncbi_Name')) %>%
-             mutate( to_process = label %in% mz_clades_toprocess$clade_name) %>%
-             left_join(mz_clades, by=c('label'='clade_name'))
-
-df_clade = df_metazoa %>% filter( !is_leaf )
-
-ggtree(metazoa,layout = 'dendrogram',branch.length = 'none') %<+% df_metazoa +
-  geom_nodepoint(aes(subset=node %in% df_clade$node, col = to_process),size=2) +
-  geom_text_repel(aes(subset=node %in% df_clade$node, label=clade_desc, col = to_process),
-                  fontface='bold', size=3)
+# library(ggtree)
+# metazoa_tree = treeio::read.tree(here::here('data','ncbi','ncbi-metazoan.phy'))
+# df_metazoa = metazoa_tree %>% as_tibble() %>%
+#              mutate( label = stringr::str_remove_all(label,pattern="'"),
+#                      depth = ape::node.depth(metazoa_tree),
+#                      is_leaf = depth == 1) %>%
+#              left_join(mz_ncbi_eggnog %>% dplyr::select(ncbi_name,ncbi_Name,eggnog_name,taxid), by=c('label'='ncbi_Name')) %>%
+#              mutate( to_process = label %in% mz_clades_toprocess$clade_name) %>%
+#              left_join(mz_clades, by=c('label'='clade_name'))
+#
+# df_clade = df_metazoa %>% filter( !is_leaf )
+#
+# ggtree(metazoa,layout = 'dendrogram',branch.length = 'none') %<+% df_metazoa +
+#   geom_nodepoint(aes(subset=node %in% df_clade$node, col = to_process),size=2) +
+#   geom_text_repel(aes(subset=node %in% df_clade$node, label=clade_desc, col = to_process),
+#                   fontface='bold', size=3)
 
 mz_human   = eggnog_annotations_species(node = 33208, species = c(9606))
 
@@ -426,25 +457,71 @@ janitor::tabyl(mz_toprocess,clade_name,clade_ns)
 ####_filter orthogroups fasta to keep at most 161 species (ortholog closest to human) ####
 #chunk_size=100
 #chunks=seq(1,nrow(mz_toprocess),by=chunk_size)
-mz_toprocess.2 = mz_toprocess %>% filter(clade_ns < 20 & clade_has_ref == 0)
-list_mz_toprocess = split(mz_toprocess.2, mz_toprocess.2$clade_desc)
+#mz_toprocess.2 = mz_toprocess %>% filter(clade_ns < 20 & clade_has_ref == 0)
+list_mz_toprocess = split(mz_toprocess, mz_toprocess$clade_desc)
 
-pbmcapply::pbmclapply(seq(list_mz_toprocess),FUN = function(og){
+mz_dirsptree = here::here("data","eggnog","33208_Metazoa_speciestree","sptree","cog_100-alg_concat_default-raxml_default")
+metazoa_sptree = file.path(mz_dirsptree,"metazoa161-15orthogroups-seqs-sorted.fa.gz.final_tree.nw")
+metazoa_15 = read.tree(metazoa_sptree)
+
+## TREE MUST HAVE TAXON ID AS LEAVES
+chunks=seq(7,length(list_mz_toprocess),by=1)
+pbmcapply::pbmclapply(chunks,FUN = function(og){
   filter_orthogroups(
     orthologs_count = list_mz_toprocess[[og]],
-    ref_tree = metazoa,
+    ref_tree = metazoa_15, eggnog_tree = T,
     ref_sp = 9606,
     debug = F,
-    force = F) },mc.cores = 6)
+    force = F) },mc.cores = 10)
 
 
-mz_ref %>% filter(node_has_ref == 2 & clade_has_ref == 2)
+filter_orthogroups(
+  orthologs_count = list_mz_toprocess[[1]],
+  ref_tree = metazoa_15, eggnog_tree = T,
+  ref_sp = 9606,
+  debug = F,
+  force = F)
+
+#### _retrieveing orthogroups to build species tree ####
+# Select orthogroups for building the metazoa species tree
+# ---> orthogroups must be at the taxonomic level of fungi (id=33208)
+# ---> all species must be present (161 metazoan species)
+# ---> at least 95% of orthologs should be 1-to-1
+# ---> h. sapiens ortholog must be single (not duplicated)
+mz_sptree = mz_ref %>%
+  filter(clade_id == mz_node$node_id & clade_f1to1>0.95 & clade_f == 1 & node_has_ref == 1) %>%
+  mutate( ref_id = map_chr(node_orthogroup,~str_subset(.x, "^9606\\.")) )
+
+mz_sptree_fasta = with(mz_sptree,file.path(mz_dir,clade_desc,"fasta",
+                         paste0(clade_name,"_",OG,"_",ref_id,"_","1to1-orthologs.fa")))
+mz_sptree_tree = with(mz_sptree,file.path(mz_dir,clade_desc,"tree",
+                                           paste0(clade_name,"_",OG,"_",ref_id,"_","1to1-orthologs.nwk")))
+mz_sptree_dir = here::here("data","eggnog","33208_Metazoa_speciestree")
+#file.exists(mz_sptree_fasta)
+#file.exists(mz_sptree_tree)
+file.copy(mz_sptree_fasta,mz_sptree_dir)
+file.copy(mz_sptree_tree,mz_sptree_dir)
+
+orthogroup_fasta = Biostrings::readAAStringSet(mz_sptree_fasta)
+names(orthogroup_fasta) = names(orthogroup_fasta)  %>% str_replace("\\.","|")
+orthogroup_fasta.sorted = orthogroup_fasta[gtools::mixedsort(names(orthogroup_fasta))]
 
 
-# Filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast)
-mz_processed = filter_orthogroups(orthologs_count = mz_ref,
-                                  ref_tree = metazoa, ref_sp = 9606,
-                                  debug = F, force = F)
+orthologs_ids =map(mz_sptree_fasta,
+                   ~Biostrings::readAAStringSet(.x) %>%
+                     names() %>%
+                     str_replace("\\.","|") %>%
+                     gtools::mixedsort() )
+Biostrings::writeXStringSet(orthogroup_fasta.sorted,
+                            filepath=file.path(mz_sptree_dir,"metazoa161-15orthogroups-seqs-sorted.fa.gz"), compress = T, format = 'fasta')
+
+write_lines(unlist(lapply(orthologs_ids, paste, collapse="\t")),
+            file = file.path(mz_sptree_dir,"metazoa161-15orthogroups.ids"))
+
+# # Filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast)
+# mz_processed = filter_orthogroups(orthologs_count = mz_ref,
+#                                   ref_tree = metazoa, ref_sp = 9606,
+#                                   debug = F, force = F)
 
 
 #### MAMMALIA ####
