@@ -3,7 +3,6 @@
 # comments: general purpose functions
 # ```{r}Sys.time()```
 #
-
 # I/O --------------------------------------------------------------------------
 
 url.exists <- function(url) {
@@ -627,6 +626,13 @@ get_os <- function(){
   }
   tolower(os)
 }
+
+get_source_path <- function(){
+  if(.Platform$GUI == "RStudio"){
+    return(dirname(rstudioapi::getSourceEditorContext()$path))
+  }
+}
+
 
 # shorthands -------------------------------------------------------------------
 
