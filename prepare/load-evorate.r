@@ -23,7 +23,7 @@ sc_evo$yk11 = preload(strains.rds,
         'get evolutionary rates for 1011 isolated yeast...')
 
 #### HUMAN EVORATE ####
-mammals_dir = "/media/WEXAC_data/MAMMALS/"
+mammals_dir = "/media/WEXAC/MAMMALS/"
 phylums = c('mammals','mammals_all','euarchontoglires','laurasiatheria','glires','laurasiatheria.1','primates','carnivora')
 alndir = normalizePath(file.path(mammals_dir,paste0('hs_',phylums),'ali')) %>% set_names(phylums) %>% as.list
 
@@ -76,7 +76,6 @@ sapply(hs_r4s,colnames)
 sapply(hs_r4s,dim)
 
 # Evolutionary rate ------------------------------------------------------------
-
 BY = c('id','ref_aa','ref_pos')
 HS_R4S = left_join(hs_r4s$mammals_all,hs_r4s$mammals, by=BY, suffix=c('','_mammals')) %>%
   left_join(hs_r4s$euarchontoglires, by=BY, suffix=c('','_euarchontoglires')) %>%
@@ -88,6 +87,8 @@ HS_R4S = left_join(hs_r4s$mammals_all,hs_r4s$mammals, by=BY, suffix=c('','_mamma
   dplyr::rename_with(starts_with('r4s_rate'),.fn = str_replace, pattern='r4s_rate',replacement='r4s') %>%
   dplyr::rename_with(starts_with('total'),.fn = str_replace, pattern='total',replacement='nsp') %>%
   ungroup()
+
+saveRDS(HS_R4S, here::here('plots','paper_evo','rate4site_mammals_ensembl.rds'))
 
 colnames(HS_R4S)
 head(HS_R4S)
