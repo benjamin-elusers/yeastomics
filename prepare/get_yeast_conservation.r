@@ -20,6 +20,7 @@ evo_snp_prot =  group_by(evo_snp,id) %>%
              leisr_mle = mean(leisr_mle[leisr_mle!=0]),
              leisr_low=mean(leisr_low[leisr_low!=0]),
              leisr_up=mean(leisr_up[leisr_up!=0]), leisr_global=mean(leisr_global), leisr_local=mean(leisr_local) )
+saveRDS(evo_snp_prot,here::here('output','evolution-snp-protein.rds'))
 
 write_delim(evo_snp,gzfile(here::here('output','evolution-snp-residue.tsv.gz')),delim = '\t')
 write_delim(evo_snp_prot,gzfile(here::here('output','evolution-snp-protein.tsv.gz')),delim = '\t')
@@ -36,7 +37,7 @@ evo_full_prot = group_by(evo_full, id) %>%
              iq=mean(iq_rate),iq_ml=mean(iq_mlrate), iq_cat=mean(iq_cat), iq_hi = mean(iq_rate_hicat),
              leisr_mle = mean(leisr_mle), leisr_low=mean(leisr_low), leisr_up=mean(leisr_up),
              leisr_global=mean(leisr_global), leisr_local=mean(leisr_local) )
-
+saveRDS(evo_full_prot,here::here('output','evolution-fungi-protein.rds'))
 write_delim(evo_full,gzfile(here::here('output','evolution-fungi-residue.tsv.gz')),delim = '\t')
 write_delim(evo_full_prot,gzfile(here::here('output','evolution-fungi-protein.tsv.gz')),delim = '\t')
 
