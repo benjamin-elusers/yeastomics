@@ -740,7 +740,7 @@ spearman.toplot = function(X,Y){
   s   = spearman(X,Y)
   pv = ifelse(s$p.value==0,"<1e-324" ,sprintf("%.1e",s$p.value))
   s$N = sum(complete.cases(X,Y))
-  s$toshow = sprintf(" r %.3f \n p %s \n N %s \n",s$estimate,pv,s$N)
+  s$toshow = sprintf(" r %.3f \n p %s \n N %s",s$estimate,pv,s$N)
   s$xmax = max_(X)
   s$ymax = max_(Y)
   s$xmin = min_(X)
