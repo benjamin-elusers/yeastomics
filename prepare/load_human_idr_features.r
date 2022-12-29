@@ -41,7 +41,6 @@ hs_aa = get.uniprot.proteome(taxid = human$tax_id, DNA = F)
 ## Reference uniprot accession =================================================
 hs_uniref = names(hs_aa)
 
-
 #### .............................IDR...................................... ####
 # A.) HUMAN --------------------------------------------------------------------
 # 1. Get all human disorder predictions ========================================
@@ -503,7 +502,6 @@ write_tsv(mobidb_scores, file = here::here('prepare','ATAR-IDR-FEATURES.tsv'))
 #hs_diso = hs_mobidb_scores %>% filter(feature_len>35)
 #hs_diso$atar_selection = hs_diso$IDR_id %in% mobidb_scores$IDR_id
 
-
 col_to_log10 =  c('PROT_len','PEP_len','PEP_mw','IDR_len','IDR_count')
 df_atar = mobidb_scores %>% dplyr::select(-starts_with('PS'),-region) %>%
           mutate( across(.cols =col_to_log10,.fns = log10,.names = "{.col}_log10")) %>%
@@ -526,7 +524,7 @@ hs_mobi_num = hs_mobi_data %>% dplyr::select(where(~ is.numeric(.x))) %>%
               dplyr::select(-c(S,E,PS_S,PS_E,PS_len,PS_n))
 # Check correlogram of numeric features to remove redundancy
 # (high absoluter correlation == redundant features)
-ggcorrplot::ggcorrplot(cor(hs_mobi_num))
+ggcorrplot::ggcorrplot(cor(hs_mobi_num),outline.color = 'transparent', tl.cex = 8, tl.srt = 70)
 
 col_AA_fc = paste0(AA3,"_fc")
 # non-redundant features
@@ -573,9 +571,13 @@ summary(mobi_umap[,c('X1','X2')])
 library(ggalt)
 library(ggiraph)
 library(ggforce)
-umap_data = mobi_umap %>% filter(!outliers)
-summary(umap_data[,c('X1','X2')])
+umap_data = mobi_umap %>% filter(!outliers) %>%
+            mutate(idr_lab=paste0(PROTEIN," ",S,"-",E))
+atar_idr = subset(umap_data,atar_proteins & atar_overlap)
+atar_neighbor = subset(umap_data,atar_proteins & !atar_overlap)
 
+summary(umap_data[,c('X1','X2')])
+colnames(df_num)
 # Plot the umap
 UMAP = ggplot(data=umap_data ,aes(x = X1,y = X2)) +
   # all idrs
@@ -584,27 +586,34 @@ UMAP = ggplot(data=umap_data ,aes(x = X1,y = X2)) +
   geom_point(data=subset(umap_data,PS_overlap ), size=3, shape=21, color='white',stroke=0.5) +
 
   # highlight atar idr
-  geom_point(data=subset(umap_data,atar_proteins & atar_overlap), aes(color=PROTEIN), shape=16, size=4,alpha=0.9) +
-  geom_text_repel(data=subset(umap_data,atar_proteins & atar_overlap),aes(label=paste0(PROTEIN,"\n",S,"-",E),color=PROTEIN),max.overlaps = 50,size=4,fontface='bold') +
+  geom_point(data=atar_idr, aes(color=PROTEIN), shape=16, size=4,alpha=0.9) +
+  geom_text_repel(data=atar_idr,aes(label=idr_lab,color=PROTEIN),
+                  size=4,fontface='bold', force=5,  max.overlaps=15,force_pull = -1,
+                  seed=291222) +
 
   # highlight idr in atar's protein (not overlapping)
-  geom_point(data=subset(umap_data,atar_proteins & !atar_overlap), aes(color=PROTEIN), fill='white',shape=21, stroke=1, size=4, alpha=0.7) +
-  geom_text_repel(data=subset(umap_data,atar_proteins & !atar_overlap),aes(label=paste0(PROTEIN,"\n",S,"-",E),color=PROTEIN),max.overlaps = 50,size=3,fontface='italic') +
+  geom_point(data=atar_neighbor, aes(color=PROTEIN), fill='white',shape=21, stroke=1, size=4, alpha=0.7) +
+  geom_text_repel(data=atar_neighbor,aes(label=idr_lab,color=PROTEIN),
+                  size=3,fontface='italic', force=5, max.overlaps=15, force_pull = -1,
+                  seed=291222) +
 
   # graphical parameters
-  labs(x = "X1", y = "X2", subtitle="")+
+  labs(x = "UMAP1", y = "UMAP2", subtitle="")+
   scale_color_metro(palette = 'rainbow', discrete = T) +
   theme(legend.position="bottom") + theme_blackboard()+
   ggeasy::easy_text_size(c("axis.title","axis.text.x", "axis.text.y"), size = 20)+
-  ggeasy::easy_remove_legend()
+  ggeasy::easy_remove_legend() +
+  ggeasy::easy_remove_x_axis('text') + ggeasy::easy_remove_y_axis('text') +
+  theme(aspect.ratio = 1)
+
   # Make interactive points
   # ggiraph::geom_point_interactive(size=0.5, color='white',alpha=0, mapping=aes(tooltip=IDR_id)) +
 plot(UMAP)
 #ggiraph::girafe( code = print(UMAP) )
 
 # save umap in PNG/PDF
-ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human.png'), height=12,width=12, bg = 'black')
-ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human.pdf'), height=12,width=12, bg = 'black')
+ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human-labelled.png'), height=12,width=12, bg = 'black')
+ggsave(UMAP, filename = here::here('prepare','umap-atar-idr-human-labelled.pdf'), height=12,width=12, bg = 'black')
 
 #subset(umap_data,atar_proteins) %>% arrange(IDR_id) %>%
 #  dplyr::relocate(PROTEIN,acc,IDR_id,S,E,S_atar,E_atar,atar_proteins,atar_overlap,PS_overlap) %>% View()
