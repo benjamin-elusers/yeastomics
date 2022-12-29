@@ -202,7 +202,7 @@ getmode <- function(v) { # returns the mode (most frequent value)
 
 # Strings ----------------------------------------------------------------------
 str2chr  <- function(x){ return( unlist(strsplit(x,split='')) ) } # split string by character
-concat   <- function(x){ return( paste(x,collapse='') ) }        # concatenate characters to string
+concat   <- function(...){ return( paste(...,collapse='') ) }     # concatenate characters to string
 
 towords  <- function(x){ return( unlist(strsplit(x,split="\\s")) ) } # split string by any white space
 xxS      <- function(x,sx,s='.'){ paste0(x,s,sx) } # Add suffix to a string
@@ -751,24 +751,27 @@ spearman.toplot = function(X,Y){
 get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','p.value')]) }
 
 # precomputed data -------------------------------------------------------------
-# Amino acid scores used in Dubreuil et al. 2019
 get.AA1 = function(){ unlist(strsplit("ACDEFGHIKLMNPQRSTVWY","")) }
 #aaa=c('ALA',"TYR","K","ser","Thr")
 
+regex_AA1 = function(extra=c('\\*','\\-'),negate=F,any=T){
+# Amino acid scores used in Dubreuil et al. 2019
+  bracket1="["
+  bracket2="]"
+  if(negate){ bracket1="[^" }
+  if(any){ bracket2="]+" }
+  aas = c(bracket1,get.AA1(),extra,bracket2)
+  return(concat(aas))
+}
+
 # Checks wether character corresponds to 1-letter amino acid code
 is.aa1    <- function(x,.add.names=T,.ignore.case=T){
-  return( is.in(x,get.AA1(),
-                case.sensitive=!.ignore.case,
-                withNames=.add.names)
-        )
+  return( is.in(x,get.AA1(), case.sensitive=!.ignore.case, withNames=.add.names) )
 }
 
 # Checks wether character corresponds to 3-letter amino acid code
 is.aa3    <- function(x,.add.names=T,.ignore.case=T){
-  return( is.in(x,get.AA3(),
-                case.sensitive=!.ignore.case,
-                withNames=.add.names)
-  )
+  return( is.in(x,get.AA3(), case.sensitive=!.ignore.case, withNames=.add.names) )
 }
 
 get.AA3 = function(){ c('A'="ALA",'C'="CYS",'D'="ASP",'E'="GLU",'F'="PHE",
@@ -781,6 +784,7 @@ get.AA.df = function(){
   return( data.frame( a=names(aaa), aaa ) )
 }
 
+# Amino acid scores used in Dubreuil et al. 2019
 get.aggrescan = function(){
   setNames(
     object=c(-0.036, 0.604, -1.836, -1.412, 1.754, -0.535, -1.033, 1.822, -0.931, 1.38,
