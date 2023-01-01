@@ -1,6 +1,19 @@
 #source("src/utils.r",local = T)
 #source("src/function_alignment.r",local = T)
 
+extract_id = function(x,ID){
+  if(ID == "ORF" ){
+    X= str_extract(x,SGD.nomenclature())
+  }else if(ID == "UNIPROT"){
+    X= str_extract(x,UNIPROT.nomenclature())
+  }else if(ID == "ENSEMBL" ){
+    X= str_extract(x,ENSEMBL.nomenclature())
+  }else{
+    X= basename(x)
+  }
+  return(X)
+}
+
 # Phylogenetic data ------------------------------------------------------------
 # load.phylogenetic = function() {
 #   load("/media/elusers/users/benjamin/A-PROJECTS/01_PhD/06-phd-final-report/data/EVO/SC-phylo-ali-prot_data.Rdata")
@@ -8,6 +21,34 @@
 #   return(SC)
 #   #scinfo = readRDS('yeast-proteome-sgd_infos.rds')
 # }
+
+# get sequence identifier from STRING ID (without the prefix taxon)
+get.id.STRING = function(id,what=c('both','id','tax'),noprint=T){
+
+  if(!is.character(id)){
+    warning("input is not a character")
+    return(NA)
+  }
+  to_return = match.arg(what,c('both','id','tax'),several.ok = F)
+
+  if( all(str_detect(id,pattern='^([0-9]+)\\.(\\w+)')) ){
+    df_id = str_split_fixed(id,pattern = '\\.',2) %>%
+      as_tibble() %>%
+      dplyr::rename(taxid=V1,string=V2)
+
+    if(!noprint){ print(df_id %>% t()) }
+    if(to_return=='both'){
+      return(df_id)
+    }else if(to_return=='id'){
+      return(df_id$string)
+    }else if(to_return == 'tax'){
+      return(df_id$taxid)
+    }
+  }else{
+    warning("Unrecognized input format (should be taxon.id)")
+    return(id)
+  }
+}
 
 get.pair.prot = function(prot, pair){
   seq.1 = prot[pair[[1]]]
@@ -64,6 +105,7 @@ align.pair.prot  = function(p1,p2,mat = "BLOSUM62",tomatrix=F, opening=10, exten
   }
 }
 
+## DUPLICATED GENES -------------------------------------------------------------
 load.ygob.ohnologs = function() {
   message("REF: Byrne and Wolfe, 2005, Genome Research")
   message("The Yeast Gene Order Browser: Combining curated homology and syntenic context reveals gene fate in polyploid species")
@@ -137,177 +179,6 @@ get.sc.ohno = function(myseq) {
   return(pair)
 }
 
-# get sequence identifier from STRING ID (without the prefix taxon)
-get.id.STRING = function(id,what=c('both','id','tax'),noprint=T){
-
-  if(!is.character(id)){
-    warning("input is not a character")
-    return(NA)
-  }
-  to_return = match.arg(what,c('both','id','tax'),several.ok = F)
-
-  if( all(str_detect(id,pattern='^([0-9]+)\\.(\\w+)')) ){
-    df_id = str_split_fixed(id,pattern = '\\.',2) %>%
-            as_tibble() %>%
-            dplyr::rename(taxid=V1,string=V2)
-
-    if(!noprint){ print(df_id %>% t()) }
-    if(to_return=='both'){
-      return(df_id)
-    }else if(to_return=='id'){
-      return(df_id$string)
-    }else if(to_return == 'tax'){
-      return(df_id$taxid)
-    }
-  }else{
-    warning("Unrecognized input format (should be taxon.id)")
-    return(id)
-  }
-}
-
-get.ortho.pair = function(ortho = load.pombe.orthologs() ){
-  return(ortho[,c('PombaseID','ORF')])
-}
-
-compare.to.ancestors = function(ancestor, current){
-  # ancestor is the data table containing ancestral sequences (AncientGenomes.org)
-  # current is a Biostrings object of proteome sequences of a particular species (S. cerevisiae for example)
-  ancestral.genome = read.delim(file = ancestor, header = T,sep = '\t',stringsAsFactors = F)
-  # Extract yeast ancestor genes
-  ancestral.genome$proxy_yeast = gsub(".+(YEAST.+)","\\1",ancestral.genome$proxy_genes)
-  ancestral.genome$proxy_yeast[ !grepl("YEAST",ancestral.genome$proxy_genes) ] = NA
-  ancestral.genome$proxy_yeast_sgd = str_replace(ancestral.genome$proxy_yeast, ".+SGD\\=(S[0-9]+).*",replacement = "\\1")
-  ancestral.genome$proxy_yeast_uni = str_replace(ancestral.genome$proxy_yeast, ".+UniProtKB\\=([A-Z0-9]+).*",replacement = "\\1")
-
-  tmp.prot = AAStringSet(gsub("\\-","",ancestral.genome$protein_sequence))
-  names(tmp.prot) = ancestral.genome$proxy_yeast_sgd
-  anc.prot = tmp.prot[!is.na(names(tmp.prot))]
-  aafreq.anc = alphabetFrequency(tmp.prot,as.prob = T)
-  aacount.anc = alphabetFrequency(tmp.prot,as.prob = F)
-
-  ancestor.ali = align.pair.prot(p1=current[names(anc.prot)],p2=anc.prot)
-  aafreq.anc.ali = alphabetFrequency(unaligned(subject(ancestor.ali)),as.prob=T)
-  aacount.anc.ali = alphabetFrequency(unaligned(subject(ancestor.ali)),as.prob=F)
-
-  anc.stat = data.frame(sgdid=names(anc.prot),
-                        pid1.anc=pid(ancestor.ali,'PID1'),
-                        pid2.anc=pid(ancestor.ali,'PID2'),
-                        pid3.anc=pid(ancestor.ali,'PID3'),
-                        pid4.anc=pid(ancestor.ali,'PID4'),
-                        nX.anc = aacount.anc.ali[,'X'],
-                        pX.anc = 100*aafreq.anc.ali[,'X'],
-                        pG.anc = 100*rowSums(aafreq.anc.ali[,c('-','+')]),
-                        L.anc = width(unaligned(subject(ancestor.ali))),
-                        S.anc = nmatch( ancestor.ali ),
-                        N.anc = nmismatch( ancestor.ali )
-  )
-
-  return(anc.stat)
-}
-
-load.eggnog.node = function(node=NULL,to.matrix=F,show.nodes=F){
-  eggnog = lst(baseurl="http://eggnog.embl.de/download/",
-                v4.5=paste0(baseurl,"eggnog_4.5/"),
-                latest=paste0(baseurl,"latest/"),
-                tax_level = paste0(v4.5,"eggnog4.taxonomic_levels.txt"),
-                tax_info =paste0(latest,"e5.taxid_info.tsv"),
-                level_info =  paste0(latest,"e5.level_info.tar.gz")
-               )
-
-  eggnog_nodes=readr::read_delim(eggnog$tax_level,delim="\t",col_types = cols(.default="c")) %>%
-    janitor::clean_names(replace = c("#"="")) %>%
-    mutate(node_full = sprintf(" %-s (%s)", paste(tax_id,tolower(level_name),sep="."), nog_prefix)) %>%
-    dplyr::select(-ends_with("_count")) %>% arrange(tax_id)
-
-  eggnog_taxons=readr::read_delim(eggnog$tax_info,delim="\t", col_types = "ccccc") %>%
-                janitor::clean_names(replace = c("#"=""))
-
-  # Testing
-  # node.test = list(null=NULL,empty=c(),none="",num=4751,name='Fungi', nog='fuNOG')
-  # node = node.test$nog
-  nodes=dplyr::select(eggnog_nodes,tax_id:level_name)
-  if(show.nodes){ return(eggnog_nodes) }
-  node_exists= !purrr::is_empty(node)
-  is_eggnog_node=F
-
-  if(node_exists){
-    node_pos  = which( node == nodes, arr.ind=T) # check if the node exists
-    if( nrow(node_pos) == 1 ){
-      inod=node_pos[,'row']
-      node_type = names(nodes)[ node_pos[,'col'] ] # find what column the node is found (tax_id, nog_prefix or level_name)
-      message("(",node,") is a valid eggnog node of type [",node_type,"]")
-      is_eggnog_node=T
-    }else if( nrow(node_pos)>1){
-      warning("(",node,") is not unique! Please select a valid unique node",immediate.=T)
-      is_eggnog_node=F
-    }
-  }
-  nodes_list = eggnog_nodes$node_full %>%  gtools::mixedsort()
-
-  if( !is_eggnog_node ){
-    warning(node," is not a valid eggnog taxonomic level!",immediate.=T)
-    inod = menu( choices=nodes_list )
-  }
-  node_info = eggnog_nodes[inod,] %>% dplyr::select(-node_full)
-  print(node_info)
-
-  node_members = sprintf("%s/per_tax_level/%s/%s_members.tsv.gz",eggnog$latest,node_info$tax_id,node_info$tax_id)
-  df.ortho = readr::read_delim(node_members,"\t",progress=T,
-                    col_names = c('node','OG','ns','np','ortho','taxons'),
-                    col_types=cols(.default="c")) %>%
-    mutate(has_yeast = str_detect(string = taxons,pattern = "4932")) %>%
-    separate_rows(ortho,sep=",") %>%
-    extract(ortho,into=c('taxid','protid'),regex='^(^[0-9]+)\\.(.+)') %>%
-    group_by(OG,taxid) %>% mutate(is_1to1=n()==1) %>%
-    left_join(node_info, by=c('node'='tax_id'))
-
-  if( to.matrix ){
-    ortho.m= df.ortho %>%
-              filter(is_1to1) %>%
-              pivot_wider(id_cols=c(OG,np),names_from=taxid, values_from=protid)
-    return(ortho.m)
-  }
-  return(df.ortho)
-}
-
-#NODES = get.eggnog.node(node = 4751,to.matrix = F)
-#colnames(NODES)
-
-get.enog.4891 = function(){
-  sp.4891 = data.frame(
-    taxid=c('4952','5476', # outgroup
-            '4956','4950','28985','45285','33169','381046', # prewgd
-            '4932','5478','1071379','113608','588726','27288','27289','36033','432096', # postwgd
-            '1041607','42374','273371','36914','340170','45596','4909','4920','4922','4924','4929','4959','5479','5480','5482','1005962'  # nonwgd
-    ),
-    abb = c('Y. lipolytica','C. albicans', # outgroup
-            'Z. rouxii','T. delbrueckii','K .lactis','E. cymbalariae','E. gossypii','L. thermotolerans', # prewgd
-            'S. cerevisiae','C. glabrata','T. blattae','T. phaffii','K. naganishii','N. castellii','N. dairenensis','V. polyspora','K. africana', # postwgd
-            "W. ciferrii", "C. dubliniensis", "C. orthopsilosis", "L. elongisporus", "S. passalidarum", "C. tenuis", # nonwgd
-            "P. kudriavzevii", "M. farinosa", "K. pastoris", "S. stipitis", "M. guilliermondii", # nonwgd
-            "D. hansenii", "C. maltosa", "C. parapsilosis", "C. tropicalis", "O. parapolymorpha" # nonwgd
-    ),
-    clade=c('out','out',
-            'prewgd','prewgd','prewgd','prewgd','prewgd','prewgd',
-            'postwgd','postwgd','postwgd','postwgd','postwgd','postwgd','postwgd','postwgd','postwgd',
-            'nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd',
-            'nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd'
-    )
-  )
-  library(rotl)
-  taxid = read.delim(taxid_info,header=T,stringsAsFactors = F)
-  node = read.delim(node_info,header=F,stringsAsFactors = F, col.names = c('taxid','sciname','rank','ancestors','lineage'))
-  LCA = Reduce(intersect,strsplit(node$ancestors,","))
-  LCA.taxid = Reduce(intersect,strsplit(node$lineage,","))
-  node$LCA = tail(LCA,1)
-  node$LCA.taxid = tail(LCA.taxid,1)
-  MRCA = find.common.ancestor(node$ancestors)
-  node$MRCA = sapply(MRCA,b4.last)
-  node$ancestors = toString(LCA)
-  node$lineage = toString(LCA.taxid)
-  node.info = merge(node,sp.4891, by='taxid')
-  return(node.info)
-}
 
 find.lineage= function(tree,full=F){
 
@@ -336,6 +207,13 @@ find.common.ancestor= function(lineage){
   return(MRCA)
 }
 
+
+
+
+
+
+## CONSERVATION / EVOLUTIONARY RATE ---------------------------------------------
+### RATE4SITE -------------------------------------------------------------------
 read.R4S = function(r4s, id=NULL,verbose=T){
   library(tidyverse)
   if(is.null(id)){
@@ -365,8 +243,8 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   #5     I 0.0002452   [9.65e-19,3.989e-06] 0.001131 1011/1011
   r4s.col = c('POS','SEQ','SCORE','QQ-INTERVAL','STD','MSA')
   r4s.header = grep(x=readLines(r4s),pattern="^#POS",v=T) %>% # read the lines that contains the header
-                str_sub(start = 2) %>% # remove the '#' symbol
-                str_split(pattern="\\s+") %>% unlist
+    str_sub(start = 2) %>% # remove the '#' symbol
+    str_split(pattern="\\s+") %>% unlist
   r4s_col_in_file = intersect(r4s.col,r4s.header)
 
   # Make sure QQ-INTERVAL does not have any space in between brackets
@@ -378,25 +256,25 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   r4s_content =readLines(r4s)
   clean_r4s = r4s_content %>%  str_replace_all(string = ., pattern = "^([0-9]{5,})([A-Z])", replacement='\\1\t\\2')
   if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
-        clean_r4s = clean_r4s %>% str_replace_all(string = ., pattern = "\\s+(?=[^\\[\\]]*\\])", replacement="")
+    clean_r4s = clean_r4s %>% str_replace_all(string = ., pattern = "\\s+(?=[^\\[\\]]*\\])", replacement="")
   }
   #gsub(x = .,  pattern = "(?<=\\[)([^\\]]*)( +)([^\\]]*)(?=\\])","\\1\\3",perl = T)
-    #gsub("(?<=\\[)(\\s+)","",x = .,perl = T) # Remove spaces after bracket
-    #gsub("(\\s+)(?=\\])","",x = .,perl = T) # Remove spaces before bracket
+  #gsub("(?<=\\[)(\\s+)","",x = .,perl = T) # Remove spaces after bracket
+  #gsub("(\\s+)(?=\\])","",x = .,perl = T) # Remove spaces before bracket
   df.r4s = readr::read_table(file = clean_r4s, comment = '#', col_names = r4s_col_in_file) %>%
-           mutate( ID = id ) %>%
-           dplyr::relocate(ID,POS,SEQ,SCORE) %>%
-           as_tibble() %>%
-          janitor::clean_names('screaming_snake') %>%
-          separate(col=MSA, into=c('nmsa','nseq'), remove=F, sep='/',convert = T) %>%
-          mutate(fmsa = nmsa/nseq, fgap= 1- fmsa)
+    mutate( ID = id ) %>%
+    dplyr::relocate(ID,POS,SEQ,SCORE) %>%
+    as_tibble() %>%
+    janitor::clean_names('screaming_snake') %>%
+    separate(col=MSA, into=c('nmsa','nseq'), remove=F, sep='/',convert = T) %>%
+    mutate(fmsa = nmsa/nseq, fgap= 1- fmsa)
   if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
     df.r4s = df.r4s %>%
-             dplyr::mutate( QQ = str_remove_all(QQ_INTERVAL, pattern = "\\[|\\]") ) %>%
-             separate(col=QQ, into=c('QQ1','QQ2'), sep = ',',convert = T)
-             #         QQ1 = as.double(str_split_fixed(QQ,',',n=2)[,1]),
-             #         QQ2 = as.double(str_split_fixed(QQ,',',n=2)[,2])) %>%
-             # dplyr::select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
+      dplyr::mutate( QQ = str_remove_all(QQ_INTERVAL, pattern = "\\[|\\]") ) %>%
+      separate(col=QQ, into=c('QQ1','QQ2'), sep = ',',convert = T)
+    #         QQ1 = as.double(str_split_fixed(QQ,',',n=2)[,1]),
+    #         QQ2 = as.double(str_split_fixed(QQ,',',n=2)[,2])) %>%
+    # dplyr::select(ID,POS,SEQ,SCORE,QQ1,QQ2,STD,MSA)
   }
 
   return(df.r4s)
@@ -417,19 +295,6 @@ read.R4S.param = function(r4s, as.df=F){
     return(df.param)
   }
   return(r4s.param)
-}
-
-extract_id = function(x,ID){
-  if(ID == "ORF" ){
-   X= str_extract(x,SGD.nomenclature())
-  }else if(ID == "UNIPROT"){
-   X= str_extract(x,UNIPROT.nomenclature())
-  }else if(ID == "ENSEMBL" ){
-   X= str_extract(x,ENSEMBL.nomenclature())
-  }else{
-   X= basename(x)
-  }
-  return(X)
 }
 
 find_r4s = function(r4s_resdir="/media/elusers/users/benjamin/A-PROJECTS/03_PostDoc/EvoRate-paper/data/r4s-fungi",
@@ -461,6 +326,9 @@ get_r4s = function(r4s_files, as_df=T){
     return(r4s_data)
   }
 }
+
+
+### LEISR ------------------------------------------------------------------------
 
 find_leisr = function(leisr_resdir="/data/benjamin/NonSpecific_Interaction/Data/Evolution/eggNOG/1011G/fasta_strain/",
                       filetype = "LEISR.json"){
@@ -513,6 +381,17 @@ get_leisr = function(leisr_files,  as_df=T){
   }
 }
 
+read_leisr = function(json){
+  content = do.call(rbind,json$MLE$content[[1]])
+  header = sapply(json$MLE$header,'[[',1)
+  df = as_tibble(content) %>% rename_with(~header) %>% janitor::clean_names()
+  df$pos = 1:nrow(df)
+  ID = str_extract(json$input$`file name`, pattern = SGD.nomenclature())
+  df$id = ID
+  return(df)
+}
+
+### IQTREE -----------------------------------------------------------------------
 find_iqtree = function(iqtree_resdir="/media/WEXAC_data/FUNGI/IQTREE/",
                        filetype = ".rate"){
   iqtree_type = match.arg(arg=filetype, choices = c(".mlrate",".rate"),several.ok = F)
@@ -550,15 +429,112 @@ get_iqtree = function(iqtree_files,  as_df=T){
   }
 }
 
-read_leisr = function(json){
-  content = do.call(rbind,json$MLE$content[[1]])
-  header = sapply(json$MLE$header,'[[',1)
-  df = as_tibble(content) %>% rename_with(~header) %>% janitor::clean_names()
-  df$pos = 1:nrow(df)
-  ID = str_extract(json$input$`file name`, pattern = SGD.nomenclature())
-  df$id = ID
-  return(df)
+
+## PHYLUM / CLADES PRECOMPUTED DATA ---------------------------------------------
+load.eggnog.node = function(node=NULL,to.matrix=F,show.nodes=F){
+  eggnog = lst(baseurl="http://eggnog.embl.de/download/",
+               v4.5=paste0(baseurl,"eggnog_4.5/"),
+               latest=paste0(baseurl,"latest/"),
+               tax_level = paste0(v4.5,"eggnog4.taxonomic_levels.txt"),
+               tax_info =paste0(latest,"e5.taxid_info.tsv"),
+               level_info =  paste0(latest,"e5.level_info.tar.gz")
+  )
+
+  eggnog_nodes=readr::read_delim(eggnog$tax_level,delim="\t",col_types = cols(.default="c")) %>%
+    janitor::clean_names(replace = c("#"="")) %>%
+    mutate(node_full = sprintf(" %-s (%s)", paste(tax_id,tolower(level_name),sep="."), nog_prefix)) %>%
+    dplyr::select(-ends_with("_count")) %>% arrange(tax_id)
+
+  eggnog_taxons=readr::read_delim(eggnog$tax_info,delim="\t", col_types = "ccccc") %>%
+    janitor::clean_names(replace = c("#"=""))
+
+  # Testing
+  # node.test = list(null=NULL,empty=c(),none="",num=4751,name='Fungi', nog='fuNOG')
+  # node = node.test$nog
+  nodes=dplyr::select(eggnog_nodes,tax_id:level_name)
+  if(show.nodes){ return(eggnog_nodes) }
+  node_exists= !purrr::is_empty(node)
+  is_eggnog_node=F
+
+  if(node_exists){
+    node_pos  = which( node == nodes, arr.ind=T) # check if the node exists
+    if( nrow(node_pos) == 1 ){
+      inod=node_pos[,'row']
+      node_type = names(nodes)[ node_pos[,'col'] ] # find what column the node is found (tax_id, nog_prefix or level_name)
+      message("(",node,") is a valid eggnog node of type [",node_type,"]")
+      is_eggnog_node=T
+    }else if( nrow(node_pos)>1){
+      warning("(",node,") is not unique! Please select a valid unique node",immediate.=T)
+      is_eggnog_node=F
+    }
+  }
+  nodes_list = eggnog_nodes$node_full %>%  gtools::mixedsort()
+
+  if( !is_eggnog_node ){
+    warning(node," is not a valid eggnog taxonomic level!",immediate.=T)
+    inod = menu( choices=nodes_list )
+  }
+  node_info = eggnog_nodes[inod,] %>% dplyr::select(-node_full)
+  print(node_info)
+
+  node_members = sprintf("%s/per_tax_level/%s/%s_members.tsv.gz",eggnog$latest,node_info$tax_id,node_info$tax_id)
+  df.ortho = readr::read_delim(node_members,"\t",progress=T,
+                               col_names = c('node','OG','ns','np','ortho','taxons'),
+                               col_types=cols(.default="c")) %>%
+    mutate(has_yeast = str_detect(string = taxons,pattern = "4932")) %>%
+    separate_rows(ortho,sep=",") %>%
+    extract(ortho,into=c('taxid','protid'),regex='^(^[0-9]+)\\.(.+)') %>%
+    group_by(OG,taxid) %>% mutate(is_1to1=n()==1) %>%
+    left_join(node_info, by=c('node'='tax_id'))
+
+  if( to.matrix ){
+    ortho.m= df.ortho %>%
+      filter(is_1to1) %>%
+      pivot_wider(id_cols=c(OG,np),names_from=taxid, values_from=protid)
+    return(ortho.m)
+  }
+  return(df.ortho)
 }
+
+#NODES = get.eggnog.node(node = 4751,to.matrix = F)
+#colnames(NODES)
+
+get.enog.4891 = function(){
+  sp.4891 = data.frame(
+    taxid=c('4952','5476', # outgroup
+            '4956','4950','28985','45285','33169','381046', # prewgd
+            '4932','5478','1071379','113608','588726','27288','27289','36033','432096', # postwgd
+            '1041607','42374','273371','36914','340170','45596','4909','4920','4922','4924','4929','4959','5479','5480','5482','1005962'  # nonwgd
+    ),
+    abb = c('Y. lipolytica','C. albicans', # outgroup
+            'Z. rouxii','T. delbrueckii','K .lactis','E. cymbalariae','E. gossypii','L. thermotolerans', # prewgd
+            'S. cerevisiae','C. glabrata','T. blattae','T. phaffii','K. naganishii','N. castellii','N. dairenensis','V. polyspora','K. africana', # postwgd
+            "W. ciferrii", "C. dubliniensis", "C. orthopsilosis", "L. elongisporus", "S. passalidarum", "C. tenuis", # nonwgd
+            "P. kudriavzevii", "M. farinosa", "K. pastoris", "S. stipitis", "M. guilliermondii", # nonwgd
+            "D. hansenii", "C. maltosa", "C. parapsilosis", "C. tropicalis", "O. parapolymorpha" # nonwgd
+    ),
+    clade=c('out','out',
+            'prewgd','prewgd','prewgd','prewgd','prewgd','prewgd',
+            'postwgd','postwgd','postwgd','postwgd','postwgd','postwgd','postwgd','postwgd','postwgd',
+            'nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd',
+            'nonwgd','nonwgd','nonwgd','nonwgd','nonwgd','nonwgd'
+    )
+  )
+  library(rotl)
+  taxid = read.delim(taxid_info,header=T,stringsAsFactors = F)
+  node = read.delim(node_info,header=F,stringsAsFactors = F, col.names = c('taxid','sciname','rank','ancestors','lineage'))
+  LCA = Reduce(intersect,strsplit(node$ancestors,","))
+  LCA.taxid = Reduce(intersect,strsplit(node$lineage,","))
+  node$LCA = tail(LCA,1)
+  node$LCA.taxid = tail(LCA.taxid,1)
+  MRCA = find.common.ancestor(node$ancestors)
+  node$MRCA = sapply(MRCA,b4.last)
+  node$ancestors = toString(LCA)
+  node$lineage = toString(LCA.taxid)
+  node.info = merge(node,sp.4891, by='taxid')
+  return(node.info)
+}
+
 
 get_fungi_clades = function(){
   fungi.clades = tibble::lst(
@@ -684,20 +660,12 @@ get_phylo_data = function(data, include.wgd=T,  include.ali=T,
   return(res)
 }
 
-load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
-                        ext.seq='fasta', ext.r4s = 'raw.r4s',
-                        ref='S288C',id_type="ORF", ncores=parallelly::availableCores(which='max')-2){
+# MISCELLANEOUS ----------------------------------------------------------------
+load_msa = function(fastafiles, ref='S288C',id_type="ORF",
+                    ncores=parallelly::availableCores(which='max')-2){
 
-  if(missing(resdir)){ resdir = normalizePath(file.path(alndir,'../')) }
-  message(sprintf('Alignment directory : %s',alndir))
-  message(sprintf('Result directory    : %s',resdir))
-
-  tictoc::tic("load evolutionary rate...")
-  seqfiles = list.files(normalizePath(alndir), pattern=paste0('.',ext.seq,'$'), full.names = T)
-  if(length(seqfiles)==0){ stop(sprintf('No sequence found (format=%s)',ext.seq)) }
-  message("(1) Reading fasta sequences...")
-
-  sequences = read.sequences(seqfiles,type='AA', strip.fname = T)
+  message("--> Reading fasta sequences...")
+  sequences = read.sequences(fastafiles,type='AA', strip.fname = T)
   # rename sequences
   ids = names(sequences) %>% coalesce(extract_id(.,id_type),.)
   names(sequences) = ids
@@ -706,7 +674,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   sequences = sequences[ aligned ]
 
   tictoc::tic("Compute alignment statistics...")
-  message('(2) Compute statistics from sequence alignment...')
+  message('--> Compute statistics from sequence alignment...')
   id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
   list_df_seq=list()
   if(require(pbmcapply)){
@@ -720,34 +688,62 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
     for( x in names(sequences)){
       perc = (100 * i / NSEQ) %>% round(d=2)
       cat(sprintf('[%10s] %s%% %s/%s    \r',x,perc,i,NSEQ))
-       list_df_seq[[x]] = id_msa2df(x,sequences)
-       i=i+1
+      list_df_seq[[x]] = id_msa2df(x,sequences)
+      i=i+1
     }
   }
 
   df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
   tictoc::toc()
+  return(df_seq)
+}
 
-  message('(3) Read evolutionary rate inference...')
-  r4s_files = find_r4s(r4s_resdir = file.path(resdir,"R4S/"), filetype = ext.r4s)
+
+load_r4s = function(r4sfiles,id_type="ORF",
+                    ncores=parallelly::availableCores(which='max')-2){
+  tictoc::tic("--> Read Rate4site evolutionary rate inference...")
+  message("--> Read Rate4site evolutionary rate inference...")
+
   if(require(pbmcapply)){
     library(pbmcapply)
     message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
-    r4s_data = pbmclapply(X = r4s_files, FUN = get_r4s, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
-               bind_rows() %>% as_tibble()
+    r4s_data = pbmclapply(X = r4sfiles, FUN = get_r4s, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
+      bind_rows() %>% as_tibble()
   }else{
-    r4s_data = get_r4s(r4s_files,as_df = T)
+    r4s_data = get_r4s(r4sfiles,as_df = T)
   }
   r4s = r4s_data %>% mutate(ID = coalesce(extract_id(ID,id_type),ID) )
+  tictoc::toc()
+  return(r4s)
+}
 
+load.evorate = function(alndir="/media/WEXAC/1011G/",resdir,
+                        ext.seq='fasta', ext.r4s = 'raw.r4s',
+                        ref='S288C',id_type="ORF"){
+
+  if(missing(resdir)){ resdir = normalizePath(file.path(alndir,'../')) }
+  message(sprintf('Alignment directory : %s',alndir))
+  message(sprintf('Result directory    : %s',resdir))
+
+  tictoc::tic("load evolutionary rate...")
+  seqfiles = list.files(normalizePath(alndir), pattern=paste0('.',ext.seq,'$'), full.names = T)
+  if(length(seqfiles)==0){ stop(sprintf('No sequence found (format=%s)',ext.seq)) }
+
+  R4S_DIR = file.path(resdir,"R4S/")
   IQTREE_DIR = file.path(resdir,"IQTREE/")
   LEISR_DIR = file.path(resdir,"LEISR/")
 
+  r4sfiles = find_r4s(R4S_DIR,ext.r4s)
+  if(length(r4sfiles)==0){ stop(sprintf('No rate4site results found (format=%s)',ext.r4s)) }
+
+  df_msa = load_msa(seqfiles,ref,id_type)
+  df_r4s = load_r4s(r4sfiles,id_type)
+
   message('(4) Merge sequence to evolutionary rate...')
-  evorates = left_join(df_seq,r4s, by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
-      dplyr::filter(!is.na(ref_pos)) %>%
-      dplyr::rename(r4s_rate=SCORE) %>%
-      dplyr::select(-c('QQ1','QQ2','STD','MSA'))
+  df_evo = left_join(df_msa,df_r4s, by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
+    dplyr::filter(!is.na(ref_pos)) %>%
+    dplyr::rename(r4s_rate=SCORE) %>%
+    dplyr::select(-c('QQ1','QQ2','STD','MSA'))
 
   if( dir.exists(IQTREE_DIR) ){
     message('(4.1) Add IQTREE evolutionary rate...')
@@ -767,8 +763,8 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
     }
 
     iqtree = left_join(iqtree.mlrate,iqtree.rate,by=c('id','Site')) %>%
-             mutate(ID = coalesce(extract_id(id,id_type),id) ) %>%
-             dplyr::rename(iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate)
+      mutate(ID = coalesce(extract_id(id,id_type),id) ) %>%
+      dplyr::rename(iq_rate=Rate.x,iq_mlrate=Rate.y, iq_cat=Cat,iq_rate_hicat=C_Rate)
 
     evorates = left_join(evorates,iqtree,by=c('id'='ID','msa_pos'='Site'),suffix=c('','_iqtree'))
   }
@@ -780,7 +776,7 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
       library(pbmcapply)
       message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
       leisr.rate = pbmclapply(X =.leisr.json, FUN = get_leisr, mc.cores = ncores, mc.silent=F, mc.cleanup = T) %>%
-                  bind_rows()
+        bind_rows()
     }else{
       leisr.rate = get_leisr(.leisr.json, as_df = T)
     }
@@ -794,4 +790,45 @@ load.evorate = function(alndir="/media/WEXAC_data/1011G/",resdir,
   tictoc::toc()
   return(evorates)
 }
+
+get.ortho.pair = function(ortho = load.pombe.orthologs() ){
+  return(ortho[,c('PombaseID','ORF')])
+}
+
+compare.to.ancestors = function(ancestor, current){
+  # ancestor is the data table containing ancestral sequences (AncientGenomes.org)
+  # current is a Biostrings object of proteome sequences of a particular species (S. cerevisiae for example)
+  ancestral.genome = read.delim(file = ancestor, header = T,sep = '\t',stringsAsFactors = F)
+  # Extract yeast ancestor genes
+  ancestral.genome$proxy_yeast = gsub(".+(YEAST.+)","\\1",ancestral.genome$proxy_genes)
+  ancestral.genome$proxy_yeast[ !grepl("YEAST",ancestral.genome$proxy_genes) ] = NA
+  ancestral.genome$proxy_yeast_sgd = str_replace(ancestral.genome$proxy_yeast, ".+SGD\\=(S[0-9]+).*",replacement = "\\1")
+  ancestral.genome$proxy_yeast_uni = str_replace(ancestral.genome$proxy_yeast, ".+UniProtKB\\=([A-Z0-9]+).*",replacement = "\\1")
+
+  tmp.prot = AAStringSet(gsub("\\-","",ancestral.genome$protein_sequence))
+  names(tmp.prot) = ancestral.genome$proxy_yeast_sgd
+  anc.prot = tmp.prot[!is.na(names(tmp.prot))]
+  aafreq.anc = alphabetFrequency(tmp.prot,as.prob = T)
+  aacount.anc = alphabetFrequency(tmp.prot,as.prob = F)
+
+  ancestor.ali = align.pair.prot(p1=current[names(anc.prot)],p2=anc.prot)
+  aafreq.anc.ali = alphabetFrequency(unaligned(subject(ancestor.ali)),as.prob=T)
+  aacount.anc.ali = alphabetFrequency(unaligned(subject(ancestor.ali)),as.prob=F)
+
+  anc.stat = data.frame(sgdid=names(anc.prot),
+                        pid1.anc=pid(ancestor.ali,'PID1'),
+                        pid2.anc=pid(ancestor.ali,'PID2'),
+                        pid3.anc=pid(ancestor.ali,'PID3'),
+                        pid4.anc=pid(ancestor.ali,'PID4'),
+                        nX.anc = aacount.anc.ali[,'X'],
+                        pX.anc = 100*aafreq.anc.ali[,'X'],
+                        pG.anc = 100*rowSums(aafreq.anc.ali[,c('-','+')]),
+                        L.anc = width(unaligned(subject(ancestor.ali))),
+                        S.anc = nmatch( ancestor.ali ),
+                        N.anc = nmismatch( ancestor.ali )
+  )
+
+  return(anc.stat)
+}
+
 
