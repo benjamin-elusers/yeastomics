@@ -666,7 +666,7 @@ load_seq = function(fastafiles, ref='S288C',id_type="ORF",
                     ncores=parallelly::availableCores(which='max')-2){
 
   message("--> Reading fasta sequences...")
-  sequences = read.sequences(fastafiles,type='AA', strip.fname = T)
+  sequences = read.sequences(fastafiles,type='AA', strip.fname = T, ncores=ncores)
   # rename sequences
   ids = names(sequences) %>% coalesce(extract_id(.,id_type),.)
   names(sequences) = ids
