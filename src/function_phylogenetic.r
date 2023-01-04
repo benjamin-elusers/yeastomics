@@ -660,8 +660,9 @@ get_phylo_data = function(data, include.wgd=T,  include.ali=T,
   return(res)
 }
 
+
 # MISCELLANEOUS ----------------------------------------------------------------
-load_msa = function(fastafiles, ref='S288C',id_type="ORF",
+load_seq = function(fastafiles, ref='S288C',id_type="ORF",
                     ncores=parallelly::availableCores(which='max')-2){
 
   message("--> Reading fasta sequences...")
@@ -672,6 +673,17 @@ load_msa = function(fastafiles, ref='S288C',id_type="ORF",
   # check if sequences are aligned
   aligned = sapply(sequences,function(x){ n_distinct(width(x)) == 1})
   sequences = sequences[ aligned ]
+  return(sequences)
+}
+
+load_msa = function(fastafiles, ref='S288C',id_type="ORF",
+                    ncores=parallelly::availableCores(which='max')-2){
+
+  if(class(fastafiles) != "AAStringSetList"){
+    sequences = load_seq(fastafiles,ref,id_type,ncores)
+  }else{
+    sequences = fastafiles
+  }
 
   tictoc::tic("Compute alignment statistics...")
   message('--> Compute statistics from sequence alignment...')
