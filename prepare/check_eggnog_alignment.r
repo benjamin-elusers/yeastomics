@@ -6,19 +6,31 @@ library(ggthemes)
 library(patchwork)
 source(here::here("src","__setup_yeastomics__.r"))
 fudir = here::here("data","eggnog","4751_Fungi")
+mzdir = here::here("data","eggnog","33208_Metazoa")
+fu_wexac="/media/WEXAC/EGGNOG/4751_Fungi"
+mz_wexac="/media/WEXAC/EGGNOG/33208_Metazoa"
 
 count.fasta = function(fastafile){
   return(sum(grepl("^>",readLines(fastafile))))
 }
 
-count.file = function(directory, fileext=""){
+find.file = function(directory, fileext=""){
   if(length(fileext)>1){
     resfile = list.files(directory, full.names=T, recursive=T)
-    return( map(fileext, ~str_subset(resfile, pattern = paste0("\\.",.x,"$")) %>% length ) )
+    return( map(fileext, ~str_subset(resfile, pattern = paste0("\\.",.x,"$"))) )
   }else{
     resfile = list.files(directory, pattern=fileext, full.names=T, recursive=T)
-    return(length(resfile))
+    return(resfile)
   }
+}
+
+count.file = function(directory, fileext=""){
+  return( map(find.file(directory, fileext),length) )
+}
+
+find.muscle = function(directory){
+  cat(sprintf("get muscle alignments files %s...\n",basename(directory)))
+  return( find.file(file.path(directory,"muscle"),"\\.mu$") )
 }
 
 count.muscle = function(directory){
@@ -26,109 +38,167 @@ count.muscle = function(directory){
   return( count.file(file.path(directory,"muscle"),"\\.mu$") )
 }
 
-count.trimal = function(directory){
+find.trimal = function(directory,params=c(10,20,50,80,'pyout')){
+  cat(sprintf("get trimal result files %s...\n",basename(directory)))
+  params = paste0("trimal_gap",params)
+  map(params, ~find.file(file.path(directory,.x), paste0("\\.",.x,"$"))) %>%
+    set_names(nm = paste0("files_",params)) %>% as_tibble()
+}
+
+count.trimal = function(directory,params=c(10,20,50,80,'pyout')){
   cat(sprintf("count trimal results %s...\n",basename(directory)))
-  params = paste0("trimal_gap",c(10,20,50,80,'pyout'))
+  params = paste0("trimal_gap",params)
   map(params, ~count.file(file.path(directory,.x), paste0("\\.",.x,"$"))) %>%
     set_names(nm = paste0("n_",params)) %>% as_tibble()
 }
 
-count.r4s = function(directory){
-  cat(sprintf("count rate4site results %s...\n",basename(directory)))
-  params = c('notrim', paste0("trimal_gap",c(10,20,50,80,"pyout")))
-  r4s_dir = c('r4s_muscle', str_replace(params[-1],"trimal","r4s"))
+find.r4s = function(directory,params=c(10,20,50,80,'pyout')){
+  cat(sprintf("get rate4site result files %s...\n",basename(directory)))
+  trimal_params = paste0("trimal_gap",params) %>% str_replace("trimal_gap0","notrim")
+  r4s_dir = str_replace(trimal_params,"trimal","r4s") %>% str_replace("notrim","r4s_muscle")
+
   r4s_ext="\\.eggnog_sptree\\.r4s_raw"
-  map(seq(params), ~count.file(file.path(directory,r4s_dir[.x]), paste0("\\.",params[.x],r4s_ext,"$"))) %>%
-    set_names(nm = paste0("n_",params)) %>% as_tibble()
+  map(seq(trimal_params), ~find.file(directory = file.path(directory,r4s_dir[.x]),
+                               fileext = paste0("\\.",trimal_params[.x],r4s_ext,"$"))) %>%
+    set_names(nm = paste0("n_",trimal_params)) %>% as_tibble()
 }
 
-wexac_fu="/media/WEXAC/EGGNOG/4751_Fungi"
+count.r4s = function(directory,params=c(10,20,50,80,'pyout')){
+  cat(sprintf("count rate4site results %s...\n",basename(directory)))
+  trimal_params = paste0("trimal_gap",params) %>% str_replace("trimal_gap0","notrim")
+  r4s_dir = str_replace(trimal_params,"trimal","r4s") %>% str_replace("notrim","r4s_muscle")
+
+  r4s_ext="\\.eggnog_sptree\\.r4s_raw"
+  map(seq(trimal_params), ~count.file(directory = file.path(directory,r4s_dir[.x]),
+                               fileext = paste0("\\.",trimal_params[.x],r4s_ext,"$"))) %>%
+    set_names(nm = paste0("n_",trimal_params)) %>% as_tibble()
+}
+
 clade_regex="[0-9]+_[a-zA-Z]+_[0-9]+sp"
 col_clade = paste0("clade_",c("id","name","ns"))
 
-clades = list.dirs(wexac_fu,recursive = F) %>% basename %>% str_subset(clade_regex)
+NODE_DIR = mz_wexac
+clades = list.dirs(NODE_DIR,recursive = F) %>% basename %>% str_subset(clade_regex)
 df_clade = tibble(clade_desc=clades) %>%
            separate(col='clade_desc', into=col_clade, sep = "_", remove=F) %>%
            rowwise() %>%
-           mutate( resdir = file.path(wexac_fu,clade_desc) )
+           mutate( resdir = file.path(NODE_DIR,clade_desc) )
 
-df_clade = df_clade %>% mutate( n_muscle = count.muscle(resdir ) )
-df_clade = df_clade %>% mutate( n_trimal = count.trimal( resdir ) )
-df_clade = df_clade %>% mutate( n_r4s = count.r4s( resdir ) )
+muscle_files = pbmcapply::pbmcmapply(find.muscle,df_clade$resdir, mc.cores=14, SIMPLIFY=F)
+trimal_files = pbmcapply::pbmcmapply(find.trimal,MoreArgs=list(params=c(10,20)), df_clade$resdir, mc.cores=14, SIMPLIFY=F )
+r4s_files    = pbmcapply::pbmcmapply(find.r4s,MoreArgs=list(params=c(0,10,20)), df_clade$resdir, mc.cores=14, SIMPLIFY=F )
+
+df_clade$muscle_files = muscle_files
+df_clade$trimal_files = trimal_files
+df_clade$r4s_files = r4s_files
+
+df_clade$n_muscle = map_int(df_clade$muscle_files,n_distinct)
+df_clade$n_trimal = map_dfr(df_clade$trimal_files, ~map_df(.x,n_distinct))
+df_clade$n_r4s = map_dfr(df_clade$r4s_files, ~map_df(.x,n_distinct))
 
 
 df_clade$n_muscle - df_clade$n_trimal
 df_clade$n_muscle - df_clade$n_r4s
-
-muscle_files = list.files(wexac_fu, recursive = T,  pattern="\\.mu$", full.names=T)
-#table(str_extract(dirname(muscle_files),clade_regex))
-#df_clade$n_muscle %>% setNames(df_clade$clade_desc)
-trimal_files = list.files(wexac_fu, recursive = T,  pattern="\\.trimal_gap(10|20|50|80|pyout)$", full.names=T)
-#table(str_extract(dirname(trimal_files),clade_regex))
-#rowSums(df_clade$n_trimal) %>% setNames(df_clade$clade_desc)
-r4s_files  = list.files(wexac_fu, recursive = T,  pattern="\\.eggnog_sptree\\.r4s_raw$", full.names=T)
-#table(str_extract(dirname(r4s_files),clade_regex))
-#rowSums(df_clade$n_r4s) %>% setNames(df_clade$clade_desc)
-
-save.image(here::here("data/eggnog","4751_Fungi-eggnog-results.rdata"))
-
-
-clade_desc = dirname(muscle_files) %>% str_extract(clade_regex)
-orthogroup = basename(muscle_files) %>% str_split_fixed(string = ., "_",n=4)
-orthoname = apply(orthogroup[,1:2],1,paste0,collapse="_")
-muscle_gaps = pbmcapply::pbmcmapply(count_gaps_fromfile, muscle_files,  mc.cores = 14)
-names(muscle_gaps) = orthoname
-muscle_gapstat = tibble(ortho=orthoname,
-                        clade=clade_desc,
-                        gaps=muscle_gaps) %>%
-               rowwise() %>%
-               mutate( agap = mean(gaps,na.rm=T),
-                       sgap = sd(gaps,na.rm=T),
-                       mgap = median(gaps,na.rm=T),
-                       gap5 = quantile(gaps,probs=0.05),
-                       gap20 = quantile(gaps,probs=0.2),
-                       gap80 = quantile(gaps,probs=0.8),
-                       gap95 = quantile(gaps,probs=0.95)) %>%
-              mutate(og=str_split_fixed(ortho,"_",2)[,2]) %>%
-              group_by(clade) %>% add_count(name='nclade')
-
-clade_desc = dirname(trimal_files) %>% str_extract(clade_regex)
-orthogroup = basename(trimal_files) %>% str_split_fixed(string = ., "_",n=4)
-orthoname = apply(orthogroup[,1:2],1,paste0,collapse="_")
-trimal_param = dirname(trimal_files) %>% basename()
-
-trim_gaps = pbmcapply::pbmcmapply(trimal_files, FUN=count_gaps_fromfile, mc.cores = 14)
-names(trim_gaps) = orthoname
-trim_gapstat = tibble(ortho=orthoname,
-                      clade=clade_desc,
-                      params=trimal_param,
-                      gaps=trim_gaps) %>%
-  rowwise() %>%
-  mutate( agap = mean(gaps,na.rm=T),
-          sgap = sd(gaps,na.rm=T),
-          mgap = median(gaps,na.rm=T),
-          gap5 = quantile(gaps,probs=0.05),
-          gap20 = quantile(gaps,probs=0.2),
-          gap80 = quantile(gaps,probs=0.8),
-          gap95 = quantile(gaps,probs=0.95)) %>%
-  mutate(og=str_split_fixed(ortho,"_",2)[,2]) %>%
-  group_by(clade,params) %>% add_count(name='nclade')
-
-pg=ggplot(muscle_gapstat) +
-  geom_density(aes(x=agap)) +
-  geom_text(aes(label=paste0('n=',nclade)),x=Inf,y=Inf,hjust='inward',vjust='inward',check_overlap = T,size=3) +
-  geom_density(data=trim_gapstat,aes(x=agap,color=clade_desc)) +
-  facet_wrap(~params,scales='free_y',nrow = 4) +
-  xlab('Average % gap in alignment') +
-  theme_clean()
-pg
-
-ggsave(path=here::here("plots"),
-       filename="4751_Fungi-gaps_frequency_eggnog.pdf",
-       plot=pg,
-       scale=1.5)
+saveRDS(df_clade,file=here::here("data/eggnog","33208_Metazoa-eggnog-results.rds"))
+#save.image(here::here("data/eggnog","4751_Fungi-eggnog-results.rdata"))
+#
+# clade_desc = dirname(muscle_files) %>% str_extract(clade_regex)
+# orthogroup = basename(muscle_files) %>% str_split_fixed(string = ., "_",n=4)
+# orthoname = apply(orthogroup[,1:2],1,paste0,collapse="_")
+# muscle_gaps = pbmcapply::pbmcmapply(count_gaps_fromfile, muscle_files,  mc.cores = 14)
+# names(muscle_gaps) = orthoname
+# muscle_gapstat = tibble(ortho=orthoname,
+#                         clade=clade_desc,
+#                         gaps=muscle_gaps) %>%
+#                rowwise() %>%
+#                mutate( agap = mean(gaps,na.rm=T),
+#                        sgap = sd(gaps,na.rm=T),
+#                        mgap = median(gaps,na.rm=T),
+#                        gap5 = quantile(gaps,probs=0.05),
+#                        gap20 = quantile(gaps,probs=0.2),
+#                        gap80 = quantile(gaps,probs=0.8),
+#                        gap95 = quantile(gaps,probs=0.95)) %>%
+#               mutate(og=str_split_fixed(ortho,"_",2)[,2]) %>%
+#               group_by(clade) %>% add_count(name='nclade')
+#
+# clade_desc = dirname(trimal_files) %>% str_extract(clade_regex)
+# orthogroup = basename(trimal_files) %>% str_split_fixed(string = ., "_",n=4)
+# orthoname = apply(orthogroup[,1:2],1,paste0,collapse="_")
+# trimal_param = dirname(trimal_files) %>% basename()
+#
+# trim_gaps = pbmcapply::pbmcmapply(trimal_files, FUN=count_gaps_fromfile, mc.cores = 14)
+# names(trim_gaps) = orthoname
+# trim_gapstat = tibble(ortho=orthoname,
+#                       clade=clade_desc,
+#                       params=trimal_param,
+#                       gaps=trim_gaps) %>%
+#   rowwise() %>%
+#   mutate( agap = mean(gaps,na.rm=T),
+#           sgap = sd(gaps,na.rm=T),
+#           mgap = median(gaps,na.rm=T),
+#           gap5 = quantile(gaps,probs=0.05),
+#           gap20 = quantile(gaps,probs=0.2),
+#           gap80 = quantile(gaps,probs=0.8),
+#           gap95 = quantile(gaps,probs=0.95)) %>%
+#   mutate(og=str_split_fixed(ortho,"_",2)[,2]) %>%
+#   group_by(clade,params) %>% add_count(name='nclade')
+#
+# pg=ggplot(muscle_gapstat) +
+#   geom_density(aes(x=agap)) +
+#   geom_text(aes(label=paste0('n=',nclade)),x=Inf,y=Inf,hjust='inward',vjust='inward',check_overlap = T,size=3) +
+#   geom_density(data=trim_gapstat,aes(x=agap,color=clade_desc)) +
+#   facet_wrap(~params,scales='free_y',nrow = 4) +
+#   xlab('Average % gap in alignment') +
+#   theme_clean()
+# pg
+#
+# ggsave(path=here::here("plots"),
+#        filename="4751_Fungi-gaps_frequency_eggnog.pdf",
+#        plot=pg,
+#        scale=1.5)
 
 ###
+sgd_len = get.width(load.sgd.proteome()) %>% rename(s288c_len=len)
+
+##### Wapinski Fungi lineage ------------------------------------------------------------
+wapinski_dir = "/media/WEXAC/FUNGI/"
+wapinski.rds =  here('output','sc-evorate-wapinski.rds')
+wapinski.fasta = Rfast::read.directory(file.path(wapinski_dir,'fasta')) %>%
+                 str_subset('\\.fasta$') %>% file.path(wapinski_dir,'fasta',.)
+wapinski.msa = load_msa(wapinski.fasta,ref = 'Saccharomyces_cerevisiae')
+wapinski.r4sfiles = Rfast::read.directory(file.path(wapinski_dir,'R4S')) %>%
+               str_subset('raw\\.r4s$') %>% file.path(wapinski_dir,'R4S',.)
+wapinski.r4s = load_r4s(wapinski.r4sfiles)
+
+wapinski.evo = inner_join(wapinski.msa,wapinski.r4s,
+                         by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
+               group_by(id) %>% mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos)) %>%
+               #dplyr::filter(!is.na(ref_pos)) %>%
+               dplyr::rename(r4s_rate=SCORE) %>%
+               dplyr::select(-c('QQ1','QQ2','STD','MSA')) %>%
+               left_join(sgd_len, by=c('id'='orf'))
+
+
+wapinski.evo[wapinski.evo$len_ref != wapinski.evo$s288c_len,]
+
+
+YLR158C.fa=wapinski.fasta %>% str_subset("YLR158C")
+Biostrings::readAAMultipleAlignment(YLR158C.fa)
+
+YLR158C.msa = wapinski.msa %>% filter( id == "YLR158C")
+YLR158C.r4s = wapinski.r4s %>% filter( ID == "YLR158C") %>% print(n=500)
+
+YLR158C.fa$ref_aa
+YLR158C.r4s$SEQ
+
+##### Cerevisiae isolates ------------------------------------------------------
+strains_dir = "/media/WEXAC_data/1011G/"
+strains.rds =  here('output','sc-evorate-yk11.rds')
+
+sc_evo$yk11 = preload(strains.rds,
+                      load.evorate(alndir=file.path(strains_dir,'aln_s288c'), id_type = 'ORF', ext.seq = 'fasta', ref = 'S288C'),
+                      'get evolutionary rates for 1011 isolated yeast...')
+
 r4s_res=pbmcapply::pbmcmapply(r4s_files,FUN = read.R4S, mc.cores = 20, SIMPLIFY=F) # DO NOT SIMPLIFY TO KEEP AS A LIST
 saveRDS(r4s_res,file.path(fudir,"rate4site-4751_fungi-clades.rds"))
 
