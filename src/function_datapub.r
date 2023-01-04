@@ -323,24 +323,31 @@ load.lee2014.data = function(rawdata=F){
   # Related to this first paper: The chemical genomic portrait of yeast: Uncovering a phenotype for all genes
   # E. Hillenmeyer, et al. Science 320,362–365 (2008).doi:10.1126/science.1150021
 
+  #  EDIT (01.01.23): URL IS DEAD!
+  ## url.hiphop="https://chemogenomics.pharmacy.ubc.ca/hiphop/files/supplemental"
 
-  url.hiphop="http://chemogenomics.pharmacy.ubc.ca/hiphop/files/supplemental"
-  url.s1 = paste0(url.hiphop,"/","leesupptableS1.xlsx")
-  url.s4 = paste0(url.hiphop,"/","leesupptableS4.xlsx")
-  url.fitness_hom =paste0(url.hiphop,"/","fitness_defect_matrix_hom.txt")
-  url.fitness_het =paste0(url.hiphop,"/","fitness_defect_matrix_het.txt")
+  URL_SCIENCE_SUPPL = "https://www.science.org/action/downloadSupplement?doi="
+  doi = "10.1126/science.1250217"
+  s1 = "1250217s1.xlsx"
+  s4 = "1250217s4.xlsx"
+  url.s1 = paste0(URL_SCIENCE_SUPPL,doi,"&file=",s1)
+  url.s4 = paste0(URL_SCIENCE_SUPPL,doi,"&file=",s4)
+  #url.fitness_hom =paste0(url.hiphop,"/","fitness_defect_matrix_hom.txt")
+  #url.fitness_het =paste0(url.hiphop,"/","fitness_defect_matrix_het.txt")
 
-  library(openxlsx)
+  library(openxlsx) # cant read from url with readxl
   # Compound library
   compound.library =  openxlsx::read.xlsx(  xlsxFile = url.s1, sheet = 2,
-                                            colNames = T, skipEmptyRows = T,
-                                            skipEmptyCols = T, na.strings = c(""))
+                                             colNames = T, skipEmptyRows = T,
+                                             skipEmptyCols = T, na.strings = c(""))
+
+  #readxl::read_xlsx(path = url.s1, sheet = 2, col_names = T, progress=T,na = "")
 
   # Fitness Defect Score Matrix, homozygous strains (right-click to download, tab-delimited text, 280 Mb)
   # [Rows=Yeast Deletion Strain, Identified by Systematic ORF name; Columns=Fitness Screens, Identified by Screen ID (SGTC_N)]
   # Fitness defect on homozygous deletion strain for 3000 small molecules screen
   library(vroom)
-  if(rawdata){
+  if(rawdata){ # NOT AVAILABLE (01.01.23)
     chemofit = vroom(file=url.fitness_het, col_names=T, delim="\t",
                      col_select = list(orf = 1, everything()),
                      col_types = cols(.default = col_double()))
@@ -352,6 +359,7 @@ load.lee2014.data = function(rawdata=F){
 
     minor.responses = openxlsx::read.xlsx(  xlsxFile = url.s4, sheet = 3, na.strings = c("",NA)) %>%
                       janitor::clean_names() %>% hablar::convert(chr(response_signature))
+
     responses = bind_rows(major.responses, minor.responses) %>%
                 relocate(gene) %>%
                 arrange(gene,response_signature) %>%
