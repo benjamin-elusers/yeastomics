@@ -8,8 +8,8 @@ ncbi_dir = here::here("data","ncbi")
 
 reduce_orthologs = function(fastaseq, id_ref, id_orthogroup){
 
-  reference_seq = fastaseq[id_ref] %>% as.character() %>% chartr("U","X",x=.)
-  orthogroup_seq = fastaseq[id_orthogroup] %>% as.character() %>% chartr("U","X",x=.)
+  reference_seq = fastaseq[id_ref] %>% as.character() %>% chartr("U","C",x=.) %>% chartr("J","L",x=.)
+  orthogroup_seq = fastaseq[id_orthogroup] %>% as.character() %>% chartr("U","C",x=.) %>% chartr("J","L",x=.)
   df_seq = tibble(ids = id_orthogroup) %>%
            separate(col=ids, into=c('taxon','string'), sep = "\\.", extra ='merge', remove = F) %>%
            group_by(taxon) %>%
@@ -309,15 +309,27 @@ table(fu_toprocess$clade_name,fu_toprocess$node_has_ref)
 janitor::tabyl(fu_toprocess,clade_name,clade_ns)
 
 ####_filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast) ####
-chunk_size=100
-chunks=seq(1,nrow(fu_toprocess),by=chunk_size)
-pbmcapply::pbmclapply(chunks,FUN = function(irow){
-                     filter_orthogroups(
-                          orthologs_count = fu_toprocess[irow:(irow+chunk_size),],
-                          ref_tree = fungi_19,
-                          ref_sp = 4932,
-                          debug = F,
-                          force = F) },mc.cores = 14)
+
+#chunk_size=100
+#chunks=seq(1,nrow(fu_toprocess),by=chunk_size)
+list_fu_toprocess = split(fu_toprocess, fu_toprocess$clade_desc)
+chunks=seq(1,length(list_fu_toprocess),by=1)
+pbmcapply::pbmclapply(chunks,FUN = function(og){
+  filter_orthogroups(
+    orthologs_count = list_fu_toprocess[[og]],
+    ref_tree = fungi_19, eggnog_tree = T,
+    ref_sp = 4932,
+    debug = F,
+    force = F) },mc.cores = 10)
+
+#
+# pbmcapply::pbmclapply(chunks,FUN = function(irow){
+#                      filter_orthogroups(
+#                           orthologs_count = fu_toprocess[irow:(irow+chunk_size),],
+#                           ref_tree = fungi_19,
+#                           ref_sp = 4932,
+#                           debug = F,
+#                           force = F) },mc.cores = 14)
 
 #### _retrieveing orthogroups to build species tree ####
 # Select orthogroups for building the fungi species tree
@@ -518,44 +530,11 @@ Biostrings::writeXStringSet(orthogroup_fasta.sorted,
 write_lines(unlist(lapply(orthologs_ids, paste, collapse="\t")),
             file = file.path(mz_sptree_dir,"metazoa161-15orthogroups.ids"))
 
-# # Filter orthogroups fasta to keep at most 179 species (ortholog closest to yeast)
-# mz_processed = filter_orthogroups(orthologs_count = mz_ref,
-#                                   ref_tree = metazoa, ref_sp = 9606,
-#                                   debug = F, force = F)
-
-
-#### MAMMALIA ####
-# mammalia = treeio::read.tree(here::here('data','ncbi','ncbi-mammalia.phy'))
-# mammalia$tip.label = str_remove_all(mammalia$tip.label,"['\\[\\]]") #%>% str_replace_all(" ","_")
-# mammalia_clades = c('40674'='mammalia','314146'='euarchontoglires','9443'='primates',
-#                     '9989'='rodentia','33554'='carnivora','91561'='cetartiodactyla',
-#                     '9397'='chiroptera','311790'='Afrotheria')
-#
-#
-# ma_dir = here::here('data','eggnog','40674_Mammalia')
-# maNOG = get_eggnog_node(40674)
-# ma_tax=get_eggnog_taxonomy(40674)
-#
-# ma_species = get_eggnog_species(node = 40674)
-# write_lines(ma_species$taxid, here::here('data','ncbi','40674-mammalia-70taxids.txt'))
-# write_lines(ma_species$taxon, here::here('data','ncbi','40674-mammalia-70taxons.txt'))
-#
-# ma_ncbi = preload( saved.file = here('data','ncbi','ncbi-to-eggnog-mammalia-70species.rds'),
-#                    { match_strings(SP1=mammalia$tip.label, SP2=ma_species$taxon, use_soundex = F, manual = T) },
-#                    'match ncbi species tree to eggnog mammalian species...')
-#
-# mammalia_eggnog = treeio::read.tree(here::here('data','ncbi','ncbi-mammalia.phy'))
-# mammalia_eggnog$tip.label = ma_ncbi_eggnog$taxid
-#
 # laurasiatheria = extract.clade(mammalia_eggnog, 'Laurasiatheria', root.edge = 0, collapse.singles = TRUE)
 # laurasiatheria_clades=c('cetartiodactyla'=91561,'carnivora'=33554,'chiroptera'=9397)
 # id_laurasiatheria = laurasiatheria$tip.label %>% as.numeric %>% sum
 #
 #pbmcapply::pbmclapply(mzNOG$url_fasta, safe_download, mc.cores=14, path=mz_dir, ext='.fasta')
-#mz_ali = get_eggnog_alignment(node=33208, use_trimmed = F)
-#mz_clades = map(metazoa_clades, ~get_eggnog_taxonomy(.x))
-
-
 
 #### EGGNOG V6 ####
 #"http://eggnog6.embl.de/download/eggnog_6.0/e6.og2level.tsv"
