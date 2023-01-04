@@ -679,7 +679,7 @@ load_seq = function(fastafiles, ref='S288C',id_type="ORF",
 load_msa = function(fastafiles, ref='S288C',id_type="ORF",
                     ncores=parallelly::availableCores(which='max')-2){
 
-  if(class(fastafiles) != "AAStringSetList"){
+  if(is(fastafiles,"AAStringSetList")){
     sequences = load_seq(fastafiles,ref,id_type,ncores)
   }else{
     sequences = fastafiles

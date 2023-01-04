@@ -141,7 +141,7 @@ count_pair_ali = function(ali){
   return(c('S'=N,'NS'=NS,'G'=INDEL,"I"=IN,"D"=DEL,'L'=L,'L1'=L1,'L2'=L2,"gapped"=GAP))
 }
 
-msa2df = function(MSA_SEQ,REF_NAME,ID,verbose=F){
+msa2df = function(MSA_SEQ,REF_NAME,ID=NULL,verbose=F){
 
   if(is(MSA_SEQ,"AAStringSet")){
     if( n_distinct(widths(MSA_SEQ)) != 1){
@@ -151,6 +151,8 @@ msa2df = function(MSA_SEQ,REF_NAME,ID,verbose=F){
       MSA_SEQ = AAMultipleAlignment(MSA_SEQ)
     }
   }
+
+  if(is.null(ID)){ ID=rownames(MSA_SEQ)[1] }
   if(is.null(REF_NAME)){ REF_NAME=ID }
 
   L = nchar(MSA_SEQ)
@@ -165,7 +167,6 @@ msa2df = function(MSA_SEQ,REF_NAME,ID,verbose=F){
     warning(sprintf("%s\n"), toString(rownames(MSA_SEQ)[IREF]))
     IREF=IREF[1]
     warning(sprintf('First sequence used as reference %s...\n',rownames(MSA_SEQ[IREF])))
-
   }
 
   if(verbose)
