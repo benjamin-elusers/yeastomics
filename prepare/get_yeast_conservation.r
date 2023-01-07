@@ -1,30 +1,52 @@
 source("https://raw.githubusercontent.com/benjamin-elusers/yeastomics/main/src/__setup_yeastomics__.r")
 sgd_len = get.width(load.sgd.proteome()) %>% rename(s288c_len=len)
+evodir = "/data/benjamin/Evolution"
 
 ##### S. cerevisiae isolates ---------------------------------------------------
 yk11.rds =  here('output','evorate-yk11-msa-r4s.rds')
 
 if(!file.exists(yk11.rds)){
 
-  yk11_dir = "/media/WEXAC/1011G/"
-  yk11.fasta = Rfast::read.directory(file.path(yk11_dir,'fasta')) %>%
-               str_subset('\\.fasta$') %>% file.path(yk11_dir,'fasta',.)
-  yk11.msa = load_msa(yk11.fasta,ref = 'S288C')
+  yk11_dir = file.path(evodir,"YK11")
+  yk11.fasta = Rfast::read.directory(file.path(yk11_dir,'aln_s288c')) %>%
+               str_subset('\\.fasta$') %>% file.path(yk11_dir,'aln_s288c',.)
+  yk11.seq = load_seq(yk11.fasta,ref ='S288C', id_type = 'ORF', ncores = 14)
+  yk11.msa = load_msa(yk11.seq,ref = 'S288C')
+
   yk11.r4sfiles = Rfast::read.directory(file.path(yk11_dir,'R4S')) %>%
                   str_subset('raw\\.r4s$') %>% file.path(yk11_dir,'R4S',.)
   yk11.r4s = load_r4s(yk11.r4sfiles)
 
-  yk11.evo = inner_join(yk11.msa,yk11.r4s,
-                            by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
-    group_by(id) %>% mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos)) %>%
-    dplyr::rename(r4s_rate=SCORE) %>%
-    dplyr::select(-c('QQ1','QQ2','STD','MSA')) %>%
-    left_join(sgd_len, by=c('id'='orf'))
+  # yk11.leisrfiles = Rfast::read.directory(file.path(yk11_dir,'LEISR')) %>%
+  #   str_subset('LEISR\\.json$') %>% file.path(yk11_dir,'LEISR',.)
+  #yk11.leisr = load_leisr(yk11.leisrfiles)
+  # yk11.iqtreefiles = Rfast::read.directory(file.path(yk11_dir,'IQTREE')) %>%
+  #   str_subset('\\.mltree$') %>% file.path(yk11_dir,'IQTREE',.)
+  #yk11.iqtree = load_iqtree(yk11.iqtreefiles)
 
-  saveRDS(yk11.evo, yk11.rds)
+  yk11.evo = inner_join(yk11.msa,yk11.r4s,
+                            by=c('id'='ID','msa_pos'='POS')) %>%
+    group_by(id) %>% mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos),
+                             fid = matched/total, fmis=mismatched/total) %>%
+    dplyr::rename(r4s_rate=SCORE, r4s_aa=SEQ, r4s_nmsa=nmsa, r4s_fmsa=fmsa, r4s_fgap=fgap, r4s_nseq=nseq) %>%
+    dplyr::select(-c('QQ1','QQ2','STD','MSA')) %>%
+    left_join(sgd_len, by=c('id'='orf')) %>%
+    relocate(id,msa_pos,ref_pos,ref_gap,ref_aa,r4s_aa,
+             matched,fid, mismatched,fmis, indel,ins,del, total,
+             r4s_nmsa, r4s_fmsa, r4s_fgap, r4s_nseq)
+
+  yk11.data = list()
+  yk11.data[["seq"]] = yk11.seq
+  yk11.data[["msa"]] = yk11.msa
+  yk11.data[["r4s"]] = yk11.r4s
+  yk11.data[["evo"]] = yk11.evo
+
+  saveRDS(yk11.data, yk11.rds)
+  yk11_rds =  file.path(yk11_dir,'evorate-yk11-msa-r4s.rds')
+  saveRDS(yk11.data, yk11_rds)
 }else{
   cat('reading precomputed yk11 data...\n')
-  yk11.evo = readRDS(yk11.rds)
+  yk11.data = readRDS(yk11.rds)
 }
 
 ##### Wapinski Fungi lineage ---------------------------------------------------
@@ -32,58 +54,99 @@ wapinski.rds =  here('output','evorate-wapinski-msa-r4s.rds')
 
 if(!file.exists(wapinski.rds)){
 
-  wapinski_dir = "/media/WEXAC/FUNGI/"
+  wapinski_dir = file.path(evodir,"WAPINSKI")
   wapinski.fasta = Rfast::read.directory(file.path(wapinski_dir,'fasta')) %>%
                    str_subset('\\.fasta$') %>% file.path(wapinski_dir,'fasta',.)
-  wapinski.msa = load_msa(wapinski.fasta,ref = 'Saccharomyces_cerevisiae')
+
+  wapinski.seq = load_seq(wapinski.fasta,ref ='Saccharomyces_cerevisiae', id_type = 'ORF')
+  wapinski.msa = load_msa(wapinski.seq,ref = 'Saccharomyces_cerevisiae')
   wapinski.r4sfiles = Rfast::read.directory(file.path(wapinski_dir,'R4S')) %>%
                    str_subset('raw\\.r4s$') %>% file.path(wapinski_dir,'R4S',.)
   wapinski.r4s = load_r4s(wapinski.r4sfiles)
 
   wapinski.evo = inner_join(wapinski.msa,wapinski.r4s,
-                            by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
-    group_by(id) %>% mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos)) %>%
-    #dplyr::filter(!is.na(ref_pos)) %>%
-    dplyr::rename(r4s_rate=SCORE) %>%
-    dplyr::select(-c('QQ1','QQ2','STD','MSA')) %>%
-    left_join(sgd_len, by=c('id'='orf'))
+                            by=c('id'='ID','msa_pos'='POS')) %>%
+                 group_by(id) %>% mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos),
+                                          fid = matched/total, fmis=mismatched/total) %>%
+                 dplyr::rename(r4s_rate=SCORE, r4s_aa=SEQ, r4s_nmsa=nmsa,
+                               r4s_fmsa=fmsa, r4s_fgap=fgap, r4s_nseq=nseq) %>%
+                 dplyr::select(-c('QQ1','QQ2','STD','MSA')) %>%
+                 left_join(sgd_len, by=c('id'='orf')) %>%
+                 relocate(id,msa_pos,ref_pos,ref_gap,ref_aa,r4s_aa,
+                         matched,fid, mismatched,fmis, indel,ins,del, total,
+                         r4s_nmsa, r4s_fmsa, r4s_fgap, r4s_nseq)
 
-  saveRDS(wapinski.evo, wapinski.rds)
+  wapinski.data = list()
+  wapinski.data[["seq"]] = wapinski.seq
+  wapinski.data[["msa"]] = wapinski.msa
+  wapinski.data[["r4s"]] = wapinski.r4s
+  wapinski.data[["evo"]] = wapinski.evo
+
+  saveRDS(wapinski.data, wapinski.rds)
+  wapinski_rds =  file.path(wapinski_dir,'evorate-yk11-msa-r4s.rds')
+  saveRDS(wapinski.data, wapinski_rds)
 }else{
   cat('reading precomputed wapinski data...\n')
-  wapinski.evo = readRDS(wapinski.rds)
+  wapinski.data = readRDS(wapinski.rds)
 }
 ##### Eggnog Fungi lineage -----------------------------------------------------
 fungi.rds =  here('output','evorate-eggnog_fungi-msa-r4s.rds')
 
-fu_dir = "/media/WEXAC/EGGNOG/4751_Fungi"
+fu_dir = file.path(evodir,"EGGNOG","4751_Fungi")
 clades_dir = Rfast::read.directory(fu_dir) %>% str_subset("sp$")
 
 fungi.data=list()
 i=1
 for( clade in clades_dir){
   cat(i,")",clade,"\n")
-  clade_rds =  here('output',sprintf('evorate-eggnogV5_fungi-%s-msa-r4s.rds',clade))
-
+  clade_rds =  file.path(fu_dir,sprintf('evorate-eggnogV5_fungi-%s-msa-r4s.rds',clade))
   if(!file.exists(clade_rds)){
 
-    clade.fasta = Rfast::read.directory(file.path(fu_dir,clade,'muscle')) %>%
+    clade.fasta = Rfast::read.directory(file.path(fu_dir,clade,'fasta')) %>%
+      str_subset('\\.fasta$') %>% file.path(fu_dir,clade,'fasta',.)
+
+    clade.ali = Rfast::read.directory(file.path(fu_dir,clade,'muscle')) %>%
                   str_subset('\\.mu$') %>% file.path(fu_dir,clade,'muscle',.)
 
-    clade.msa = load_msa(clade.fasta,ref = NULL)
+    clade.seq = load_seq(clade.ali,ref = NULL,id_type = 'filename')
+    clade.msa = load_msa(clade.seq,ref = NULL,id_type = 'filename')
+
+    IDS = clade.data$seq[[xx]] %>% names()
+    A   = clade.data$seq[[xx]]
+    S   = A %>% str_replace_all("\\-","")
+    L   = tibble(len=nchar(S),id=IDS) %>% separate(col='id', sep='\\.',into=c('taxid','string'),remove=F)
+    M   = clade.data$msa %>% filter( id == xx )
+    R   = clade.data$r4s %>% filter(ID == "YMR165C")
+
+    SREF = A$`4932.YMR165C` %>% as.character() %>% str2chr() %>% str_replace_all("\\-","X")
+
+    L %>% filter(taxid=='4932')
+    length(R$SEQ[R$SEQ!="X"])
+    all(R$SEQ == SREF)
+    all(R$SEQ[R$SEQ!="X"] ==  M$ref_aa)
+
+
 
     clade.r4sfiles = Rfast::read.directory(file.path(fu_dir,clade,'r4s_muscle')) %>%
                      str_subset('\\.r4s_raw$') %>% file.path(fu_dir,clade,'r4s_muscle',.)
-    clade.r4s = load_r4s(clade.r4sfiles)
+    clade.r4s = load_r4s(clade.r4sfiles) %>%
+      mutate( ID = str_replace(ID,"(?<=\\.mu).+$","")) # keep ID similar to msa filename
 
     clade.evo = inner_join(clade.msa,clade.r4s,
-                            by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
-                 group_by(id) %>%
-                 mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos)) %>%
-                #dplyr::filter(!is.na(ref_pos)) %>%
-                dplyr::rename(r4s_rate=SCORE) %>%
-                dplyr::select(-c('QQ1','QQ2','STD','MSA'))
+                           by=c('id'='ID','msa_pos'='POS')) %>%
+                separate(sep = "_", into = c('clade_name','OG','protid'), remove=F, col = 'id') %>%
+                group_by(clade_name,OG,id) %>%
+                mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos),
+                        fid = matched/total, fmis=mismatched/total) %>%
+                dplyr::rename(r4s_rate=SCORE, r4s_aa=SEQ, r4s_nmsa=nmsa,
+                              r4s_fmsa=fmsa, r4s_fgap=fgap, r4s_nseq=nseq) %>%
+                dplyr::select(-c('QQ1','QQ2','STD','MSA')) %>%
+                relocate(id,msa_pos,ref_pos,ref_gap,ref_aa,r4s_aa,
+                matched,fid, mismatched,fmis, indel,ins,del, total,
+           r4s_nmsa, r4s_fmsa, r4s_fgap, r4s_nseq)
+
     clade.data = list()
+    clade.data[[clade]][["seq"]] = clade.seq
     clade.data[[clade]][["msa"]] = clade.msa
     clade.data[[clade]][["r4s"]] = clade.r4s
     clade.data[[clade]][["evo"]] = clade.evo
@@ -114,22 +177,25 @@ for( clade in clades_dir){
     clade.fasta = Rfast::read.directory(file.path(mz_dir,clade,'muscle')) %>%
       str_subset('\\.mu$') %>% file.path(mz_dir,clade,'muscle',.)
 
-    clade.seq = read.sequences(clade.fasta,type='AA', strip.fname = T)
-
-    clade.msa = load_msa(clade.fasta,ref = NULL,id_type = 'ENSEMBL')
+    clade.seq = load_seq(clade.fasta,ref = NULL,id_type = 'filename',ncores=1) # force to use regular lapply
+    clade.msa = load_msa(clade.seq,ref = NULL,id_type = 'filename')
 
     clade.r4sfiles = Rfast::read.directory(file.path(mz_dir,clade,'r4s_muscle')) %>%
       str_subset('\\.r4s_raw$') %>% file.path(mz_dir,clade,'r4s_muscle',.)
-    clade.r4s = load_r4s(clade.r4sfiles)
+    clade.r4s = load_r4s(clade.r4sfiles) %>%
+                mutate( ID = str_replace(ID,"(?<=\\.mu).+$","")) # keep ID similar to msa filename
 
     clade.evo = inner_join(clade.msa,clade.r4s,
                            by=c('id'='ID','msa_pos'='POS','ref_aa'='SEQ')) %>%
+      separate(sep = "_", into = c('clade_name','OG','protid'), remove=F, col = 'id') %>%
       group_by(id) %>%
-      mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos)) %>%
+      mutate(clade_n = n_distinct(id), len_ref = max_(ref_pos), len_msa = max_(msa_pos)) %>%
       #dplyr::filter(!is.na(ref_pos)) %>%
       dplyr::rename(r4s_rate=SCORE) %>%
       dplyr::select(-c('QQ1','QQ2','STD','MSA'))
+
     clade.data = list()
+    clade.data[[clade]][["seq"]] = clade.seq
     clade.data[[clade]][["msa"]] = clade.msa
     clade.data[[clade]][["r4s"]] = clade.r4s
     clade.data[[clade]][["evo"]] = clade.evo
@@ -137,14 +203,14 @@ for( clade in clades_dir){
     saveRDS(clade.data[[clade]],clade_rds)
   }else{
     cat('--> Reading precomputed data...\n\n')
-    clade.data = readRDS(clade_rds)
+    #clade.data = readRDS(clade_rds)
     #metazoa.data
   }
   i=i+1
 }
 
 
-
+## ANNOTATION ------------------------------------------------------------------
 sc_annotation = load.annotation()
 sc_identifiers = sc_annotation %>% dplyr::select(UNIPROT,ORF,GENENAME,SGD,OG) %>%
                   dplyr::filter(!duplicated(ORF) & !duplicated(UNIPROT) & !duplicated(SGD) & !duplicated(GENENAME))
