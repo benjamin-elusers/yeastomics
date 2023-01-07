@@ -677,6 +677,7 @@ load_seq = function(fastafiles, ref='S288C',id_type="ORF",
 }
 
 load_msa = function(fastafiles, ref='S288C',id_type="ORF",
+                    remove.na.ref=T,
                     ncores=parallelly::availableCores(which='max')-2){
 
   if(is(fastafiles,"AAStringSetList")){
@@ -684,10 +685,23 @@ load_msa = function(fastafiles, ref='S288C',id_type="ORF",
   }else{
     sequences = load_seq(fastafiles,ref,id_type,ncores)
   }
+  lref = length(ref)
+  N = length(sequences)
+  if(lref == 1){
+    reference_ids = setNames(rep(ref,N), names(sequences))
+  }else if(lref>1){
+    if(lref==N){
+      reference_ids = ref
+    }else{
+      # Use the first identifier sequence
+      reference_ids = sapply(sequences, function(x){ names(x)[1]})
+    }
+  }
 
+  #ref = names(sequences)[1]
   tictoc::tic("Compute alignment statistics...")
   message('--> Compute statistics from sequence alignment...')
-  id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=ref, ID=x,verbose=F) }
+  id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=reference_ids[x], ID=x,verbose=F) }
   list_df_seq=list()
   if(require(pbmcapply)){
     library(pbmcapply)
@@ -704,8 +718,11 @@ load_msa = function(fastafiles, ref='S288C',id_type="ORF",
       i=i+1
     }
   }
-
-  df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
+  if(remove.na.ref){
+    df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
+  }else{
+    df_seq = list_df_seq %>% bind_rows()
+  }
   tictoc::toc()
   return(df_seq)
 }
