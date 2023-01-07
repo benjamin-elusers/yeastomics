@@ -9,6 +9,9 @@ fudir = here::here("data","eggnog","4751_Fungi")
 mzdir = here::here("data","eggnog","33208_Metazoa")
 fu_wexac="/media/WEXAC/EGGNOG/4751_Fungi"
 mz_wexac="/media/WEXAC/EGGNOG/33208_Metazoa"
+outdir="/data/benjamin/Evolution/EGGNOG/"
+fu_out=file.path(outdir,"4751_Fungi")
+mz_out=file.path(outdir,"33208_Metazoa")
 
 count.fasta = function(fastafile){
   return(sum(grepl("^>",readLines(fastafile))))
@@ -33,23 +36,14 @@ find.muscle = function(directory){
   return( find.file(file.path(directory,"muscle"),"\\.mu$") )
 }
 
-count.muscle = function(directory){
-  cat(sprintf("count muscle alignments %s...\n",basename(directory)))
-  return( count.file(file.path(directory,"muscle"),"\\.mu$") )
-}
-
 find.trimal = function(directory,params=c(10,20,50,80,'pyout')){
   cat(sprintf("get trimal result files %s...\n",basename(directory)))
   params = paste0("trimal_gap",params)
-  map(params, ~find.file(file.path(directory,.x), paste0("\\.",.x,"$"))) %>%
-    set_names(nm = paste0("files_",params)) %>% as_tibble()
-}
-
-count.trimal = function(directory,params=c(10,20,50,80,'pyout')){
-  cat(sprintf("count trimal results %s...\n",basename(directory)))
-  params = paste0("trimal_gap",params)
-  map(params, ~count.file(file.path(directory,.x), paste0("\\.",.x,"$"))) %>%
-    set_names(nm = paste0("n_",params)) %>% as_tibble()
+  files = map(params, ~find.file(file.path(directory,.x), paste0("\\.",.x,"$"))) %>%
+          set_names(nm = paste0("files_",params))
+  n=map(files,n_distinct) %>% unique
+  if( length(n) == 1){ return(files %>% as_tibble())  }
+  return(files)
 }
 
 find.r4s = function(directory,params=c(10,20,50,80,'pyout')){
@@ -58,26 +52,18 @@ find.r4s = function(directory,params=c(10,20,50,80,'pyout')){
   r4s_dir = str_replace(trimal_params,"trimal","r4s") %>% str_replace("notrim","r4s_muscle")
 
   r4s_ext="\\.eggnog_sptree\\.r4s_raw"
-  map(seq(trimal_params), ~find.file(directory = file.path(directory,r4s_dir[.x]),
+  files = map(seq(trimal_params),~find.file(directory = file.path(directory,r4s_dir[.x]),
                                fileext = paste0("\\.",trimal_params[.x],r4s_ext,"$"))) %>%
-    set_names(nm = paste0("n_",trimal_params)) %>% as_tibble()
-}
-
-count.r4s = function(directory,params=c(10,20,50,80,'pyout')){
-  cat(sprintf("count rate4site results %s...\n",basename(directory)))
-  trimal_params = paste0("trimal_gap",params) %>% str_replace("trimal_gap0","notrim")
-  r4s_dir = str_replace(trimal_params,"trimal","r4s") %>% str_replace("notrim","r4s_muscle")
-
-  r4s_ext="\\.eggnog_sptree\\.r4s_raw"
-  map(seq(trimal_params), ~count.file(directory = file.path(directory,r4s_dir[.x]),
-                               fileext = paste0("\\.",trimal_params[.x],r4s_ext,"$"))) %>%
-    set_names(nm = paste0("n_",trimal_params)) %>% as_tibble()
+          set_names(nm = paste0("n_",trimal_params))
+  n=map(files,n_distinct) %>% unique
+  if( length(n) == 1){ return(files %>% as_tibble())  }
+  return(files)
 }
 
 clade_regex="[0-9]+_[a-zA-Z]+_[0-9]+sp"
 col_clade = paste0("clade_",c("id","name","ns"))
 
-NODE_DIR = mz_wexac
+NODE_DIR = fu_out
 clades = list.dirs(NODE_DIR,recursive = F) %>% basename %>% str_subset(clade_regex)
 df_clade = tibble(clade_desc=clades) %>%
            separate(col='clade_desc', into=col_clade, sep = "_", remove=F) %>%
@@ -86,7 +72,21 @@ df_clade = tibble(clade_desc=clades) %>%
 
 muscle_files = pbmcapply::pbmcmapply(find.muscle,df_clade$resdir, mc.cores=14, SIMPLIFY=F)
 trimal_files = pbmcapply::pbmcmapply(find.trimal,MoreArgs=list(params=c(10,20)), df_clade$resdir, mc.cores=14, SIMPLIFY=F )
-r4s_files    = pbmcapply::pbmcmapply(find.r4s,MoreArgs=list(params=c(0,10,20)), df_clade$resdir, mc.cores=14, SIMPLIFY=F )
+r4s_files    = pbmcapply::pbmcmapply(find.r4s,MoreArgs=list(params=c(0,10,20)), df_clade$resdir, mc.cores=14, SIMPLIFY=F)
+
+# purrr::flatten(muscle_files) %>%
+#   str_detect("^/data/benjamin/Evolution/EGGNOG//33208_Metazoa/.+/muscle/.+_1to1-orthologs\\.mu$") %>%
+#   mean
+#
+# trimal_files %>% purrr::flatten() %>% purrr::flatten() %>% unlist %>%
+#   str_detect("^/data/benjamin/Evolution/EGGNOG//33208_Metazoa/.+/trimal_gap[0-9]+/.+_1to1-orthologs\\.mu\\.trimal_gap[0-9]+$") %>%
+#   mean
+#
+# test= r4s_files %>% purrr::flatten() %>% purrr::flatten() %>% unlist
+# test %>%
+#   str_detect("^/data/benjamin/Evolution/EGGNOG//33208_Metazoa/.+/r4s_.+/.+_1to1-orthologs.+\\.eggnog_sptree\\.r4s_raw$") %>%
+#   mean
+
 
 df_clade$muscle_files = muscle_files
 df_clade$trimal_files = trimal_files
@@ -99,7 +99,12 @@ df_clade$n_r4s = map_dfr(df_clade$r4s_files, ~map_df(.x,n_distinct))
 
 df_clade$n_muscle - df_clade$n_trimal
 df_clade$n_muscle - df_clade$n_r4s
-saveRDS(df_clade,file=here::here("data/eggnog","33208_Metazoa-eggnog-results.rds"))
+
+if(NODE_DIR==fu_out){
+  saveRDS(df_clade,file=here::here("data/eggnog","4751_Fungi-eggnog-results.rds"))
+}else if(NODE_DIR==mz_out){
+  saveRDS(df_clade,file=here::here("data/eggnog","33208_Metazoa-eggnog-results.rds"))
+}
 #save.image(here::here("data/eggnog","4751_Fungi-eggnog-results.rdata"))
 #
 # clade_desc = dirname(muscle_files) %>% str_extract(clade_regex)
