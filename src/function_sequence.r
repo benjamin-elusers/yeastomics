@@ -97,9 +97,9 @@ count.fasta = function(fastafile){
   return(sum(grepl("^>",readLines(fastafile))))
 }
 
-get.orf.fasta = function(fastafile){
+get.fasta.names= function(fastafile){
   library(Biostrings)
-  fasta = Biostrings::readAAStringSet(fastafile)
+  fasta = Biostrings::readAAStringSet(fastafile, format = 'fasta')
   return(names(fasta))
 }
 
@@ -144,7 +144,7 @@ read.sequences = function(seqfiles,strip.fname=F,ncores=parallelly::availableCor
     if(!.pb$finished){ .pb$tick(tokens=list(what=.pb.toprint)) }
     #return( biomartr::read_proteome(file,format,obj.type,...) )
     if(seqtype == 'AA'){
-      return(Biostrings::readAAStringSet(file, format = 'fasta' ))
+      return(Biostrings::readAAStringSet(file, format = 'fasta'))
     }else if(seqtype == 'DNA'){
       return(Biostrings::readDNAStringSet(file, format = 'fasta' ))
     }
