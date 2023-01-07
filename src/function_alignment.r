@@ -152,42 +152,54 @@ msa2df = function(MSA_SEQ,REF_NAME,ID=NULL,verbose=F){
     }
   }
 
-  if(is.null(ID)){ ID=rownames(MSA_SEQ)[1] }
-  if(is.null(REF_NAME)){ REF_NAME=ID }
 
-  L = nchar(MSA_SEQ)
-  N = length(unmasked(MSA_SEQ))
-  IREF = grep(REF_NAME,rownames(MSA_SEQ)) # which(rownames(MSA_SEQ) %in% REF_NAME)
-  if(length(IREF) == 0){
-    IREF = 1
-    warning(sprintf('Reference name %s not found.\n',REF_NAME))
-    warning(sprintf('First sequence used as reference %s...',rownames(MSA_SEQ)[IREF]))
-  }else if(length(IREF) > 1){
-    warning(sprintf('Refrence name matched %s sequence identifiers.\n',length(IREF)))
-    warning(sprintf("%s\n"), toString(rownames(MSA_SEQ)[IREF]))
-    IREF=IREF[1]
-    warning(sprintf('First sequence used as reference %s...\n',rownames(MSA_SEQ[IREF])))
+  NC = nchar(MSA_SEQ)
+  NS = nrow(MSA_SEQ)
+  NAMES = rownames(MSA_SEQ)
+  IREF = 1 ## default to use the first sequence in the alignment
+
+  if(is.null(ID)){ stop("The msa should have an identifier (e.g. filename)") }
+
+  if( is.character(REF_NAME) ){
+    IREF = grep(REF_NAME,NAMES)
+    if(length(IREF) == 0){
+      IREF = 1
+      warning(sprintf('Reference name %s not found.\n',REF_NAME))
+      warning(sprintf('First sequence used as reference %s...',NAMES[IREF]))
+    }else if(length(IREF)>1){
+      warning(sprintf('Refrence name matched %s sequence identifiers.\n',length(IREF)))
+      warning(sprintf("%s\n"), toString(NAMES[IREF]))
+      IREF = select.list(title = 'pick the reference sequence to use:',
+                         multiple=F, preselect=NAMES[IREF][1], choices=NAMES[IREF])
+    }
+  }else if( is_integer(REF_NAME) && between(REF_NAME,1,NS) ){
+    IREF = REF_NAME
+  }else{
+    IREF=1
   }
+  REF = NAMES[IREF]
 
   if(verbose)
-    message(ID)
+    message(paste("msa=",ID," ref ->", REF))
 
-  MSA = as.matrix(MSA_SEQ)
-  REF = MSA[IREF,]
-  REFMAT = matrix(REF,nrow = N-1, ncol=L,byrow=T)
+  MSAFULL = as.matrix(MSA_SEQ)
+  REFSEQ = MSAFULL[IREF,]
+  MSA_NOREF = MSAFULL[-IREF,]
+  REFMAT = matrix(REFSEQ,nrow = NS-1, ncol=NC,byrow=T)
 
   CONSENSUS =  consensusMatrix(MSA_SEQ)
   iref_aa=match(REF,rownames(CONSENSUS))
 
-  df_msa = tibble( id = ID,
-                   ref_aa  = REF,
-                   ref_gap = REF == "-",
-                   msa_pos = 1:L,
-                   matched = CONSENSUS[iref_aa + (seq_along(REF)-1) * nrow(CONSENSUS)],
-                   mismatched = colSums(REFMAT != MSA[-IREF,] & MSA[-IREF,]!="-" & REFMAT!="-"),
-                   indel = colSums( xor(MSA[-IREF,]=='-',REFMAT=="-") ),
-                   ins = colSums(REFMAT=="-" & MSA[-IREF,]!="-"),
-                   del  = colSums(REFMAT!="-" & MSA[-IREF,]=="-")
+  df_msa = tibble( idfile = ID,
+                   id     = REF,
+                   ref_aa  = REFSEQ,
+                   ref_gap = REFSEQ == "-",
+                   msa_pos = 1:NC,
+                   matched = CONSENSUS[iref_aa + (seq_along(REFSEQ)-1) * nrow(CONSENSUS)],
+                   mismatched = colSums(REFMAT != MSA_NOREF & MSA_NOREF!="-" & REFMAT!="-"),
+                   indel = colSums( xor(MSA_NOREF=='-',REFMAT=="-") ),
+                   ins = colSums(REFMAT=="-" & MSA_NOREF!="-"),
+                   del  = colSums(REFMAT!="-" & MSA_NOREF=="-")
     ) %>%
     group_by(ref_gap) %>% mutate(ref_pos = ifelse(ref_gap, NA, row_number() ) ) %>%
     rowwise() %>% mutate( total = sum(c_across(cols = c(indel,matched,mismatched))) )
