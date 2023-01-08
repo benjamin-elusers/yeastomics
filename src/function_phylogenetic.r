@@ -262,8 +262,8 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   #gsub("(?<=\\[)(\\s+)","",x = .,perl = T) # Remove spaces after bracket
   #gsub("(\\s+)(?=\\])","",x = .,perl = T) # Remove spaces before bracket
   df.r4s = readr::read_table(file = clean_r4s, comment = '#', col_names = r4s_col_in_file) %>%
-    mutate( ID = id ) %>%
-    dplyr::relocate(ID,POS,SEQ,SCORE) %>%
+    mutate( ID = id, IDFILE = basename(r4s)) %>%
+    dplyr::relocate(IDFILE,ID,POS,SEQ,SCORE) %>%
     as_tibble() %>%
     janitor::clean_names('screaming_snake') %>%
     separate(col=MSA, into=c('nmsa','nseq'), remove=F, sep='/',convert = T) %>%
