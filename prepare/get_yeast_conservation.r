@@ -103,34 +103,47 @@ for( clade in clades_dir){
   if(!file.exists(clade_rds)){
 
     clade.fasta = Rfast::read.directory(file.path(fu_dir,clade,'fasta')) %>%
-      str_subset('\\.fasta$') %>% file.path(fu_dir,clade,'fasta',.)
+      str_subset('\\.fa$') %>% file.path(fu_dir,clade,'fasta',.)
+    ncores=14
+    message(sprintf("Retrieving orthologs identifiers by order of reference using %s cpus",ncores))
+    clade.ids = pbmcapply::pbmclapply(FUN=get.fasta.names, clade.fasta, mc.cores=ncores,
+                                      mc.silent=F, mc.cleanup = T) %>%
+                purrr::map(.,pluck,1) %>%
+                set_names(nm=basename(clade.fasta) %>%str_replace('.fa$','.mu'))
 
     clade.ali = Rfast::read.directory(file.path(fu_dir,clade,'muscle')) %>%
                   str_subset('\\.mu$') %>% file.path(fu_dir,clade,'muscle',.)
 
-    clade.seq = load_seq(clade.ali,ref = NULL,id_type = 'filename')
-    clade.msa = load_msa(clade.seq,ref = NULL,id_type = 'filename')
+    seqnames = intersect(basename(clade.ali),names(clade.ids))
+    clade.seq = load_seq(clade.ali,ref = clade.ids, id_type = 'filename')
 
-    IDS = clade.data$seq[[xx]] %>% names()
-    A   = clade.data$seq[[xx]]
+    fastafiles=clade.seq[seqnames][1:10]
+    ref= clade.ids[seqnames][1:10]
+    clade.msa = load_msa(fastafiles,ref=ref, id_type = 'filename', remove.na.ref = T,ncores = 14)
+
+    xx = runif(1, min = 1,max=length(clade.seq))
+    msafile = clade.ali[xx] %>% basename
+    IDS = clade.seq[[msafile]] %>% names()
+    A   = clade.seq[[msafile]]
     S   = A %>% str_replace_all("\\-","")
-    L   = tibble(len=nchar(S),id=IDS) %>% separate(col='id', sep='\\.',into=c('taxid','string'),remove=F)
-    M   = clade.data$msa %>% filter( id == xx )
-    R   = clade.data$r4s %>% filter(ID == "YMR165C")
+    refid = clade.ids[[ msafile ]]
 
-    SREF = A$`4932.YMR165C` %>% as.character() %>% str2chr() %>% str_replace_all("\\-","X")
+    L   = tibble(len=nchar(S),id=IDS) %>% separate(col='id', sep='\\.',into=c('taxid','string'),remove=F)
+
+    refstring = L$string[ L$id == refid ]
+    M   = clade.msa %>% filter( id == msafile )
+    R   = clade.r4s %>% filter(ID == refstring)
+    SREF = A[[refid]] %>% as.character() %>% str2chr() %>% str_replace_all("\\-","X")
 
     L %>% filter(taxid=='4932')
     length(R$SEQ[R$SEQ!="X"])
     all(R$SEQ == SREF)
     all(R$SEQ[R$SEQ!="X"] ==  M$ref_aa)
 
-
-
     clade.r4sfiles = Rfast::read.directory(file.path(fu_dir,clade,'r4s_muscle')) %>%
                      str_subset('\\.r4s_raw$') %>% file.path(fu_dir,clade,'r4s_muscle',.)
     clade.r4s = load_r4s(clade.r4sfiles) %>%
-      mutate( ID = str_replace(ID,"(?<=\\.mu).+$","")) # keep ID similar to msa filename
+                 mutate( ID = str_replace(ID,"(?<=\\.mu).+$","")) # keep ID similar to msa filename
 
     clade.evo = inner_join(clade.msa,clade.r4s,
                            by=c('id'='ID','msa_pos'='POS')) %>%
