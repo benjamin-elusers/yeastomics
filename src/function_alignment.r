@@ -152,7 +152,6 @@ msa2df = function(MSA_SEQ,REF_NAME,ID=NULL,verbose=F){
     }
   }
 
-
   NC = nchar(MSA_SEQ)
   NS = nrow(MSA_SEQ)
   NAMES = rownames(MSA_SEQ)
