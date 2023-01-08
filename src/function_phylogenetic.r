@@ -685,6 +685,7 @@ load_msa = function(fastafiles, ref='S288C',id_type="ORF",
   }else{
     sequences = load_seq(fastafiles,ref,id_type,ncores)
   }
+
   lref = length(ref)
   N = length(sequences)
   if(lref == 1){
@@ -701,12 +702,12 @@ load_msa = function(fastafiles, ref='S288C',id_type="ORF",
   #ref = names(sequences)[1]
   tictoc::tic("Compute alignment statistics...")
   message('--> Compute statistics from sequence alignment...')
-  id_msa2df = function(x,SEQLIST=sequences){  msa2df(SEQLIST[[x]],REF_NAME=reference_ids[x], ID=x,verbose=F) }
   list_df_seq=list()
   if(require(pbmcapply)){
     library(pbmcapply)
     message(sprintf("using 'pbmcapply' to track progress in parallel across %s cpus",ncores))
-    list_df_seq = pbmclapply(X = names(sequences), FUN = id_msa2df, SEQLIST=sequences,
+    list_df_seq = pbmclapply(X = names(sequences),
+                             FUN = function(xx){ msa2df(MSA_SEQ=sequences[[xx]], REF_NAME=reference_ids[[xx]], ID=xx, verbose = T) },
                              mc.cores = ncores, mc.silent=F, mc.cleanup = T)
   }else{
     i=1
@@ -718,6 +719,8 @@ load_msa = function(fastafiles, ref='S288C',id_type="ORF",
       i=i+1
     }
   }
+
+
   if(remove.na.ref){
     df_seq = list_df_seq %>% bind_rows() %>% dplyr::filter(!is.na(ref_pos))
   }else{
