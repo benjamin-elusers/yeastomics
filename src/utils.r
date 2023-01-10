@@ -661,13 +661,13 @@ lf <- function(path = ".", maxdepth = 0L, pattern = NULL, all.files = FALSE, inc
     c(fn, unlist(l, FALSE, FALSE))
 }
 
-find.files = function(directory, pattern, full.names=T){
+find.files = function(directory, pattern, full=T){
 # shorthand for non-recursive list.files() (depth=0)
-  list.files(directory, pattern=pattern, full.names=full.names, recursive=F)
+  list.files(directory, pattern=pattern, full.names=full, recursive=F)
 }
 
-find.fasta = function(directory,full.names=T){
-  find.files(directory=directory,pattern="\\.(fa|fas|fasta)$",full.names=full.names)
+find.fasta = function(directory,full=T){
+  find.files(directory=directory,pattern="\\.(fa|fas|fasta)$",full=full)
 }
 
 
