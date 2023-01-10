@@ -635,6 +635,31 @@ get_source_path <- function(){
 
 
 # shorthands -------------------------------------------------------------------
+lf <- function(path = ".", maxdepth = 0L, pattern = NULL, all.files = FALSE, include.dirs = FALSE) {
+  # https://stackoverflow.com/questions/70957718/how-to-list-files-until-n-level-deep-subdirectory-in-r
+  # example: lf(".", maxdepth = n, pattern = "[.]xlsx$")
+    fn <- list.files(path, pattern = pattern, all.files = all.files, full.names = TRUE, no.. = TRUE)
+    dn <- list.dirs(path, full.names = TRUE, recursive = FALSE)
+    fn <- fn[match(fn, dn, 0L) == 0L]
+    if (!all.files) {
+      dn <- dn[grepl("^[^.]", basename(dn))]
+    }
+    if (length(dn) == 0L) {
+      return(fn)
+    }
+    if (maxdepth < 1L) {
+      if (include.dirs) {
+        return(c(fn, dn))
+      } else {
+        return(fn)
+      }
+    }
+    l <- lapply(dn, lf, maxdepth = maxdepth - 1L, pattern = pattern, all.files = all.files, include.dirs = include.dirs)
+    if (include.dirs) {
+      l <- Map(c, dn, l, USE.NAMES = FALSE)
+    }
+    c(fn, unlist(l, FALSE, FALSE))
+}
 
 get_rows_by_keyword = function(word,df){
   library(tidyverse)
@@ -688,7 +713,6 @@ make_dataframe = function(col_names,n_rows=0,def_val=NA){
   df = setNames( data.frame(matrix(data = def_val,nrow = n_rows, ncol=nc)), nm = col_names)
   return(df)
 }
-
 
 ht = function(d, n = 6){ rbind(head(d, n), tail(d, n)) }  # ht == headtail
 hh = function(d){ d[1:5, 1:5] } # show the first 5 rows & first 5 columns of a data frame
