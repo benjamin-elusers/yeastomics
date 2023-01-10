@@ -661,6 +661,16 @@ lf <- function(path = ".", maxdepth = 0L, pattern = NULL, all.files = FALSE, inc
     c(fn, unlist(l, FALSE, FALSE))
 }
 
+find.files = function(directory, pattern, full.names=T){
+# shorthand for non-recursive list.files() (depth=0)
+  list.files(directory, pattern=pattern, full.names=full.names, recursive=F)
+}
+
+find.fasta = function(directory,full.names=T){
+  find.files(directory=directory,pattern="\\.(fa|fas|fasta)$",full.names=full.names)
+}
+
+
 get_rows_by_keyword = function(word,df){
   library(tidyverse)
   rows = df |> dplyr::filter(dplyr::if_any(everything(),stringr::str_detect, paste0("(?i)",as.character(word))))
