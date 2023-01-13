@@ -3,13 +3,14 @@ sgd_len = get.width(load.sgd.proteome()) %>% rename(s288c_len=len)
 evodir = "/data/benjamin/Evolution"
 
 ##### S. cerevisiae isolates ---------------------------------------------------
-yk11.rds =  here('output','evorate-yk11-msa-r4s.rds')
+yk11_dir = file.path(evodir,"YK11")
+#yk11.rds =  here('output','evorate-yk11-msa-r4s.rds')
+yk11_rds =  file.path(yk11_dir,'evorate-yk11-msa-r4s.rds')
 
-if(!file.exists(yk11.rds)){
+if(!file.exists(yk11_rds)){
 
-  yk11_dir = file.path(evodir,"YK11")
-  yk11.fasta = Rfast::read.directory(file.path(yk11_dir,'aln_s288c')) %>%
-               str_subset('\\.fasta$') %>% file.path(yk11_dir,'aln_s288c',.)
+  yk11.fasta = find.fasta(file.path(yk11_dir,'aln_s288c'),"\\.fasta$")
+
   yk11.seq = load_seq(yk11.fasta,ref ='S288C', id_type = 'ORF', ncores = 14)
   yk11.msa = load_msa(yk11.seq,ref = 'S288C')
 
@@ -42,7 +43,6 @@ if(!file.exists(yk11.rds)){
   yk11.data[["evo"]] = yk11.evo
 
   saveRDS(yk11.data, yk11.rds)
-  yk11_rds =  file.path(yk11_dir,'evorate-yk11-msa-r4s.rds')
   saveRDS(yk11.data, yk11_rds)
 }else{
   cat('reading precomputed yk11 data...\n')
@@ -83,7 +83,7 @@ if(!file.exists(wapinski.rds)){
   wapinski.data[["evo"]] = wapinski.evo
 
   saveRDS(wapinski.data, wapinski.rds)
-  wapinski_rds =  file.path(wapinski_dir,'evorate-yk11-msa-r4s.rds')
+  wapinski_rds =  file.path(wapinski_dir,wapinski.rds)
   saveRDS(wapinski.data, wapinski_rds)
 }else{
   cat('reading precomputed wapinski data...\n')
@@ -93,34 +93,38 @@ if(!file.exists(wapinski.rds)){
 fungi.rds =  here('output','evorate-eggnog_fungi-msa-r4s.rds')
 
 fu_dir = file.path(evodir,"EGGNOG","4751_Fungi")
-clades_dir = Rfast::read.directory(fu_dir) %>% str_subset("sp$")
+clades_dir = list.dirs(fu_dir,recursive = F,full.names = F) %>% str_subset("sp$")
 
 fungi.data=list()
 i=1
+
 for( clade in clades_dir){
   cat(i,")",clade,"\n")
   clade_rds =  file.path(fu_dir,sprintf('evorate-eggnogV5_fungi-%s-msa-r4s.rds',clade))
   if(!file.exists(clade_rds)){
 
-    clade.fasta = Rfast::read.directory(file.path(fu_dir,clade,'fasta')) %>%
-      str_subset('\\.fa$') %>% file.path(fu_dir,clade,'fasta',.)
+    fasta_dir = file.path(fu_dir,clade,'fasta')
+    fasta_ext = '\\.fa$'
+    clade.fasta = list.files(fasta_dir, fasta_ext, full.names=T, recursive=F)
     ncores=14
     message(sprintf("Retrieving orthologs identifiers by order of reference using %s cpus",ncores))
     clade.ids = pbmcapply::pbmclapply(FUN=get.fasta.names, clade.fasta, mc.cores=ncores) %>%
                 purrr::map(.,pluck,1) %>%
                 set_names(nm=basename(clade.fasta) %>%str_replace('.fa$','.mu'))
 
-    clade.ali = Rfast::read.directory(file.path(fu_dir,clade,'muscle')) %>%
-                  str_subset('\\.mu$') %>% file.path(fu_dir,clade,'muscle',.)
+    muscle_dir=file.path(fu_dir,clade,'muscle')
+    muscle_ext='\\.mu$'
+    clade.ali = list.files(muscle_dir,muscle_ext,full.names=T, recursive = F)
 
     seqnames = intersect(basename(clade.ali),names(clade.ids))
     clade.seq = load_seq(clade.ali,ref = clade.ids, id_type = 'filename')
     clade.msa = load_msa(clade.seq[seqnames],ref=clade.ids[seqnames], id_type = 'filename')
 
-    clade.r4sfiles = Rfast::read.directory(file.path(fu_dir,clade,'r4s_muscle')) %>%
-                     str_subset('\\.r4s_raw$') %>% file.path(fu_dir,clade,'r4s_muscle',.)
+    r4s_dir = file.path(fu_dir,clade,'r4s_muscle')
+    r4s_ext = '\\.r4s_raw$'
+    clade.r4sfiles = list.files(r4s_dir,r4s_ext,full.names=T, recursive=F)
     clade.r4s = load_r4s(clade.r4sfiles) %>%
-                 mutate( IDFILE = str_replace(basename(clade.r4sfiles),"(?<=\\.mu).+$","")) # keep ID similar to msa filename
+                 mutate( IDFILE = str_replace(IDFILE,"(?<=\\.mu).+$",""))
 
     clade.evo = inner_join(clade.msa,clade.r4s,
                            by=c('idfile'='IDFILE','msa_pos'='POS')) %>%
@@ -128,12 +132,14 @@ for( clade in clades_dir){
                 group_by(clade_name,OG,id) %>%
                 mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos),
                         fid = matched/total, fmis=mismatched/total) %>%
-                dplyr::rename(r4s_rate=SCORE, r4s_aa=SEQ, r4s_nmsa=nmsa,
+                dplyr::rename(r4s_rate=SCORE,r4s_aa=SEQ, r4s_nmsa=nmsa,
                               r4s_fmsa=fmsa, r4s_fgap=fgap, r4s_nseq=nseq) %>%
                 dplyr::select(-c('QQ1','QQ2','STD','MSA')) %>%
-                relocate(id,msa_pos,ref_pos,ref_gap,ref_aa,r4s_aa,
-                matched,fid, mismatched,fmis, indel,ins,del, total,
-           r4s_nmsa, r4s_fmsa, r4s_fgap, r4s_nseq)
+                relocate(idfile,clade_name,OG,
+                         protid,id,ID,
+                         msa_pos,ref_pos,ref_gap,ref_aa,r4s_aa,
+                         matched,fid, mismatched,fmis, indel,ins,del, total,
+                         r4s_nmsa, r4s_fmsa, r4s_fgap, r4s_nseq)
 
     clade.data = list()
     clade.data[[clade]][["seq"]] = clade.seq
@@ -154,46 +160,73 @@ for( clade in clades_dir){
 metazoa.rds =  here('output','evorate-eggnog_metazoa-msa-r4s.rds')
 
 mz_dir = "/data/benjamin/Evolution/EGGNOG/33208_Metazoa"
-clades_dir = Rfast::read.directory(mz_dir) %>% str_subset("sp$")
+clades_dir = list.dirs(mz_dir,full.names = F, recursive = F) %>% str_subset("sp$")
+
+#i=str_which(clades_dir,'Mammalia') #
 
 metazoa.data=list()
 i=1
+#clade = clades_dir[i]
 for( clade in clades_dir){
   cat(i,")",clade,"\n")
   clade_rds =  file.path(mz_dir,sprintf('evorate-eggnogV5_metazoa-%s-msa-r4s.rds',clade))
 
   if(!file.exists(clade_rds)){
 
-    clade.fasta = Rfast::read.directory(file.path(mz_dir,clade,'fasta')) %>%
-      str_subset('\\.fa$') %>% file.path(mz_dir,clade,'fasta',.)
-
+    fasta_dir = file.path(mz_dir,clade,'fasta')
+    fasta_ext = '\\.fa$'
+    clade.fasta = list.files(fasta_dir, fasta_ext, full.names=T, recursive=F)
     ncores=14
     message(sprintf("Retrieving orthologs identifiers by order of reference using %s cpus",ncores))
-    clade.ids = pbmcapply::pbmclapply(FUN=get.fasta.names, clade.fasta, mc.cores=ncores) %>%
-                purrr::map(.,pluck,1) %>%
-                set_names(nm=basename(clade.fasta) %>% str_replace('.fa$','.mu'))
+    clade.ids = pbmcapply::pbmcmapply(FUN=get.fasta.names, clade.fasta, mc.cores=14,SIMPLIFY=F) %>%
+      purrr::map(.,pluck,1) %>%
+      set_names(nm=basename(clade.fasta) %>%str_replace('.fa$','.mu'))
+    saveRDS(clade.ids,file.path(mz_dir,sprintf('%s-ids.rds',clade)))
 
-    clade.ali = Rfast::read.directory(file.path(mz_dir,clade,'muscle')) %>%
-                str_subset('\\.mu$') %>% file.path(mz_dir,clade,'muscle',.)
+    muscle_dir=file.path(mz_dir,clade,'muscle')
+    muscle_ext='\\.mu$'
+    clade.ali = list.files(muscle_dir,muscle_ext,full.names=T, recursive = F)
 
     seqnames = intersect(basename(clade.ali),names(clade.ids))
     clade.seq = load_seq(clade.ali,ref = clade.ids, id_type = 'filename')
-    clade.msa = load_msa(clade.seq[seqnames],ref=clade.ids[seqnames], id_type = 'filename')
+    saveRDS(clade.seq,file.path(mz_dir,sprintf('%s-seq.rds',clade)))
 
-    clade.r4sfiles = Rfast::read.directory(file.path(mz_dir,clade,'r4s_muscle')) %>%
-      str_subset('\\.r4s_raw$') %>% file.path(mz_dir,clade,'r4s_muscle',.)
-    clade.r4s = load_r4s(clade.r4sfiles) %>%
-                mutate( ID = str_replace(ID,"(?<=\\.mu).+$","")) # keep ID similar to msa filename
+    clade.msa = load_msa(clade.seq[seqnames],ref=clade.ids[seqnames], id_type = 'filename')
+    saveRDS(clade.msa,file.path(mz_dir,sprintf('%s-msa.rds',clade)))
+    rm(clade.seq)
+    rm(clade.msa)
+    gc()
+
+    r4s_dir = file.path(mz_dir,clade,'r4s_muscle')
+    r4s_ext = '\\.r4s_raw$'
+    clade.r4sfiles = list.files(r4s_dir,r4s_ext,full.names=T, recursive=F)
+    errIO = pbmcapply::pbmclapply(clade.r4sfiles, mc.cores=14,
+                                  function(x){ if( length(readLines(x,n=10))==0 ){ return(x) }}) %>%
+            purrr::compact() %>% unlist() %>% unlink()
+    clade.r4sfiles = list.files(r4s_dir,r4s_ext,full.names=T, recursive=F)
+
+    clade.r4s = load_r4s(clade.r4sfiles,ncores = 10) %>% # 9426
+      mutate( IDFILE = str_replace(IDFILE,"(?<=\\.mu).+$",""))
+      #group_by(IDFILE) %>% nest(col=-IDFILE)
+    saveRDS(clade.r4s,file.path(mz_dir,sprintf('%s-r4s_muscle.rds',clade)))
+
+    clade.msa=readRDS(file.path(mz_dir,sprintf('%s-msa.rds',clade)))
+    clade.seq=readRDS(file.path(mz_dir,sprintf('%s-seq.rds',clade)))
 
     clade.evo = inner_join(clade.msa,clade.r4s,
-                           by=c('idfile'='ID','msa_pos'='POS')) %>%
+                           by=c('idfile'='IDFILE','msa_pos'='POS')) %>%
       separate(sep = "_", into = c('clade_name','OG','protid'), remove=F, col = 'idfile') %>%
-      group_by(id) %>%
-      mutate(clade_n = n_distinct(id), len_ref = max_(ref_pos), len_msa = max_(msa_pos)) %>%
-      #dplyr::filter(!is.na(ref_pos)) %>%
-      dplyr::rename(r4s_rate=SCORE) %>%
-      dplyr::select(-c('QQ1','QQ2','STD','MSA'))
-
+      group_by(clade_name,OG,id) %>%
+      mutate( len_ref = max_(ref_pos), len_msa = max_(msa_pos),
+              fid = matched/total, fmis=mismatched/total) %>%
+      dplyr::rename(r4s_rate=SCORE,r4s_aa=SEQ, r4s_nmsa=nmsa,
+                    r4s_fmsa=fmsa, r4s_fgap=fgap, r4s_nseq=nseq) %>%
+      dplyr::select(-c('QQ1','QQ2','STD','MSA')) %>%
+      relocate(idfile,clade_name,OG,
+               protid,id,ID,
+               msa_pos,ref_pos,ref_gap,ref_aa,r4s_aa,
+               matched,fid, mismatched,fmis, indel,ins,del, total,
+               r4s_nmsa, r4s_fmsa, r4s_fgap, r4s_nseq)
     clade.data = list()
     clade.data[[clade]][["seq"]] = clade.seq
     clade.data[[clade]][["msa"]] = clade.msa
@@ -201,6 +234,8 @@ for( clade in clades_dir){
     clade.data[[clade]][["evo"]] = clade.evo
 
     saveRDS(clade.data[[clade]],clade_rds)
+    rm(clade.data,clade.seq,clade.msa,clade.r4s,clade.evo)
+    gc()
   }else{
     cat('--> Reading precomputed data...\n\n')
     #clade.data = readRDS(clade_rds)
@@ -208,7 +243,6 @@ for( clade in clades_dir){
   }
   i=i+1
 }
-
 
 ## ANNOTATION ------------------------------------------------------------------
 sc_annotation = load.annotation()
