@@ -1581,6 +1581,7 @@ get_eggnog_annotations = function(node){
 eggnog_annotations_species=function(node,species){
 
   eggnog_annotations = get_eggnog_annotations(node)
+  eggnog_node = find_eggnog_node(node,.print=F)
   .info$log('reading eggnog orthogroups...')
   members_node = get_eggnog_node(eggnog_node$id,to_long = T,.print = F) %>%
         dplyr::select( -c(algo,tree,taxon_ids,url_fasta) ) %>%
