@@ -1571,10 +1571,18 @@ get_eggnog_annotations = function(node){
   #library(rotl)
   eggnog_annotation_file = sprintf("%s/%s.og_annotations.tsv",URL_EGGNOG,.ver)
   .info$log('reading eggnog annotations...')
+
+  func_class = eggnog_functional_categories()
   eggnog_annotations_node = readr::read_delim(eggnog_annotation_file,"\t",
                                               col_types = 'icfc',
                                               col_names = c('nodes','og','letter','annotation')) %>%
-    dplyr::filter(nodes == eggnog_node$id)
+    dplyr::filter(nodes == eggnog_node$id) %>%
+    mutate(pleiotropic = str_length(letter)>1,
+           letter1 = letter) %>%
+    separate_rows(letter1,sep="") %>%
+    filter(letter1!="") %>%
+    left_join(func_class, by=c('letter1'='letter'))
+
   return(eggnog_annotations_node)
 }
 
@@ -1591,10 +1599,8 @@ eggnog_annotations_species=function(node,species){
   }
 
   .info$log('merging annotations on orthogroups...')
-  func_class = eggnog_functional_categories()
   annotation_sp = left_join(members_node,eggnog_annotations, by=c('node'='nodes','OG'='og')) %>%
-                    dplyr::filter(taxid %in% species) %>%
-                    left_join(func_class, by=c('letter'))
+                    dplyr::filter(taxid %in% species)
   return(annotation_sp)
 }
 
