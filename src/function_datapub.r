@@ -1563,7 +1563,8 @@ find_eggnog_taxlevels = function(.print=T){
   return(taxlevels)
 }
 
-eggnog_annotations_species=function(node,species){
+get_eggnog_annotations = function(node){
+
   URL_EGGNOG = "http://eggnog.embl.de/download/latest/"
   .ver=find_eggnog_version(.print = F)
   eggnog_node = find_eggnog_node(node,.print=T)
@@ -1573,16 +1574,24 @@ eggnog_annotations_species=function(node,species){
   eggnog_annotations_node = readr::read_delim(eggnog_annotation_file,"\t",
                                               col_types = 'icfc',
                                               col_names = c('nodes','og','letter','annotation')) %>%
-                            dplyr::filter(nodes == eggnog_node$id)
+    dplyr::filter(nodes == eggnog_node$id)
+  return(eggnog_annotations_node)
+}
 
+eggnog_annotations_species=function(node,species){
+
+  eggnog_annotations = get_eggnog_annotations(node)
   .info$log('reading eggnog orthogroups...')
   members_node = get_eggnog_node(eggnog_node$id,to_long = T,.print = F) %>%
         dplyr::select( -c(algo,tree,taxon_ids,url_fasta) ) %>%
         distinct()
+  if(missing(species)){
+    species = unique(members_node$taxid)
+  }
 
   .info$log('merging annotations on orthogroups...')
   func_class = eggnog_functional_categories()
-  annotation_sp = left_join(members_node,eggnog_annotations_node, by=c('node'='nodes','OG'='og')) %>%
+  annotation_sp = left_join(members_node,eggnog_annotations, by=c('node'='nodes','OG'='og')) %>%
                     dplyr::filter(taxid %in% species) %>%
                     left_join(func_class, by=c('letter'))
   return(annotation_sp)
