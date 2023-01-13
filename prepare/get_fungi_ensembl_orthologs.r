@@ -240,8 +240,6 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
   ids_mammals = og[,col_ortho_prot] %>% unlist() %>% na.omit() %>% as.vector()
   valid_ids = intersect(ids_mammals,names(all_seq))
 
-
-
   peptide2sp_all = strfind(valid_ids,ortho_prefix$prefix) %>%
     enframe('prefix','id_peptide') %>%
     unnest(id_peptide ) %>%
@@ -255,55 +253,12 @@ make_mammals_fasta  = function(irow,ortho=hs_ortho,force.overwrite=F){
 
   if(og$is_best){
 
-    peptide2sp = strfind(valid_ids,HS_BOREOEUTHERIA$prefix) %>%
-      enframe('prefix','id_peptide') %>%
-      unnest(id_peptide ) %>%
-      left_join(HS_BOREOEUTHERIA,by=c('prefix')) %>%
-      dplyr::select(id_peptide,ens_dataset,prefix,mammals_tree,two,four) %>%
-      filter( id_peptide %in% names(all_seq) )
-
-    ## BOREOEUTHERIA
-    prepare_phylodata(id_hs = ENSP, path_group = mammals.path, group_data = peptide2sp, sp_seq = all_seq,
-                      add_human = T, overwrite = T)
-
-    ## EUARCHONTOGLIRES
-    euarcho.df= peptide2sp %>% filter(two=='Euarchontoglires')  %>% arrange(id_peptide)
-
-    prepare_phylodata(id_hs = ENSP, path_group = euarcho.path, group_data = euarcho.df, sp_seq = all_seq,
-                      add_human = T, overwrite = T)
-
-    ## GLIRES
-    glires.df= peptide2sp %>% filter(four=='Glires') %>%
-      left_join(fours, by=c('id_peptide'='id_ortho','ens_dataset','mammals_tree','two','four')) %>% arrange(rk_four)
-
-    prepare_phylodata(id_hs = ENSP, path_group = glires.path, group_data = glires.df, sp_seq = all_seq,
-                      add_human = F, overwrite = T)
-
-    ## LAURASIATHERIA
-    laura.df= peptide2sp %>% filter(two=='Laurasiatheria') %>%
-      left_join(twos, by=c('id_peptide'='id_ortho', 'ens_dataset','mammals_tree','two','four')) %>% arrange(rk_two)
-
-    prepare_phylodata(id_hs = ENSP, path_group = laura.path, group_data = laura.df, sp_seq = all_seq,
-                      add_human = F, overwrite = T)
-
-    ## LAURASIATHERIA
-    laura1.df= peptide2sp %>% filter(four=='Laurasiatheria.1') %>%
-      left_join(fours, by=c('id_peptide'='id_ortho','ens_dataset','mammals_tree','two','four')) %>% arrange(rk_four)
-
-    prepare_phylodata(id_hs = ENSP, path_group = laura1.path, group_data = laura1.df, sp_seq = all_seq,
-                      add_human = F, overwrite = T)
-
-    ## PRIMATES
-    primates.df= peptide2sp %>% filter(four=='Primates')  %>% arrange(id_peptide)
-    prepare_phylodata(id_hs = ENSP, path_group = primates.path, group_data = primates.df, sp_seq = all_seq,
-                      add_human = T, overwrite = T)
-
-    ## CARNIVORA
-    carnivora.df= peptide2sp %>% filter(four=='Carnivora')  %>%
-      left_join(fours, by=c('id_peptide'='id_ortho','ens_dataset','mammals_tree','two','four')) %>% arrange(rk_four)
-
-    prepare_phylodata(id_hs = ENSP, path_group = carnivora.path, group_data = carnivora.df, sp_seq = all_seq,
-                      add_human = F, overwrite = T)
+    # peptide2sp = strfind(valid_ids,HS_BOREOEUTHERIA$prefix) %>%
+    #   enframe('prefix','id_peptide') %>%
+    #   unnest(id_peptide ) %>%
+    #   left_join(HS_BOREOEUTHERIA,by=c('prefix')) %>%
+    #   dplyr::select(id_peptide,ens_dataset,prefix,mammals_tree,two,four) %>%
+    #   filter( id_peptide %in% names(all_seq) )
   }
 }
 
