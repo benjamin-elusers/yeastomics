@@ -1577,13 +1577,22 @@ get_eggnog_annotations = function(node){
                                               col_types = 'icfc',
                                               col_names = c('nodes','og','letter','annotation')) %>%
     dplyr::filter(nodes == eggnog_node$id) %>%
-    mutate(pleiotropic = str_length(letter)>1,
-           letter1 = letter) %>%
-    separate_rows(letter1,sep="") %>%
-    filter(letter1!="") %>%
-    left_join(func_class, by=c('letter1'='letter'))
+    mutate(pleiotropic = str_length(letter)>1)
 
-  return(eggnog_annotations_node)
+  eggnog_single = eggnog_annotations_node %>%
+                  filter(!pleiotropic) %>%
+                  left_join(func_class, by=c('letter')) %>%
+                  mutate(func_types = func_type, eggnog_fns=eggnog_func)
+  eggnog_multi = eggnog_annotations_node %>% filter(pleiotropic) %>%
+                 mutate( letter1 = letter) %>%
+                 separate_rows(letter1,sep="") %>% filter(letter1!="") %>%
+                 left_join(func_class, by=c('letter1'='letter')) %>%
+                 group_by(nodes,og,letter,annotation,pleiotropic) %>%
+                 summarize( func_type = "PLEIOTROPIC", func_types= paste0( "[", str_c(unique(func_type),collapse=";"),"]"),
+                            eggnog_func = "Multiple functions", eggnog_fns = paste0("[",str_c(unique(eggnog_func),collapse=";"),"]"))
+  eggnog_annotation = bind_rows(eggnog_single,eggnog_multi)
+
+  return(eggnog_annotation)
 }
 
 eggnog_annotations_species=function(node,species){
