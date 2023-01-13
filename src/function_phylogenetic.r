@@ -662,7 +662,7 @@ get_phylo_data = function(data, include.wgd=T,  include.ali=T,
 
 
 # MISCELLANEOUS ----------------------------------------------------------------
-load_seq = function(fastafiles, ref='S288C',id_type="ORF",
+load_seq = function(fastafiles, ref='S288C',id_type="ORF", only_aligned=F,
                     ncores=parallelly::availableCores(which='max')-2){
 
   message("--> Reading fasta sequences...")
@@ -671,8 +671,11 @@ load_seq = function(fastafiles, ref='S288C',id_type="ORF",
   ids = names(sequences) %>% coalesce(extract_id(.,id_type),.)
   names(sequences) = ids
   # check if sequences are aligned
-  aligned = sapply(sequences,function(x){ n_distinct(width(x)) == 1})
-  sequences = sequences[ aligned ]
+  if( only_aligned ){
+    message("----> only aligned sequences")
+    aligned = sapply(sequences,function(x){ n_distinct(width(x)) == 1})
+    sequences = sequences[ aligned ]
+  }
   return(sequences)
 }
 
