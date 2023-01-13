@@ -2104,8 +2104,25 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
   }else{
     names(Pombase) = gname
   }
-
   return(Pombase)
+}
+
+load.pombase.features = function(){
+  pombase.url = "https://www.pombase.org/data/names_and_identifiers/gene_IDs_names_products.tsv"
+  regexPombaseID = "(SP[^ ]+)(?=:pep)"
+  regexPombase = "(?<=:pep )(.+)(?=\\|)"
+  pombase_features = readr::read_delim(pombase.url,
+                    delim =  "\t",
+                    col_names = c('ID',"pombase","gname","chr","desc","uniprot","type","synonyms"))
+# 1. systematic ID (without prefix)
+# 2. systematic ID with PomBase: prefix
+# 3. primary gene name (where assigned)
+# 4. chromosome
+# 5. product description
+# 6. UniProtKB accession (without prefix)
+# 7. product type
+# 8. all synonyms
+  return(pombase_features)
 }
 
 ##### Uniprot #####
