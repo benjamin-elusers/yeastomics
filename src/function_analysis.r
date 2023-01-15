@@ -71,7 +71,9 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
                N=n(),
                na.xy= sum( is.na(!!sym(XX)) | is.na(!!sym(YY))),
                nax=sum(is.na(!!sym(XX))), nay=sum(is.na(!!sym(YY))),
-               n=N-na.xy
+               n=N-na.xy,
+               toshow = sprintf(" r %.3f \n p %.1e \n N %s",r,p,N),
+               X=XX,Y=YY,BY=BY
     )
   if(na.rm){
     message('removing NAs...')
