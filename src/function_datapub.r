@@ -2128,7 +2128,7 @@ load.pombase.features = function(verbose=F){
   regexPombase = "(?<=:pep )(.+)(?=\\|)"
   pombase_features = readr::read_delim(pombase.url,
                     delim =  "\t", show_col_types = verbose,
-                    col_names = c('ID',"pombase","gname","chr","desc","uniprot","type","synonyms")) %>%
+                    col_names = c('pombase_orf',"pombase_id","gname","chr","desc","uniprot","type","synonyms")) %>%
                     mutate(string_id=paste0("4896.",ID,".1"))
 # 1. systematic ID (without prefix)
 # 2. systematic ID with PomBase: prefix
