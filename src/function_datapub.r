@@ -2122,13 +2122,14 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
   return(Pombase)
 }
 
-load.pombase.features = function(){
+load.pombase.features = function(verbose=F){
   pombase.url = "https://www.pombase.org/data/names_and_identifiers/gene_IDs_names_products.tsv"
   regexPombaseID = "(SP[^ ]+)(?=:pep)"
   regexPombase = "(?<=:pep )(.+)(?=\\|)"
   pombase_features = readr::read_delim(pombase.url,
-                    delim =  "\t",
-                    col_names = c('ID',"pombase","gname","chr","desc","uniprot","type","synonyms"))
+                    delim =  "\t", show_col_types = !verbose,
+                    col_names = c('ID',"pombase","gname","chr","desc","uniprot","type","synonyms")) %>%
+                    mutate(string_id=paste0("4896.",ID,".1"))
 # 1. systematic ID (without prefix)
 # 2. systematic ID with PomBase: prefix
 # 3. primary gene name (where assigned)
