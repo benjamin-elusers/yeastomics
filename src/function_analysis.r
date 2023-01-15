@@ -72,7 +72,7 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
                na.xy= sum( is.na(!!sym(XX)) | is.na(!!sym(YY))),
                nax=sum(is.na(!!sym(XX))), nay=sum(is.na(!!sym(YY))),
                n=N-na.xy,
-               toshow = sprintf(" r %.3f \n p %.1e \n N %s",r,p,N),
+               toshow = sprintf(" r %.3f \n p %s \n N %s",r,ifelse(p==0,"<1e-324" ,sprintf("%.1e",p)),N),
                X=XX,Y=YY,BY=BY
     )
   if(na.rm){
