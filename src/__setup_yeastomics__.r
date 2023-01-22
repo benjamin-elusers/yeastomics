@@ -31,17 +31,22 @@ violet= RColorBrewer::brewer.pal(name = 'Paired',n=12)[9:10]
 purple = colorRampPalette(colors = violet)(5)
 
 # Visualization themes
-theme_set(theme_bw(base_size=16,base_line_size = 0.5) +theme(plot.background = element_blank(),aspect.ratio=1) )
+theme_set(
+  theme_bw(base_size=16,base_line_size = 0.5) +
+    theme(plot.background = element_blank(),aspect.ratio=1)
+)
 
-mytheme = theme(plot.background = element_blank(),
-                panel.background =element_blank(),
+mytheme = theme(plot.background =  element_blank(),
+                panel.background = element_blank(),
                 panel.grid.minor = element_line(color="#AAAAAA"),
                 axis.title = element_markdown(family="Helvetica",colour = 'black',size=18),
-                axis.text=element_text(color='black',size=10,family="Helvetica"),
-                axis.line = element_line(color='black',size=0.5),
-                text=element_text(family='Helvetica'))
+                axis.text = element_text(color='black',size=10,family="Helvetica"),
+                axis.line = element_line(color='black',linewidth=0.5),
+                text = element_text(family='Helvetica'))
 # Options
-options(dplyr.summarise.inform = FALSE, dplyr.width=Inf)
+options(dplyr.summarise.inform=FALSE,
+        dplyr.width=Inf,
+        max.print=2e4)
 
 # Logger
 library(log)
