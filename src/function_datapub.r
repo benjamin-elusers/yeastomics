@@ -1111,6 +1111,17 @@ load.pombe.orthologs = function() {
   return(sp.sc)
 }
 
+get_timetree_age = function(ncbi_ids,to_numeric=T){
+  API_TIMETREE = "http://timetree.temple.edu/api"
+  AGE = rvest::read_html(sprintf("%s/mrca/id/%s/age",API_TIMETREE,ncbi_ids)) |>
+        rvest::html_element("body") |>
+        rvest::html_text2()
+  if(to_numeric){
+    AGE = str_replace(AGE,"precomputed_time:","") |> as.numeric()
+  }
+  return(AGE)
+}
+
 ##### MobiDB #####
 
 get.mobidb.id = function(id="A0A075B734"){
