@@ -2162,6 +2162,14 @@ get_uniprot_id = function(accession){
   return(res)
 }
 
+get_uniprot_xref = function(xref_db,xref_id,isoform=F){
+  UNIPROT_URL = sprintf("https://rest.uniprot.org/uniprotkb/search?query=xref:%s-%s&includeIsoform=%s&format=tsv&fields=accession,gene_primary,protein_name,length,keyword,protein_existence,reviewed",xref_db,xref_id,tolower(as.character(isoform)))
+  #OX   NCBI_TaxID=7955 {ECO:0000312|Proteomes:UP000000437};
+  if( httr::http_error(UNIPROT_URL) ){ return(NULL) }
+  res = readr::read_delim(UNIPROT_URL,show_col_types = FALSE, progress = F)
+  return(res)
+}
+
 get_uniprot_ids = function(accessions){
   msg = sprintf("Retrieve %s uniprot ids from URL...",n_distinct(accessions))
   if(require(pbmcapply)){
