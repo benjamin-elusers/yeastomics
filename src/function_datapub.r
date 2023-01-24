@@ -1117,7 +1117,7 @@ get_timetree_age = function(ncbi_ids,to_numeric=T){
         rvest::html_element("body") |>
         rvest::html_text2()
   if(to_numeric){
-    AGE = str_replace(AGE,"precomputed_time:","") |> as.numeric()
+    AGE = str_replace(AGE,"precomputed_age:","") |> as.numeric()
   }
   return(AGE)
 }
