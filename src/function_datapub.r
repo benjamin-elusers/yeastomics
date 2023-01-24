@@ -2166,9 +2166,10 @@ get_uniprot_xref = function(xref_db,xref_id,isoform=F){
   UNIPROT_URL = sprintf("https://rest.uniprot.org/uniprotkb/search?query=xref:%s-%s&includeIsoform=%s&format=tsv&fields=accession,gene_primary,protein_name,length,keyword,protein_existence,reviewed",xref_db,xref_id,tolower(as.character(isoform)))
   #OX   NCBI_TaxID=7955 {ECO:0000312|Proteomes:UP000000437};
   if( httr::http_error(UNIPROT_URL) ){ return(NULL) }
-  res = readr::read_delim(UNIPROT_URL, col_types = 'ccciccc', show_col_types = FALSE, progress = F) %>%
-        mutate(database = xref_db, id = xref_id) %>%
-        dplyr::relocate(database,id)
+  res = readr::read_delim(UNIPROT_URL, col_types = 'ccciccc', show_col_types = FALSE, progress = F,
+                          col_names = c('AC','GN','PN','LEN','KW','PE','Reviewed')) %>%
+        mutate(db = xref_db, db_id = xref_id) %>%
+        dplyr::relocate(db,db_id)
   return(res)
 }
 
