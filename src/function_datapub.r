@@ -2154,11 +2154,13 @@ load.pombase.features = function(verbose=F){
 
 ##### Uniprot #####
 
-get_uniprot_id = function(accession){
-  UNIPROT_URL = sprintf("https://rest.uniprot.org/uniprotkb/%s.tsv",accession)
+get_uniprot_id = function(accession,isoform=F){
+  UNIPROT_URL = sprintf("https://rest.uniprot.org/uniprotkb/search?query=accession:%s&includeIsoform=%s&format=tsv&fields=accession,gene_primary,protein_name,length,keyword,protein_existence,reviewed",accession,tolower(as.character(isoform)))
   #OX   NCBI_TaxID=7955 {ECO:0000312|Proteomes:UP000000437};
   if( httr::http_error(UNIPROT_URL) ){ return(NULL) }
-  res = readr::read_delim(UNIPROT_URL,show_col_types = FALSE, progress = F)
+  res = readr::read_delim(UNIPROT_URL,col_types = 'ccciccc', delim = '\t',
+                          skip = 1, col_names = c('AC','GN','PN','LEN','KW','PE','Reviewed'),
+                          show_col_types = FALSE, progress = F)
   return(res)
 }
 
