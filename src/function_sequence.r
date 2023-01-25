@@ -231,3 +231,8 @@ get_aa_score = function(string,score){
 
   return(df_scores)
 }
+
+normalize_sequence = function(BS){
+  BS_norm = BS %>% chartr("U","S",.) %>% chartr("O","K",.) %>% chartr("J","L",.)
+  return(BS_norm)
+}
