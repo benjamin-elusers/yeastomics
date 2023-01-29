@@ -1111,15 +1111,26 @@ load.pombe.orthologs = function() {
   return(sp.sc)
 }
 
-get_timetree_age = function(ncbi_ids,to_numeric=T){
+get_timetree_age = function(ncbi_ids, adjusted=T){
   API_TIMETREE = "http://timetree.temple.edu/api"
   AGE = rvest::read_html(sprintf("%s/mrca/id/%s/age",API_TIMETREE,ncbi_ids)) |>
-        rvest::html_element("body") |>
-        rvest::html_text2()
-  if(to_numeric){
-    AGE = str_replace(AGE,"precomputed_age:","") |> as.numeric()
+    rvest::html_element("body") |>
+    rvest::html_text2() |>
+    readr::parse_number()
+
+  AGE.adj = rvest::read_html(sprintf("%s/mrca/id/%s/json",API_TIMETREE,ncbi_ids)) |>
+    rvest::html_element("body") |>
+    rvest::html_text2() |>
+    rjson::fromJSON() |>
+    magrittr::extract2('adjusted_age') |>
+    readr::parse_number()
+
+  if(adjusted){
+    return(AGE.adj |> as.numeric())
+  }else{
+    return(AGE |> as.numeric())
   }
-  return(AGE)
+  return(NULL)
 }
 
 ##### MobiDB #####
