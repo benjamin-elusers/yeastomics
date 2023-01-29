@@ -1122,8 +1122,7 @@ get_timetree_age = function(ncbi_ids, adjusted=T){
     rvest::html_element("body") |>
     rvest::html_text2() |>
     rjson::fromJSON() |>
-    magrittr::extract2('adjusted_age') |>
-    readr::parse_number()
+    magrittr::extract2('adjusted_age')
 
   if(adjusted){
     return(AGE.adj |> as.numeric())
