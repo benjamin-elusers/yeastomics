@@ -1118,11 +1118,15 @@ get_timetree_age = function(ncbi_ids, adjusted=T){
     rvest::html_text2() |>
     readr::parse_number()
 
-  AGE.adj = rvest::read_html(sprintf("%s/mrca/id/%s/json",API_TIMETREE,ncbi_ids)) |>
+  AGE.json = rvest::read_html(sprintf("%s/mrca/id/%s/json",API_TIMETREE,ncbi_ids)) |>
     rvest::html_element("body") |>
-    rvest::html_text2() |>
-    rjson::fromJSON() |>
-    magrittr::extract2('adjusted_age')
+    rvest::html_text2()
+
+  if( jsonlite::validate(AGE.json) ){
+    AGE.adj = AGE.json |> jsonlite::read_json() |> magrittr::extract2('adjusted_age')
+  }else{
+    AGE.adj = NA
+  }
 
   if(adjusted){
     return(AGE.adj |> as.numeric())
