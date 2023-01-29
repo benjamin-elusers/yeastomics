@@ -1123,7 +1123,13 @@ get_timetree_age = function(ncbi_ids, adjusted=T){
     rvest::html_text2()
 
   if( jsonlite::validate(AGE.json) ){
-    AGE.adj = AGE.json |> jsonlite::read_json() |> magrittr::extract2('adjusted_age')
+    AGE.data = AGE.json |> rjson::fromJSON()
+
+    AGE.adj = AGE.data |> magrittr::extract2('adjusted_age')
+    if(AGE.adj == 0){
+      warning('adjusted age is 0. Using median of time estimates...')
+      AGE.adj = AGE.data$time_estimates |> str_split_1(",") |> map_dbl(~parse_number(.x)) |> median()
+    }
   }else{
     AGE.adj = NA
   }
