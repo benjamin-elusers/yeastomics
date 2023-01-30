@@ -71,8 +71,8 @@ read.url <- function(file_url) {
 # Execute loading call and save data unless saved data already exists
 preload = function(saved.file,loading.call,doing='create data...'){
   library(tictoc)
+  cat(doing,"\n")
   if( !file.exists(saved.file) ){
-    cat(doing,"\n")
     tic(doing)
     res = eval(substitute(loading.call))
     if( !dir.exists(dirname(saved.file)) ){
