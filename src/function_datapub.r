@@ -1122,9 +1122,12 @@ get_timetree_age = function(ncbi_ids, what='adjusted'){
   AGE$maxrange  = range(AGE$estimates)
   AGE$adjusted_ci  = c(age_json$precomputed_ci_low,age_json$precomputed_ci_high)
 
-  res = select.list(choices=names(AGE),multiple = F,preselect = what,
+  if( missing(what) || !is.element(what,names(AGES)){
+    res = select.list(choices=names(AGE),multiple = F,preselect = what,
                     title = 'pick one age measures from timetree.org...',graphics = F)
-  return(AGE[[res]])
+    return(AGE[[res]])
+  }
+  return(AGE[[what]])
 }
 
 get_timetree_json = function(ncbi_ids){
