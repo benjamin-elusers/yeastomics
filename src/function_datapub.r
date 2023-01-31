@@ -1111,35 +1111,34 @@ load.pombe.orthologs = function() {
   return(sp.sc)
 }
 
-get_timetree_age = function(ncbi_ids, adjusted=T){
+get_timetree_age = function(ncbi_ids, what='adjusted'){
   API_TIMETREE = "http://timetree.temple.edu/api"
-  AGE = rvest::read_html(sprintf("%s/mrca/id/%s/age",API_TIMETREE,ncbi_ids)) |>
-    rvest::html_element("body") |>
-    rvest::html_text2() |>
-    readr::parse_number()
+  age_json = get_timetree_json(ncbi_ids)
 
-  AGE.json = rvest::read_html(sprintf("%s/mrca/id/%s/json",API_TIMETREE,ncbi_ids)) |>
+  AGE = list()
+  AGE$estimates = age_json[['time_estimates']] |> stringr::str_split_1(",") |> purrr::map_dbl(~readr::parse_number(.x))
+  AGE$estimated = age_json[['precomputed_age']]
+  AGE$adjusted   = hablar::if_zero(age_json[['adjusted_age']],age_json[['precomputed_age']])
+  AGE$maxrange  = range(AGE$estimates)
+  AGE$adjusted_ci  = c(age_json$precomputed_ci_low,age_json$precomputed_ci_high)
+
+  res = select.list(choices=names(AGE),multiple = F,preselect = what,
+                    title = 'pick one age measures from timetree.org...',graphics = F)
+  return(AGE[[res]])
+}
+
+get_timetree_json = function(ncbi_ids){
+
+  API_TIMETREE = "http://timetree.temple.edu/api"
+  mrca_json = rvest::read_html(sprintf("%s/mrca/id/%s/json",API_TIMETREE,ncbi_ids)) |>
     rvest::html_element("body") |>
     rvest::html_text2()
 
-  if( jsonlite::validate(AGE.json) ){
-    AGE.data = AGE.json |> rjson::fromJSON()
-
-    AGE.adj = AGE.data |> magrittr::extract2('adjusted_age')
-    if(AGE.adj == 0){
-      warning('adjusted age is 0. Using median of time estimates...')
-      AGE.adj = AGE.data$time_estimates |> str_split_1(",") |> map_dbl(~parse_number(.x)) |> median()
-    }
-  }else{
-    AGE.adj = NA
+  if( jsonlite::validate(mrca_json) ){
+    data_mrca = mrca_json |> rjson::fromJSON()
+    return(data_mrca)
   }
-
-  if(adjusted){
-    return(AGE.adj |> as.numeric())
-  }else{
-    return(AGE |> as.numeric())
-  }
-  return(NULL)
+  return(NA)
 }
 
 ##### MobiDB #####
