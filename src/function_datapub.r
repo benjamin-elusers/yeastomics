@@ -1115,6 +1115,11 @@ get_timetree_age = function(ncbi_ids, what='adjusted'){
   API_TIMETREE = "http://timetree.temple.edu/api"
   age_json = get_timetree_json(ncbi_ids)
 
+  if(is.na(age_json)){
+    warning(sprintf("NO VALID JSON DATA IN TIMETREE FOR YOUR INPUT (%s)",ncbi_ids))
+    return(NA)
+  }
+
   AGE = list()
   AGE$estimates = age_json[['time_estimates']] |> stringr::str_split_1(",") |> purrr::map_dbl(~readr::parse_number(.x))
   AGE$estimated = age_json[['precomputed_age']]
