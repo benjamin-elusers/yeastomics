@@ -779,8 +779,6 @@ spearman <- function(X,Y){
   res = cor.test(x = X, y=Y , method = "spearman",use='pairwise.complete',exact=F) |>
         broom::tidy() |> dplyr::rename(r=estimate,p=p.value)
   res$p.value = ifelse(res$p==0,"<1e-324" ,sprintf("%.1e",res$p))
-
-
   return(res)
 }
 
@@ -788,7 +786,7 @@ spearman <- function(X,Y){
 spearman.toplot = function(X,Y){
   s   = spearman(X,Y)
   s$N = sum(complete.cases(X,Y))
-  s$toshow = sprintf(" r %.3f \n p %s \n N %s",s$estimate,pv,s$N)
+  s$toshow = sprintf(" r %.3f \n p %s \n N %s",s$r,s$p,s$N)
   s$xmax = max_(X)
   s$ymax = max_(Y)
   s$xmin = min_(X)
