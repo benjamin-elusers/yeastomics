@@ -762,17 +762,21 @@ quantile_ <- function(x,...){  quantile(x,...,na.rm=T) } # quantile with no erro
 range_ <- function(x,...){  range(x,...,na.rm=T) } # range with no error message for missing values
 
 # Correlation with spearman method (ranks) and pairwise value
-scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){ cor.test(x,y,method = met, use=use, exact=F) }
+scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){
+  res = cor.test(x,y,method = met, use=use, exact=F)
+  res$p.value = ifelse(res$p.value==0,"<1e-324" ,sprintf("%.1e",res$p.value))
+}
+
 spearman <- function(X,Y){
   library(broom)
   res = cor.test(x = X, y=Y , method = "spearman",use='pairwise.complete',exact=F) %>% broom::tidy()
+  res$p.value = ifelse(res$p.value==0,"<1e-324" ,sprintf("%.1e",res$p.value))
   return(res)
 }
 
 # Get spearman correlation parameters ready to plot
 spearman.toplot = function(X,Y){
   s   = spearman(X,Y)
-  pv = ifelse(s$p.value==0,"<1e-324" ,sprintf("%.1e",s$p.value))
   s$N = sum(complete.cases(X,Y))
   s$toshow = sprintf(" r %.3f \n p %s \n N %s",s$estimate,pv,s$N)
   s$xmax = max_(X)
