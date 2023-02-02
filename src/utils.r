@@ -765,6 +765,7 @@ range_ <- function(x,...){  range(x,...,na.rm=T) } # range with no error message
 scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){
   res = cor.test(x,y,method = met, use=use, exact=F)
   res$p.value = ifelse(res$p.value==0,"<1e-324" ,sprintf("%.1e",res$p.value))
+  return(res)
 }
 
 spearman <- function(X,Y){

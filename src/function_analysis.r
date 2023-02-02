@@ -53,21 +53,26 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
 # Calculate the spearman correlation of two variables by group
 cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
   CC = DATA %>%
-    dplyr::select(any_of(c({{XX}},{{YY}},{{BY}},{{ID}}))) %>%
-    group_by(across(all_of(BY)),.drop = T) %>%
+    dplyr::select(any_of(c( XX, YY , BY ,ID))) %>%
+    group_by(across(all_of( BY)),.drop = T) %>%
     add_count(name="N0") %>%
-    summarize( r = spearman({{XX}},{{YY}}), p=scor({{XX}},{{YY}})$'p.value',
-            na.xy= sum( is.na({{XX}}) | is.na({{YY}})),
-            na.x=sum(is.na({{XX}})), na.y=sum(is.na({{YY}})), n=N0-na.xy,
-            toshow = sprintf(" r %.3f \n p %s \n N %s",r,p,n),
-            X=XX,Y=YY,BY=BY) %>%
-    drop_na({{XX}},{{YY}},{{BY}}) %>%
-    add_count(name="N")
+    mutate( na.xy= sum( is.na(.data[[XX]]) | is.na(.data[[YY]]) ),
+            na.x=sum(is.na(.data[[XX]])), na.y=sum(is.na(.data[[YY]])), n=N0-na.xy,
+            x=XX,y=YY,by=BY ) %>%
+    drop_na(XX,YY,BY) %>%
+    mutate( spearman(.data[[XX]],.data[[YY]]),
+            toshow = sprintf(" r %.3f \n p %s \n N %s",estimate,p.value,n),
+            ) %>%
+    dplyr::select(-any_of(c(XX,YY,ID))) %>%
+    distinct() %>%
+    ungroup() %>%
+    add_row( is_og_dup=NA, N0 = nrow(DATA),
+            na.xy = sum(is.na(DATA[[XX]]) | is.na(DATA[[YY]])),
+            na.x=sum(is.na(DATA[[XX]])), na.y=sum(is.na(DATA[[YY]])), n=N0-na.xy,
+            x=XX,y=YY, by=BY, spearman(DATA[[XX]],DATA[[YY]]),
+            toshow = sprintf(" r %.3f \n p %s \n N %s",estimate,p.value,n)
+            )
 
-  #if(na.rm){
-    #message('removing NAs...')
-    #return( CC %>% dplyr::filter(  !is.na(across(all_of(BY))) )
-  #}
   return(CC)
 }
 
