@@ -62,7 +62,7 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
             toshow = sprintf(" r %.3f \n p %s \n N %s",r,p,n),
             X=XX,Y=YY,BY=BY) %>%
     drop_na({{XX}},{{YY}},{{BY}}) %>%
-    add_count(name="N") %>%
+    add_count(name="N")
 
   #if(na.rm){
     #message('removing NAs...')
