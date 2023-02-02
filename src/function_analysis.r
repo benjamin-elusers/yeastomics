@@ -71,7 +71,8 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
             na.x=sum(is.na(DATA[[XX]])), na.y=sum(is.na(DATA[[YY]])), n=N0-na.xy,
             x=XX,y=YY, by=BY, spearman(DATA[[XX]],DATA[[YY]]),
             toshow = sprintf(" r %.3f \n p %s \n N %s",estimate,p.value,n)
-            )
+            ) %>%
+    dplyr::rename(r=estimate,p=p.value)
 
   return(CC)
 }
