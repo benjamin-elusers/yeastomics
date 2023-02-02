@@ -51,7 +51,7 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
 }
 
 # Calculate the spearman correlation of two variables by group
-cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
+cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,include_full=T){
   CC = DATA %>%
     dplyr::select(any_of(c( XX, YY , BY ,ID))) %>%
     group_by(across(all_of( BY)),.drop = T) %>%
@@ -66,12 +66,16 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
     dplyr::select(-any_of(c(XX,YY,ID))) %>%
     distinct() %>%
     ungroup() %>%
-    add_row(N0 = nrow(DATA),
+    dplyr::rename(r=estimate, p=p.value)
+
+    if(include_full){
+      CC_full = CC %>% add_row(N0 = nrow(DATA),
             na.xy = sum(is.na(DATA[[XX]]) | is.na(DATA[[YY]])),
             na.x=sum(is.na(DATA[[XX]])), na.y=sum(is.na(DATA[[YY]])), n=N0-na.xy,
             x=XX,y=YY, by=BY, spearman(DATA[[XX]],DATA[[YY]]),
             toshow = sprintf(" r %.3f \n p %s \n N %s",estimate,p.value,n)) %>%
-    dplyr::rename(r=estimate, p=p.value)
+        return(CC_full)
+    }
 
   return(CC)
 }
