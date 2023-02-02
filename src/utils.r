@@ -777,8 +777,9 @@ scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){
 spearman <- function(X,Y){
   library(broom)
   res = cor.test(x = X, y=Y , method = "spearman",use='pairwise.complete',exact=F) |>
-        broom::tidy() |> dplyr::rename(r=estimate,p=p.value)
-  res$p.value = ifelse(res$p==0,"<1e-324" ,sprintf("%.1e",res$p))
+        broom::tidy() |>
+    mutate( p.value= ifelse(p.value==0,"<1e-324" ,sprintf("%.1e",p.value))) |>
+    dplyr::rename(r=estimate,p=p.value)
   return(res)
 }
 
