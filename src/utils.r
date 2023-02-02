@@ -89,10 +89,10 @@ preload = function(saved.file,loading.call,doing='create data...'){
 
 get.last.file = function(path,pattern){
   library(tidyverse)
-  list.files(path, pattern, full.names=T) %>%
-    file.info %>%
-    dplyr::slice(which.max(mtime)) %>%
-    rownames
+  list.files(path, pattern, full.names=T) |>
+    file.info() |>
+    dplyr::slice(which.max(mtime)) |>
+    rownames()
 }
 
 fallback = function(url,archived){
@@ -271,27 +271,27 @@ match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, manual = F, ve
   library(sjmisc)
   sp1 =  tolower(SP1)
   sp2 =  tolower(SP2)
-  paired_name = expand_grid(s1=sp1,s2=sp2) %>%
+  paired_name = expand_grid(s1=sp1,s2=sp2) |>
                 # Keep identically matched names
-                rowwise %>% mutate(is_identical = identical(s1,s2)) %>%
-                group_by(s1) %>% filter( if_any(is_identical) | sum(is_identical)==0 )
+                rowwise() |> mutate(is_identical = identical(s1,s2)) |>
+                group_by(s1) |> filter( if_any(is_identical) | sum(is_identical)==0 )
 
-  matched_name = paired_name %>%
+  matched_name = paired_name |>
                  # Keep matched names that are nested (i.e. one string is a substring of the other)
-                 rowwise %>% mutate(is_substring = str_contains(s2,s1) - str_contains(s1,s2)) %>%
-                 group_by(s1) %>% filter( if_any(is_substring, ~ . != 0) | all(is_substring==0)) %>%
+                 rowwise() |> mutate(is_substring = str_contains(s2,s1) - str_contains(s1,s2)) |>
+                 group_by(s1) |> filter( if_any(is_substring, ~ . != 0) | all(is_substring==0)) |>
                  mutate( is_matched = (n() == 1))
 
-  twins = matched_name %>% filter(is_matched) %>% mutate(verified = 'by_substring')
-  unmatched  = matched_name %>% filter(!is_matched)
+  twins = matched_name |> filter(is_matched) |> mutate(verified = 'by_substring')
+  unmatched  = matched_name |> filter(!is_matched)
 
-  similarities = tidy_stringdist(df=unmatched,v1=s1,v2=s2) %>%
-                 group_by(s1) %>%
+  similarities = tidy_stringdist(df=unmatched,v1=s1,v2=s2) |>
+                 group_by(s1) |>
                  # remove names that have been previously matched (identical or substring)
-                 mutate( already_matched = s2 %in% twins$s2, verified='by_similarity') %>%
-                 filter( !already_matched ) %>%
-                 filter( ifelse(use_soundex, soundex == min(soundex), T) ) %>%
-                 add_count(name='n1') %>% mutate( is_matched = (n1 == 1) )  %>%
+                 mutate( already_matched = s2 %in% twins$s2, verified='by_similarity') |>
+                 filter( !already_matched ) |>
+                 filter( ifelse(use_soundex, soundex == min(soundex), T) ) |>
+                 add_count(name='n1') |> mutate( is_matched = (n1 == 1) )  |>
                  slice_min(order_by = lcs, n = max_strings)
 
   if(verbose){
@@ -303,18 +303,18 @@ match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, manual = F, ve
   results = bind_rows(twins,similarities)
   if(manual && ndup>1){
     cat('matching remaining names manually...\n\n')
-    DUP = similarities %>% filter(n1 != 1)
-    dup_name = DUP$s1 %>% unique
+    DUP = similarities |> filter(n1 != 1)
+    dup_name = DUP$s1 |> unique()
     name_chosen=c()
     for(name in dup_name){
-      name_options = DUP %>% filter(s1 == name) %>% pull(s2) %>% setdiff(name_chosen)
+      name_options = DUP |> filter(s1 == name) |> pull(s2) |> setdiff(name_chosen)
       x = menu(name_options,graphics = F, title = paste0("'",name,"' corresponds to:"))
       name_chosen = append(name_chosen, name_options[x])
     }
-    MANUAL = tibble(s1=dup_name,s2=name_chosen) %>%
-                left_join(DUP, by=c('s1','s2')) %>%
+    MANUAL = tibble(s1=dup_name,s2=name_chosen) |>
+                left_join(DUP, by=c('s1','s2')) |>
                 mutate(verified = 'manually/taxid/synonym')
-    results = bind_rows(twins,MANUAL) %>% add_count(name='n1') %>% mutate( is_matched = (n1 == 1) )
+    results = bind_rows(twins,MANUAL) |> add_count(name='n1') |> mutate( is_matched = (n1 == 1) )
   }
 
   return(results)
@@ -635,6 +635,12 @@ get_source_path <- function(){
 
 
 # shorthands -------------------------------------------------------------------
+replace_name <- function(.x, ..., .strict = TRUE) {
+  pos <- tidyselect::eval_rename(quote(c(...)), .x, strict = .strict)
+  names(.x)[pos] <- names(pos)
+  .x
+}
+
 lf <- function(path = ".", maxdepth = 0L, pattern = NULL, all.files = FALSE, include.dirs = FALSE) {
   # https://stackoverflow.com/questions/70957718/how-to-list-files-until-n-level-deep-subdirectory-in-r
   # example: lf(".", maxdepth = n, pattern = "[.]xlsx$")
@@ -683,8 +689,7 @@ find_keywords = function(df,keywords,strict=T){
   count_keywords = list()
   for( kw in  unique(keywords) ){
     count_kw = sapply(df,
-                function(x){ str_count( string=tolower(x), pattern=paste0("(?i)",as.character(kw))) }) %>%
-      rowSums
+                function(x){ str_count( string=tolower(x), pattern=paste0("(?i)",as.character(kw))) }) |> rowSums()
     count_keywords[[kw]]=count_kw
   }
 
@@ -763,15 +768,19 @@ range_ <- function(x,...){  range(x,...,na.rm=T) } # range with no error message
 
 # Correlation with spearman method (ranks) and pairwise value
 scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){
-  res = cor.test(x,y,method = met, use=use, exact=F)
+  res = cor.test(x,y,method = met, use=use, exact=F) |>
+        replace_name("r"="estimate","p"="p.value")
   res$p.value = ifelse(res$p.value==0,"<1e-324" ,sprintf("%.1e",res$p.value))
   return(res)
 }
 
 spearman <- function(X,Y){
   library(broom)
-  res = cor.test(x = X, y=Y , method = "spearman",use='pairwise.complete',exact=F) %>% broom::tidy()
-  res$p.value = ifelse(res$p.value==0,"<1e-324" ,sprintf("%.1e",res$p.value))
+  res = cor.test(x = X, y=Y , method = "spearman",use='pairwise.complete',exact=F) |>
+        broom::tidy() |> dplyr::rename(r=estimate,p=p.value)
+  res$p.value = ifelse(res$p==0,"<1e-324" ,sprintf("%.1e",res$p))
+
+
   return(res)
 }
 
