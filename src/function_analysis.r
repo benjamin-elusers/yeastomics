@@ -53,7 +53,7 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
 # Calculate the spearman correlation of two variables by group
 cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
   CC = DATA %>%
-    dplyr::select(all_of(c({{XX}},{{YY}},{{BY}},{{ID}}))) %>%
+    dplyr::select(any_of(c({{XX}},{{YY}},{{BY}},{{ID}}))) %>%
     group_by(across(all_of(BY)),.drop = T) %>%
     add_count(name="N0") %>%
     mutate(na.xy= sum( is.na({{XX}}) | is.na({{YY}})),
