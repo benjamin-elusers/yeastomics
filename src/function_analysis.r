@@ -52,27 +52,20 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
 
 # Calculate the spearman correlation of two variables by group
 cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
-  # if( length(BY) == 1){
-  #   BYCOL=DATA[[BY]]
-  #   if( !is.factor(BYCOL) ){ BINS = na.exclude(unique(BYCOL)) }
-  #   BINS = levels(BYCOL)
-  #   nby = length(BINS)
-  #   message(sprintf("Number of groups: %s\n",nby))
-  #   bins = sprintf("[%s] %s",seq_along(BINS),as.character(levels(BINS)))
-  #   cat(str_wrap(toString(bins), width = 90))
-  #   cat("\n")
-  # }
 
-  CC = DATA %>% dplyr::select(XX,YY,BY,ID) %>%
+
+  CC = DATA %>%
+    dplyr::select(all_of(c({{XX}},{{YY}},{{BY}},{{ID}}))) %>%
     group_by(across(all_of(BY)),.drop = T) %>%
-    drop_na(!!sym(XX),!!sym(YY)) %>%
-    mutate( R = scor(!!sym(XX),!!sym(YY))$estimate, P=scor(!!sym(XX),!!sym(YY))$'p.value', n=n()) %>%
-    summarise( r=unique(R) , p=unique(P),
-               N=n(),
-               na.xy= sum( is.na(!!sym(XX)) | is.na(!!sym(YY))),
-               nax=sum(is.na(!!sym(XX))), nay=sum(is.na(!!sym(YY))),
-               n=N-na.xy,
-               toshow = sprintf(" r %.3f \n p %s \n N %s",r,ifelse(p==0,"<1e-324" ,sprintf("%.1e",p)),N),
+    add_count(name="N0") %>%
+    mutate(na.xy= sum( is.na({{XX}}) | is.na({{YY}})),
+           na.x=sum(is.na({{XX}})), na.y=sum(is.na({{YY}})),
+           n=N0-na.xy) %>%
+    drop_na({{XX}},{{YY}}) %>%
+    add_count(name="N") %>%
+    mutate(r = spearman({{XX}},{{YY}}), p=scor({{XX}},{{YY}})$'p.value') %>%
+    summarise( r=unique(R) , p= ifelse(p==0,"<1e-324" ,sprintf("%.1e",p),unique(P)) ,
+               toshow = sprintf(" r %.3f \n p %s \n N %s",r,,N),
                X=XX,Y=YY,BY=BY
     )
   if(na.rm){
