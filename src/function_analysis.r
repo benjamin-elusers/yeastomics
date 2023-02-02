@@ -56,14 +56,14 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
     dplyr::select(any_of(c({{XX}},{{YY}},{{BY}},{{ID}}))) %>%
     group_by(across(all_of(BY)),.drop = T) %>%
     add_count(name="N0") %>%
-    mutate(na.xy= sum( is.na({{XX}}) | is.na({{YY}})),
-           na.x=sum(is.na({{XX}})), na.y=sum(is.na({{YY}})),
-           n=N0-na.xy) %>%
+    summarize( r = spearman({{XX}},{{YY}}), p=scor({{XX}},{{YY}})$'p.value',
+            na.xy= sum( is.na({{XX}}) | is.na({{YY}})),
+            na.x=sum(is.na({{XX}})), na.y=sum(is.na({{YY}})), n=N0-na.xy,
+            toshow = sprintf(" r %.3f \n p %s \n N %s",r,p,n),
+            X=XX,Y=YY,BY=BY) %>%
     drop_na({{XX}},{{YY}},{{BY}}) %>%
     add_count(name="N") %>%
-    mutate(r = spearman({{XX}},{{YY}}), p=scor({{XX}},{{YY}})$'p.value',
-           toshow = sprintf(" r %.3f \n p %s \n N %s",r,N),
-           X=XX,Y=YY,BY=BY)
+
   #if(na.rm){
     #message('removing NAs...')
     #return( CC %>% dplyr::filter(  !is.na(across(all_of(BY))) )
