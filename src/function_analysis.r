@@ -52,8 +52,6 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
 
 # Calculate the spearman correlation of two variables by group
 cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
-
-
   CC = DATA %>%
     dplyr::select(all_of(c({{XX}},{{YY}},{{BY}},{{ID}}))) %>%
     group_by(across(all_of(BY)),.drop = T) %>%
@@ -61,17 +59,15 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
     mutate(na.xy= sum( is.na({{XX}}) | is.na({{YY}})),
            na.x=sum(is.na({{XX}})), na.y=sum(is.na({{YY}})),
            n=N0-na.xy) %>%
-    drop_na({{XX}},{{YY}}) %>%
+    drop_na({{XX}},{{YY}},{{BY}}) %>%
     add_count(name="N") %>%
-    mutate(r = spearman({{XX}},{{YY}}), p=scor({{XX}},{{YY}})$'p.value') %>%
-    summarise( r=unique(R) , p= ifelse(p==0,"<1e-324" ,sprintf("%.1e",p),unique(P)) ,
-               toshow = sprintf(" r %.3f \n p %s \n N %s",r,,N),
-               X=XX,Y=YY,BY=BY
-    )
-  if(na.rm){
-    message('removing NAs...')
+    mutate(r = spearman({{XX}},{{YY}}), p=scor({{XX}},{{YY}})$'p.value',
+           toshow = sprintf(" r %.3f \n p %s \n N %s",r,N),
+           X=XX,Y=YY,BY=BY)
+  #if(na.rm){
+    #message('removing NAs...')
     #return( CC %>% dplyr::filter(  !is.na(across(all_of(BY))) )
-  }
+  #}
   return(CC)
 }
 
