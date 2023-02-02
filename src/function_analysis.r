@@ -66,7 +66,7 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,na.rm=T){
     dplyr::select(-any_of(c(XX,YY,ID))) %>%
     distinct() %>%
     ungroup() %>%
-    add_row( is_og_dup="ALL", N0 = nrow(DATA),
+    add_row(N0 = nrow(DATA),
             na.xy = sum(is.na(DATA[[XX]]) | is.na(DATA[[YY]])),
             na.x=sum(is.na(DATA[[XX]])), na.y=sum(is.na(DATA[[YY]])), n=N0-na.xy,
             x=XX,y=YY, by=BY, spearman(DATA[[XX]],DATA[[YY]]),
