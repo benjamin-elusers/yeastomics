@@ -73,7 +73,7 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,include_full=T){
             na.xy = sum(is.na(DATA[[XX]]) | is.na(DATA[[YY]])),
             na.x=sum(is.na(DATA[[XX]])), na.y=sum(is.na(DATA[[YY]])), n=N0-na.xy,
             x=XX,y=YY, by=BY, spearman(DATA[[XX]],DATA[[YY]]),
-            toshow = sprintf(" r %.3f \n p %s \n N %s",estimate,p.value,n)) %>%
+            toshow = sprintf(" r %.3f \n p %s \n N %s",estimate,p.value,n))
         CC_full[[ BY ]] = forcats::fct_explicit_na(CC_full[[BY]],"all")
         return(CC_full)
     }
