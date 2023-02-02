@@ -65,15 +65,13 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,include_full=T){
             ) %>%
     dplyr::select(-any_of(c(XX,YY,ID))) %>%
     distinct() %>%
-    ungroup() %>%
-    dplyr::rename(r=estimate, p=p.value)
-
+    ungroup()
     if(include_full){
       CC_full = CC %>% add_row(N0 = nrow(DATA),
             na.xy = sum(is.na(DATA[[XX]]) | is.na(DATA[[YY]])),
             na.x=sum(is.na(DATA[[XX]])), na.y=sum(is.na(DATA[[YY]])), n=N0-na.xy,
             x=XX,y=YY, by=BY, spearman(DATA[[XX]],DATA[[YY]]),
-            toshow = sprintf(" r %.3f \n p %s \n N %s",estimate,p.value,n))
+            toshow = sprintf(" r %.3f \n p %s \n N %s",r,p,n))
         CC_full[[ BY ]] = forcats::fct_explicit_na(CC_full[[BY]],"all")
         return(CC_full)
     }
