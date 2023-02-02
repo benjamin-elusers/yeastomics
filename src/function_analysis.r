@@ -61,7 +61,7 @@ cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,include_full=T){
             x=XX,y=YY,by=BY ) %>%
     drop_na(XX,YY,BY) %>%
     mutate( spearman(.data[[XX]],.data[[YY]]),
-            toshow = sprintf(" r %.3f \n p %s \n N %s",estimate,p.value,n),
+            toshow = sprintf(" r %.3f \n p %s \n N %s",r,p,n),
             ) %>%
     dplyr::select(-any_of(c(XX,YY,ID))) %>%
     distinct() %>%
