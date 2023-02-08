@@ -308,7 +308,11 @@ match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, manual = F, ve
     name_chosen=c()
     for(name in dup_name){
       name_options = DUP |> filter(s1 == name) |> pull(s2) |> setdiff(name_chosen)
-      x = menu(name_options,graphics = F, title = paste0("'",name,"' corresponds to:"))
+      n_options = n_distinct(name_options)
+      x=1
+      if(n_options > 1){
+        x = menu(name_options,graphics = F, title = paste0("'",name,"' corresponds to:"))
+      }
       name_chosen = append(name_chosen, name_options[x])
     }
     MANUAL = tibble(s1=dup_name,s2=name_chosen) |>
