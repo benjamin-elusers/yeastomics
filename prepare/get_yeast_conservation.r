@@ -162,12 +162,14 @@ metazoa.rds =  here('output','evorate-eggnog_metazoa-msa-r4s.rds')
 mz_dir = "/data/benjamin/Evolution/EGGNOG/33208_Metazoa"
 clades_dir = list.dirs(mz_dir,full.names = F, recursive = F) %>% str_subset("sp$")
 
+CLADES_DIR = clades_dir[clades_dir %pin% c('Metazoa','Mammalia','Euarchontoglires','Laurasiatheria')]
+
 #i=str_which(clades_dir,'Mammalia') #
 
 metazoa.data=list()
 i=1
 #clade = clades_dir[i]
-for( clade in clades_dir){
+for( clade in CLADES_DIR){
   cat(i,")",clade,"\n")
   clade_rds =  file.path(mz_dir,sprintf('evorate-eggnogV5_metazoa-%s-msa-r4s.rds',clade))
 
