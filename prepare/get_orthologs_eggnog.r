@@ -258,7 +258,9 @@ fu_ncbi_eggnog = fu_ncbi %>%
 
 library(taxize)
 fungi$tip.label = fu_ncbi_eggnog$taxid[match(tolower(fungi$tip.label),fu_ncbi_eggnog$ncbi_name)]
-#fungi_19$tip.label = fu_ncbi_eggnog$taxid[match(tolower(fungi_19$tip.label),fu_ncbi_eggnog$taxid)]
+# fungi_19$taxids = fu_ncbi_eggnog$taxid[match(tolower(fungi_19$tip.label),fu_ncbi_eggnog$taxid)]
+# fungi_19$taxons = fu_ncbi_eggnog$Taxon[match(tolower(fungi_19$tip.label),fu_ncbi_eggnog$taxid)]
+# fungi_19$tip.label = fungi_19$taxons
 
 fu_clades = subtrees(fungi) %>%
             set_names(fungi$node.label %>% str_remove_all("['\\[\\]]"))  %>%
