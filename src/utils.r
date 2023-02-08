@@ -318,7 +318,11 @@ match_strings = function(SP1, SP2, max_strings=20, use_soundex=T, manual = F, ve
     MANUAL = tibble(s1=dup_name,s2=name_chosen) |>
                 left_join(DUP, by=c('s1','s2')) |>
                 mutate(verified = 'manually/taxid/synonym')
-    results = bind_rows(twins,MANUAL) |> add_count(name='n1') |> mutate( is_matched = (n1 == 1) )
+    results = bind_rows(twins,MANUAL) |>
+              add_count(name='n') |>
+              mutate( is_matched = (n1 == 1) ) |>
+              group_by(s1) |>
+              add_count(name='n1')
   }
 
   return(results)
