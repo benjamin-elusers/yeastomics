@@ -5,10 +5,9 @@ source(here::here("analysis","function_evorate_fitting.R"))
 library(patchwork)
 library(scales)
 
-validation = EVOLUTION %>%
-             dplyr::filter( !(ORF %in% orf_orthologs) & !is.na(log10.EVO.FULL_R4S)) %>%
+sc_validation = EVOLUTION %>%
+             dplyr::filter( !(ORF %in% orf_orthologs) & !is.na(log10.EVO.FULL_R4S) & !is.na(MPC)) %>%
              left_join(PREDICTORS,by='ORF')
-
 #### VARIABLE SELECTION ####
 XCOL="MPC"
 YCOL="log10.EVO.FULL_R4S"
@@ -101,12 +100,11 @@ SC_PREDICTORS = PREDICTORS %>% filter(ORF %in% orthologs$ORF)
 
 ## TARGET = ER
 fit_ER = fit_m0(orthologs,XCOL,YCOL,SC_PREDICTORS,ZCOL,IDCOLS)
-sc_evo_all = select_variable(fit_ER,response = Y_RESID, raw = T)#min_ess = 0, min_ess_frac = 0)
-saveRDS(sc_evo_all,here("output","sc-all-lm-evo.rds"))
+sc_evo_all = preload( here("output","sc-all-lm-evo.rds"), select_variable(fit_ER,response = Y_RESID, raw = T) )#min_ess = 0, min_ess_frac = 0)
 
 # Most explicative variables for evolution
 sc_evo = sc_evo_all %>%
-  dplyr::filter(pc_ess  > 1 & !variable %in% c(XCOL,YCOL,ZCOL) &
+  dplyr::filter(pc_ess  > 2 & !variable %in% c(XCOL,YCOL,ZCOL) &
                 !str_detect(variable,pattern = 'byrne2005') &
                 !str_detect(variable,pattern = 'peter2018.snp_') &
                 !str_detect(variable,pattern = 'paxdb.ortho') &
@@ -117,9 +115,9 @@ sc_evo = sc_evo_all %>%
 dim(sc_evo)
 
 sc_evo = sc_evo_all %>%
-  dplyr::filter(pc_ess  > 0.5 & !variable %in% c(XCOL,YCOL,ZCOL)  )
+  dplyr::filter(pc_ess  > 0.2 & !variable %in% c(XCOL,YCOL,ZCOL)  )
 
-saveRDS(sc_evo$var,file = here::here('output','sc_features_ess_over_0.5.rds'))
+saveRDS(sc_evo$var,file = here::here('output','sc_features_ess_over_2.rds'))
 
 sc_evo_pred = fit_ER$P[,c(XCOL, YCOL, Y_RESID, ZCOL, sc_evo$variable)]
 n_sc_evo = n_distinct(sc_evo$variable)
@@ -173,12 +171,22 @@ bind_rows(
   decompose_variance(m_best_snp_ER,T)
 )
 
+dim(sc_evo)
+
 sc_best_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),data=sc_evo_pred)
-print(labels(m_best_ER))
+print()
 decompose_variance(sc_best_lm,to.df = T)
 
-
 sc_validation_lm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ER)),data=validation)
+sc_validation_lm_ppm = lm(reformulate(response = YCOL, termlabels = labels(m_best_ppm_ER)),data=validation)
+sc_validation_lm_snp = lm(reformulate(response = YCOL, termlabels = labels(m_best_snp_ER)),data=validation)
+
+bind_rows(
+  decompose_variance(sc_validation_lm,T),
+  decompose_variance(sc_validation_lm_ppm,T),
+  decompose_variance(sc_validation_lm_snp,T)
+)
+
 print(labels(sc_validation_lm))
 decompose_variance(sc_validation_lm,to.df = T)
 
