@@ -63,7 +63,7 @@ find.r4s = function(directory,params=c(10,20,50,80,'pyout')){
 clade_regex="[0-9]+_[a-zA-Z]+_[0-9]+sp"
 col_clade = paste0("clade_",c("id","name","ns"))
 
-NODE_DIR = fu_out
+NODE_DIR = mz_out
 clades = list.dirs(NODE_DIR,recursive = F) %>% basename %>% str_subset(clade_regex)
 df_clade = tibble(clade_desc=clades) %>%
            separate(col='clade_desc', into=col_clade, sep = "_", remove=F) %>%
@@ -75,18 +75,17 @@ trimal_files = pbmcapply::pbmcmapply(find.trimal,MoreArgs=list(params=c(10,20)),
 r4s_files    = pbmcapply::pbmcmapply(find.r4s,MoreArgs=list(params=c(0,10,20)), df_clade$resdir, mc.cores=14, SIMPLIFY=F)
 
 # purrr::flatten(muscle_files) %>%
-#   str_detect("^/data/benjamin/Evolution/EGGNOG//33208_Metazoa/.+/muscle/.+_1to1-orthologs\\.mu$") %>%
-#   mean
-#
-# trimal_files %>% purrr::flatten() %>% purrr::flatten() %>% unlist %>%
-#   str_detect("^/data/benjamin/Evolution/EGGNOG//33208_Metazoa/.+/trimal_gap[0-9]+/.+_1to1-orthologs\\.mu\\.trimal_gap[0-9]+$") %>%
-#   mean
-#
-# test= r4s_files %>% purrr::flatten() %>% purrr::flatten() %>% unlist
-# test %>%
-#   str_detect("^/data/benjamin/Evolution/EGGNOG//33208_Metazoa/.+/r4s_.+/.+_1to1-orthologs.+\\.eggnog_sptree\\.r4s_raw$") %>%
+#   str_detect(paste0("^",mz_out,"/.+/muscle/.+_1to1-orthologs\\.mu$")) %>%
 #   mean
 
+# trimal_files %>% purrr::flatten() %>% purrr::flatten() %>% unlist %>%
+#   str_detect(paste0("^",mz_out,"/.+/trimal_gap[0-9]+/.+_1to1-orthologs\\.mu\\.trimal_gap[0-9]+$")) %>%
+#   mean
+
+test= r4s_files %>% purrr::flatten() %>% purrr::flatten() %>% unlist
+test %>%
+  str_detect(paste0("^",mz_out,"/.+/r4s_.+/.+_1to1-orthologs.+\\.eggnog_sptree\\.r4s_raw$")) %>%
+  mean
 
 df_clade$muscle_files = muscle_files
 df_clade$trimal_files = trimal_files
@@ -96,9 +95,13 @@ df_clade$n_muscle = map_int(df_clade$muscle_files,n_distinct)
 df_clade$n_trimal = map_dfr(df_clade$trimal_files, ~map_df(.x,n_distinct))
 df_clade$n_r4s = map_dfr(df_clade$r4s_files, ~map_df(.x,n_distinct))
 
+cbind(df_clade$clade_desc, df_clade$n_muscle - df_clade$n_trimal)
+cbind(df_clade$clade_desc, df_clade$n_muscle - df_clade$n_r4s)
 
-df_clade$n_muscle - df_clade$n_trimal
-df_clade$n_muscle - df_clade$n_r4s
+errIO = pbmcapply::pbmclapply(unlist(r4s_files),mc.cores = 14,
+                              function(x){ if( length(readLines(x,n=10))==0 ){ return(x) }}) %>%
+        purrr::compact() %>% unlist()
+
 
 if(NODE_DIR==fu_out){
   saveRDS(df_clade,file=here::here("data/eggnog","4751_Fungi-eggnog-results.rds"))
