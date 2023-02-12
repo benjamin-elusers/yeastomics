@@ -237,3 +237,19 @@ normalize_sequence = function(BS){
   BS_norm = BS %>% chartr("U","S",.) %>% chartr("O","K",.) %>% chartr("J","L",.)
   return(BS_norm)
 }
+
+count_aa = function(BS){
+  seqids = BS |> names()
+  freqaa = Biostrings::alphabetFrequency(BS,as.prob = F) |>
+    as_tibble() |> mutate(ids=seqids, naa=width(BS)) |> relocate(ids,naa) |>
+    group_by(ids,naa) |>
+    mutate( noAA = sum_( c_across(cols=-Biostrings::AA_STANDARD) ),
+            AA = sum_( c_across(cols=Biostrings::AA_STANDARD)),
+            f_noAA = noAA / naa,
+            f_AA = AA / naa
+    ) |>
+    nest(aacount=c(Biostrings::AA_STANDARD,"other")) |>
+    filter( noAA > 0)
+  return(freqaa)
+}
+
