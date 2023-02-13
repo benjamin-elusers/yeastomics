@@ -249,8 +249,7 @@ count_aa = function(BS){
             AA = sum_( c_across(cols=Biostrings::AA_STANDARD)),
             f_noAA = noAA / naa,
             f_AA = AA / naa
-    ) |>
-    nest(aacount=c(Biostrings::AA_STANDARD,"other"))
+    ) |> nest(aacount=c(Biostrings::AA_STANDARD,"other"))
   return(freqaa)
 }
 
