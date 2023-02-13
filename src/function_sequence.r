@@ -240,16 +240,19 @@ normalize_sequence = function(BS){
 
 count_aa = function(BS){
   seqids = BS |> names()
+  col_AA   = Biostrings::AA_STANDARD
+  col_noAA = setdiff(Biostrings::AA_ALPHABET,col_AA)
+
   freqaa = Biostrings::alphabetFrequency(BS,as.prob = F) |>
     as_tibble() |>
     mutate(ids=seqids, naa=width(BS), nseq = n_distinct(seqids)) |>
     relocate(nseq,ids,naa) |>
-    group_by(ids,naa) |>
-    mutate( noAA = sum_( c_across(cols=-Biostrings::AA_STANDARD) ),
-            AA = sum_( c_across(cols=Biostrings::AA_STANDARD)),
+    group_by(ids,naa,nseq) |>
+    mutate( noAA = sum_( c_across(cols=all_of(col_noAA)) ),
+            AA = sum_( c_across(cols=all_of(colAA)) ),
             f_noAA = noAA / naa,
             f_AA = AA / naa
-    ) |> nest(aacount=c(Biostrings::AA_STANDARD,"other"))
+    ) |> nest(aacount=c(colAA,"other"))
   return(freqaa)
 }
 
