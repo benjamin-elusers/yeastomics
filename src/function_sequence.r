@@ -249,10 +249,10 @@ count_aa = function(BS){
     relocate(nseq,ids,naa) |>
     group_by(ids,naa,nseq) |>
     mutate( noAA = sum_( c_across(cols=all_of(col_noAA)) ),
-            AA = sum_( c_across(cols=all_of(colAA)) ),
+            AA = sum_( c_across(cols=all_of(col_AA)) ),
             f_noAA = noAA / naa,
             f_AA = AA / naa
-    ) |> nest(aacount=c(colAA,"other"))
+    ) |> nest(aacount=c(col_AA,"other"))
   return(freqaa)
 }
 
