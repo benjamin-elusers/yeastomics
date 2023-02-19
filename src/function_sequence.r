@@ -234,7 +234,7 @@ get_aa_score = function(string,score){
 
 normalize_sequence = function(BS){
   #data("BLOSUM62")
-  BS_norm = BS %>% chartr("U","S",.) %>% chartr("O","K",.) %>% chartr("J","L",.)
+  BS_norm = BS %>% chartr("U","C",.) %>% chartr("O","K",.) %>% chartr("J","L",.)
   return(BS_norm)
 }
 
