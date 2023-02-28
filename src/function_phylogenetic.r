@@ -243,7 +243,7 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   #5     I 0.0002452   [9.65e-19,3.989e-06] 0.001131 1011/1011
   r4s.col = c('POS','SEQ','SCORE','QQ-INTERVAL','STD','MSA')
   r4s.header = grep(x=readLines(r4s),pattern="^#POS",v=T) |> # read the lines that contains the header
-    stringr::str_sub(start = 2L, stop=-1L) |> # remove the '#' symbol
+    stringr::str_sub(start = 2L, end=-1L) |> # remove the '#' symbol
     stringr::str_split(pattern="\\s+") |> unlist()
   r4s_col_in_file = intersect(r4s.col,r4s.header)
 
