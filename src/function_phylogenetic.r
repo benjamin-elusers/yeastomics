@@ -256,7 +256,9 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   r4s_content =readLines(r4s)
   clean_r4s = r4s_content |>  gsub(pattern = "^([0-9]{5,})([A-Z])", replacement='\\1\t\\2')
   if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
-    clean_r4s = clean_r4s |> gsub(pattern = "\\s+(?=[^\\[\\]]*\\])", replacement="")
+    clean_r4s_qq = clean_r4s |>
+      gsub(pattern = "\\[\\s+", replacement="[") |>
+      gsub(pattern = ",\\s+", replacement=",")
   }
   #gsub(x = .,  pattern = "(?<=\\[)([^\\]]*)( +)([^\\]]*)(?=\\])","\\1\\3",perl = T)
   #gsub("(?<=\\[)(\\s+)","",x = .,perl = T) # Remove spaces after bracket
