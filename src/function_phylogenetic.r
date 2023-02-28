@@ -214,15 +214,15 @@ find.common.ancestor= function(lineage){
 
 ## CONSERVATION / EVOLUTIONARY RATE ---------------------------------------------
 ### RATE4SITE -------------------------------------------------------------------
-read.R4S = function(r4s, id=NULL,verbose=T){
+read.R4S = function(r4s, id2use=NULL,verbose=T){
   #library(tidyverse)
-  if(is.null(id)){
-    id = basename(r4s)
-    is_orf = stringr::str_detect(id,SGD.nomenclature())
-    if ( is_orf ){ id = stringr::str_extract(id,SGD.nomenclature()) }
+  if(is.null(id2use)){
+    id2use = basename(r4s)
+    is_orf = stringr::str_detect(id2use,SGD.nomenclature())
+    if ( is_orf ){ id2use = stringr::str_extract(id2use,SGD.nomenclature()) }
   }
 
-  if(verbose){ message(sprintf('reading r4s results %s\n',id)) }
+  if(verbose){ message(sprintf('reading r4s results %s\n',id2use)) }
   #Rates were calculated using the expectation of the posterior rate distribution
   #Prior distribution is Gamma with 16 discrete categories
 
@@ -256,7 +256,7 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   r4s_content =readLines(r4s)
   clean_r4s = r4s_content |>  gsub(pattern = "^([0-9]{5,})([A-Z])", replacement='\\1\t\\2')
   if( "QQ-INTERVAL" %in% r4s_col_in_file  ){
-    clean_r4s_qq = clean_r4s |>
+    clean_r4s = clean_r4s |>
       gsub(pattern = "\\[\\s+", replacement="[") |>
       gsub(pattern = ",\\s+", replacement=",")
   }
@@ -264,7 +264,7 @@ read.R4S = function(r4s, id=NULL,verbose=T){
   #gsub("(?<=\\[)(\\s+)","",x = .,perl = T) # Remove spaces after bracket
   #gsub("(\\s+)(?=\\])","",x = .,perl = T) # Remove spaces before bracket
   df.r4s = readr::read_table(file = clean_r4s, comment = '#', col_names = r4s_col_in_file) |>
-    dplyr::mutate( ID = id, IDFILE = basename(r4s)) |>
+    dplyr::mutate( ID = id2use, IDFILE = basename(r4s)) |>
     dplyr::relocate(IDFILE,ID,POS,SEQ,SCORE) |>
     tibble::as_tibble() |>
     janitor::clean_names('screaming_snake') |>
