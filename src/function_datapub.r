@@ -1115,8 +1115,16 @@ get_timetree_age = function(ncbi_ids, what='adjusted'){
   API_TIMETREE = "http://timetree.temple.edu/api"
   age_json = get_timetree_json(ncbi_ids)
 
-  if(length(age_json) == 1 && is.na(age_json)){
+  if(length(age_json) == 1 && is.na(age_json) ){
     warning(sprintf("NO VALID JSON DATA IN TIMETREE FOR YOUR INPUT (%s)",ncbi_ids))
+    return(NA)
+  }
+
+  if(length(age_json) == 1 && is.na(age_json) ){
+    warning(sprintf("NO VALID JSON DATA IN TIMETREE FOR YOUR INPUT (%s)",ncbi_ids))
+    return(NA)
+  }else if( is.null(age_json[['time_estimates']]) ){
+    warning(sprintf("NO ESTIMATED TIEM OF DIVERGENCE FOR YOUR INPUT (%s)",ncbi_ids))
     return(NA)
   }
 
