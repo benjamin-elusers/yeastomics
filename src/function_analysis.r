@@ -51,33 +51,34 @@ make.bins <- function(tobin, nbin = 5, mode=c('equals','distrib'),
 }
 
 # Calculate the spearman correlation of two variables by group
-cor.sub.by = function(DATA,  XX, YY, BY, ID=NULL,include_full=F){
+cor.sub.by = function(DATA=data_s1b_longer,  XX, YY, BY, ID=NULL,include_full=F){
   CC = DATA %>%
     dplyr::select(any_of(c( XX, YY , BY ,ID))) %>%
     group_by(across(all_of( BY)),.drop = T) %>%
     add_count(name="N0") %>%
     mutate( na.xy= sum( is.na(.data[[XX]]) | is.na(.data[[YY]]) ),
             na.x=sum(is.na(.data[[XX]])), na.y=sum(is.na(.data[[YY]])), n=N0-na.xy,
-            x=XX,y=YY,by=BY ) %>%
+            x=XX,y=YY, by=list(BY)) %>%
     drop_na(XX,YY,BY) %>%
     mutate( spearman(.data[[XX]],.data[[YY]]),
             toshow = sprintf(" r %.3f \n p %s \n N %s",r,p,n),
-            ) %>%
+    ) %>%
     dplyr::select(-any_of(c(XX,YY,ID))) %>%
     distinct() %>%
     ungroup()
-    if(include_full){
-      CC_full = CC %>% add_row(N0 = nrow(DATA),
-            na.xy = sum(is.na(DATA[[XX]]) | is.na(DATA[[YY]])),
-            na.x=sum(is.na(DATA[[XX]])), na.y=sum(is.na(DATA[[YY]])), n=N0-na.xy,
-            x=XX,y=YY, by=BY, spearman(DATA[[XX]],DATA[[YY]]),
-            toshow = sprintf(" r %.3f \n p %s \n N %s",r,p,n))
-        CC_full[[ BY ]] = forcats::fct_explicit_na(CC_full[[BY]],"all")
-        return(CC_full)
-    }
+  if(include_full){
+    CC_full = CC %>% add_row(N0 = nrow(DATA),
+                             na.xy = sum(is.na(DATA[[XX]]) | is.na(DATA[[YY]])),
+                             na.x=sum(is.na(DATA[[XX]])), na.y=sum(is.na(DATA[[YY]])), n=N0-na.xy,
+                             x=XX,y=YY, by=BY, spearman(DATA[[XX]],DATA[[YY]]),
+                             toshow = sprintf(" r %.3f \n p %s \n N %s",r,p,n))
+    CC_full[[ BY ]] = forcats::fct_explicit_na(CC_full[[BY]],"all")
+    return(CC_full)
+  }
 
   return(CC)
 }
+
 
 # Measure centrality of a network
 network.centrality = function(fromTo,namenet=''){
