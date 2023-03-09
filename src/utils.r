@@ -782,6 +782,15 @@ scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){
   return(res)
 }
 
+pearson <- function(X,Y){
+  library(broom)
+  res = cor.test(x = X, y=Y , method = "pearson",use='pairwise.complete',exact=F) |>
+    broom::tidy() |>
+    mutate( p.value= ifelse(p.value==0,"<1e-324" ,sprintf("%.1e",p.value))) |>
+    dplyr::rename(r=estimate,p=p.value)
+  return(res)
+}
+
 spearman <- function(X,Y){
   library(broom)
   res = cor.test(x = X, y=Y , method = "spearman",use='pairwise.complete',exact=F) |>
@@ -802,6 +811,18 @@ spearman.toplot = function(X,Y){
   s$ymin = min_(Y)
   return(s)
 }
+
+pearson.toplot = function(X,Y){
+  p   = pearson(X,Y)
+  p$N = sum(complete.cases(X,Y))
+  p$toshow = sprintf(" r %.3f \n p %s \n N %s",p$r,p$p,p$N)
+  p$xmax = max_(X)
+  p$ymax = max_(Y)
+  p$xmin = min_(X)
+  p$ymin = min_(Y)
+  return(p)
+}
+
 # Extract correlation parameters as dataframe
 get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','p.value')]) }
 
