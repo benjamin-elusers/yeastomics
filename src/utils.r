@@ -108,13 +108,13 @@ fallback = function(url,archived){
 
 # Testing/Subsetting -----------------------------------------------------------
 is.whole  <- function(x){ all(floor(x) == x) }      # checks if a value has decimal part (not necessarily integer e.g. 1.0 is whole)
-is.string <- function(x){ is.character(x) && length(x) == 1 } # checks if a value is a single string of letters
+is.string <- function(x){  length(x) == 1 & is.character(x) } # checks if a value is a single string of letters
 #is.binary <- function(x){ all( (1*x) %in% 0:1) }    # checks if a value is 0/1 (binary/logical)
 
-is_num_bin <- function(x){ is.numeric(x) && length(unique(na.omit(x))) == 2 } # checks if a numeric vector has only 2 values
-is_fac_bin <- function(x){ is.factor(x) && nlevels(na.omit(x)) == 2 }         # checks if a factor vector has only 2 levels
+is_num_bin <- function(x){ is.numeric(x) & length(unique(na.omit(x))) == 2 } # checks if a numeric vector has only 2 values
+is_fac_bin <- function(x){ is.factor(x) & nlevels(na.omit(x)) == 2 }         # checks if a factor vector has only 2 levels
 # checks if a value is binary (2 unique outcomes -- by default numeric values must be either 0 and 1)
-is.binary  <- function(x,xvals=c(0,1)){ is_num_bin(x) && range(na.omit(x)) == xvals[1:2] || is_fac_bin(x) || is.logical(x) }
+is_binary  <- function(x,xvals=c(0,1)){ is_num_bin(x) & range(na.omit(x)) %in% xvals[1:2] | is_fac_bin(x) | is.logical(x) }
 is_number <- function(x){ grepl("^[0-9]+$",x) } # checks if it contains only number
 
 is.even   <- function(x){ as.integer(x) %% 2 == 0 } # checks if a value is even
