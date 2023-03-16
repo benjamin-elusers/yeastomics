@@ -173,8 +173,8 @@ invert    <- function(x){ setNames(names(x),make.unique(x)) }
 
 # Counting ---------------------------------------------------------------------
 ulen    <- function(x){ return( length(unique(x)) ) } # gets length of unique values
-normin  <- function(x){ return( scale(x,center=min(x),scale=1)[,1] ) } # adds minimum to values (keeps original range)
-norm01  <- function(x){ return( scale(x,center=min(x),scale=diff(range(x)))[,1] ) } # scales values between 0 and 1
+normin  <- function(x){ return( scale(x,center=min(x,na.rm=T),scale=1)[,1] ) } # adds minimum to values (keeps original range)
+norm01  <- function(x){ return( scale(x,center=min(x,na.rm=T),scale=diff(range(x,na.rm=T)))[,1] ) } # scales values between 0 and 1
 maxrep  <- function(x,n){ sort(table(x), decreasing = TRUE)[1:n] } # gets the Nth most repeated values
 sum.na  <- function (x,notNA=FALSE){ sum(is.na(x) == !notNA) } # returns sum of NA or not-NA values
 geomean <- function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) } # returns geometrical mean
