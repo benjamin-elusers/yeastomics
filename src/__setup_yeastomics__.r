@@ -46,7 +46,8 @@ mytheme = theme(plot.background =  element_blank(),
 # Options
 options(dplyr.summarise.inform=FALSE,
         dplyr.width=Inf,
-        max.print=2e4)
+        max.print=2e4,
+        timeout = max(600, getOption("timeout")))
 
 # Logger
 library(log)
