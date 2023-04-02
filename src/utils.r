@@ -860,6 +860,27 @@ get.AA.df = function(){
   return( data.frame( a=names(aaa), aaa ) )
 }
 
+# Amino acid properties based on seqinr::SEQINR.UTIL$AA.PROPERTY
+get.aa.poperties = function(){
+  aa_prop = list(
+    tiny = c("A", "C", "G", "S", "T"),
+    small = c("A", "B", "C","D", "G", "N", "P", "S", "T", "V"),
+    aliphatic = c("I", "L", "V"),
+    aromatic = c("F", "H", "W", "Y"),
+    nonpolar = c("A", "C","F", "G", "I", "L", "M", "P", "V", "W", "Y"),
+    polar = c("D","E", "H", "K", "N", "Q", "R", "S", "T", "Z"),
+    charged = c("B","D", "E", "H", "K", "R", "Z"),
+    basic = c("H", "K", "R"),
+    acidic = c("B","D", "E", "Z"),
+    alcohol=c('S','T') ,
+    turnlike=c('A','C','D','E','G','H','K','N','Q','R','S','T')
+  )
+
+  aa_grouped = sapply(aa_prop,paste0,collapse="")
+  names(aa_prop) = paste0(names(aa_prop),"_",aa_grouped)
+  return(aa_prop)
+}
+
 # Amino acid scores used in Dubreuil et al. 2019
 get.aggrescan = function(){
   setNames(
