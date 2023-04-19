@@ -850,6 +850,11 @@ is.aa3    <- function(x,.add.names=T,.ignore.case=T){
   return( is.in(x,get.AA3(), case.sensitive=!.ignore.case, withNames=.add.names) )
 }
 
+get.AAA = function(){ c("ALA","CYS","ASP","GLU","PHE",
+                        "GLY","HIS","ILE","LYS","LEU",
+                        "MET","ASN","PRO","GLN","ARG",
+                        "SER","THR","VAL","TRP","TYR") }
+
 get.AA3 = function(){ c('A'="ALA",'C'="CYS",'D'="ASP",'E'="GLU",'F'="PHE",
                         'G'="GLY",'H'="HIS",'I'="ILE",'K'="LYS",'L'="LEU",
                         'M'="MET",'N'="ASN",'P'="PRO",'Q'="GLN",'R'="ARG",
@@ -863,17 +868,17 @@ get.AA.df = function(){
 # Amino acid properties based on seqinr::SEQINR.UTIL$AA.PROPERTY
 get.aa.poperties = function(){
   aa_prop = list(
-    tiny = c("A", "C", "G", "S", "T"),
-    small = c("A", "B", "C","D", "G", "N", "P", "S", "T", "V"),
-    aliphatic = c("I", "L", "V"),
-    aromatic = c("F", "H", "W", "Y"),
-    nonpolar = c("A", "C","F", "G", "I", "L", "M", "P", "V", "W", "Y"),
-    polar = c("D","E", "H", "K", "N", "Q", "R", "S", "T", "Z"),
-    charged = c("B","D", "E", "H", "K", "R", "Z"),
-    basic = c("H", "K", "R"),
-    acidic = c("B","D", "E", "Z"),
-    alcohol=c('S','T') ,
-    turnlike=c('A','C','D','E','G','H','K','N','Q','R','S','T')
+    tiny      = c('A','C','G','S','T'),
+    small     = c('A','B','C','D','G','N','P','S','T','V'),
+    aliphatic = c('I','L','V'),
+    aromatic  = c('F','H','W','Y'),
+    nonpolar  = c('A','C','F','G','I','L','M','P','V','W','Y'),
+    polar     = c('D','E','H','K','N','Q','R','S','T','Z'),
+    charged   = c('B','D','E','H','K','R','Z'),
+    basic     = c('H','K','R'),
+    acidic    = c('B','D','E','Z'),
+    alcohol   = c('S','T'),
+    turnlike  = c('A','C','D','E','G','H','K','N','Q','R','S','T')
   )
 
   aa_grouped = sapply(aa_prop,paste0,collapse="")
