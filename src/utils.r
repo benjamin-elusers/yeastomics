@@ -116,6 +116,7 @@ is_fac_bin <- function(x){ is.factor(x) & nlevels(na.omit(x)) == 2 }         # c
 # checks if a value is binary (2 unique outcomes -- by default numeric values must be either 0 and 1)
 is_binary  <- function(x,xvals=c(0,1)){ is_num_bin(x) & all(range(na.omit(x)) %in% xvals[1:2]) | is_fac_bin(x) | is.logical(x) }
 is_number <- function(x){ grepl("^[0-9]+$",x) } # checks if it contains only number
+is_frequency <- function(x){ all(is.numeric(x) & x>=0 & x<=100) } # checks if values are between 0 and 100
 
 is.even   <- function(x){ as.integer(x) %% 2 == 0 } # checks if a value is even
 is.odd    <- function(x){ as.integer(x) %% 2 != 0 } # checks if a value is odd
