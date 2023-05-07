@@ -754,6 +754,11 @@ paste.pair = function(x,s='_'){ # join by pair (upper limit of pair i is the low
   return(pair)
 }
 
+between_ <- function(x,l,r){
+  if(any(is.na(c(l,r)))){ return(NA) }
+  x>min(l,r) & x<max(l,r)
+}
+
 get.even  <- function(x){ x[is.even(x)] } # returns even values
 get.odd   <- function(x){ x[is.odd(x)]  } # returns odd values
 get.dup   <- function(x){ x[is.dup(x)]  } # returns duplicates
