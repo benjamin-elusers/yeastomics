@@ -512,7 +512,10 @@ fneg    <- function(SEQ){ mean(is.neg(SEQ)) }
 charged <- function(SEQ){ return( pos(SEQ) + neg(SEQ) ) }
 fcr     <- function(SEQ){ return( fpos(SEQ) + fneg(SEQ)  ) }
 npcr    <- function(SEQ){ return( abs( fpos(SEQ) - fneg(SEQ) )  ) }
-charge.asym <- function(p,n){ return( (p-n)**2 / (p+n) ) } #p=positives n=negatives (sums)
+charge.asym <- function(p,n){ #p=positives n=negatives (sums)
+  if( (p+n) == 0){ return(0) }
+  return( (p-n)**2 / (p+n) )
+}
 
 # Fasta format
 seq2fasta <- function(seq, maxline=70, as.string=F){
