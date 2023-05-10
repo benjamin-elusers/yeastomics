@@ -2882,9 +2882,9 @@ get_hs_transcript = function(BIOMART=get_ensembl_dataset('ENSEMBL_MART_ENSEMBL',
   att_uni = c('uniprotswissprot')
   att_type = c('gene_biotype','transcript_biotype')
 
-  filters = c('biotype'='protein_coding','transcript_biotype'='protein_coding')
+  filters = list('biotype'='protein_coding','transcript_biotype'='protein_coding')
 
-  if(with_uniprot){ filters = c(filters,'with_uniprotswissprot'=T)  }
+  if(with_uniprot){ filters = append(filters,'with_uniprotswissprot'=T)  }
 
   #hs_ens = useEnsembl('ensembl','hsapiens_gene_ensembl',mirror=ENS_MIRROR)
   # Get representative human proteome with UniProt/SwissProt identifiers
