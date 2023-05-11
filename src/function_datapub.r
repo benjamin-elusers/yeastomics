@@ -2146,6 +2146,25 @@ load.sgd.proteome = function(withORF=T,rm.stop=T, orf_protein="sequence/S288C_re
   return(SGD)
 }
 
+load.pombase.features = function(verbose=F){
+  pombase.url = "https://www.pombase.org/data/names_and_identifiers/gene_IDs_names_products.tsv"
+  regexPombaseID = "(SP[^ ]+)(?=:pep)"
+  regexPombase = "(?<=:pep )(.+)(?=\\|)"
+  pombase_features = readr::read_delim(pombase.url, skip=1,
+                                       delim =  "\t", show_col_types = verbose,
+                                       col_names = c('pombase_orf',"pombase_id","gname","chr","desc","uniprot","type","synonyms")) %>%
+    mutate(string_id=paste0("4896.",pombase_orf,".1"))
+  # 1. systematic ID (without prefix)
+  # 2. systematic ID with PomBase: prefix
+  # 3. primary gene name (where assigned)
+  # 4. chromosome
+  # 5. product description
+  # 6. UniProtKB accession (without prefix)
+  # 7. product type
+  # 8. all synonyms
+  return(pombase_features)
+}
+
 load.pombase.proteome = function(withORF=T,rm.version=T) {
   library(stringr)
   pombase.url = "ftp://ftp.pombase.org/pombe/genome_sequence_and_features/feature_sequences/peptide.fa.gz"
@@ -2168,23 +2187,19 @@ load.pombase.proteome = function(withORF=T,rm.version=T) {
   return(Pombase)
 }
 
-load.pombase.features = function(verbose=F){
-  pombase.url = "https://www.pombase.org/data/names_and_identifiers/gene_IDs_names_products.tsv"
-  regexPombaseID = "(SP[^ ]+)(?=:pep)"
-  regexPombase = "(?<=:pep )(.+)(?=\\|)"
-  pombase_features = readr::read_delim(pombase.url,
-                    delim =  "\t", show_col_types = verbose,
-                    col_names = c('pombase_orf',"pombase_id","gname","chr","desc","uniprot","type","synonyms")) %>%
-                    mutate(string_id=paste0("4896.",pombase_orf,".1"))
-# 1. systematic ID (without prefix)
-# 2. systematic ID with PomBase: prefix
-# 3. primary gene name (where assigned)
-# 4. chromosome
-# 5. product description
-# 6. UniProtKB accession (without prefix)
-# 7. product type
-# 8. all synonyms
-  return(pombase_features)
+load.pombase.CDS = function(coding=T) {
+  library(stringr)
+  pombase.cdna_url = "https://www.pombase.org/data/genome_sequence_and_features/feature_sequences/cds.fa.gz"
+  Pombase_cdna = load.genome(pombase.cdna_url)
+
+  pombase_coding = load.pombase.features() |>
+    dplyr::filter(type=='protein coding gene') |>
+    dplyr::select(uniprot,pombase_orf,gname)
+  if(coding){
+    return(Pombase_cdna[pombase_coding$pombase_orf])
+  }
+
+  return(Pombase_cdna)
 }
 
 ##### Uniprot #####
