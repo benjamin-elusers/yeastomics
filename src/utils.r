@@ -830,7 +830,7 @@ spearman <- function(X,Y){
 
 get_slope <- function(X,Y,I=F){
   df_xy = data.frame(X=X,Y=Y)
-  m = lm(data=df_xy, formula = reformulate(termlabels = X,response = Y,intercept=I))
+  m = lm(data=df_xy, formula = reformulate(termlabels = "X",response ="Y",intercept=I))
   return(coefficients(m)[I+1])
 }
 
