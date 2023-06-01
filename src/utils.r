@@ -849,7 +849,7 @@ spearman.toplot = function(X,Y,intercept=F){
 
 pearson.toplot = function(X,Y){
   p   = pearson(X,Y)
-  p$slope =  get_slope(X,Y)(X,Y)
+  p$slope =  get_slope(X,Y)
   p$N = sum(complete.cases(X,Y))
   p$toshow = sprintf("%2.1f\n%.3f\n%4s\n%4s",p$slope,p$r,p$p,p$N)
   p$xmax = max_(X)
