@@ -783,6 +783,26 @@ mad_      <- function(...){ mad(na.rm=T,...) } # Median absoluted deviations wit
 quantile_ <- function(x,...){  quantile(x,...,na.rm=T) } # quantile with no error message for missing values
 range_ <- function(x,...){  range(x,...,na.rm=T) } # range with no error message for missing values
 
+
+slope <- function(x, y){
+  mean_x <- mean(x,na.rm=T)
+  mean_y <- mean(y,na.rm=T)
+  nom <- sum((x - mean_x)*(y-mean_y),na.rm=T)
+  denom <- sum((x - mean_x)^2,na.rm=T)
+  m <- nom / denom
+  return(m)
+}
+
+# the slope formula is just
+# covariance(x, y) / variance(x)
+slope2 <- function(x, y){
+  return(cov(x, y,use = 'pairwise', 'pearson')/var(x,na.rm = T))
+}
+
+intercept <- function(x, y, m){
+  b <- mean(y,na.rm=T) - (m * mean(x,na.rm=T))
+  return(b)
+}
 # Correlation with spearman method (ranks) and pairwise value
 scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){
   res = cor.test(x,y,method = met, use=use, exact=F) |>
@@ -812,8 +832,9 @@ spearman <- function(X,Y){
 # Get spearman correlation parameters ready to plot
 spearman.toplot = function(X,Y){
   s   = spearman(X,Y)
+  s$slope = slope(X,Y)
   s$N = sum(complete.cases(X,Y))
-  s$toshow = sprintf(" r %.3f \n p %s \n N %s",s$r,s$p,s$N)
+  s$toshow = sprintf("%.3f\n%4s\n%4s",s$slope, s$r,s$p,s$N)
   s$xmax = max_(X)
   s$ymax = max_(Y)
   s$xmin = min_(X)
@@ -823,8 +844,9 @@ spearman.toplot = function(X,Y){
 
 pearson.toplot = function(X,Y){
   p   = pearson(X,Y)
+  p$slope = slope(X,Y)
   p$N = sum(complete.cases(X,Y))
-  p$toshow = sprintf(" r %.3f \n p %s \n N %s",p$r,p$p,p$N)
+  p$toshow = sprintf("%.1f%.3f\n%4s\n%4s",p$slope,p$r,p$p,p$N)
   p$xmax = max_(X)
   p$ymax = max_(Y)
   p$xmin = min_(X)
