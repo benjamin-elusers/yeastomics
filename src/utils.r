@@ -784,7 +784,7 @@ quantile_ <- function(x,...){  quantile(x,...,na.rm=T) } # quantile with no erro
 range_ <- function(x,...){  range(x,...,na.rm=T) } # range with no error message for missing values
 
 
-slope <- function(x, y){
+slope.manual <- function(x, y){
   mean_x <- mean(x,na.rm=T)
   mean_y <- mean(y,na.rm=T)
   nom <- sum((x - mean_x)*(y-mean_y),na.rm=T)
@@ -793,16 +793,15 @@ slope <- function(x, y){
   return(m)
 }
 
-# the slope formula is just
-# covariance(x, y) / variance(x)
-slope2 <- function(x, y){
-  return(cov(x, y,use = 'pairwise', 'pearson')/var(x,na.rm = T))
-}
-
-intercept <- function(x, y, m){
+intercept.manual <- function(x, y, m){
   b <- mean(y,na.rm=T) - (m * mean(x,na.rm=T))
   return(b)
 }
+# slope = covariance(x, y) / variance(x)
+slope <- function(x, y, use='pairwise', method = 'pearson'){
+  return(cov(x, y,use = use , method = method)/var(x,na.rm = T))
+}
+
 # Correlation with spearman method (ranks) and pairwise value
 scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){
   res = cor.test(x,y,method = met, use=use, exact=F) |>
@@ -829,10 +828,16 @@ spearman <- function(X,Y){
   return(res)
 }
 
+get_slope <- function(X,Y,I=F){
+  df_xy = data.frame(X=X,Y=Y)
+  m = lm(df_xy,reformulate(termlabels = X,response = Y,intercept=I))
+  return(coefficients(m)[I+1])
+}
+
 # Get spearman correlation parameters ready to plot
-spearman.toplot = function(X,Y){
+spearman.toplot = function(X,Y,intercept=F){
   s   = spearman(X,Y)
-  s$slope = slope(X,Y)
+  s$slope = get_slope(X,Y)
   s$N = sum(complete.cases(X,Y))
   s$toshow = sprintf("%.3f\n%4s\n%4s",s$slope, s$r,s$p,s$N)
   s$xmax = max_(X)
@@ -844,7 +849,7 @@ spearman.toplot = function(X,Y){
 
 pearson.toplot = function(X,Y){
   p   = pearson(X,Y)
-  p$slope = slope(X,Y)
+  p$slope =  get_slope(X,Y)(X,Y)
   p$N = sum(complete.cases(X,Y))
   p$toshow = sprintf("%.1f%.3f\n%4s\n%4s",p$slope,p$r,p$p,p$N)
   p$xmax = max_(X)
