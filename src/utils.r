@@ -807,7 +807,8 @@ intercept <- function(x, y, m){
 scor <- function(x,y,met='spearman',use='pairwise.complete.obs'){
   res = cor.test(x,y,method = met, use=use, exact=F) |>
         replace_name("r"="estimate","p"="p.value")
-  res$p.value = ifelse(res$p.value==0,"<1e-324" ,sprintf("%.1e",res$p.value))
+  res$pv = res$p.value
+  res$p.value = ifelse(res$pv==0,"<1e-324" ,sprintf("%.1e",res$pv))
   return(res)
 }
 
@@ -815,7 +816,8 @@ pearson <- function(X,Y){
   library(broom)
   res = cor.test(x = X, y=Y , method = "pearson",use='pairwise.complete',exact=F) |>
     broom::tidy() |>
-    mutate( p.value= ifelse(p.value==0,"<1e-324" ,sprintf("%.1e",p.value))) |>
+    mutate( pv = p.value,
+            p.value= ifelse(pv==0,"<1e-324" ,sprintf("%.1e",pv))) |>
     dplyr::rename(r=estimate,p=p.value)
   return(res)
 }
@@ -824,7 +826,8 @@ spearman <- function(X,Y){
   library(broom)
   res = cor.test(x = X, y=Y , method = "spearman",use='pairwise.complete',exact=F) |>
         broom::tidy() |>
-    mutate( p.value= ifelse(p.value==0,"<1e-324" ,sprintf("%.1e",p.value))) |>
+    mutate( pv = p.value,
+            p.value= ifelse(pv==0,"<1e-324" ,sprintf("%.1e",pv))) |>
     dplyr::rename(r=estimate,p=p.value)
   return(res)
 }
@@ -855,7 +858,7 @@ pearson.toplot = function(X,Y){
 }
 
 # Extract correlation parameters as dataframe
-get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','p.value')]) }
+get.cor.param = function(x,y,...){ as.data.frame(scor(x,y,...)[c('estimate','pv','p.value')]) }
 
 # precomputed data -------------------------------------------------------------
 get.AA1 = function(){ unlist(strsplit("ACDEFGHIKLMNPQRSTVWY","")) }
