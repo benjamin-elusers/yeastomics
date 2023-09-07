@@ -332,8 +332,14 @@ load.lee2014.data = function(rawdata=F){
   s4 = "1250217s4.xlsx"
   url.s1 = paste0(URL_SCIENCE_SUPPL,doi,"&file=",s1)
   url.s4 = paste0(URL_SCIENCE_SUPPL,doi,"&file=",s4)
+  local_s1 = here("released-dataset","original_data","1250217s1.xlsx")
+  local_s4 = here("released-dataset","original_data","1250217s4.xlsx")
+
   #url.fitness_hom =paste0(url.hiphop,"/","fitness_defect_matrix_hom.txt")
   #url.fitness_het =paste0(url.hiphop,"/","fitness_defect_matrix_het.txt")
+
+  url.s1 = ifelse( xfun::url_accessible(url.s1), url.s1 , local_s1)
+  url.s4 = ifelse( xfun::url_accessible(url.s4), url.s4 , local_s4)
 
   library(openxlsx) # cant read from url with readxl
   # Compound library
@@ -518,10 +524,10 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
   # Target url for downloading the file is:
   # https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx
 
-
-
   #success = download.file("https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx", destfile = "aai7825_Leuenberger_Table-S3.xlsx" )
-  S3.url = here("released-dataset","original_data","aai7825_leuenberger_table-s3.xlsx")
+  S3.local = here("released-dataset","original_data","aai7825_leuenberger_table-s3.xlsx")
+  S3.url = ifelse( xfun::url_accessible(S3.url), S3.url , S3.local)
+
   LIP_MS = openxlsx::read.xlsx(xlsxFile = S3.url,
                                sheet = species, detectDates = T,
                                skipEmptyRows = T, skipEmptyCols = T) %>%
