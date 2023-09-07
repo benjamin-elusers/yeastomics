@@ -518,7 +518,10 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
   # Target url for downloading the file is:
   # https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx
 
-  #download.file(S3.url, destfile = "aai7825_Leuenberger_Table-S3.xlsx" )
+
+
+  #success = download.file("https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx", destfile = "aai7825_Leuenberger_Table-S3.xlsx" )
+  S3.url = here("released-dataset","original_data","aai7825_leuenberger_table-s3.xlsx")
   LIP_MS = openxlsx::read.xlsx(xlsxFile = S3.url,
                                sheet = species, detectDates = T,
                                skipEmptyRows = T, skipEmptyCols = T) %>%
