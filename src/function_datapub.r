@@ -138,8 +138,11 @@ load.pu2008.data = function(){
   message("REF: S. Pu et al., 2008, Nucleic Acids Research")
   message("Up-to-date catalogues of yeast protein complexes")
 
-  CYC2008.url = "http://wodaklab.org/cyc2008/resources/CYC2008_complex.tab"
-  CYC2008 = read.delim(file = CYC2008.url, sep='\t', stringsAsFactors = F,header = T, na.strings = "") %>%
+  CYC2008.url = "https://wodaklab.org/cyc2008/resources/CYC2008_complex.tab"
+  CYC2008_local = here("released-dataset","original_data","CYC2008_complex.tab")
+
+  CYC2008.url=  ifelse(xfun::url_accessible(CYC2008.url), CYC2008.url, CYC2008_local)
+  CYC2008 = read.delim(file = CYC2008_local, sep='\t', stringsAsFactors = F,header = T, na.strings = "") %>%
     as_tibble() %>%
     group_by(Complex) %>%
     fill(PubMed_id:Jaccard_Index, .direction = "down") %>%
@@ -375,11 +378,17 @@ load.lee2014.data = function(rawdata=F){
 }
 
 
-load.filleton2015.data = function(){
+load.filleton2015.data = function(full=F){
   message("REF: Filleton F. et al, 2015, Epigenetics & Chromatin")
   message("The complex pattern of epigenomic variation between natural yeast strains at single-nucleosome resolution")
   # Epidiv values for all genes (intra-species variation of chromatin modifications)
   S12="https://static-content.springer.com/esm/art%3A10.1186%2Fs13072-015-0019-3/MediaObjects/13072_2015_19_MOESM12_ESM.ods"
+  epidiv = rio::import(S12,skip=5,na=c("")) %>%
+           drop_empty_cols() %>%
+           dplyr::rename(orf = Gene, epigenomic_variation = Epidiv)
+
+  if(full){ return(epidiv) }
+  return(epidiv %>% dplyr::select(orf,epigenomic_variation))
 }
 
 
@@ -388,6 +397,9 @@ load.lancaster2014.data = function(){
   message("PLAAC: a web and command-line application to identify proteins with Prion-Like Amino Acid Composition")
   #doi:10.1093/bioinformatics/btu310
   yeast_datafile="http://plaac.wi.mit.edu/Scer-all-proteins-2014-05-17.xls"
+
+  test = rio::import(yeast_datafile,setclass = 'tibble') %>%
+         dplyr::select(orf = SEQid, prion_likelihood = LLR)
 }
 
 
@@ -408,6 +420,7 @@ load.vanleeuwen2016.data = function(single_orf=F){
   #temp=tempfile()
   #download.file(S7, destfile = temp)
 
+  S7 = ifelse(xfun::url_accessible(S7), S7, here("released-dataset","original_data","aag0839tables7.xlsx"))
   .class_function = c(
     'A'="Amio acid biosynth & transport",
     'B'="Autophagy",
@@ -807,8 +820,14 @@ load.szavitsnossan2020.data = function(){
   message("REF: J. Szavits-Nossan et al., 2020, Nucleic Acids Research")
   message("Inferring efficiency of translation initiation and elongation from ribosome profiling")
   zip.url = "https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/nar/48/17/10.1093_nar_gkaa678/1/gkaa678_supplemental_files.zip?Expires=1648233481&Signature=SPpuRD-C9Hl8cQYD5qtQnTXvPpPHpoqQCorupykk62Ix5jhnIe5JMiaVO3-rpTToxETOAe56z8BhVKVd5n6FBFvl0ovfvCoTeAsEquMZdzoBzUhSErDkllLunIXilFhF17L1Upv7wZFjPmTc3J1rK~Ckmm8EFqnnoJu5LvQBHcMN~HT8cpj3koYuBEnh1GFJ8pb17bILkNcB6qCwHnvtoW8g9e7S0fHZ2hsjYM9AlRCdwheSadSHQZgTyIJI44xHI2X51t5VC4v9LP~gGDlb8EcuYkDiRLcpQSbQkoI5Yt~BDOvymQY4AOna6UFVb1qN4Ll0j4J3Yv55ZjeXmXSm4g__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA"
-  temp<-tempfile()
-  download.file(zip.url,temp)
+
+  if(xfun::url_accessible(zip.url)){
+   temp<-tempfile()
+   download.file(zip.url,temp)
+  }else{
+   temp = here('released-dataset','original_data','gkaa678_supplemental_files.zip')
+  }
+
   data_files = unzip(temp,list = T)$Name[1:3]
 
   ## ribosome profiling experiments
@@ -858,6 +877,7 @@ load.vanleeuwen2020.data = function(){
   message("Systematic analysis of bypass suppression of essential genes")
   #"https://www.embopress.org/doi/full/10.15252/msb.20209828"
   EV13.url = "https://www.embopress.org/action/downloadSupplement?doi=10.15252%2Fmsb.20209828&file=msb209828-sup-0014-DatasetEV13.xlsx"
+  EV13.url = ifelse(xfun::url_accessible(EV13.url),EV13.url,here("released-dataset","original_data","msb209828-sup-0014-datasetev13.xlsx"))
   #download.file(EV13.url, destfile = "msb209828-sup-0014-datasetev13.xlsx" )
   dispensable = openxlsx::read.xlsx(xlsxFile = EV13.url,
                                     sheet = 2, detectDates = F,
