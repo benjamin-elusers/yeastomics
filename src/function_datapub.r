@@ -1094,7 +1094,10 @@ load.pfam = function(tax='559292'){
 load.string = function(tax="4932",phy=T,ful=T,min.score=700,vers="v11.0"){
   # Load protein links (physical PPI)
   # 4932 = S.cerevisiae
-  URL_STRING = "https://stringdb-static.org/download"
+
+  URL_STRING="https://stringdb-downloads.org/download"
+  #/protein.links.v12.0/4932.protein.links.v12.0.txt.gz
+  #URL_STRING = "https://stringdb-static.org/download"
   .version = vers
   .protein = ifelse(phy,"protein.physical","protein")
   .links = ifelse(ful,"links.full","links")
@@ -2179,9 +2182,12 @@ load.pombase.features = function(verbose=F){
   pombase.url = "https://www.pombase.org/data/names_and_identifiers/gene_IDs_names_products.tsv"
   regexPombaseID = "(SP[^ ]+)(?=:pep)"
   regexPombase = "(?<=:pep )(.+)(?=\\|)"
+  #c('pombase_orf',"pombase_id","gname","chr","desc","uniprot","type","synonyms")
+  pombase_columns = c("pombase_orf","orf_prefix","name","chromosome_id","description","uniprot","type","synonyms")
+
   pombase_features = readr::read_delim(pombase.url, skip=1,
                                        delim =  "\t", show_col_types = verbose,
-                                       col_names = c('pombase_orf',"pombase_id","gname","chr","desc","uniprot","type","synonyms")) %>%
+                                       col_names = pombase_columns) %>%
     mutate(string_id=paste0("4896.",pombase_orf,".1"))
   # 1. systematic ID (without prefix)
   # 2. systematic ID with PomBase: prefix
