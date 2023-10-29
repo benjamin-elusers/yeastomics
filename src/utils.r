@@ -181,6 +181,7 @@ sum.na  <- function (x,notNA=FALSE){ sum(is.na(x) == !notNA) } # returns sum of 
 geomean <- function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) } # returns geometrical mean
 geosd   <- function(x) {  exp(sd(log(x[x != 0 & !is.na(x)]))) } # returns geometrical standard deviation
 min_above <- function(x,above=0,...){ min(x[x>above],...) }
+max_below <- function(x,beow=0,...){ max(x[x<below],...) }
 
 rowsNA = function(m){ # counts how many rows have NAs
   # input must be 2D array (matrix/dataframe)
@@ -833,11 +834,14 @@ spearman <- function(X,Y){
 }
 
 # Get spearman correlation parameters ready to plot
-spearman.toplot = function(X,Y){
+spearman.toplot = function(X,Y,rm.slope=T){
   s   = spearman(X,Y)
   s$slope = slope(X,Y)
   s$N = sum(complete.cases(X,Y))
-  s$toshow = sprintf("%.3f\n%.3f\n%4s\n%4s",s$slope, s$r,s$p,s$N)
+  s$toshow = sprintf("%.3f\n%.3f\n%4s\n%4s",s$slope,s$r,s$p,s$N)
+  if(rm.slope){
+    s$toshow = sprintf("%.3f\n%4s\n%4s",s$r,s$p,s$N)
+  }
   s$xmax = max_(X)
   s$ymax = max_(Y)
   s$xmin = min_(X)
@@ -845,11 +849,14 @@ spearman.toplot = function(X,Y){
   return(s)
 }
 
-pearson.toplot = function(X,Y){
+pearson.toplot = function(X,Y,rm.slope=F){
   p   = pearson(X,Y)
   p$slope = slope(X,Y)
   p$N = sum(complete.cases(X,Y))
   p$toshow = sprintf("%.3f\n%.3f\n%4s\n%4s",p$slope,p$r,p$p,p$N)
+  if(rm.slope){
+    p$toshow = sprintf("%.3f\n%4s\n%4s",p$r,p$p,p$N)
+  }
   p$xmax = max_(X)
   p$ymax = max_(Y)
   p$xmin = min_(X)

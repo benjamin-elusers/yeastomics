@@ -3156,10 +3156,13 @@ get_ncbi_tree = function(ids,dbfile='data/ncbi/ncbiTaxa.sql'){
 
 load.hgnc = function(with_protein=T, all_fields=F){
 
-  hgnc = read_delim("http://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/non_alt_loci_set.txt",delim = '\t') %>%
-          dplyr::rename(uni=uniprot_ids,ensg=ensembl_gene_id)
+  #old_url = "http://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/non_alt_loci_set.txt"
+  #hgnc_old = read_delim(  old_url, delim = '\t') %>%
+  # dplyr::rename(uni=uniprot_ids,ensg=ensembl_gene_id)
 
-  minified = c('uni','ensg','symbol','name','location','gene_group','locus_group','locus_type')
+  hgnc = read_delim(  "https://ftp.ebi.ac.uk/pub/databases/genenames/hgnc/tsv/locus_groups/protein-coding_gene.txt",delim = '\t')
+
+  minified = c('uniprot_ids','ensembl_gene_id','symbol','name','location','gene_group','locus_group','locus_type')
 
   if(with_protein){
     hgnc = hgnc %>% filter(locus_group == 'protein-coding gene' & locus_type=='gene with protein product') %>%
