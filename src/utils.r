@@ -181,7 +181,7 @@ sum.na  <- function (x,notNA=FALSE){ sum(is.na(x) == !notNA) } # returns sum of 
 geomean <- function(x) {  exp(mean(log(x[x != 0 & !is.na(x)]))) } # returns geometrical mean
 geosd   <- function(x) {  exp(sd(log(x[x != 0 & !is.na(x)]))) } # returns geometrical standard deviation
 min_above <- function(x,above=0,...){ min(x[x>above],...) }
-max_below <- function(x,beow=0,...){ max(x[x<below],...) }
+max_below <- function(x,below=0,...){ max(x[x<below],...) }
 
 rowsNA = function(m){ # counts how many rows have NAs
   # input must be 2D array (matrix/dataframe)
