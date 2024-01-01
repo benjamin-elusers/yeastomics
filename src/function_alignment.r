@@ -187,7 +187,7 @@ msa2df = function(MSA_SEQ,REF_NAME,ID=NULL,verbose=F){
   REFMAT = matrix(REFSEQ,nrow = NS-1, ncol=NC,byrow=T)
 
   CONSENSUS =  consensusMatrix(MSA_SEQ)
-  iref_aa=match(REF,rownames(CONSENSUS))
+  iref_aa=match(REF,rownames(MSA_SEQ))
 
   df_msa = tibble( idfile = ID,
                    id     = REF,
