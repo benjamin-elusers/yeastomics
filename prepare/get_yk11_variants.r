@@ -2,6 +2,79 @@
 source(here::here("src","__setup_yeastomics__.r"))
 source(here::here("src","function_YK11.r"))
 
+load_aligned_yk11 = function(){
+
+  DIR_YK11_PAL2NAL = "/media/elusers/users/benjamin/A-PROJECTS/03_PostDoc/EvoRate-paper/pal2nal/"
+  cds_yk11.rds=file.path(DIR_YK11_PAL2NAL,"cds_yk11.rds")
+  prot_yk11.rds=file.path(DIR_YK11_PAL2NAL,"prot_yk11.rds")
+
+  if(!file.exists(cds_yk11.rds) & !file.exists(prot_yk11.rds)){
+    DIR_YK11_CDS = file.path(DIR_YK11_PAL2NAL,"output/")
+    muscle_yk11_cds = list.files(DIR_YK11_CDS,pattern='\\.out',full.names = T)
+    is_aligned = map(muscle_yk11_cds,~readDNAStringSet(.x) %>% widths %>% unique)
+    not_aligned = sapply(is_aligned,length) > 1
+
+    DIR_YK11_PROT = file.path(DIR_YK11_PAL2NAL,"aln_s288c/")
+    muscle_yk11_prot = list.files(DIR_YK11_PROT,pattern='\\.fasta',full.names = T)
+
+    orf_both = intersect(get.orf(muscle_yk11_prot),get.orf(muscle_yk11_cds[!not_aligned]))
+
+    cds_aligned = file.path(DIR_YK11_CDS,paste0(orf_both,'_s288c.out'))
+    prot_aligned = file.path(DIR_YK11_PROT,paste0(orf_both,'_strains_only.fasta'))
+
+    cds_yk11 = map(cds_aligned,readDNAMultipleAlignment)
+    names(cds_yk11) = orf_both
+    prot_yk11 = map(prot_aligned,readAAMultipleAlignment)
+    names(prot_yk11) = orf_both
+
+    saveRDS(cds_yk11,cds_yk11.rds)
+    saveRDS(prot_yk11,prot_yk11.rds)
+  }
+
+  YK11_ALIGNED = list(CDS = readRDS(cds_yk11.rds), PROT = readRDS(prot_yk11.rds))
+  return(YK11_ALIGNED)
+}
+
+count_msa = function(MSA_TABLE, alpabet="[ARNDCQEGHILKMFPSTWYV]"){
+
+  idref = unique(MSA_TABLE$id_4932)
+  CLADE = unique(MSA_TABLE$clade_name)
+  OG = unique(MSA_TABLE$OG)
+  msa_aas = MSA_TABLE %>% dplyr::select(-clade_name, -OG, -id_4932, -POS, -{{idref}})
+  MSA_TABLE$msa_col = apply(msa_aas,1,paste,collapse="")
+
+  MSA_TABLE$ref_aa = MSA_TABLE[[idref]]
+  MSA_TABLE$ref_gap = MSA_TABLE$ref_aa == "-"
+
+  MSA_TABLE$p_gap = str_count(MSA_TABLE$msa_col,"-") + MSA_TABLE$ref_gap
+  MSA_TABLE$p_defined = str_count(MSA_TABLE$msa_col,alpabet) + !MSA_TABLE$ref_gap
+
+  MSA_TABLE$p_matched = rowSums(!MSA_TABLE$ref_gap & MSA_TABLE$ref_aa == msa_aas) + !MSA_TABLE$ref_gap
+  MSA_TABLE$p_mismatched = rowSums(!MSA_TABLE$ref_gap & MSA_TABLE$ref_aa != msa_aas & msa_aas != "-")
+
+  MSA_TABLE$nseq = ncol(msa_aas) + 1
+  MSA_TABLE$len_msa = max_(MSA_TABLE$POS)
+  MSA_TABLE$len_ref = sum_(!MSA_TABLE$ref_gap)
+
+  msa_pos = tibble(
+    CLADE = CLADE,
+    OG = OG,
+    ref_id = idref,
+    pos_msa=MSA_TABLE$POS,
+    len_msa=max_(MSA_TABLE$POS),
+    len_ref=sum_(!MSA_TABLE$ref_gap),
+    ref_aa=MSA_TABLE$ref_aa,
+    ref_gap=MSA_TABLE$ref_gap,
+    msa_col=MSA_TABLE$msa_col,
+    p_defined=MSA_TABLE$p_defined,
+    p_mismatched=MSA_TABLE$p_mismatched,
+    p_matched=MSA_TABLE$p_matched,
+    p_gap=MSA_TABLE$p_gap)
+
+  return(msa_pos)
+}
+
+
 # Find Single Amino Acid Polymorphisms (SNP_AA) ----------------------------------
 S288C = load.sgd.proteome(withORF=T,rm.stop=F) # Reference SGD protein sequences
 YK11_SNP_AA.rds = here("data",'YK11-SNP_AA.rds')
@@ -74,14 +147,18 @@ if( file.exists(cds_snp_nt.rds) ){
   yk11_fastadir = "/media/elusers/users/benjamin/A-PROJECTS/01_PhD/02-abundance-evolution/strains1011/data/transfer_1638744_files_c25fb55c/CDS_withAmbiguityRes/"
   yk11_cds = here("data","YK11-CDS.rds")
   yk11 = preload(yk11_cds,{load.1011.strains(seqdir = yk11_fastadir,seqtype='DNA')},"loading genome cds from 1011 strains...")
+  aligned_yk11 = load_aligned_yk11()
   #zero_len = sapply(yk11,length) == 0
   #yk11= yk11[!zero_len]
 
   # GENOME DATAFRAME
-  G = tibble( orf=names(yk11),
+  # G = tibble( orf=names(yk11),
+  #             n_strains=lengths(yk11),
+  #             len = widths(yk11)) %>%
+    G = tibble( orf=names(yk11),
               n_strains=lengths(yk11),
               len = widths(yk11)) %>%
-    left_join(get.width(yk11), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
+    left_join(get.width(CDS), by=c('orf'='orf'),suffix=c('','.s288c')) %>%
     mutate( match_wt = len == len.s288c )
 
   # FIND NUCLEOTIDE VARIANTS
@@ -89,18 +166,42 @@ if( file.exists(cds_snp_nt.rds) ){
   nt_var = preload(yk11_nt_var, {lapply(yk11, get.variants,verbose=F) %>% bind_rows()},"find nucleotide variants...")
 
   snp_nt = get.variants.to.SNP(nt_var) %>%
+    #filter(alt_aa %in% c('A','T','C','G') & ref_aa %in% c('A','T','C','G'))  %>%
     add_count(id,ref_pos,name='nvar') %>%
     group_by(id,ref_pos) %>%
     mutate( alt_cumfr=sum(alt_fr)) %>%
     left_join(G,by=c('id'='orf'))
 
+  all_codons = get_all_codons(shorten=T)
+
   cds_snp_nt = left_join(snp_nt,wt, by=c('id'='orf','ref_pos'='wt_pos','len.s288c'='len')) %>%
     mutate(wt_low = alt_aa == wt_aa, wt_missing=is.na(wt_aa)) %>%
     mutate(alt_codon =stringi::stri_sub_replace(codon,from=codon_pos,to=codon_pos,replacement=alt_aa)) %>%
     mutate(alt_codon_aa = Biostrings::GENETIC_CODE[alt_codon], synonymous = (codon_aa == alt_codon_aa) ) %>%
-    mutate(ambiguous= !(alt_aa %in% Biostrings::DNA_BASES)) %>%
     # replace aa by nt in column names
-    dplyr::rename(ref_nt=ref_aa,alt_nt=alt_aa,wt_nt=wt_aa,cds_pos=ref_pos, cds_fr=ref_fr)
+    dplyr::rename(ref_nt=ref_aa,alt_nt=alt_aa,wt_nt=wt_aa,cds_pos=ref_pos, cds_fr=ref_fr) %>%
+    left_join(all_codons,by=c('alt_codon'='fuzzy_codon')) %>%
+    mutate(rate_synonymous = str_count(pattern = fixed(codon_aa), string=aa_ambiguous) / n_codons ) %>%
+    group_by(id,aa_pos) %>%
+      mutate(dn     = (rate_synonymous==0) * nvar,
+             dn_amb = (rate_synonymous<1) * nvar,
+             ds_amb = (rate_synonymous>0) * nvar,
+             ds     = (rate_synonymous>0.5) * nvar) %>%
+    group_by(id) %>%
+      mutate(N_POS = n(), N_VAR = sum(nvar),
+             N_VAR_STANDARD = sum(!is_ambiguous),
+             N_VAR_AMBIGUOUS = sum(is_ambiguous),
+             dN = sum(dn), dS=sum(ds),
+             dN_amb = sum(dn_amb), dS_amb = sum(ds_amb)) %>%
+      relocate(id,n_strains,len,len.s288c,match_wt,
+             cds_pos, bin.pos, wt_nt, wt_low, wt_missing,
+             ref_nt,cds_fr,alt_nt,alt_fr,alt_cumfr,
+             codon_pos, n_codons, codon, alt_codon, is_ambiguous, codon_ambiguous,
+             aa_pos, n_aa, codon_aa,alt_codon_aa, aa_ambiguous,
+             synonymous, rate_synonymous,
+             nvar, dn,dn_amb, ds,ds_amb,
+             N_POS, N_VAR, N_VAR_STANDARD, N_VAR_AMBIGUOUS,
+             dN,dN_amb, dS,dS_amb)
 
   # Save nucleotide polymorphism
   saveRDS(cds_snp_nt,cds_snp_nt.rds)
@@ -285,3 +386,66 @@ yeast_orf_var = left_join(yk11_orf_var,y8_orf_var,
                           suffix=c('.yk11','.y8')) %>%
   relocate(id,n_strains.y8,n_strains.yk11,len.s288c.nt,len.s288c.aa, len.aa,len.nt )
 saveRDS(yeast_orf_var, here('data','YEAST_ORF_VAR.rds'))
+
+
+align_cds = function(ID,REF,STRAINS,OUTDIR="/data/benjamin/Evolution/YK11/aligned_cds_s288c/"){
+  outfile=sprintf("%s/s288c_yk11_%s_cds.mu",OUTDIR,ID)
+  if(!file.exists(outfile)){
+    refseq = DNAStringSet(REF[[ID]])
+    names(refseq) = paste0("S288C_",ID)
+    newseq = c(refseq,STRAINS[[ID]])
+    ali = muscle::muscle(newseq, quiet = T, diags=T, maxiters=3)
+    Biostrings::writeXStringSet(as(ali,"DNAStringSet"),filepath = outfile)
+  }else{
+    ali = Biostrings::readDNAMultipleAlignment(outfile)
+  }
+  return(ali)
+}
+
+add_s288c_cds = function(ID,REF,STRAINS,OUTDIR="/data/benjamin/Evolution/YK11/cds_s288c"){
+  fastafile=sprintf("%s/s288c_yk11_%s_cds.fa",OUTDIR,ID)
+  refseq = DNAStringSet(REF[[ID]])
+  names(refseq) = paste0("S288C_",ID)
+  newseq = c(refseq,STRAINS[[ID]])
+
+
+  if(length(refseq) == 1 & length(STRAINS[[ID]])>1){
+    Biostrings::writeXStringSet(as(newseq,"DNAStringSet"),filepath = fastafile)
+  }else{
+    return(refseq)
+  }
+  return(newseq)
+}
+
+add_s288c_prot = function(ID,REF,STRAINS,OUTDIR="/data/benjamin/Evolution/YK11/prot_s288c"){
+  fastafile=sprintf("%s/s288c_yk11_%s_prot.fa",OUTDIR,ID)
+  refseq = AAStringSet(REF[[ID]])
+  names(refseq) = paste0("S288C_",ID)
+  newseq = c(refseq,STRAINS[[ID]])
+
+  if(length(refseq) == 1 & length(STRAINS[[ID]])>1){
+    Biostrings::writeXStringSet(as(newseq,"AAStringSet"),filepath = fastafile)
+  }else{
+    return(refseq)
+  }
+  return(newseq)
+}
+
+cds_s288c_yk11 = map(names(CDS), ~add_s288c_cds(.x,CDS,YK11_cds))
+prot_s288c_yk11 = map(names(S288C), ~add_s288c_prot(.x,S288C,YK11))
+
+sum( lengths(prot_s288c_yk11) == 1 )
+
+align_prot = function(ID,REF,STRAINS,OUTDIR="/data/benjamin/Evolution/YK11/aligned_prot_s288c/"){
+  outfile=sprintf("%s/s288c_yk11_%s_prot.mu",OUTDIR,ID)
+  if(!file.exists(outfile)){
+    ali = muscle::muscle(newseq, quiet = T, diags=T, maxiters=3)
+    Biostrings::writeXStringSet(as(ali,"AAStringSet"),filepath = outfile)
+  }else{
+    ali = Biostrings::readAAMultipleAlignment(outfile)
+  }
+  return(ali)
+}
+msa_nt_yk11 = map(names(CDS), ~align_cds(.x,CDS,YK11_cds))
+msa_aa_yk11 = map(names(PROT), ~align_prot(.x,PROT,YK11))
+
