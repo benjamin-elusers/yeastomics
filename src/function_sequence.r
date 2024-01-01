@@ -73,19 +73,46 @@ rm.stop = function(BS){
   subseq(BS,start = 1,end=width(BS)-1)
 }
 
-widths = function(BS){
-  if(is.list(BS)){
-    W = sapply(BS, function(x){
-      if(n_distinct(width(x))==1){ return(unique(width(x))) }
-      return(width(x))
-      })
+# widths = function(BS){
+#   if(is.list(BS)){
+#     W = sapply(BS, function(x){
+#       if(n_distinct(width(x))==1){ return(unique(width(x))) }
+#       return(width(x))
+#       })
+#     return(W)
+#   }else if( class(BS) %in% c("AAStringSet","DNAStringSet") ){
+#     return(width(BS))
+#   }else if( class(BS) %in% c("AAStringSetList","DNAStringSetList") ){
+#     return( unlist( lapply(nchar(BS),unique) )  )
+#   }else{
+#     stop(sprintf('function not defined for unknown class of input [%s]',class(BS)))
+#   }
+# }
+
+all_same <- function(x) {
+  length(unique(x)) == 1
+}
+
+# Function to calculate widths for different classes
+calculate_widths <- function(x) {
+  if (inherits(x, c("AAStringSet", "DNAStringSet"))) {
+    w = width(x)
+    if(all_same(w)){ return( unique(w) ) }
+    return(w)
+  }else if (inherits(x, c("AAStringSetList", "DNAStringSetList")) ){
+    return( unlist( lapply(nchar(x),unique) )  )
+  } else if (inherits(x, c("AAMultipleAlignment", "DNAMultipleAlignment"))) {
+    return(unique(ncol(x)))
+  }
+  return(width(x))
+}
+
+widths <- function(BS) {
+  if (is.list(BS)) {
+    W <- sapply(BS, calculate_widths)
     return(W)
-  }else if( class(BS) %in% c("AAStringSet","DNAStringSet") ){
-    return(width(BS))
-  }else if( class(BS) %in% c("AAStringSetList","DNAStringSetList") ){
-    return( unlist( lapply(nchar(BS),unique) )  )
-  }else{
-    stop(sprintf('function not defined for unknown class of input [%s]',class(BS)))
+  } else {
+    return(calculate_widths(BS))
   }
 }
 
@@ -254,5 +281,43 @@ count_aa = function(BS){
             f_AA = AA / naa
     ) |> nest(aacount=c(col_AA,"other"))
   return(freqaa)
+}
+
+
+get_ambiguous_codon <- function(codon, code_map=Biostrings::IUPAC_CODE_MAP) {
+  # Split the codon into its bases
+  bases <- strsplit(codon, "")[[1]]
+  # Get the possible replacements for each base
+  replacements <- lapply(bases, function(b) strsplit(code_map[b], "")[[1]])
+  # Create all combinations of the replacements
+  possible_codons <- expand.grid(replacements[[1]], replacements[[2]], replacements[[3]])
+  # Collapse each combination into a codon string
+  apply(possible_codons, 1, paste, collapse = "")
+}
+
+get_all_codons = function(shorten=F){
+  iupac_bases = names(Biostrings::IUPAC_CODE_MAP)
+  codons = expand_grid(b1=iupac_bases,
+                       b2=iupac_bases,
+                       b3=iupac_bases) |>
+           rowwise() |>
+           mutate(fuzzy_codon = paste0(b1,b2,b3,collapse='')) |>
+           mutate(codon = list(get_ambiguous_codon(fuzzy_codon, Biostrings::IUPAC_CODE_MAP))) %>%
+           unnest(col=codon) |>
+           mutate(aa_codon = Biostrings::GENETIC_CODE[codon]) |>
+           group_by(fuzzy_codon) |>
+           mutate(n_codons = n(), n_aa = n_distinct(aa_codon)) |>
+           arrange(n_codons,n_aa) |>
+           mutate(is_ambiguous = n_codons > 1)
+
+  if(shorten){
+   codons |>
+    group_by(fuzzy_codon, is_ambiguous,  n_codons, n_aa) %>%
+    summarise(
+      codon_ambiguous = paste(unique(codon), collapse="/"),
+      aa_ambiguous = paste(aa_codon, collapse="/"),
+      .groups = "drop"
+    )
+  }
 }
 
