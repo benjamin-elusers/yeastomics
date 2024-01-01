@@ -232,7 +232,7 @@ repchar <- function(char,times){ # replicates a character multiple times as a st
 }
 
 subname=function(name,sep="\\.",lc=F){ # extracts substring until first separator
-  b4sep = sprintf("([^%s]+).+",sep)
+  b4sep = sprintf("^([^%s]+)%s",sep,sep)
   part1 = sub(b4sep, "\\1", x=name)
   if(lc){ tolower(part1) }
   return(part1)
@@ -849,7 +849,7 @@ spearman.toplot = function(X,Y,rm.slope=T){
   return(s)
 }
 
-pearson.toplot = function(X,Y,rm.slope=F){
+pearson.toplot = function(X,Y,rm.slope=T){
   p   = pearson(X,Y)
   p$slope = slope(X,Y)
   p$N = sum(complete.cases(X,Y))
