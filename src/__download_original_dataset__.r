@@ -3,20 +3,32 @@ original_data = here("released-dataset","original_data")
 source(here::here("src","__setup_yeastomics__.r"))
 source(here::here("analysis","function_evorate_fitting.R"))
 
+DATASETS = tibble(source,name,url,accessible,local)
+
 # SGD
-url_sgd_proteome = "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_protein/orf_trans_all.fasta.gz"
-url_sgd_cds = "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_dna/orf_coding_all.fasta.gz"
-url_sgd_features = "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"
+SGD = tibble(
+  source = c('SGD','SGD','SGD'),
+  name = c('proteome','genome_coding','genomic_features'),
+  url = c("http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_protein/orf_trans_all.fasta.gz",
+         "http://sgd-archive.yeastgenome.org/sequence/S288C_reference/orf_dna/orf_coding_all.fasta.gz",
+         "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab")
+  )
 
-# UNIPROT REFERENCE
-url_uniprot_proteome = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000002311/UP000002311_559292.fasta.gz"
-url_uniprot_genome = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000002311/UP000002311_559292_DNA.fasta.gz"
-url_uniprot_mapping = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000002311/UP000002311_559292.idmapping.gz"
-url_uniprot_fullmapping = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/YEAST_559292_idmapping.dat.gz"
 
-# UNIPROT LOCALIZATION
+# UNIPROT
 # query REST API for single proteins
 url_uniprot_rest_query = "https://rest.uniprot.org/uniprotkb/search?query="
+UNIPROT =
+  tibble(
+    source = c('UNIPROT','UNIPROT','UNIPROT','UNIPROT','UNIPROT'),
+    name = c('reference_proteome','reference_genome_coding','reference_mapping','full_mapping','localization'),
+    url = c("https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000002311/UP000002311_559292.fasta.gz",
+            "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000002311/UP000002311_559292_DNA.fasta.gz",
+            "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000002311/UP000002311_559292.idmapping.gz",
+            "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/YEAST_559292_idmapping.dat.gz",
+            "https://rest.uniprot.org/uniprotkb/search?query=")
+  )
+
 
 # ENSEMBL
 # query the biomart ensembl database

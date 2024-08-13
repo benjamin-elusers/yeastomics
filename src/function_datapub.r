@@ -1359,15 +1359,15 @@ find_paxdb_datasets = function(taxon=4932){
   }
 
   message(sprintf('retrieving paxdb datasets information [%s]...\n',taxon))
-  if(require(pbmcapply)){
-    ncpu = parallelly::availableCores()-2
-    cat(sprintf("Using 'pbmcapply' with %s parallel threads",ncpu))
-    infos = pbmcapply::pbmcmapply(mc.cores = ncpu, taxon_url , FUN = get.paxdb_header)  %>%
-            bind_rows(.id='taxon_url')
-  }else{
-    cat("Using only 1 cpu! please consider installing 'pbmcapply' to use parallel threads.")
-    infos = map_dfr(taxon_url, get.paxdb_header)
-  }
+  # if(require(pbmcapply)){
+  #   ncpu = parallelly::availableCores()-2
+  #   cat(sprintf("Using 'pbmcapply' with %s parallel threads",ncpu))
+  #   infos = pbmcapply::pbmcmapply(mc.cores = ncpu, taxon_url , FUN = get.paxdb_header)  %>%
+  #           bind_rows(.id='taxon_url')
+  # }else{
+    #cat("Using only 1 cpu! please consider installing 'pbmcapply' to use parallel threads.")
+    infos = pmap_dfr(list(taxon_url), get.paxdb_header, .progress=T)
+  # }
   infodata = infos %>%
               mutate( w=parse_number(weight)*0.01,ndata = n_distinct(id,filename),
                       is_integrated = integrated=='true' | ndata==1) %>%
@@ -2178,6 +2178,28 @@ load.sgd.proteome = function(withORF=T,rm.stop=T, orf_protein="sequence/S288C_re
   return(SGD)
 }
 
+load.sgd.features = function(by.chr=T){ # Gene/Protein features from SGD
+  library(stringr)
+  sgd_feat.url = "http://sgd-archive.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"
+  sgd.feat = read.delim2(sgd_feat.url, sep='\t', quote = "",
+                         header=F, fill=T, strip.white=T,stringsAsFactors = F,
+                         col.names = c('sgdid','type','qual','name',
+                                       'gname','alias','parent','sgdid2',
+                                       'chr','start','end','strand','gpos',
+                                       'coordv','seqv','desc')  )
+  ord = 1:nrow(sgd.feat)
+  if(by.chr){ ord = gtools::mixedorder(sgd.feat$chr) }
+  return(sgd.feat[ord,])
+}
+
+load.sgd.orf = function(sgd.feat){
+  if(missing(sgd.feat)){ sgd.feat = load.sgd.features() }
+  ORF             = sgd.feat$type == 'ORF'
+  #Verified        = sgd.feat$qual == 'Verified'
+  #Uncharacterized = sgd.feat$qual == 'Uncharacterized'
+  #notDubious      = c(Verified,Uncharacterized)
+  return( sgd.feat$name[ORF] )
+}
 load.pombase.features = function(verbose=F){
   pombase.url = "https://www.pombase.org/data/names_and_identifiers/gene_IDs_names_products.tsv"
   regexPombaseID = "(SP[^ ]+)(?=:pep)"

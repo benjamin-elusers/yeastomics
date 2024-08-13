@@ -295,29 +295,36 @@ get_ambiguous_codon <- function(codon, code_map=Biostrings::IUPAC_CODE_MAP) {
   apply(possible_codons, 1, paste, collapse = "")
 }
 
-get_all_codons = function(shorten=F){
+get_all_codons = function(shorten=F, rm.wildcard=T, rm.negative=T){
+
   iupac_bases = names(Biostrings::IUPAC_CODE_MAP)
-  codons = expand_grid(b1=iupac_bases,
+  if(rm.wildcard){ iupac_bases = setdiff( iupac_bases,"N") }
+  if(rm.negative){ iupac_bases = setdiff( iupac_bases,c("V","H","D","B") ) }
+
+  codons_long = expand_grid(b1=iupac_bases,
                        b2=iupac_bases,
                        b3=iupac_bases) |>
            rowwise() |>
-           mutate(fuzzy_codon = paste0(b1,b2,b3,collapse='')) |>
-           mutate(codon = list(get_ambiguous_codon(fuzzy_codon, Biostrings::IUPAC_CODE_MAP))) %>%
+           mutate(fuzzy_codon = paste0(b1,b2,b3,collapse=''),
+                  n_fuzzy_bases = sum(!(c(b1,b2,b3) %in% c("U",Biostrings::DNA_BASES)))) |>
+           mutate(codon = list(get_ambiguous_codon(fuzzy_codon, Biostrings::IUPAC_CODE_MAP[iupac_bases]))) |>
            unnest(col=codon) |>
            mutate(aa_codon = Biostrings::GENETIC_CODE[codon]) |>
            group_by(fuzzy_codon) |>
-           mutate(n_codons = n(), n_aa = n_distinct(aa_codon)) |>
+           mutate(n_codons = n(),
+                  n_aa = n_distinct(aa_codon)) |>
            arrange(n_codons,n_aa) |>
            mutate(is_ambiguous = n_codons > 1)
 
-  if(shorten){
-   codons |>
-    group_by(fuzzy_codon, is_ambiguous,  n_codons, n_aa) %>%
+    codons_short = codons_long |>
+    group_by(fuzzy_codon, is_ambiguous, n_fuzzy_bases, n_codons, n_aa) %>%
     summarise(
       codon_ambiguous = paste(unique(codon), collapse="/"),
       aa_ambiguous = paste(aa_codon, collapse="/"),
       .groups = "drop"
     )
-  }
+    codons = codons_long
+    if(shorten){ codons = codons_short }
+  return(codons)
 }
 
