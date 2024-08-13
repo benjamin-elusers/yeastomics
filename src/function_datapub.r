@@ -9,6 +9,13 @@ source(file.path(yeastomics_url,"main/src/utils.r"))
   time()$
   hook(crayon::bgWhite)
 
+PATH2DATA = file.path(yeastomics_url,"released-dataset","original_data")
+if( !curl::has_internet() ){
+  # ASSUMING WD=ROOT OF YEASTOMICS, DATA SHOULD BE STORED LOCALLY:
+  PATH2DATA = here("released-dataset","original_data")
+}
+
+
 # TO REMOVE DEPENDENCIES, THOSE FUNCTIONS WERE COPIED FROM OTHER SCRIPTS
 # Utils --------------------------------------------------------------------
 library(openxlsx)
@@ -139,7 +146,7 @@ load.pu2008.data = function(){
   message("Up-to-date catalogues of yeast protein complexes")
 
   CYC2008.url = "https://wodaklab.org/cyc2008/resources/CYC2008_complex.tab"
-  CYC2008_local = here("released-dataset","original_data","CYC2008_complex.tab")
+  CYC2008_local = file.path(PATH2DATA,"CYC2008_complex.tab")
 
   CYC2008.url=  ifelse(xfun::url_accessible(CYC2008.url), CYC2008.url, CYC2008_local)
   CYC2008 = read.delim(file = CYC2008_local, sep='\t', stringsAsFactors = F,header = T, na.strings = "") %>%
@@ -335,8 +342,8 @@ load.lee2014.data = function(rawdata=F){
   s4 = "1250217s4.xlsx"
   url.s1 = paste0(URL_SCIENCE_SUPPL,doi,"&file=",s1)
   url.s4 = paste0(URL_SCIENCE_SUPPL,doi,"&file=",s4)
-  local_s1 = here("released-dataset","original_data","1250217s1.xlsx")
-  local_s4 = here("released-dataset","original_data","1250217s4.xlsx")
+  local_s1 = file.path(PATH2DATA,"1250217s1.xlsx")
+  local_s4 = file.path(PATH2DATA,"1250217s4.xlsx")
 
   #url.fitness_hom =paste0(url.hiphop,"/","fitness_defect_matrix_hom.txt")
   #url.fitness_het =paste0(url.hiphop,"/","fitness_defect_matrix_het.txt")
@@ -377,7 +384,6 @@ load.lee2014.data = function(rawdata=F){
   }
 }
 
-
 load.filleton2015.data = function(full=F){
   message("REF: Filleton F. et al, 2015, Epigenetics & Chromatin")
   message("The complex pattern of epigenomic variation between natural yeast strains at single-nucleosome resolution")
@@ -402,7 +408,6 @@ load.lancaster2014.data = function(){
          dplyr::select(orf = SEQid, prion_likelihood = LLR)
 }
 
-
 load.vanleeuwen2016.data = function(single_orf=F){
   # load gene classification of biological functions (based on costanzo 2010)
   message("REF: J. Van Leeuwen et al., 2016, Science")
@@ -420,7 +425,8 @@ load.vanleeuwen2016.data = function(single_orf=F){
   #temp=tempfile()
   #download.file(S7, destfile = temp)
 
-  S7 = ifelse(xfun::url_accessible(S7), S7, here("released-dataset","original_data","aag0839tables7.xlsx"))
+  S7_default = file.path(PATH2DATA,"aag0839tables7.xlsx")
+  S7 = ifelse(xfun::url_accessible(S7), S7, S7_default)
   .class_function = c(
     'A'="Amio acid biosynth & transport",
     'B'="Autophagy",
@@ -538,7 +544,7 @@ load.leuenberger2017.data = function(species='S. cerevisiae',rawdata=F){
   # https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx
 
   #success = download.file("https://www.science.org/action/downloadSupplement?doi=10.1126%2Fscience.aai7825&file=aai7825_leuenberger_table-s3.xlsx", destfile = "aai7825_Leuenberger_Table-S3.xlsx" )
-  S3.local = here("released-dataset","original_data","aai7825_leuenberger_table-s3.xlsx")
+  S3.local = file.path(PATH2DATA,"aai7825_leuenberger_table-s3.xlsx")
   S3.url = ifelse( xfun::url_accessible(S3.url), S3.url , S3.local)
 
   LIP_MS = openxlsx::read.xlsx(xlsxFile = S3.url,
@@ -825,7 +831,7 @@ load.szavitsnossan2020.data = function(){
    temp<-tempfile()
    download.file(zip.url,temp)
   }else{
-   temp = here('released-dataset','original_data','gkaa678_supplemental_files.zip')
+   temp = file.path(PATH2DATA,'gkaa678_supplemental_files.zip')
   }
 
   data_files = unzip(temp,list = T)$Name[1:3]
@@ -877,9 +883,10 @@ load.vanleeuwen2020.data = function(){
   message("Systematic analysis of bypass suppression of essential genes")
   #"https://www.embopress.org/doi/full/10.15252/msb.20209828"
   EV13.url = "https://www.embopress.org/action/downloadSupplement?doi=10.15252%2Fmsb.20209828&file=msb209828-sup-0014-DatasetEV13.xlsx"
-  EV13.url = ifelse(xfun::url_accessible(EV13.url),EV13.url,here("released-dataset","original_data","msb209828-sup-0014-datasetev13.xlsx"))
-  #download.file(EV13.url, destfile = "msb209828-sup-0014-datasetev13.xlsx" )
-  dispensable = openxlsx::read.xlsx(xlsxFile = EV13.url,
+  EV13_default = file.path(PATH2DATA,"msb209828-sup-0014-datasetev13.xlsx")
+  EV13 = ifelse(xfun::url_accessible(EV13.url),EV13.url,EV13_default)
+  #download.file(EV13, destfile = "msb209828-sup-0014-datasetev13.xlsx" )
+  dispensable = openxlsx::read.xlsx(xlsxFile = EV13,
                                     sheet = 2, detectDates = F,
                                     skipEmptyRows = T, skipEmptyCols = T
   )
