@@ -9,7 +9,7 @@ source(file.path(yeastomics_url,"main/src/utils.r"))
   time()$
   hook(crayon::bgWhite)
 
-PATH2DATA = file.path(yeastomics_url,"released-dataset","original_data")
+PATH2DATA = "https://github.com/benjamin-elusers/yeastomics/raw/main/released-dataset/original_data/"
 if( !curl::has_internet() ){
   # ASSUMING WD=ROOT OF YEASTOMICS, DATA SHOULD BE STORED LOCALLY:
   PATH2DATA = here("released-dataset","original_data")
