@@ -1282,6 +1282,20 @@ get_paxdb_version = function(verbose=T){
   return(.version)
 }
 
+get_paxdb_uniprot = function(taxon){
+  URL_PAXDB = "https://pax-db.org/downloads/latest/"
+  .version= get_paxdb_version(F)
+  mapping_uniprot=paste0(URL_PAXDB,sprintf("paxdb-uniprot-links-v%s/paxdb-uniprot-links-v%s.tsv",.version,.version))
+  map2uniprot = readr::read_delim(mapping_uniprot,delim="\t",col_names = c('id_string','id_uniprot'), show_col_types = F ) %>% 
+    tidyr::extract(id_string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)',remove = F)
+
+  if(!missing(taxon)){
+    return(filter(map2uniprot, taxid == taxon))
+  }
+  
+  return(map2uniprot)
+}
+
 load.paxdb.orthologs = function(node,show.nodes=F) {
   library(rio)
   library(RCurl)
@@ -1337,50 +1351,59 @@ load.paxdb.orthologs = function(node,show.nodes=F) {
   return(node_ortho)
 }
 
-find_paxdb_datasets = function(taxon=4932){
+find_paxdb_datasets = function(taxon){
   URL_PAXDB = "https://pax-db.org/downloads/latest/"
   paxdb_dataset =paste0(URL_PAXDB,"datasets/")
   taxon_dir=file.path(paxdb_dataset,taxon,"/")
-
+  
   .version= get_paxdb_version()
-
+  
   taxon_data <- rvest::read_html(taxon_dir) %>%
     rvest::html_nodes("a") %>%
     rvest::html_attr(name='href') %>%
     stringr::str_subset(pattern = "/$",negate = T) %>%
     stringr::str_subset("\\.txt")
-
+  
   Ndata = length(taxon_data)
   message(Ndata," paxDB datasets for taxon [",taxon,"]")
-
+  
   taxon_url = paste0(taxon_dir,taxon_data)
-  get.paxdb_header = function(urldata){
-    read.url(urldata) %>%
-      stringr::str_subset(pattern="^#") %>%
-      as_tibble %>%
-      tidyr::extract(col=value,into=c('info',"value"), regex="^#([^\\:]+)\\:(.+)$") %>%
-      dplyr::mutate(info=str_trim(info),value=str_trim(value)) %>%
-      dplyr::filter( !is.na(info) ) %>%
-      pivot_wider(names_from='info',values_from=c(value)) %>%
-      mutate(taxid=as.character(taxon))
-  }
+  return(taxon_url)
+}
 
+read_paxdb_dataset_header = function(urldata){
+  read.url(urldata) %>%
+    stringr::str_subset(pattern="^#") %>%
+    as_tibble %>%
+    tidyr::extract(col=value,into=c('info',"value"), regex="^#([^\\:]+)\\:(.+)$") %>%
+    dplyr::mutate(info=str_trim(info),value=str_trim(value)) %>%
+    dplyr::filter( !is.na(info) ) %>%
+    pivot_wider(names_from='info',values_from=c(value)) %>%
+    mutate(taxid=as.character(taxon), data.origin =  str_extract(name,"\\(.+\\)"))
+}
+
+read_paxdb_dataset = function(urldata){
+  read_delim(urldata, comment="#", delim="\t",
+             col_names = c("string","ppm","count"), col_types = "cdi",
+             progress = F, show_col_types = F) %>% 
+    mutate(filename = basename(utils::URLdecode(urldata))) %>% 
+    tidyr::extract(string,into=c('taxid','protid'),regex='(^[0-9]+)\\.(.+)',remove = F) 
+    
+    
+}
+
+load_paxdb_taxon = function(taxon){
+  url_paxdb_datasets = find_paxdb_datasets(taxon)
   message(sprintf('retrieving paxdb datasets information [%s]...\n',taxon))
-  # if(require(pbmcapply)){
-  #   ncpu = parallelly::availableCores()-2
-  #   cat(sprintf("Using 'pbmcapply' with %s parallel threads",ncpu))
-  #   infos = pbmcapply::pbmcmapply(mc.cores = ncpu, taxon_url , FUN = get.paxdb_header)  %>%
-  #           bind_rows(.id='taxon_url')
-  # }else{
-    #cat("Using only 1 cpu! please consider installing 'pbmcapply' to use parallel threads.")
-    infos = pmap_dfr(list(taxon_url), get.paxdb_header, .progress=T)
-  # }
-  infodata = infos %>%
-              mutate( w=parse_number(weight)*0.01,ndata = n_distinct(id,filename),
-                      is_integrated = integrated=='true' | ndata==1) %>%
-              dplyr::select(taxid,organ,ndata,id,filename,is_integrated,
-                  score,w,cov=coverage,yr=publication_year)
-  return(infodata)
+  header_paxdb_datasets = pmap( list(url_paxdb_datasets), read_paxdb_dataset_header, .progress = T) %>% list_rbind()
+  
+  paxdb2uniprot = get_paxdb_uniprot(taxon)
+  ppm = pmap( list(url_paxdb_datasets), read_paxdb_dataset, .progress = T ) %>% list_rbind() 
+  paxdb = ppm %>% 
+    left_join(header_paxdb_datasets, by=c('filename','taxid')) %>%
+    left_join(paxdb2uniprot,by=c('string'='id_string', 'protid','taxid')) %>%
+    arrange(protid,id_uniprot,ppm)
+   return(paxdb)
 }
 
 load.paxdb = function(taxon=4932,rm.zero=T){
@@ -2269,11 +2292,11 @@ load.pombase.CDS = function(coding=T) {
 ##### Uniprot #####
 
 get_uniprot_id = function(accession,isoform=F){
-  UNIPROT_URL = sprintf("https://rest.uniprot.org/uniprotkb/search?query=accession:%s&includeIsoform=%s&format=tsv&fields=accession,gene_primary,protein_name,length,keyword,protein_existence,reviewed",accession,tolower(as.character(isoform)))
+  UNIPROT_URL = sprintf("https://rest.uniprot.org/uniprotkb/search?query=accession:%s&includeIsoform=%s&format=tsv&fields=organism_id,organism_name,accession,id,gene_primary,protein_name,length,keyword,protein_existence,reviewed",accession,tolower(as.character(isoform)))
   #OX   NCBI_TaxID=7955 {ECO:0000312|Proteomes:UP000000437};
   if( httr::http_error(UNIPROT_URL) ){ return(NULL) }
-  res = readr::read_delim(UNIPROT_URL,col_types = 'ccciccc', delim = '\t',
-                          skip = 1, col_names = c('AC','GN','PN','LEN','KW','PE','Reviewed'),
+  res = readr::read_delim(UNIPROT_URL,col_types = 'cccccciccc', delim = '\t',
+                          skip = 1, col_names = c('OX','OS','AC','ID','GN','PN','LEN','KW','PE','Reviewed'),
                           show_col_types = FALSE, progress = F)
   return(res)
 }
