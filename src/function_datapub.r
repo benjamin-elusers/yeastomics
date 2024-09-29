@@ -2301,7 +2301,18 @@ get_uniprot_id = function(accession,isoform=F){
   return(res)
 }
 
-get_uniprot_xref = function(xref_db,xref_id,isoform=F){
+get_uniprot_to_xref = function(accession,xref_db,isoform=F){
+  UNIPROT_URL = sprintf("https://rest.uniprot.org/uniprotkb/search?query=accession:%s&includeIsoform=%s&format=tsv&fields=organism_id,organism_name,accession,id,gene_primary,protein_name,length,keyword,protein_existence,reviewed,%s",accession,tolower(as.character(isoform)),xref_db)
+  #OX   NCBI_TaxID=7955 {ECO:0000312|Proteomes:UP000000437};
+  if( httr::http_error(UNIPROT_URL) ){ return(NULL) }
+  res = readr::read_delim(UNIPROT_URL,col_types = 'ccccccicccc', delim = '\t',
+                          skip = 1, col_names = c('OX','OS','AC','ID','GN','PN','LEN','KW','PE','Reviewed',"XREF_ID"),
+                          show_col_types = FALSE, progress = F) %>% 
+        mutate(XREF_DB = str_remove(xref_db,"xref_") %>% toupper()) %>% 
+        relocate(XREF_DB, .before = "XREF_ID")
+  return(res)
+}
+get_uniprot_from_xref = function(xref_db,xref_id,isoform=F){
   UNIPROT_URL = sprintf("https://rest.uniprot.org/uniprotkb/search?query=xref:%s-%s&includeIsoform=%s&format=tsv&fields=accession,gene_primary,protein_name,length,keyword,protein_existence,reviewed",xref_db,xref_id,tolower(as.character(isoform)))
   #OX   NCBI_TaxID=7955 {ECO:0000312|Proteomes:UP000000437};
   if( httr::http_error(UNIPROT_URL) ){ return(NULL) }
