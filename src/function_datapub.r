@@ -1126,6 +1126,27 @@ load.string = function(tax="4932",phy=T,ful=T,min.score=700,vers="v11.0"){
   return(STRING_net)
 }
 
+load_string_aliases = function(tax="9606",vers="v12.0"){
+  # Load STRING identifier mapped to aliases
+  # 4932 = S.cerevisiae
+  # 9606 = H.sapiens
+  
+  URL_STRING="https://stringdb-downloads.org/download"
+  #URL_STRING = "https://stringdb-static.org/download"
+  
+  .version = vers
+  STRING_dataset = sprintf("protein.aliases.%s",.version)
+  # "/protein.aliases.v12.0/9606.protein.aliases.v12.0.txt.gz"
+  STRING_url = sprintf("%s/%s/%s.%s.%s",URL_STRING,STRING_dataset,tax,STRING_dataset,"txt.gz")
+  
+  message("STRING VERSION: ", .version)
+  message("STRING DATASET: ",STRING_dataset)
+  STRING_aliases = readr::read_delim(STRING_url, 
+                                     delim = "\t", progress = T, show_col_types = F,
+                                     col_names = c("STRING","ALIAS","SOURCE"))
+  return(STRING_aliases)
+}
+
 load.pombe.orthologs = function() {
   # Load orthologs pombe-cerevisiae
   # Fused genes have parentheses to indicate which fused side they are
