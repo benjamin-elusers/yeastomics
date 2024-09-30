@@ -1399,8 +1399,8 @@ read_paxdb_dataset_header = function(urldata){
     tidyr::extract(col=value,into=c('info',"value"), regex="^#([^\\:]+)\\:(.+)$") %>%
     dplyr::mutate(info=str_trim(info),value=str_trim(value)) %>%
     dplyr::filter( !is.na(info) ) %>%
-    pivot_wider(names_from='info',values_from=c(value)) %>%
-    mutate(taxid=as.character(taxon), data.origin =  str_extract(name,"\\(.+\\)"))
+    pivot_wider(names_from='info',values_from=c(value))
+    
 }
 
 read_paxdb_dataset = function(urldata){
@@ -1416,7 +1416,8 @@ read_paxdb_dataset = function(urldata){
 load_paxdb_taxon = function(taxon){
   url_paxdb_datasets = find_paxdb_datasets(taxon)
   message(sprintf('retrieving paxdb datasets information [%s]...\n',taxon))
-  header_paxdb_datasets = pmap( list(url_paxdb_datasets), read_paxdb_dataset_header, .progress = T) %>% list_rbind()
+  header_paxdb_datasets = pmap( list(url_paxdb_datasets), read_paxdb_dataset_header, .progress = T) %>% list_rbind() %>% 
+                          mutate(taxid=as.character(taxon), data.origin =  str_extract(name,"\\(.+\\)"))
   
   paxdb2uniprot = get_paxdb_uniprot(taxon)
   ppm = pmap( list(url_paxdb_datasets), read_paxdb_dataset, .progress = T ) %>% list_rbind() 
