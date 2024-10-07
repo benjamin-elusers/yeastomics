@@ -1417,13 +1417,18 @@ load_paxdb_taxon = function(taxon){
   url_paxdb_datasets = find_paxdb_datasets(taxon)
   message(sprintf('retrieving paxdb datasets information [%s]...\n',taxon))
   header_paxdb_datasets = pmap( list(url_paxdb_datasets), read_paxdb_dataset_header, .progress = T) %>% list_rbind() %>% 
-                          mutate(taxid=as.character(taxon), data.origin =  str_extract(name,"\\(.+\\)"))
-  
+                          mutate(taxid=as.character(taxon), 
+                                 name = str_remove_all(pattern="(^H.sapiens \\- | \\(.+\\)$)",string=name ),
+                                 data.origin =  str_extract(name,"\\(.+\\)"))
+
   paxdb2uniprot = get_paxdb_uniprot(taxon)
   ppm = pmap( list(url_paxdb_datasets), read_paxdb_dataset, .progress = T ) %>% list_rbind() 
   paxdb = ppm %>% 
     left_join(header_paxdb_datasets, by=c('filename','taxid')) %>%
     left_join(paxdb2uniprot,by=c('string'='id_string', 'protid','taxid')) %>%
+    group_by(filename,id,name,score,coverage) %>% 
+    mutate(ppm_pc = percent_rank(ppm), ppm_rk = dense_rank(ppm)) %>% 
+    ungroup() %>% 
     arrange(protid,id_uniprot,ppm)
    return(paxdb)
 }
