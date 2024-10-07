@@ -1131,14 +1131,17 @@ load_string_aliases = function(tax="9606",vers="v12.0"){
   # 4932 = S.cerevisiae
   # 9606 = H.sapiens
   
-  URL_STRING="https://stringdb-downloads.org/download"
-  #URL_STRING = "https://stringdb-static.org/download"
+  URL_STRING="http://stringdb-downloads.org/download" # When SSL certificates error
+  #URL_STRING="https://stringdb-downloads.org/download"
+  #URL_STRING = "https://stringdb-static.org/download" # UP UNTIL V11
   
   .version = vers
   STRING_dataset = sprintf("protein.aliases.%s",.version)
   # "/protein.aliases.v12.0/9606.protein.aliases.v12.0.txt.gz"
   STRING_url = sprintf("%s/%s/%s.%s.%s",URL_STRING,STRING_dataset,tax,STRING_dataset,"txt.gz")
-  
+
+  httr::set_config(httr::config(ssl_verifypeer = FALSE))
+
   message("STRING VERSION: ", .version)
   message("STRING DATASET: ",STRING_dataset)
   STRING_aliases = readr::read_delim(STRING_url, 
