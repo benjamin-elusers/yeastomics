@@ -1440,7 +1440,7 @@ load_paxdb_taxon = function(taxon){
               str_detect(description, "MAPPED_BY_AUTHORS") ~ "From the authors",
               TRUE ~ "other"),
             is_normalized  = str_detect(description,"(n|N)o(r)?malized"),
-            additional_info = str_extract(description, "(?<=abundance based on[^,]*, )(.*?)(?=Interaction consistency score:)") %>% str_trim()) %>%
+            additional_info = str_extract(description, "(?<=abundance based on [^,],)(.*?)(?=,Interaction consistency score:)") %>% str_trim()) %>%
     group_by(filename,id,name,score,coverage) %>% 
     mutate(ppm_pc = percent_rank(ppm), ppm_rk = dense_rank(ppm)) %>% 
     ungroup() %>% 
