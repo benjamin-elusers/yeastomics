@@ -1422,6 +1422,7 @@ load_paxdb_taxon = function(taxon){
   header_paxdb_datasets = pmap( list(url_paxdb_datasets), read_paxdb_dataset_header, .progress = T) %>% list_rbind() %>% 
                           mutate(taxid=as.character(taxon), 
                                  data.origin =  str_extract(name,"\\(.+\\)"),
+                                 abundance_based = str_replace(pattern="abundance based on (.)",string=name,replacement="\\1"),
                                  name = str_remove_all(pattern="(^H.sapiens \\- | \\(.+\\)$)",string=name ))
 
   paxdb2uniprot = get_paxdb_uniprot(taxon)
