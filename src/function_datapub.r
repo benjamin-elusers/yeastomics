@@ -1429,18 +1429,6 @@ load_paxdb_taxon = function(taxon){
   paxdb = ppm %>% 
     left_join(header_paxdb_datasets, by=c('filename','taxid')) %>%
     left_join(paxdb2uniprot,by=c('string'='id_string', 'protid','taxid')) %>%
-    mutate( abundance_type = case_when(
-              str_detect(description, "integrated dataset") ~ "Weighted average",
-              str_detect(description, "(Spectral counting|SC)") ~ "Spectral counting",
-              str_detect(description, "copy number estimated from proteomic ruler") ~ "Copy number from proteomic ruler",
-              str_detect(description, "(iBAQ|IBAQ)") ~ "iBAQ",
-              str_detect(description, "Peptide Ion Intensity Values") ~ "Peptide Ion Intensity",
-              str_detect(description, "CPC") ~ "Comprehensive Peak Characterization",
-              str_detect(description, "APEX") ~ "APEX",
-              str_detect(description, "MAPPED_BY_AUTHORS") ~ "From the authors",
-              TRUE ~ "other"),
-            is_normalized  = str_detect(description,"(n|N)o(r)?malized"),
-            additional_info = str_extract(description, "(?<=abundance based on [^,],)(.*?)(?=,Interaction consistency score:)") %>% str_trim()) %>%
     group_by(filename,id,name,score,coverage) %>% 
     mutate(ppm_pc = percent_rank(ppm), ppm_rk = dense_rank(ppm)) %>% 
     ungroup() %>% 
