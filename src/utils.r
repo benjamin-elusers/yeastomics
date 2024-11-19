@@ -68,23 +68,44 @@ read.url <- function(file_url) {
   return(txt)
 }
 
-# Execute loading call and save data unless saved data already exists
-preload = function(saved.file,loading.call,doing='create data...'){
-  library(tictoc)
-  cat(doing,"\n")
-  if( !file.exists(saved.file) ){
-    tic(doing)
-    res = eval(substitute(loading.call))
-    if( !dir.exists(dirname(saved.file)) ){
-      warning('No such directory! Recursively making the path...')
-      dir.create(dirname(saved.file),recursive = T,showWarnings = T)
-    }
-    saveRDS(res,saved.file)
-    toc()
-  }else{
-    res = readRDS(saved.file)
+# Function to determine file type and load appropriately
+load_file <- function(datafile) {
+  ext <- tools::file_ext(tolower(file))
+  if (ext == "rds") {
+    return(readRDS(file))
+  } else if (ext %in% c("rda", "rdata", "data")) {
+    load(file, envir = .GlobalEnv) # Loads into the global environment
+    return(invisible(NULL)) # Return NULL since the data is in the environment
+  } else {
+    stop("Unsupported file format: ", ext)
   }
-  return(res)
+}
+
+# Execute loading call and save data unless saved data already exists
+preload <- function(saved.file, loading.call, doing = "Creating data...") {
+  library(tictoc)
+  cat(doing, "\n")
+  
+  # If the file doesn't exist, create and save it
+  if (!file.exists(saved.file)) {
+    tic(doing)
+    res <- eval(substitute(loading.call))
+    
+    # Ensure the directory exists
+    save_dir <- dirname(saved.file)
+    if (!dir.exists(save_dir)) {
+      message("Directory does not exist. Creating path: ", save_dir)
+      dir.create(save_dir, recursive = TRUE)
+    }
+    
+    # Save the result in RDS format
+    saveRDS(res, saved.file)
+    toc()
+    return(res)
+  } else {
+    # Load the existing file
+    return(load_file(saved.file))
+  }
 }
 
 get.last.file = function(path,pattern){
