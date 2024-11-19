@@ -70,7 +70,7 @@ read.url <- function(file_url) {
 
 # Function to determine file type and load appropriately
 load_file <- function(datafile) {
-  ext <- tools::file_ext(tolower(file))
+  ext <- tools::file_ext(tolower(datafile))
   if (ext == "rds") {
     return(readRDS(file))
   } else if (ext %in% c("rda", "rdata", "data")) {
