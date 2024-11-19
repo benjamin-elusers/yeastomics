@@ -72,9 +72,9 @@ read.url <- function(file_url) {
 load_file <- function(datafile) {
   ext <- tools::file_ext(tolower(datafile))
   if (ext == "rds") {
-    return(readRDS(file))
+    return(readRDS(datafile))
   } else if (ext %in% c("rda", "rdata", "data")) {
-    load(file, envir = .GlobalEnv) # Loads into the global environment
+    load(datafile, envir = .GlobalEnv) # Loads into the global environment
     return(invisible(NULL)) # Return NULL since the data is in the environment
   } else {
     stop("Unsupported file format: ", ext)
