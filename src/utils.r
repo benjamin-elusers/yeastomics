@@ -69,7 +69,7 @@ read.url <- function(file_url) {
 }
 
 # Function to determine file type and load appropriately
-load_file <- function(datafile) {
+load_datafile <- function(datafile) {
   ext <- tools::file_ext(tolower(datafile))
   if (ext == "rds") {
     return(readRDS(datafile))
@@ -104,7 +104,7 @@ preload <- function(saved.file, loading.call, doing = "Creating data...") {
     return(res)
   } else {
     # Load the existing file
-    return(load_file(saved.file))
+    return(load_datafile(saved.file))
   }
 }
 
