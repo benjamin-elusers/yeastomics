@@ -1126,7 +1126,7 @@ load.string = function(tax="4932",phy=T,ful=T,min.score=700,vers="v11.0"){
   return(STRING_net)
 }
 
-load_string_aliases = function(tax="9606",vers="v12.0"){
+load_string_aliases =function(tax="9606",vers="v12.0"){
   # Load STRING identifier mapped to aliases
   # 4932 = S.cerevisiae
   # 9606 = H.sapiens
@@ -1139,14 +1139,14 @@ load_string_aliases = function(tax="9606",vers="v12.0"){
   STRING_dataset = sprintf("protein.aliases.%s",.version)
   # "/protein.aliases.v12.0/9606.protein.aliases.v12.0.txt.gz"
   STRING_url = sprintf("%s/%s/%s.%s.%s",URL_STRING,STRING_dataset,tax,STRING_dataset,"txt.gz")
-
+  
   httr::set_config(httr::config(ssl_verifypeer = FALSE))
-
+  
   message("STRING VERSION: ", .version)
   message("STRING DATASET: ",STRING_dataset)
   STRING_aliases = readr::read_delim(STRING_url, 
                                      delim = "\t", progress = T, show_col_types = F,
-                                     col_names = c("STRING","ALIAS","SOURCE"))
+                                     col_names = c("STRING","ALIAS","SOURCE"),skip=1)
   return(STRING_aliases)
 }
 
